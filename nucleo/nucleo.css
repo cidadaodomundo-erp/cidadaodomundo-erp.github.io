@@ -938,7 +938,8 @@
     #tabelaCgPessoas > table > tbody > tr > td.cg-sal { order:-1; margin-left:auto; color:var(--tx-1); font-size:14px; font-weight:800; }
     #tabelaCgPessoas > table > tbody > tr > td.cg-al { order:1; flex:1 1 100%; min-width:0 !important; }
     #tabelaCgPessoas > table > tbody > tr > td.cg-seta { display:none; }
-    #tabelaCgPessoas > table > tbody > tr > td[colspan] { flex:1 1 100%; width:100%; min-width:0; }
+    #tabelaCgPessoas > table > tbody > tr > td[colspan] { flex:1 1 100%; width:100%; min-width:0; overflow-wrap:normal; }
+    #tabelaCgMov > table > tbody > tr { background:var(--surface-2) !important; padding:8px 10px; }
     /* Hoje na rede: loja, venda, comparação e pedidos cabem sem rolar; o valor médio desce para baixo da venda */
     #tabelaHojeVenda { max-height:none; overflow:visible; }
     #tabelaHojeVenda th, #tabelaHojeVenda td { padding:6px; }

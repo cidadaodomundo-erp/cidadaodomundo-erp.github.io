@@ -932,7 +932,7 @@ function cgMovHtml(p) {
   if (x === undefined || x === null) return '<div class="contexto" style="text-align:left;">Lendo as movimentações…</div>';
   if (x.erro) return `<div class="contexto" style="text-align:left;">✗ Não consegui ler: ${cgEsc(x.erro)} <button type="button" class="preset-btn" onclick="cgMovCarregar(${p.id})">Tentar de novo</button></div>`;
   if (!x.linhas.length) return '<div class="contexto" style="text-align:left;">Sem movimentações nas folhas guardadas.</div>';
-  return `<div id="tabelaCgMov" style="max-width:980px;"><table><thead><tr><th>Quando</th><th>O que mudou</th><th style="white-space:normal;">De</th><th style="white-space:normal;">Para</th><th>Origem</th></tr></thead><tbody>
+  return `<div id="tabelaCgMov" class="cel-cartao" style="max-width:980px;"><table><thead><tr><th>Quando</th><th>O que mudou</th><th style="white-space:normal;">De</th><th style="white-space:normal;">Para</th><th>Origem</th></tr></thead><tbody>
     ${x.linhas.map((l) => `<tr><td>${cgEsc(l.quando)}</td><td><b>${cgEsc(l.o)}</b></td><td style="white-space:normal;">${cgEsc(l.de)}</td><td style="white-space:normal;">${cgEsc(l.para)}</td><td style="color:var(--tx-4);">${cgEsc(l.fonte)}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
