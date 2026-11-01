@@ -255,6 +255,8 @@
 
     <!-- A faixa de recados (16/10/2026) saiu em 24/10/2026: aviso à equipe vai só pelo WhatsApp do robô (dono). -->
 
+    <!-- 01/11/2026 (dono: adaptar ao celular): até 760 px o número vem primeiro; período, marcas e a explicação ficam atrás deste botão -->
+    <button class="preset-btn" type="button" id="filtrosCel" onclick="filtrosCelTroca()"></button>
     <div class="periodo-presets" id="periodoPresets"></div>
 
     <!-- De/Ate viraram ESTADO INTERNO (etapa 2, 12/08/2026): as janelas por
@@ -1067,11 +1069,27 @@ function filtroAtivo() {
   if (!VENDAS_CARREGADAS) return false;
   const base = JANELA_DATAS || periodoPadrao();
   return fDataIni.value !== base.ini || fDataFim.value !== base.fim ||
-    Object.keys(FILTRO_DEFS).some((id) => selecionados[id] && selecionados[id].size !== FILTRO_DEFS[id].dominio().length);
+    Object.keys(FILTRO_DEFS).some((id) => selecionados[id] && selecionados[id].size !== FILTRO_DEFS[id].dominio().length) ||
+    [...lojaOptCont.querySelectorAll('input[data-l]')].some((c) => !c.checked);
 }
 function limparFiltrosVer(nome) {
   const barra = document.getElementById('limparFiltrosBar');
   if (barra) barra.style.display = TELAS_SEM_BARRA_FILTRO.includes(nome) || (NA_CASCA && !filtroAtivo()) ? 'none' : 'flex';
+  filtrosCelVer(nome);
+}
+function filtrosCelVer(nome) {
+  const painel = document.getElementById('painel');
+  const temJanela = Object.prototype.hasOwnProperty.call(JANELA_DO_MODULO, nome);
+  const tem = VENDAS_CARREGADAS && (temJanela || MODULOS_COM_FILTRO_TOPO.has(nome));
+  painel.classList.toggle('filtros-cel', tem);
+  if (!tem) return;
+  const marcas = document.getElementById('lojaSummary').textContent;
+  document.getElementById('filtrosCel').textContent = 'Filtros' + (temJanela ? ' · ' + ddmm(fDataIni.value) + ' a ' + ddmm(fDataFim.value) : '') +
+    (/todas/i.test(marcas) ? '' : ' · ' + marcas) + (painel.classList.contains('filtros-abertos') ? ' ▴' : ' ▾');
+}
+function filtrosCelTroca() {
+  document.getElementById('painel').classList.toggle('filtros-abertos');
+  filtrosCelVer(MODULO_ATUAL);
 }
 function resetFiltros() {
   JANELA_DATAS = null;
@@ -1937,7 +1955,7 @@ function linhaContexto(ant) {
     Canal iFood. <a href="javascript:void(0)" onclick="mostrarModulo('evolucao')" style="color:#a5a49a;">Ver ao lado do salão, site e balcão &rsaquo;</a>
   </div>`;
 
-  return `<div class="contexto">
+  return `<div class="contexto contexto-filtro">
     Mostrando ${partes.join(' &middot; ')}.<br>${comparacao}
     ${canais}
     <details style="margin-top:8px; padding-top:8px; border-top:1px solid #34332f; font-size:11.5px; color:#8a897e;">
@@ -10934,7 +10952,8 @@ function renderHoje() {
     '<div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px;">' +
     '<h2 style="margin:0; font-size:20px;">Hoje na rede</h2>' +
     '<span style="color:var(--tx-5); font-size:13px;">' + diaRot(hojeIso) + ' · ' + (finVazio() ? lojaNome(finVazio()) : 'Água Verde, Ahú e São Braz') + '</span></div>' +
-    b1 + b2 + b3 + b4s + b4;
+    // no celular a venda vem antes das filas, que ocupam quase uma tela inteira
+    (matchMedia('(max-width:760px)').matches ? b2 + b1 : b1 + b2) + b3 + b4s + b4;
 }
 
 async function entrarEstaSemana() {
@@ -11884,19 +11903,22 @@ function renderPlacar() {
   const segPer = periodos.slice(-14).map(p =>
     `<button class="preset-btn ${PLC_SEL === p.chave ? 'active' : ''}" onclick="plcPeriodo('${p.chave}')">${p.rot}</button>`).join('');
 
+  // no celular os avisos e a explicação vêm depois dos números
+  const plcCel = matchMedia('(max-width:760px)').matches;
+  const plcAvisos = (() => { const b = blocoAlertas(); return b ? `<div class="section-label">O que precisa de você agora</div>
+      <div class="caption-label" style="text-align:center;">A mesma faixa da tela "Esta semana" — aqui e lá ela é a mesma conta, não uma cópia. Clique no aviso para ir direto na tela dele.</div>${b}` : ''; })() + seletorLojaFin();
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">O Placar — ${nomeLojaFin()} · ${atual.rot}</div>
-    <div class="caption-label" style="text-align:center;">Contra o período anterior e contra a meta. <b>Clique num número para abrir.</b></div>
-    ${(() => { const b = blocoAlertas(); return b ? `<div class="section-label">O que precisa de você agora</div>
-      <div class="caption-label" style="text-align:center;">A mesma faixa da tela "Esta semana" — aqui e lá ela é a mesma conta, não uma cópia. Clique no aviso para ir direto na tela dele.</div>${b}` : ''; })()}
-    ${seletorLojaFin()}
+    <div class="caption-label cel-esconde" style="text-align:center;">Contra o período anterior e contra a meta. <b>Clique num número para abrir.</b></div>
+    ${plcCel ? '' : plcAvisos}
     <div class="periodo-presets" style="margin-top:10px;">${segGrao}</div>
-    <div class="periodo-presets" style="margin-top:6px;">${segPer}</div>
+    <div class="periodo-presets plc-per" style="margin-top:6px;">${segPer}</div>
     ${atual.completo ? '' : `<div class="contexto" style="border-color:var(--amber-2);">
       <b>${atual.rot} tem ${atual.meses.length} de ${PLC_ESPERADO[PLC_GRAO]} meses</b> (${atual.meses.map(m => fxMesRot(m)).join(', ')}).
       Por isso a comparação é com ${anterior ? anterior.rot : '—'}, do mesmo tamanho.</div>`}
     ${A.temFato ? '' : `<div class="contexto" style="border-color:var(--amber-2);">Custo dos canais neste período é vendido − recebido, não cobrança a cobrança.</div>`}
     <div class="fx-tiles">${cartoes}</div>
+    ${plcCel ? plcAvisos : ''}
     ${lojaFin() === 'REDE' ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
     <div id="tabelaPlacarLado" style="overflow-x:auto;"><table><tr><th>Loja</th>${PLC_TILES.map((t) => `<th>${t.rot}</th>`).join('')}</tr>
       ${FX_TODAS.map((u) => { const ag = plcComLoja(u, () => plcAgrega(atual.meses)); return `<tr><td>${lojaNome(u)}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, ag))}</td>`).join('')}</tr>`; }).join('')}
@@ -11905,6 +11927,8 @@ function renderPlacar() {
     <div class="caption-label" title="Sem comparação com 2025: a venda começa em 02/01/2026.">
       Só meses fechados — o último é ${fxMesLongo(plcMesesFechados()[plcMesesFechados().length - 1])}, na mesma conta do Fechamento do mês.
     </div>`;
+  const plcPerAtivo = alvo.querySelector('.plc-per .active');   // no celular a fila de meses rola de lado: abre no escolhido
+  if (plcPerAtivo) plcPerAtivo.parentElement.scrollLeft = plcPerAtivo.offsetLeft - plcPerAtivo.parentElement.offsetLeft - 40;
 }
 
 function renderFechamento() {
