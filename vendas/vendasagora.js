@@ -55,7 +55,7 @@ function vaDelta(hoje, antes, txt) {
   const d = (hoje - antes) / antes * 100;
   const n = Math.abs(d).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
   const seta = Math.round(d) === 0 ? '<b>igual</b>' : d > 0 ? `<span class="va-sobe">▲ ${n}%</span>` : `<span class="va-desce">▼ ${n}%</span>`;
-  return `${seta} · era ${txt}`;
+  return `${seta} · ${txt}`;
 }
 // A comparação de um conjunto de lojas: loja fechada no dia da semana passada não entra (§C3).
 function vaComparacao(lojas) {
@@ -79,11 +79,14 @@ function vaNumeros(ped, valor, comp) {
   const med = ped ? valor / ped : 0;
   const c = comp && comp.valorBase ? comp : null;
   const medHoje = c && c.pedHoje ? c.valorHoje / c.pedHoje : 0, medBase = c && c.pedBase ? c.valorBase / c.pedBase : 0;
+  // loja fechada na semana passada está no total e fora da comparação: o "era" ao lado do total pareceria contradição
+  const sem = c && c.fechadas.length ? 'sem ' + c.fechadas.map((b) => lojaNome(b.unidade)).join(', ') : '';
+  const era = (txt) => sem || 'era ' + txt;
   const cartao = (rot, val, delta) => `<div class="va-num"><div class="va-num-rot">${rot}</div><div class="va-num-val">${val}</div><div class="va-delta">${delta || '&nbsp;'}</div></div>`;
   return `<div class="va-numeros">` +
-    cartao('Faturamento', vaBrl(valor), c ? vaDelta(c.valorHoje, c.valorBase, vaBrl(c.valorBase)) : '') +
-    cartao('Pedidos', vaInt(ped), c ? vaDelta(c.pedHoje, c.pedBase, vaInt(c.pedBase)) : '') +
-    cartao('Valor médio', vaBrl(med), c ? vaDelta(medHoje, medBase, vaBrl(medBase)) : '') + `</div>`;
+    cartao('Faturamento', vaBrl(valor), c ? vaDelta(c.valorHoje, c.valorBase, era(vaBrl(c.valorBase))) : '') +
+    cartao('Pedidos', vaInt(ped), c ? vaDelta(c.pedHoje, c.pedBase, era(vaInt(c.pedBase))) : '') +
+    cartao('Valor médio', vaBrl(med), c ? vaDelta(medHoje, medBase, era(vaBrl(medBase))) : '') + `</div>`;
 }
 function vaAvisoAtraso(lojas) {
   const atras = lojas.map((u) => ({ u, min: vaAtrasoMin(u) })).filter((x) => x.min);
@@ -107,7 +110,7 @@ function vaRede(el, cab) {
     const t = vaUltimaLeitura(d.u);
     let cmp = '';
     if (d.base && !d.base.aberta_no_dia_base) cmp = `loja fechada em ${vaDdmm(d.base.dia_base)}`;
-    else if (d.base && Number(d.base.valor)) cmp = vaDelta(d.valor, Number(d.base.valor), vaBrl(d.base.valor));
+    else if (d.base && Number(d.base.valor)) cmp = vaDelta(d.valor, Number(d.base.valor), 'era ' + vaBrl(d.base.valor));
     const hora = !t ? 'sem leitura' : (vaAtrasoMin(d.u) ? `<span class="va-velho">número das ${vaHora(t)}</span>` : `às ${vaHora(t)}`);
     return `<button class="va-loja" ${podeTocar ? `onclick="vaPedirLoja('${trEscH(d.u)}')"` : 'disabled'}>
       <b>${trEscH(lojaNome(d.u))}</b><span class="va-loja-val">${vaBrl(d.valor)}</span>
