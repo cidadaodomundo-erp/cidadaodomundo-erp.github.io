@@ -922,7 +922,7 @@
     #painel.filtros-cel:not(.filtros-abertos) #filtrosTopo,
     #painel.filtros-cel:not(.filtros-abertos) .contexto-filtro { display:none !important; }
     .cel-esconde { display:none; }
-    .plc-per { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; }
+    .plc-per { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none; }
     .plc-per .preset-btn { flex:0 0 auto; }
     .cards:not(.cards-3) { grid-template-columns:1fr 1fr; gap:8px; }
     .cards .card { padding:12px 10px; }

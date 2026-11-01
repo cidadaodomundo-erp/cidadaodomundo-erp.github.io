@@ -1084,7 +1084,8 @@ function filtrosCelVer(nome) {
   painel.classList.toggle('filtros-cel', tem);
   if (!tem) return;
   const marcas = document.getElementById('lojaSummary').textContent;
-  document.getElementById('filtrosCel').textContent = 'Filtros' + (temJanela ? ' · ' + ddmm(fDataIni.value) + ' a ' + ddmm(fDataFim.value) : '') +
+  const dm = (s) => s.slice(8, 10) + '/' + s.slice(5, 7);
+  document.getElementById('filtrosCel').textContent = 'Filtros' + (temJanela ? ' · ' + dm(fDataIni.value) + ' a ' + dm(fDataFim.value) : '') +
     (/todas/i.test(marcas) ? '' : ' · ' + marcas) + (painel.classList.contains('filtros-abertos') ? ' ▴' : ' ▾');
 }
 function filtrosCelTroca() {
