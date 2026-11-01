@@ -96,7 +96,6 @@
   .home-loja-op { display:flex; flex-wrap:wrap; gap:6px; }
   .faixa-loja { padding:7px 16px; font-size:12.5px; color:var(--tx-2); background:var(--surface-2); border-bottom:1px solid var(--line); }
   .faixa-loja[hidden] { display:none; }
-  @media (max-width:760px) { .vendo .rot { display:none; } }
   .vista { flex:1; position:relative; min-height:0; }
   .vista > * { position:absolute; inset:0; }
   .vista iframe { width:100%; height:100%; border:0; background:var(--bg); }
@@ -144,6 +143,20 @@
     .side.aberta + .veu { display:block; }
     .ham { display:block; }
     .acoes .so-largo { display:none; }
+    /* 01/11/2026 (dono: "o cabeçalho em cima não é legal"): o seletor encolhia o título até virar "🏠 .". Título inteiro na
+       primeira linha; a loja, sempre escrita (decisão de 28/10), numa segunda linha fina. Computador não muda. */
+    .top { flex-wrap:wrap; gap:2px 8px; min-height:0; padding:calc(8px + env(safe-area-inset-top)) 12px 6px; }
+    .ham { min-width:40px; min-height:40px; padding:0; }
+    .ti { flex:1; min-width:0; }
+    .acoes { margin-left:0; }
+    .acoes .btn { min-height:40px; padding:6px 10px; }
+    #btnRecarregar { display:none; }
+    .vendo { order:9; flex:1 0 100%; min-width:0; margin:0; padding:0; border:0; border-radius:0; background:none; color:var(--tx-3); font-size:12.5px; font-weight:600; }
+    .vendo b { font-size:13px; padding:0; }
+    /* 16 px: com menos que isso o iPhone dá zoom na tela ao tocar */
+    .vendo select { flex:1; min-width:0; min-height:36px; padding:4px 8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); font-size:16px; font-weight:700; }
+    .home { padding-top:16px; }
+    .home-loja { display:none; }
   }
   @media (prefers-reduced-motion: reduce) { .side, .grp .seta { transition:none; } }
 </style>

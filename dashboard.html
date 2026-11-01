@@ -291,7 +291,7 @@
     </div>
 
     <div id="limparFiltrosBar" style="display:flex; justify-content:center; margin-bottom:20px; border-bottom:1px solid #34332f; padding-top:20px; padding-bottom:20px;">
-      <button onclick="resetFiltros()">Limpar filtros</button>
+      <button class="preset-btn" onclick="resetFiltros()">Limpar filtros</button>
     </div>
 
     <div id="modulo-estasemana" class="modulo">
@@ -925,6 +925,7 @@ const JANELA_DO_MODULO = {
   atrasos: 'semAnt', logfin: 'semAnt',
 };
 let JANELA_ATUAL = null;
+let JANELA_DATAS = null;   // as datas que a janela da tela pôs: mudar à mão depois disso é filtro ativo
 
 function aplicarJanela(id) {
   const j = JANELAS.find(x => x.id === id);
@@ -933,6 +934,7 @@ function aplicarJanela(id) {
   fDataIni.value = ini < DATAS[0] ? DATAS[0] : ini;
   fDataFim.value = fim;
   JANELA_ATUAL = id;
+  JANELA_DATAS = { ini: fDataIni.value, fim: fDataFim.value };
   renderJanelas();
   renderAll();
 }
@@ -1059,7 +1061,20 @@ function activeLojas() {
     .map(c => Number(c.dataset.l)));
 }
 
+// 01/11/2026: dentro da casca o "Limpar filtros" só aparece com filtro ativo (dia, turno ou período diferente do da tela).
+const TELAS_SEM_BARRA_FILTRO = ['atendimento', 'hoje', 'projecao', 'contaspagar', 'contasreceber', 'listas', 'listasfin'];
+function filtroAtivo() {
+  if (!VENDAS_CARREGADAS) return false;
+  const base = JANELA_DATAS || periodoPadrao();
+  return fDataIni.value !== base.ini || fDataFim.value !== base.fim ||
+    Object.keys(FILTRO_DEFS).some((id) => selecionados[id] && selecionados[id].size !== FILTRO_DEFS[id].dominio().length);
+}
+function limparFiltrosVer(nome) {
+  const barra = document.getElementById('limparFiltrosBar');
+  if (barra) barra.style.display = TELAS_SEM_BARRA_FILTRO.includes(nome) || (NA_CASCA && !filtroAtivo()) ? 'none' : 'flex';
+}
 function resetFiltros() {
+  JANELA_DATAS = null;
   const padrao = periodoPadrao();
   fDataIni.value = padrao.ini;
   fDataFim.value = padrao.fim;
@@ -1145,10 +1160,9 @@ function mostrarModulo(nome) {
   if (filtros) filtros.style.display = MODULOS_COM_FILTRO_TOPO.has(nome) ? 'flex' : 'none';
   // Atendimento e' tela de ferramenta do delivery: a visao de rede e o "Limpar
   // filtros" nao agem nela, e para quem esta atendendo sao so ruido no topo.
-  ['perimetroBar', 'limparFiltrosBar'].forEach(id => {
-    const barra = document.getElementById(id);
-    if (barra) barra.style.display = ['atendimento', 'hoje', 'projecao', 'contaspagar', 'contasreceber', 'listas', 'listasfin'].includes(nome) ? 'none' : 'flex';
-  });
+  const barraPerim = document.getElementById('perimetroBar');
+  if (barraPerim) barraPerim.style.display = TELAS_SEM_BARRA_FILTRO.includes(nome) ? 'none' : 'flex';
+  limparFiltrosVer(nome);
   const modulos = {
     estasemana: ['modulo-estasemana', 'navBtnEstaSemana'],
     hoje: ['modulo-hoje', 'navBtnHoje'],   // so pela casca, ver entrarHoje
@@ -16937,6 +16951,7 @@ function renderChartMotivos() {
 }
 
 function renderAll() {
+  limparFiltrosVer(MODULO_ATUAL);
   const m = computeMetrics();
   // Mesmas metricas para a janela anterior de mesmo tamanho — e o que alimenta os selos de
   // variacao. `a` fica null quando nao ha periodo anterior com dados, e nesse caso os cards
