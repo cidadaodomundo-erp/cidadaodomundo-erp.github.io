@@ -10566,7 +10566,7 @@ function blocoMetasSemanaFechada(titulo) {
     '<div class="contexto" style="border-color:#3fb950;"><b>' + verdes + ' de ' + nContam + ' metas no verde.</b> ' +
     (atencao.length ? 'As que não estão:' : 'Semana limpa — nada fora da meta.') + '</div>' +
     (atencao.length
-      ? '<div id="tabelaHomeAtencao"><table><tr><th>Meta</th><th>Semana</th><th>Alvo</th><th>vs anterior</th><th>O que fazer</th></tr>' + linhasAtencao + '</table></div>'
+      ? '<div id="tabelaHomeAtencao" class="cel-cartao"><table><tr><th>Meta</th><th>Semana</th><th>Alvo</th><th>vs anterior</th><th>O que fazer</th></tr>' + linhasAtencao + '</table></div>'
       : '') +
     '<div style="text-align:center; margin-top:10px;"><button class="navbtn" onclick="mostrarModulo(\'indicadores\')">placar completo de metas</button> ' +
     '<button class="navbtn" onclick="mostrarModulo(\'relatorios\')">resumo semanal</button></div>';
@@ -10776,13 +10776,13 @@ function renderHoje() {
   else {
     const linha = (nome, a, b, nota, forte) =>
       '<tr' + (forte ? ' class="liq"' : '') + '><td>' + nome + (nota ? ' <span style="color:var(--tx-5); font-size:11px;">' + nota + '</span>' : '') + '</td>' +
-      '<td>R$ ' + fmt(a.t) + '</td><td>' + varTxt(a.t, b.t) + '</td>' +
+      '<td>R$ ' + fmt(a.t) + '<span class="so-cel">médio ' + (a.p ? 'R$ ' + fmt(a.t / a.p) : '—') + '</span></td><td>' + varTxt(a.t, b.t) + '</td>' +
       '<td>' + fxInt(a.p) + '</td><td>' + (a.p ? 'R$ ' + fmt(a.t / a.p) : '—') + '</td></tr>';
     // O QUE E' REDE E O QUE E' SO iFOOD VAI NO TITULO (dono, 15/10: a letra miuda ao lado "as
     // vezes passa batido por quem está lendo").
     b2 = '<div class="section-label">Venda ' + (V.emCurso ? 'da semana' : 'da semana passada') + ' · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + ' · todos os canais · ' +
       diaRot(V.iniIso) + ' a ' + diaRot(V.fimIso) + '</div>' +
-      '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th>vs os mesmos dias da semana anterior</th><th>Pedidos</th><th>Valor médio</th></tr>' +
+      '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th><th>Valor médio</th></tr>' +
       V.linhas.filter(l => !finVazio() || l.u === finVazio()).map(l => linha(l.nome, l.a, l.b, l.atrasada ? 'dados até ' + ddmm(l.ate) : '')).join('') +
       (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.b, '', true)) + '</table></div>' +
       hojeFeriadoNota(V) +
@@ -11920,7 +11920,10 @@ function renderPlacar() {
     ${A.temFato ? '' : `<div class="contexto" style="border-color:var(--amber-2);">Custo dos canais neste período é vendido − recebido, não cobrança a cobrança.</div>`}
     <div class="fx-tiles">${cartoes}</div>
     ${plcCel ? plcAvisos : ''}
-    ${lojaFin() === 'REDE' ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
+    ${lojaFin() === 'REDE' && plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
+    <div id="tabelaPlacarLado" class="plc-lado-cel"><table><tr><th>Em R$</th>${[...FX_TODAS, 'REDE'].map((u) => `<th>${u === 'REDE' ? 'Rede' : lojaNome(u)}</th>`).join('')}</tr>
+      ${PLC_TILES.map((t) => `<tr><td>${t.rot}</td>${[...FX_TODAS, 'REDE'].map((u) => { const ag = u === 'REDE' ? A : plcComLoja(u, () => plcAgrega(atual.meses)); return `<td>${String(fmtDe(t, valorDe(t, ag))).replace('R$ ', '')}</td>`; }).join('')}</tr>`).join('')}</table></div>` : ''}
+    ${lojaFin() === 'REDE' && !plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
     <div id="tabelaPlacarLado" style="overflow-x:auto;"><table><tr><th>Loja</th>${PLC_TILES.map((t) => `<th>${t.rot}</th>`).join('')}</tr>
       ${FX_TODAS.map((u) => { const ag = plcComLoja(u, () => plcAgrega(atual.meses)); return `<tr><td>${lojaNome(u)}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, ag))}</td>`).join('')}</tr>`; }).join('')}
       <tr class="liq"><td>${lojaNome('REDE')}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, A))}</td>`).join('')}</tr></table></div>` : ''}

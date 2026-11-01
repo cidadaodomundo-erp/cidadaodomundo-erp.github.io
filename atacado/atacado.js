@@ -89,7 +89,7 @@ function orcMontarHtml() {
       <button type="button" class="preset-btn" onclick="orcMaisItem()">+ item</button>
       <button type="button" class="preset-btn" onclick="orcPadrao()">Burger padrão</button>
     </div>
-    <div id="tabelaOrcItens"><table><thead><tr><th>Item</th><th style="text-align:right;">Quantidade</th><th>Por</th><th style="text-align:right;">Total</th><th style="text-align:right;">Custo do item</th><th>Origem</th><th style="text-align:right;">Custo</th><th></th></tr></thead>
+    <div id="tabelaOrcItens" class="cel-cartao"><table><thead><tr><th>Item</th><th style="text-align:right;">Quantidade</th><th>Por</th><th style="text-align:right;">Total</th><th style="text-align:right;">Custo do item</th><th>Origem</th><th style="text-align:right;">Custo</th><th></th></tr></thead>
       <tbody>${ORC.linhas.map(orcLinhaHtml).join('')}</tbody></table></div>
     <div id="orcTotais" style="margin-top:12px;">${orcTotaisHtml()}</div>`;
 }
@@ -267,7 +267,7 @@ function orcHistoricoHtml() {
   if (!ORC.hist) return '<div class="contexto">Lendo…</div>';
   if (!ORC.hist.length) return '<div class="contexto">Nenhum orçamento salvo.</div>';
   const dir = 'style="text-align:right;"';
-  return `<div id="tabelaOrcHist"><table><thead><tr><th>Nº</th><th>Data</th><th>Quem</th><th>Cliente</th><th>Entrega</th><th ${dir}>Pessoas</th><th ${dir}>% lucro</th><th ${dir}>Custo</th><th ${dir}>Frete</th><th ${dir}>Total ao cliente</th><th ${dir}>Por pessoa</th><th>Situação</th></tr></thead><tbody>
+  return `<div id="tabelaOrcHist" class="cel-cartao"><table><thead><tr><th>Nº</th><th>Data</th><th>Quem</th><th>Cliente</th><th>Entrega</th><th ${dir}>Pessoas</th><th ${dir}>% lucro</th><th ${dir}>Custo</th><th ${dir}>Frete</th><th ${dir}>Total ao cliente</th><th ${dir}>Por pessoa</th><th>Situação</th></tr></thead><tbody>
     ${ORC.hist.map((o) => { const s = ORC_SIT[o.situacao] || [o.situacao, 'var(--tx-3)'];
       return `<tr style="cursor:pointer;${ORC.aberto === o.id ? 'background:var(--surface-2);' : ''}" onclick="orcAbrir(${o.id})"><td>${o.id}</td><td>${orcD(o.criado_em)}</td><td>${o.origem === 'LOJA' ? '<b style="color:var(--marca-amarelo);">veio pelo link</b>' : trEscH(String(o.criado_por || '').split('@')[0])}</td><td>${trEscH(o.cliente || '')}</td><td style="white-space:normal;">${orcEntregaCurta(o)}</td>
         <td ${dir}>${orcTemPessoas(o.n_lanches) ? o.n_lanches : '–'}</td><td ${dir}>${orcQ(o.pct_lucro)}%</td><td ${dir}>${orcR(o.custo_total)}</td><td ${dir}>${orcR(o.frete)}</td><td ${dir}>${orcR(o.total_cliente)}</td><td ${dir}>${orcTemPessoas(o.n_lanches) ? orcR(orcPorPessoa(o)) : '–'}</td>
@@ -366,7 +366,7 @@ function orcEquipeHtml() {
     const ta = tempo(a), tb = tempo(b), pa = ta == null ? 1 : ta < agora ? 2 : 0, pb = tb == null ? 1 : tb < agora ? 2 : 0;
     return pa - pb || (pa === 2 ? tb - ta : (ta || 0) - (tb || 0));
   });
-  return `<div id="tabelaOrcEquipe"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Contato</th><th>Entrega</th><th>Quando</th><th>Onde</th><th>Cobrança</th><th>Itens</th><th style="text-align:right;">Frete</th><th style="text-align:right;">Total</th><th>Observação</th></tr></thead><tbody>
+  return `<div id="tabelaOrcEquipe" class="cel-cartao"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Contato</th><th>Entrega</th><th>Quando</th><th>Onde</th><th>Cobrança</th><th>Itens</th><th style="text-align:right;">Frete</th><th style="text-align:right;">Total</th><th>Observação</th></tr></thead><tbody>
     ${L.map((x) => { const passou = tempo(x) != null && tempo(x) < agora;
       return `<tr${passou ? ' style="opacity:.55;"' : ''}><td>${x.numero}</td><td style="white-space:normal;">${trEscH(x.cliente || '')}</td><td>${trEscH(x.cliente_contato || '')}</td><td>${trEscH(ORC_FORMA[x.entrega_forma] || '')}</td><td>${orcHora(x.entrega_quando)}</td>
         <td style="white-space:normal;">${trEscH(x.entrega_local || '')}</td><td style="white-space:normal;">${trEscH(x.cobranca || '')}</td>

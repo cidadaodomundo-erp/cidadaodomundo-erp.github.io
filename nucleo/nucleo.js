@@ -280,6 +280,13 @@ function fxSomaDias(dataStr, n) { const d = new Date(dataStr + 'T12:00:00'); d.s
 // 29/10/2026 (dono): "a barra de rolagem no topo faz sentido? assim não precisaria ir até o fim da tabela pra rolar".
 // Toda tabela do painel (div id="tabela…") mais larga que a tela ganha uma barra EM CIMA, ligada à de baixo.
 function barrasTopoTabelas() {
+  // 01/11/2026: tabela em cartão no celular (.cel-cartao, nucleo.css): cada célula leva o nome da coluna
+  document.querySelectorAll('.cel-cartao > table').forEach((t) => {
+    const cab = [...t.rows].find((r) => r.querySelector('th'));
+    if (!cab) return;
+    const nomes = [...cab.cells].map((c) => c.textContent.trim());
+    [...t.rows].forEach((r) => { if (r !== cab) [...r.cells].forEach((c, i) => { if (c.dataset.rot !== nomes[i]) c.dataset.rot = nomes[i] || ''; }); });
+  });
   document.querySelectorAll('div[id^="tabela"]').forEach((d) => {
     if (d.parentElement && d.parentElement.closest('div[id^="tabela"]')) return;   // tabela dentro de tabela: só a de fora
     let b = d.previousElementSibling && d.previousElementSibling.classList.contains('barra-topo-tabela') ? d.previousElementSibling : null;
