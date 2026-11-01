@@ -919,9 +919,12 @@
     /* tabela larga vira um cartão por linha (rótulo de cada célula: barrasTopoTabelas, no nucleo.js). A DRE segue com a primeira coluna fixa. */
     div.cel-cartao[id^="tabela"] { max-height:none; overflow:visible; }
     .cel-cartao > table, .cel-cartao > table > tbody, .cel-cartao > table > tbody > tr, .cel-cartao > table > tbody > tr > td { display:block; width:100%; }
-    .cel-cartao > table > thead, .cel-cartao > table > tbody > tr:has(> th) { display:none; }
+    .cel-cartao > table { min-width:0 !important; }
+    .cel-cartao > table > thead, .cel-cartao > table > tbody > tr.cel-cab { display:none; }
+    .cel-cartao > table > tfoot, .cel-cartao > table > tfoot > tr, .cel-cartao > table > tfoot > tr > td { display:block; width:100%; }
+    .cel-cartao > table > tbody > tr:not(.cel-cab) > th { display:block; width:100%; position:static !important; background:none !important; border:0 !important; padding:3px 0; text-align:left !important; }
     .cel-cartao > table > tbody > tr { background:var(--surface) !important; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
-    .cel-cartao > table > tbody > tr > td { position:static !important; background:none !important; border:0 !important; box-shadow:none !important; padding:3px 0; font-size:13px; white-space:normal; text-align:right !important; overflow-wrap:anywhere; }
+    .cel-cartao > table > tbody > tr > td { position:static !important; background:none !important; border:0 !important; box-shadow:none !important; padding:3px 0; font-size:13px; white-space:normal !important; min-width:0 !important; width:100% !important; text-align:right !important; overflow-wrap:anywhere; }
     .cel-cartao > table > tbody > tr > td::before { content:attr(data-rot); float:left; margin-right:12px; color:var(--tx-3); }
     .cel-cartao > table > tbody > tr > td:first-child { font-size:14px; font-weight:800; color:var(--tx-1); text-align:left !important; }
     .cel-cartao > table > tbody > tr > td:first-child::before { display:none; }
@@ -940,6 +943,15 @@
     #tabelaCgPessoas > table > tbody > tr > td.cg-seta { display:none; }
     #tabelaCgPessoas > table > tbody > tr > td[colspan] { flex:1 1 100%; width:100%; min-width:0; overflow-wrap:normal; }
     #tabelaCgMov > table > tbody > tr { background:var(--surface-2) !important; padding:8px 10px; }
+    /* Contas a pagar: título em cima; vencimento, banco e valor na linha de baixo */
+    #tabelaContasPagar { max-height:none; overflow:visible; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr { display:flex; flex-wrap:wrap; gap:2px 10px; align-items:baseline; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td { display:block; width:auto !important; text-align:left !important; color:var(--tx-3); font-size:12.5px; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td::before { display:none; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td.cp-desc { order:-1; flex:1 1 100%; color:var(--tx-1); font-size:13.5px; font-weight:700; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td.cp-venc { white-space:normal !important; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td.cp-val { margin-left:auto; color:var(--tx-1); font-size:14px; }
+    #tabelaContasPagar .cel-cartao > table > tbody > tr > td.cp-baixa { order:1; flex:1 1 100%; }
     /* Hoje na rede: loja, venda, comparação e pedidos cabem sem rolar; o valor médio desce para baixo da venda */
     #tabelaHojeVenda { max-height:none; overflow:visible; }
     #tabelaHojeVenda th, #tabelaHojeVenda td { padding:6px; }

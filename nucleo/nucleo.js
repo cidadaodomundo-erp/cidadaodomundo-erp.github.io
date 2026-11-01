@@ -279,12 +279,26 @@ function fxSomaDias(dataStr, n) { const d = new Date(dataStr + 'T12:00:00'); d.s
 // ------------------------------------------------------------------
 // 29/10/2026 (dono): "a barra de rolagem no topo faz sentido? assim não precisaria ir até o fim da tabela pra rolar".
 // Toda tabela do painel (div id="tabela…") mais larga que a tela ganha uma barra EM CIMA, ligada à de baixo.
+const CEL_FICA_TABELA = new Set(['tabelaDRE', 'tabelaDFC', 'tabelaPonte', 'tabelaPonteLucro', 'tabelaEvolMatriz', 'tabelaAtrasosMatriz', 'tabelaFreteMatriz', 'tabelaTrMensal']);
 function barrasTopoTabelas() {
-  // 01/11/2026: tabela em cartão no celular (.cel-cartao, nucleo.css): cada célula leva o nome da coluna
+  // 01/11/2026: no celular, tabela mais larga que a tela vira cartão por linha (.cel-cartao, nucleo.css). Ficam como tabela,
+  // com a primeira coluna fixa, as matrizes em que comparar colunas é o objetivo e as listas longas demais para cartão.
+  if (matchMedia('(max-width:760px)').matches) {
+    document.querySelectorAll('table').forEach((t) => {
+      const p = t.parentElement;
+      if (!t.offsetParent || p.closest('table') || p.classList.contains('cel-cartao') || t.closest('#view-caixa') || CEL_FICA_TABELA.has(p.id)) return;
+      if (t.offsetWidth <= p.clientWidth + 2 && t.getBoundingClientRect().right <= document.documentElement.clientWidth + 2) return;
+      const cabs = [...t.rows].filter((r) => r.cells.length && [...r.cells].every((c) => c.tagName === 'TH'));
+      if (t.rows.length > 60 || cabs.length !== 1 || [...cabs[0].cells].some((c) => c.colSpan > 1)) return;
+      p.classList.add('cel-cartao');
+    });
+  }
+  // cada célula leva o nome da coluna
   document.querySelectorAll('.cel-cartao > table').forEach((t) => {
-    const cab = [...t.rows].find((r) => r.querySelector('th'));
+    const cab = [...t.rows].find((r) => r.cells.length && [...r.cells].every((c) => c.tagName === 'TH'));
     if (!cab) return;
-    const nomes = [...cab.cells].map((c) => c.textContent.trim());
+    cab.classList.add('cel-cab');
+    const nomes = [...cab.cells].map((c) => (c.firstChild ? c.firstChild.textContent : '').trim());   // o título, sem a legenda embaixo dele
     [...t.rows].forEach((r) => { if (r !== cab) [...r.cells].forEach((c, i) => { if (c.dataset.rot !== nomes[i]) c.dataset.rot = nomes[i] || ''; }); });
   });
   document.querySelectorAll('div[id^="tabela"]').forEach((d) => {
@@ -308,6 +322,7 @@ if (typeof MutationObserver !== 'undefined') {
   const ligar = () => { new MutationObserver(vigia).observe(document.body, { childList: true, subtree: true }); vigia(); };
   if (document.body) ligar(); else document.addEventListener('DOMContentLoaded', ligar);
   window.addEventListener('resize', vigia);
+  document.addEventListener('toggle', vigia, true);   // tabela dentro de grupo recolhido só tem largura depois de aberto
 }
 let AVISO_REFAZER = null;
 function avisoHora() { return new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }); }

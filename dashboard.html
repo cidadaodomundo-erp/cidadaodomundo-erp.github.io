@@ -26,7 +26,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<link rel="stylesheet" href="nucleo/nucleo.css?v=20261101d">
+<link rel="stylesheet" href="nucleo/nucleo.css?v=20261101e">
 </head>
 <body>
 
@@ -551,7 +551,7 @@
   </div>
 </div>
 
-<script src="nucleo/nucleo.js?v=20261101c"></script>
+<script src="nucleo/nucleo.js?v=20261101e"></script>
 <script src="listas/listas.js?v=20261029b"></script>
 <script src="estoque/estoque.js?v=20261030f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -10909,7 +10909,7 @@ function renderHoje() {
     // ---- tabela 1: o mes em andamento ----
     const mPess = plcMeta('PESSOAL', [ult]);
     const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ontem e previsão até o fim do mês</div>' +
-      '<div id="tabelaHojeRumoMes"><table><tr><th>Loja</th>' +
+      '<div id="tabelaHojeRumoMes" class="cel-cartao"><table><tr><th>Loja</th>' +
       '<th>Vendido até ontem' + sub('caixa das lojas · ' + um(corrido) + '% do mês já passou') + '</th>' +
       '<th>Previsto no mês' + sub('no ritmo das últimas 4 semanas') + '</th>' +
       '<th>Meta do mês' + sub('a receita que dá 10% de resultado') + '</th>' +
@@ -10928,7 +10928,7 @@ function renderHoje() {
     const cabM = (rot, k, acao) => '<th>' + rot + sub((M[k] ? (M[k].sentido === 'abaixo' ? 'até ' : 'a partir de ') + um(M[k].meta) + '%' : '') + (acao ? ' · ' + acao : '')) + '</th>';
     const celM = (v, k) => v === null || v === undefined ? '—' : (M[k] ? farol(um(v) + '%', v, M[k].meta, M[k].sentido) : um(v) + '%');
     const t2 = '<div class="section-label">' + nomeMes(ult) + ' · último mês fechado · % da receita, a mesma conta da DRE</div>' +
-      '<div id="tabelaHojeRumoFechado"><table><tr><th>Loja</th>' +
+      '<div id="tabelaHojeRumoFechado" class="cel-cartao"><table><tr><th>Loja</th>' +
       cabM('CMV', 'CUSTO', 'compras e fichas') + cabM('CMO', 'PESSOAL', 'escala') + cabM('Despesas de venda', 'VENDA', 'entrega e anúncios') +
       cabM('Administrativas', 'ADMIN', 'contratos da casa') + cabM('Resultado final', 'RESULTADO', 'o que sobrou') + '</tr>' +
       cols.map(c => tr(c, [celM(c.cmv, 'CUSTO'), celM(c.cmo, 'PESSOAL'), celM(c.venda, 'VENDA'), celM(c.admin, 'ADMIN'), celM(c.res, 'RESULTADO')])).join('') +
@@ -14281,11 +14281,11 @@ function cpTabela(sentido) {
     const jaNoTitulo = r.fornecedor && String(r.descricao || '').toUpperCase().includes(String(r.fornecedor).toUpperCase());
     const sub = [agr !== 'fornecedor' && !jaNoTitulo ? r.fornecedor : '', cat(r.categoria), agr !== 'origem' && r.origem !== 'SAIPOS' ? og.rot : '']
       .filter(Boolean).map(trEscH).join(' · ');
-    return `<tr>${comData ? `<td style="white-space:nowrap; color:${cor}; width:1%;">${venc}${nota ? '<br>' + nota : ''}</td>` : ''}
-      <td style="text-align:left; white-space:normal;"${r.rateio ? ` title="rateio: ${trEscH(r.rateio)}"` : ''}>${trEscH(limpa(r.descricao))}
+    return `<tr>${comData ? `<td class="cp-venc" style="white-space:nowrap; color:${cor}; width:1%;">${venc}${nota ? '<br>' + nota : ''}</td>` : ''}
+      <td class="cp-desc" style="text-align:left; white-space:normal;"${r.rateio ? ` title="rateio: ${trEscH(r.rateio)}"` : ''}>${trEscH(limpa(r.descricao))}
         <div style="font-size:11px; color:var(--tx-4);">${sub}${!comData && nota ? ' · ' + nota : ''}</div></td>
-      <td style="width:1%; white-space:nowrap;">${trEscH(r.conta_exibida || '—')}</td>
-      <td style="width:1%; white-space:nowrap;"><b>${fmt(r.valor)}</b></td><td style="text-align:left; font-size:12px; width:1%;">${baixa}</td></tr>`;
+      <td class="cp-banco" style="width:1%; white-space:nowrap;">${trEscH(r.conta_exibida || '—')}</td>
+      <td class="cp-val" style="width:1%; white-space:nowrap;"><b>${fmt(r.valor)}</b></td><td class="cp-baixa" style="text-align:left; font-size:12px; width:1%;">${baixa}</td></tr>`;
   };
   // DENTRO DE CADA GRUPO (dono, 16/10/2026: "ordena por banco e depois por valor, do menor para o maior, se der pra
   // colocar as colunas com ordenação quando clica"): o titulo da coluna ordena; o empate cai no banco e no menor valor.
@@ -14306,7 +14306,7 @@ function cpTabela(sentido) {
       const id = `${sentido}|${agr}|${k}`;
       const aberto = so1 || CP.abertos.has(id);
       const atraso = agr === 'dia' && k === '0000-00-00';
-      return `<details class="cp-grupo"${aberto ? ' open' : ''} data-k="${trEscH(id)}" ontoggle="cpAbre(this)">
+      return `<details class="cp-grupo cel-cartao"${aberto ? ' open' : ''} data-k="${trEscH(id)}" ontoggle="cpAbre(this)">
         <summary><span class="cp-grupo-nome"${atraso ? ' style="color:var(--farol-fora);"' : ''}>${rotuloDe(k)}</span>
           <span class="cp-grupo-n">${l.length} título${l.length === 1 ? '' : 's'}</span>
           <b class="cp-grupo-v"${atraso ? ' style="color:var(--farol-fora);"' : ''}>R$ ${fmt(tot)}</b></summary>
@@ -14337,7 +14337,7 @@ function cpHojeLimpo() {
   const lojas = finLinhas();
   const lk = (k, v) => `<a href="javascript:void(0)" data-fxl="1" onclick="cpHojeAbrir('${k}')" style="color:inherit; text-decoration:underline dotted;" title="ver o que compõe">${mil(v)}</a>`;
   let h = `<div class="section-label">Hoje — ${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}, pela conta do Fluxo projetado</div>
-    <div id="tabelaCpHoje" style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Saldo inicial</th><th>A receber</th><th>A pagar</th><th>Saldo final</th></tr></thead><tbody>`;
+    <div id="tabelaCpHoje" class="cel-cartao" style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Saldo inicial</th><th>A receber</th><th>A pagar</th><th>Saldo final</th></tr></thead><tbody>`;
   lojas.forEach(([u, nome]) => {
     const x = d0.unidades[u];
     h += `<tr${u === 'REDE' ? ' class="liq"' : ''}><td>${nome}</td><td>${mil(x.saldo_inicial)}</td>
@@ -14401,7 +14401,7 @@ function cpProximosDias() {
   const total = tot.reduce((a, x) => a + x, 0);
   return `
   <div class="section-label">Os próximos dias, por grupo de conta</div>
-  <div id="tabelaCpDias"><table>
+  <div id="tabelaCpDias" class="cel-cartao"><table>
     <thead><tr><th>Vence</th><th>${FXL ? 'Títulos' : 'Total'}</th>${CP_GRUPOS.map(g => `<th>${g[0]}</th>`).join('')}${FXL ? '<th title="o que o Fluxo prevê e ainda não virou título: mercadoria por fornecedor, motoboys, diaristas, bônus">Previsto sem título</th><th title="o mesmo A pagar do Fluxo projetado nesses dias">A pagar no Fluxo</th>' : ''}</tr></thead>
     <tbody>${linhas}
     <tr style="border-top:2px solid var(--line);"><td><b>Até ${ffDdmm(d(45))}</b></td><td><b>${cpMil(total)}</b></td>${tot.map(x => `<td><b>${cpMil(x)}</b></td>`).join('')}${FXL ? `<td><b>${cpMil(totPrev)}</b></td><td></td>` : ''}</tr></tbody></table></div>
@@ -14426,7 +14426,7 @@ function cpMaioresAteAperto() {
   if (!l.length) return '';
   return `
   <div class="section-label">As 5 maiores contas ${porque}</div>
-  <div id="tabelaCpMaiores"><table>
+  <div id="tabelaCpMaiores" class="cel-cartao"><table>
     <thead><tr><th>Vence</th><th>Valor</th><th>Conta</th><th>Fornecedor</th></tr></thead>
     <tbody>${l.map(r => `<tr><td style="white-space:nowrap;">${ffDdmm(r.vencimento)}</td><td><b>${fmt(r.valor)}</b></td>
       <td style="text-align:left; white-space:normal;">${trEscH(r.descricao.replace(/\s*\(parc\. 100000\/100000\)/, ''))}</td><td style="text-align:left; white-space:normal;">${trEscH(r.fornecedor || '—')}</td></tr>`).join('')}</tbody></table></div>
