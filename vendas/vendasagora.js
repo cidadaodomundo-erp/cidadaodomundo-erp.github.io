@@ -12,6 +12,7 @@ const VA = { dia: null, linhas: [], base: [], aberto: {}, filtro: {}, falha: nul
 
 const vaBrl = (v) => 'R$ ' + fmt(Number(v) || 0);
 const vaInt = (v) => (Number(v) || 0).toLocaleString('pt-BR');
+const vaPed = (v) => vaInt(v) + (Number(v) === 1 ? ' pedido' : ' pedidos');
 const vaHora = (t) => new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 const vaDdmm = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
 const vaSemana = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
@@ -114,7 +115,7 @@ function vaRede(el, cab) {
     const hora = !t ? 'sem leitura' : (vaAtrasoMin(d.u) ? `<span class="va-velho">número das ${vaHora(t)}</span>` : `às ${vaHora(t)}`);
     return `<button class="va-loja" ${podeTocar ? `onclick="vaPedirLoja('${trEscH(d.u)}')"` : 'disabled'}>
       <b>${trEscH(lojaNome(d.u))}</b><span class="va-loja-val">${vaBrl(d.valor)}</span>
-      <small>${vaInt(d.ped)} pedidos · médio ${vaBrl(d.ped ? d.valor / d.ped : 0)} · ${hora}</small><small>${cmp}</small></button>`;
+      <small>${vaPed(d.ped)} · médio ${vaBrl(d.ped ? d.valor / d.ped : 0)} · ${hora}</small><small>${cmp}</small></button>`;
   };
   const partes = VA.linhas.filter((l) => !l.cancelada && l.unidade === VA_A_PARTE);
   const aparte = partes.length ? `<div class="va-titulo">Fora do total</div>` +
@@ -142,7 +143,7 @@ function vaLoja(el, cab, u) {
   const blocos = VA_TIPOS.map((t) => {
     const ls = paraBlocos.filter((l) => l.tipo === t);
     const ped = vaSoma(ls, 'pedidos'), val = vaSoma(ls, 'valor');
-    return `<button class="va-tipo${f.tipo === t ? ' ativo' : ''}" onclick="vaFiltroTipo('${t}')"><b>${t}</b><span>${vaBrl(val)}</span><small>${vaInt(ped)} pedidos · médio ${vaBrl(ped ? val / ped : 0)}</small></button>`;
+    return `<button class="va-tipo${f.tipo === t ? ' ativo' : ''}" onclick="vaFiltroTipo('${t}')"><b>${t}</b><span>${vaBrl(val)}</span><small>${vaPed(ped)} · médio ${vaBrl(ped ? val / ped : 0)}</small></button>`;
   }).join('');
   const linha = (rot, val) => `<div class="va-linha"><span>${rot}</span><b>${val}</b></div>`;
   el.innerHTML = cab([u]) + vaAvisoAtraso([u]) + vaNumeros(vaSoma(ok, 'pedidos'), vaSoma(ok, 'valor'), comp) +
@@ -153,7 +154,7 @@ function vaLoja(el, cab, u) {
       <label>Turno<select onchange="vaFiltro('turno', this.value)">${vaOpcoes(turnos, f.turno, 'Todos')}</select></label>
     </div>` +
     `<div class="va-titulo">Por tipo de venda</div><div class="va-tipos">${blocos}</div>` +
-    `<div class="va-titulo">Cancelados</div><div class="va-linhas">${linha(vaInt(vaSoma(canc, 'pedidos')) + ' pedidos', vaBrl(vaSoma(canc, 'valor')))}</div>` +
+    `<div class="va-titulo">Cancelados</div><div class="va-linhas">${linha(vaPed(vaSoma(canc, 'pedidos')), vaBrl(vaSoma(canc, 'valor')))}</div>` +
     `<div class="va-titulo">Composição</div><div class="va-linhas">` +
       linha('Valor dos itens', vaBrl(vaSoma(ok, 'valor_itens'))) + linha('Taxa de serviço', vaBrl(vaSoma(ok, 'taxa_servico'))) +
       linha('Taxa de entrega', vaBrl(vaSoma(ok, 'taxa_entrega'))) + linha('Acréscimos', vaBrl(vaSoma(ok, 'acrescimo'))) +
