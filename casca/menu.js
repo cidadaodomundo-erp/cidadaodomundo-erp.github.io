@@ -89,6 +89,11 @@ window.CASCA_MENU = [
   "nome": "Canal · iFood",
   "itens": [
    {
+    "chave": "vendasagora",
+    "rotulo": "Vendas agora",
+    "icone": "⏱️"
+   },
+   {
     "chave": "resumo",
     "rotulo": "Resumo do canal",
     "icone": "📈"

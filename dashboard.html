@@ -137,6 +137,7 @@
 
     <button class="sidebar-secao" onclick="toggleGrupo('gIfood')">Canal · iFood <span class="seta">▶</span></button>
     <div class="sidebar-grupo" id="gIfood">
+      <button class="sidebar-btn" id="navBtnVendasagora" onclick="mostrarModulo('vendasagora')"><span class="mico">⏱️</span>Vendas agora</button>
       <button class="sidebar-btn" id="navBtnResumo" onclick="mostrarModulo('resumo')"><span class="mico">📈</span>Resumo do canal</button>
       <button class="sidebar-btn" id="navBtnPromocoes" onclick="mostrarModulo('promocoes')"><span class="mico">🏷️</span>Promoções</button>
       <button class="sidebar-btn" id="navBtnCancelamentos" onclick="mostrarModulo('cancelamentos')"><span class="mico">🚫</span>Cancelamentos</button>
@@ -1116,6 +1117,8 @@ const MODULOS_COM_FILTRO_TOPO = new Set(['estasemana', 'resumo', 'cancelamentos'
   'promocoes', 'qualidade', 'site', 'evolucao']);
 
 function mostrarModulo(nome) {
+  // 01/11/2026: Vendas agora mora em pagina propria (docs/vendas/), aberta pela casca
+  if (nome === 'vendasagora') { window.top.location.href = 'sistema.html#vendasagora'; return; }
   // 09/09/2026: Conciliacao de cartao virou parte do Fechamento de Caixas — link
   // antigo cai no modulo unico em vez de quebrar. (Taxas da maquininha voltou a
   // ser modulo proprio no mesmo dia.)

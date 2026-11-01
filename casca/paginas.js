@@ -48,6 +48,8 @@ window.CASCA_PAGINAS = {
   fichas: 'cardapio/index.html#fichas',
   engcard: 'cardapio/index.html#engcard',
   rateio: 'cardapio/index.html#rateio',
+  // 01/11/2026 (dono): acompanhamento do dia, sem a carga de vendas do painel
+  vendasagora: 'vendas/index.html',
 };
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
@@ -58,4 +60,4 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
-  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao'];
+  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora'];

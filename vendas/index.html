@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Vendas agora · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PÁGINA PRÓPRIA DE VENDAS AGORA (01/11/2026, dono: acompanhamento do dia como o app do Saipos; proposta
+     contexto/propostas-telas/2026-11-01-vendas-agora.md), no molde de caixa/index.html: abre sem a carga de vendas do painel.
+     Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261029w">
+<style>
+  .na-casca body::before { display:none !important; }
+  #view-vendasagora { max-width:760px; margin:0 auto; }
+  .va-sub { color:var(--tx-3); font-size:13px; margin:4px 0 14px; }
+  .va-alerta { background:var(--brand-wine); border:1px solid var(--farol-fora); color:var(--tx-1); border-radius:10px;
+               padding:10px 14px; font-size:14px; font-weight:700; margin-bottom:12px; }
+  .va-falha { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .va-numeros { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+  .va-num { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; min-width:0; }
+  .va-num-rot { color:var(--tx-3); font-size:12px; font-weight:700; }
+  .va-num-val { color:var(--tx-1); font-size:24px; font-weight:800; margin-top:4px; white-space:nowrap; }
+  .va-delta { font-size:12.5px; margin-top:4px; color:var(--tx-3); }
+  .va-sobe { color:var(--farol-ok); font-weight:700; }
+  .va-desce { color:var(--farol-fora); font-weight:700; }
+  .va-comp { color:var(--tx-3); font-size:12.5px; margin:8px 2px 0; }
+  .va-titulo { color:var(--tx-1); font-size:14px; font-weight:800; margin:20px 2px 8px; }
+  .va-loja { display:grid; grid-template-columns:1fr auto; gap:2px 12px; width:100%; text-align:left; cursor:pointer; font:inherit;
+             background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:8px; color:var(--tx-1); }
+  .va-loja:hover { border-color:var(--marca-laranja); }
+  .va-loja[disabled] { cursor:default; border-color:var(--line); }
+  .va-loja b { font-size:15px; }
+  .va-loja-val { font-size:17px; font-weight:800; text-align:right; white-space:nowrap; }
+  .va-loja small { color:var(--tx-3); font-size:12.5px; }
+  .va-loja small:nth-of-type(2) { text-align:right; }
+  .va-velho { color:var(--farol-fora); font-weight:700; }
+  .va-filtros { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:16px; }
+  .va-filtros label { color:var(--tx-3); font-size:12px; font-weight:700; min-width:0; }
+  .va-filtros select { display:block; width:100%; margin-top:3px; min-height:40px; font:inherit; font-size:14px; padding:6px 8px; border-radius:8px;
+                       background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); }
+  .va-tipos { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .va-tipo { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:left; cursor:pointer; font:inherit; color:var(--tx-1); min-width:0; }
+  .va-tipo:hover { border-color:var(--marca-laranja); }
+  .va-tipo.ativo { border-color:var(--marca-amarelo); box-shadow:inset 0 0 0 1px var(--marca-amarelo); }
+  .va-tipo b { display:block; font-size:13px; color:var(--tx-2); }
+  .va-tipo span { display:block; font-size:17px; font-weight:800; margin:3px 0; white-space:nowrap; }
+  .va-tipo small { color:var(--tx-3); font-size:12px; }
+  .va-linhas { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:2px 14px; }
+  .va-linha { display:flex; justify-content:space-between; gap:12px; padding:9px 0; font-size:14px; color:var(--tx-2); border-top:1px solid var(--line); }
+  .va-linha:first-child { border-top:0; }
+  .va-linha b { color:var(--tx-1); white-space:nowrap; }
+  @media (max-width:640px) {
+    .va-numeros { grid-template-columns:1fr 1fr; }
+    .va-num:first-child { grid-column:1 / -1; }
+    .va-num:first-child .va-num-val { font-size:30px; }
+    .va-num-val { font-size:20px; }
+    .va-tipos { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-vendasagora" class="modulo" style="display:none;">
+      <div id="view-vendasagora"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261030b"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="vendasagora.js?v=20261101a"></script>
+<script>
+const TELAS = { vendasagora: entrarVendasAgora };
+const TELA = 'vendasagora';
+let MODULO_ATUAL = 'vendasagora';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+function abrirTela() {
+  document.getElementById('modulo-' + TELA).style.display = '';
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  try { TELAS[TELA](); }
+  catch (e) {
+    const el = document.getElementById('erroMsg');
+    el.style.display = 'block'; el.textContent = 'Erro ao abrir a tela: ' + e.message;
+  }
+}
+window.reentrarTela = () => { try { TELAS[TELA](); } catch (e) {} };
+abrirTela();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

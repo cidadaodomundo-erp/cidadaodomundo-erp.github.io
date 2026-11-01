@@ -37,7 +37,7 @@ window.CASCA_MODULOS = [
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: ['contestacoes', 'macertos'],
     // Atendimento ao cliente fica aqui até ir para o portal do Fabio (05/10)
-    acompanhar: ['resumo', 'cancelamentos', 'negociacoes', 'avaliacoes', 'qualidade', 'clientes', 'site', 'atrasos',
+    acompanhar: ['vendasagora', 'resumo', 'cancelamentos', 'negociacoes', 'avaliacoes', 'qualidade', 'clientes', 'site', 'atrasos',
                  'frete', 'logfin', 'atendimento'] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: [],
