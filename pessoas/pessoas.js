@@ -751,7 +751,7 @@ async function entrarCargos() {
   alvo.innerHTML = '<div class="contexto">Carregando a folha...</div>';
   try {
     const desde = cgMesIso(-5);
-    const [pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, cs, faltasFF, foraCadastro] = await Promise.all([
+    const [pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, cs, faltasFF, foraCadastro, adm] = await Promise.all([
       consultarTudo('vw_rh_pessoas?select=*&order=unidade,nome'),
       consultarTudo('vw_rh_cargos_tabela?select=*&order=unidade,familia,nivel,horas'),
       consultarTudo(`vw_rh_custo_pessoa_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,nome`),
@@ -765,8 +765,9 @@ async function entrarCargos() {
       consultarTudo('vw_rh_cargos_salarios?select=*').catch(() => []),
       consultarTudo('vw_rh_faltas_flash_folha?select=*&order=mes.desc,unidade,nome').catch(() => []),
       consultarTudo('vw_rh_ferias?select=nome&situacao=like.fora%20do%20cadastro*&order=nome').catch(() => []),
+      consultarTudo('rh_admissao?select=*&order=criado_em.desc').catch(() => []),
     ]);
-    CARGOS = { pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif,
+    CARGOS = { pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, adm: adm || [],
                cs: new Map((cs || []).map((x) => [x.pessoa_id, x])), mov: {}, faltasFF: faltasFF || [], foraCadastro: [...new Set((foraCadastro || []).map((x) => x.nome))] };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar a folha: ${cgEsc(e.message)}</div>`;
@@ -876,7 +877,8 @@ function cgAbaPessoas() {
       ${card('Com alerta', nAl, F.soConferir, 'CARGOS_F.soConferir=true;renderModuloCargos()', nAl > 0)}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-6px 0 8px;"><button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Novo registro</button><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
-    ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Novo registro</div>${cgFormPessoa(null)}` : ''}`;
+    ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Novo registro</div>${cgFormPessoa(null)}` : ''}
+    ${cgAdmAndamento()}`;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
     <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th>Alerta</th></tr></thead>
     <tbody>${vis.map((p) => { const A = alertas(p), ab = F.editando === p.id;
@@ -896,7 +898,8 @@ function cgAbaPessoas() {
 // a pessoa aberta (dono, 31/10/2026): as movimentações, das folhas fechadas e do cadastro, e o que a casa paga além do salário
 function cgDetalhePessoa(p) {
   if (CARGOS_F.formando === p.id) return cgFormPessoa(p);
-  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:12.5px;margin:2px 0 8px;">
+  const adm = cgAdmDaPessoa(p.id);
+  return `${adm ? `<div style="font-size:12.5px;margin:2px 0 8px;">${cgAdmEtapas(adm)}</div>` : ''}<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:12.5px;margin:2px 0 8px;">
       <span><b>Admissão</b> ${p.admissao ? cgData(p.admissao) : '–'}</span>
       <span><b>VT</b> ${p.vt_por_dia ? `${p.vt_por_dia} por dia` : 'não pega'}</span><span><b>VA</b> ${p.recebe_va ? 'sim' : 'não'}</span>
       <span><b>Adiantamento</b> ${p.pega_adiantamento && p.contrato === 'CLT' ? 'sim' : 'não'}</span>${p.desligamento ? `<span><b>Saiu</b> ${cgData(p.desligamento)}</span>` : ''}
@@ -912,7 +915,7 @@ function cgEditar(id) {
   if (CARGOS_F.editando && CARGOS.mov[id] === undefined) cgMovCarregar(id);
 }
 function cgFormAbrir(id) { CARGOS_F.formando = id; renderModuloCargos(); if (id) cgSugerirSalario(id); }
-function cgFormFechar() { CARGOS_F.formando = null; renderModuloCargos(); }
+function cgFormFechar() { CARGOS_F.formando = null; CG_ADM = null; renderModuloCargos(); }
 // As folhas de antes da leitura completa estão em rh_folha_historico; as demais, em rh_folha_mensal. Mesmas colunas.
 async function cgMovCarregar(id) {
   CARGOS.mov[id] = null;
@@ -984,9 +987,130 @@ function cgColunasConferir(c, p) {
   return `<td style="text-align:right;white-space:nowrap;">${fs}</td><td style="white-space:nowrap;">${fl}</td>
     <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:140px;">${cf.map(cgEsc).join('<br>')}</td>`;
 }
+// ---------- ADMISSÃO (dono, 02/11/2026; proposta 2026-11-02-rh-admissao.md): o Novo registro cadastra na Flash e vai à contabilidade. O robô envia. ----------
+let CG_ADM = null;   // { id da pessoa, docs já gravados, novos a subir }
+const CG_ADM_MAX = 15 * 1048576, CG_ADM_MAX_EMAIL = 22 * 1048576;
+const CG_ADM_DOCS = ['CTPS', 'RG', 'CPF', 'Título de eleitor', 'CNH', 'Comprovante de endereço (até 90 dias)', 'PIS', 'Certidão de nascimento ou casamento', 'Certidão e CPF dos dependentes', 'Exame admissional', 'Termo de opção sindical', 'Dados bancários', 'Foto 3x4'];
+const CG_ADM_BLOCOS = [
+  ['Pessoais', [['cpf', 'CPF *'], ['nascimento', 'Nascimento *', 'date'], ['nome_mae', 'Nome da mãe *'], ['nome_pai', 'Nome do pai'], ['municipio_nascimento', 'Município de nascimento'],
+    ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'VIÚVO', 'UNIÃO ESTÁVEL']], ['raca_cor', 'Raça/cor', ['', 'BRANCA', 'PRETA', 'PARDA', 'AMARELA', 'INDÍGENA']],
+    ['grau_instrucao', 'Grau de instrução', ['', 'FUNDAMENTAL INCOMPLETO', 'FUNDAMENTAL COMPLETO', 'MÉDIO INCOMPLETO', 'MÉDIO COMPLETO', 'SUPERIOR INCOMPLETO', 'SUPERIOR COMPLETO']]]],
+  ['Endereço e contato', [['telefone', 'Telefone *'], ['email', 'E-mail'], ['cep', 'CEP'], ['rua', 'Rua'], ['numero', 'Número'], ['complemento', 'Complemento'], ['bairro', 'Bairro'], ['cidade', 'Cidade']]],
+  ['Contrato', [['experiencia_dias', 'Experiência (dias)', 'number'], ['prorrogavel_dias', 'Prorrogável (dias)', 'number'], ['tipo_salario', 'Salário por', ['MENSAL', 'HORA']], ['entrada', 'Entrada', 'time'], ['intervalo', 'Intervalo'], ['saida', 'Saída', 'time'], ['folga', 'Folga']]],
+  ['Documentos', [['pis', 'PIS'], ['ctps', 'CTPS'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF'], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'], ['rg_orgao', 'Órgão'], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'], ['cnh_categoria', 'Categoria']]],
+  ['Benefícios', [['vt_itinerario', 'Itinerário do VT'], ['vt_valor_passagem', 'Valor da passagem', 'number'], ['va_valor_dia', 'VA por dia', 'number']]],
+  ['Banco', [['banco', 'Banco'], ['agencia', 'Agência'], ['conta', 'Conta']]],
+];
+function cgAdmDaPessoa(id) { return (CARGOS.adm || []).find((a) => a.pessoa_id === id) || null; }
+function cgFormAdmissao(a, id) {
+  if (!CG_ADM || CG_ADM.id !== id) CG_ADM = { id, docs: (a.documentos || []).slice(), novos: [] };
+  const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
+  const ctl = ([c, , t]) => {
+    const atual = a[c] == null ? '' : String(a[c]);
+    if (Array.isArray(t)) return `<select id="cgA_${c}" style="width:100%">${(t.includes(atual) || !atual ? t : [...t, atual]).map((o) => `<option value="${cgEsc(o)}" ${o === atual ? 'selected' : ''}>${cgEsc(o === '' ? '—' : o)}</option>`).join('')}</select>`;
+    return `<input id="cgA_${c}" type="${t || 'text'}" value="${cgEsc(t === 'date' ? atual.slice(0, 10) : atual)}" style="width:100%">`;
+  };
+  const titulo = (t) => `<div style="font-size:13px;font-weight:800;color:var(--tx-1);margin:14px 0 6px;">${t}</div>`;
+  setTimeout(() => { (a.dependentes || []).forEach(cgAdmDepAdd); cgAdmDocsPintar(); });
+  return `<div id="cgAdmAlerta"></div>
+    ${CG_ADM_BLOCOS.map(([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1], ctl(c))).join('')}</div>`).join('')}
+    <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
+    ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
+    ${titulo('Documentos anexos')}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><select id="cgAdmDocTipo" style="max-width:100%;">${CG_ADM_DOCS.map((d) => `<option>${cgEsc(d)}</option>`).join('')}</select>
+      <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="max-width:100%;" onchange="cgAdmDocEscolher(this)"></div>
+    <div id="cgAdmDocs" style="margin-top:6px;font-size:12.5px;"></div>
+    ${campo('<span style="margin-top:12px;">Observação para a contabilidade</span>', `<input id="cgA_obs" value="${cgEsc(a.obs || '')}" style="width:100%">`)}`;
+}
+function cgAdmData(v) {
+  const el = document.getElementById('cgAdmAlerta');
+  if (!el) return;
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  el.innerHTML = v && v <= hoje ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);margin:8px 0;"><b style="color:var(--farol-perto);">A admissão deve ser enviada antes do início do trabalho, por causa do e-Social.</b></div>' : '';
+}
+function cgAdmDepAdd(d) {
+  const v = d || {}, box = document.getElementById('cgAdmDeps');
+  if (!box) return;
+  const e = document.createElement('div');
+  e.className = 'cg-adm-dep';
+  e.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:6px;';
+  e.innerHTML = `<input data-c="nome" placeholder="Nome" value="${cgEsc(v.nome || '')}"><input data-c="nascimento" type="date" title="Nascimento" value="${cgEsc(v.nascimento || '')}">
+    <input data-c="cpf" placeholder="CPF" value="${cgEsc(v.cpf || '')}"><input data-c="parentesco" placeholder="Parentesco" value="${cgEsc(v.parentesco || '')}">
+    <button type="button" class="preset-btn" onclick="this.parentNode.remove()">Tirar</button>`;
+  box.appendChild(e);
+}
+function cgAdmDocEscolher(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  inp.value = '';
+  if (!/^(application\/pdf|image\/jpeg|image\/png)$/.test(f.type)) return avisoAcao('atencao', '! O documento precisa ser PDF, JPG ou PNG.');
+  if (f.size > CG_ADM_MAX) return avisoAcao('atencao', '! Documento maior que 15 MB. Use um menor.');
+  CG_ADM.novos.push({ tipo: document.getElementById('cgAdmDocTipo').value, arquivo: f });
+  cgAdmDocsPintar();
+}
+function cgAdmDocTirar(i, novo) { (novo ? CG_ADM.novos : CG_ADM.docs).splice(i, 1); cgAdmDocsPintar(); }
+function cgAdmDocsPintar() {
+  const el = document.getElementById('cgAdmDocs');
+  if (!el || !CG_ADM) return;
+  const linha = (t, n, i, novo) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px;">✓ <b>${cgEsc(t)}</b> <span style="color:var(--tx-3);overflow-wrap:anywhere;">${cgEsc(n)}</span> <a href="javascript:void(0)" style="color:var(--tx-3);" onclick="cgAdmDocTirar(${i},${novo})">tirar</a></div>`;
+  const soma = CG_ADM.novos.reduce((s, n) => s + n.arquivo.size, 0);
+  el.innerHTML = CG_ADM.docs.map((d, i) => linha(d.tipo, d.nome, i, false)).join('') + CG_ADM.novos.map((n, i) => linha(n.tipo, n.arquivo.name, i, true)).join('')
+    + (soma > CG_ADM_MAX_EMAIL ? '<div style="color:var(--farol-perto);font-weight:700;">Mais de 22 MB: pode não caber num e-mail só.</div>' : '');
+}
+// sobe uma vez só: Tentar de novo reaproveita o que já subiu. O nome do anexo no e-mail é o tipo com a extensão.
+async function cgAdmSubirDocs() {
+  await rmbGarantirTokenValido();
+  const pedir = (url, opt) => fetch(url, { ...opt, headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}`, ...opt.headers } });
+  for (const n of CG_ADM.novos) {
+    if (n.link) continue;
+    const ext = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' }[n.arquivo.type];
+    if (!n.caminho) n.caminho = `${crypto.randomUUID()}.${ext}`;
+    const up = await pedir(`${SUPABASE_URL}/storage/v1/object/rh-admissao/${n.caminho}`, { method: 'POST', headers: { 'Content-Type': n.arquivo.type }, body: n.arquivo });
+    if (!up.ok && !/duplicate|already exists/i.test(await up.text().catch(() => ''))) throw new Error(`o documento ${n.tipo} não subiu (${up.status})`);
+    const sg = await pedir(`${SUPABASE_URL}/storage/v1/object/sign/rh-admissao/${n.caminho}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 2592000 }) });
+    const d = sg.ok ? await sg.json() : {};
+    if (!d.signedURL) throw new Error(`o documento ${n.tipo} não subiu (${sg.status})`);
+    n.link = `${SUPABASE_URL}/storage/v1${d.signedURL}`;
+    n.nome = `${n.tipo.split(' (')[0]}.${ext}`;
+  }
+  return [...CG_ADM.docs, ...CG_ADM.novos.map((n) => ({ tipo: n.tipo, nome: n.nome, caminho: n.caminho, link: n.link }))];
+}
+function cgAdmColher() {
+  const a = {};
+  for (const [, cs] of CG_ADM_BLOCOS) for (const [c] of cs) a[c] = document.getElementById('cgA_' + c).value.trim();
+  a.va_no_local = document.getElementById('cgA_va_no_local').checked;
+  a.obs = document.getElementById('cgA_obs').value.trim();
+  a.dependentes = [...document.querySelectorAll('.cg-adm-dep')].map((e) => Object.fromEntries([...e.querySelectorAll('input')].map((i) => [i.dataset.c, i.value.trim()]))).filter((d) => d.nome);
+  return a;
+}
+function cgAdmEtapa(rot, sit, em, motivo, a, etapa) {
+  const tentar = `<button type="button" class="preset-btn" onclick="cgAdmTentar(${a.id},'${etapa}')">Tentar de novo</button>`;
+  if (sit === 'OK') return `<span style="color:var(--farol-ok);font-weight:700;">✓ ${rot}${em ? ` em ${new Date(em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}` : ''}</span>${etapa === 'CONTABILIDADE' ? ` <button type="button" class="preset-btn" onclick="cgAdmTentar(${a.id},'${etapa}')">Reenviar</button>` : ''}`;
+  if (sit === 'ERRO') return `<span style="color:var(--farol-fora);font-weight:700;">✗ ${rot}: ${cgEsc(motivo || 'não chegou')}</span> ${tentar}`;
+  if (sit === 'NAO_SE_APLICA') return `<span style="color:var(--tx-4);">${rot}: não vai</span>`;
+  return `<span style="color:var(--tx-3);">${rot}: enviando…</span>`;
+}
+function cgAdmEtapas(a) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;white-space:normal;">${cgAdmEtapa('Flash', a.flash_situacao, a.flash_em, a.flash_motivo, a, 'FLASH')}${cgAdmEtapa('Contabilidade', a.contab_situacao, a.contab_em, a.contab_motivo, a, 'CONTABILIDADE')}</div>
+    ${a.flash_aviso ? `<div style="color:var(--farol-perto);font-weight:700;white-space:normal;margin-top:4px;">${cgEsc(a.flash_aviso)}</div>` : ''}`;
+}
+// fica à vista enquanto faltar alguma etapa; nada some sozinho antes do ✓
+function cgAdmAndamento() {
+  const L = (CARGOS.adm || []).filter((a) => a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || a.flash_aviso);
+  if (!L.length) return '';
+  const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
+  return `<div class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><b>${cgEsc(cgNome(nome(a)))}</b><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
+}
+async function cgAdmTentar(id, etapa) {
+  avisoAcao('enviando', 'Pedindo o envio…');
+  const r = await trRpcSeguro('rh_admissao_tentar_de_novo', { p_id: id, p_etapa: etapa });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}.`, () => cgAdmTentar(id, etapa));
+  await cgRecarregar(`Pedido de envio registrado: ${etapa === 'FLASH' ? 'Flash' : 'contabilidade'}.`);
+}
 function cgFormPessoa(p) {
   const v = p || { unidade: CARGOS_F.unidade || 'AGUA VERDE', contrato: 'CLT', horas: 220, recebe_va: true, pega_adiantamento: true, recebe_bonificacao: true, usa_ponto: true, no_plano: true, vt_por_dia: 2, vt_dias: 24, apelidos: [] };
   const id = p ? p.id : 0;
+  const adm = p ? cgAdmDaPessoa(p.id) : {};   // registro novo e quem veio por admissão levam a ficha; o resto do cadastro segue sem ela
   const cargos = [...new Set(CARGOS.tabela.map(t => t.cargo))].sort();
   const sel = (nome, opcoes, atual) => `<select id="cgF_${nome}_${id}" style="width:100%">${(atual == null || opcoes.map(String).includes(String(atual)) ? opcoes : [...opcoes, atual]).map(o =>
     `<option value="${cgEsc(o)}" ${String(o) === String(atual == null ? '' : atual) ? 'selected' : ''}>${cgEsc(o === '' ? '—' : o)}</option>`).join('')}</select>`;
@@ -1008,15 +1132,16 @@ function cgFormPessoa(p) {
       ${campo('Turno', sel('turno', ['', 'DIA', 'NOITE', 'DIA/ NOITE'], v.turno))}
       ${campo('VT por dia', inp('vt_por_dia', v.vt_por_dia, 'number'))}
       ${campo('Dias de trabalho no mês', inp('vt_dias', v.vt_dias, 'number'))}
-      ${campo('Admissão', inp('admissao', v.admissao ? String(v.admissao).slice(0, 10) : '', 'date'))}
-      ${campo('Desligamento', inp('desligamento', v.desligamento ? String(v.desligamento).slice(0, 10) : '', 'date'))}
-      ${campo('Matrícula', inp('matricula', v.matricula))}
+      ${campo(p ? 'Admissão' : 'Admissão *', inp('admissao', v.admissao ? String(v.admissao).slice(0, 10) : '', 'date').replace('<input ', '<input onchange="cgAdmData(this.value)" '))}
+      ${p ? campo('Desligamento', inp('desligamento', v.desligamento ? String(v.desligamento).slice(0, 10) : '', 'date')) : ''}
+      ${p ? campo('Matrícula', inp('matricula', v.matricula)) : ''}
       ${campo('Como aparece no contas a pagar', inp('apelidos', [v.apelido, ...(v.apelidos || [])].filter(Boolean).join(', ')))}
       ${campo('Observação para o RH', inp('obs_rh', v.obs_rh))}
     </div>
     <div style="margin-top:8px;font-size:12px;">${chk('recebe_va', v.recebe_va, 'recebe VA')}${chk('pega_adiantamento', v.pega_adiantamento, 'pega adiantamento')}${chk('recebe_bonificacao', v.recebe_bonificacao, 'recebe bonificação')}${chk('usa_ponto', v.usa_ponto, 'bate ponto na Flash')}${chk('no_plano', v.no_plano, 'está no plano de cargos')}</div>
     <div id="cgSug_${id}" style="font-size:12px;color:var(--tx-4);margin-top:6px;"></div>
-    <div style="margin-top:8px;display:flex;gap:8px;"><button type="button" class="preset-btn active" onclick="cgSalvar(${id})">Salvar</button><button type="button" class="preset-btn" onclick="cgFormFechar()">Cancelar</button></div>
+    ${adm ? cgFormAdmissao(adm, id) : ''}
+    <div style="margin-top:12px;display:flex;gap:8px;"><button type="button" class="preset-btn active" onclick="cgSalvar(${id})">${p ? 'Salvar' : 'Salvar e enviar à Flash e à contabilidade'}</button><button type="button" class="preset-btn" onclick="cgFormFechar()">Cancelar</button></div>
   </div>`;
 }
 function cgSugerirSalario(id) {
@@ -1040,13 +1165,24 @@ async function cgSalvar(id) {
     ...(m ? { familia: m[1].replace(/^COZINHEIR.*/, 'COZINHEIRO'), nivel: m[2] } : {}),
     horas: g('horas').value, salario: g('salario').value, setor_rateio: g('setor_rateio').value, turno: g('turno').value,
     vt_por_dia: g('vt_por_dia').value, vt_dias: g('vt_dias').value, admissao: g('admissao').value,
-    desligamento: g('desligamento').value, matricula: g('matricula').value, obs_rh: g('obs_rh').value,
+    desligamento: g('desligamento') ? g('desligamento').value : '', matricula: g('matricula') ? g('matricula').value : '', obs_rh: g('obs_rh').value,
     apelido: nomes[0] || '', apelidos: nomes.slice(1),
     recebe_va: g('recebe_va').checked, pega_adiantamento: g('pega_adiantamento').checked, recebe_bonificacao: g('recebe_bonificacao').checked,
     usa_ponto: g('usa_ponto').checked, no_plano: g('no_plano').checked,
   };
   if (!corpo.nome || !cargo || !corpo.salario) { cgAviso('Preencha nome, cargo e salário.', false); return; }
   avisoAcao('enviando', 'Gravando…');
+  const adm = id ? cgAdmDaPessoa(id) : {};
+  if (adm) {
+    try {
+      const documentos = await cgAdmSubirDocs();
+      const ra = await trRpcSeguro('rh_admissao_salvar', { p_id: adm.id || null, p: { cadastro: corpo, admissao: { ...cgAdmColher(), documentos } } });
+      if (!ra.ok) throw new Error(await trErroDe(ra));
+    } catch (e) { avisoAcao('erro', `✗ Não gravou: ${e.message}`, () => cgSalvar(id)); return; }
+    CARGOS_F.formando = null; CG_ADM = null;
+    await cgRecarregar('Registro salvo. O robô envia à Flash e à contabilidade; a situação de cada um fica em Admissões em andamento.');
+    return;
+  }
   const r = await trRpcSeguro('rh_pessoa_salvar', { p_id: id || null, p: corpo });
   if (!r.ok) { cgAviso('Não deu: ' + await trErroDe(r), false); return; }
   CARGOS_F.formando = null;
@@ -1397,6 +1533,12 @@ function cgHojeItens() {
   if (Array.isArray(H.L)) for (const x of H.L) if (daLoja(x.empresa)) itens.push({ ...x, sub: [x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).join(' · '), acao: acaoFlash(x) });
   for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: '<span style="font-size:12px;color:var(--tx-3);">Na tela da Flash</span>' });
   for (const p of CARGOS.pessoas) if (p.ativo && daLoja(p.unidade)) for (const a of cgAlertasCadastro(p)) itens.push({ grupo: 'Cadastro', o_que: 'Cadastro', nome: p.nome, sub: p.unidade, detalhe: a.todo, acao: irPara('cargos', 'Abrir cadastro') });
+  for (const a of CARGOS.adm || []) {
+    const p = CARGOS.pessoas.find((x) => x.id === a.pessoa_id) || {};
+    if (!daLoja(p.unidade)) continue;
+    const motivo = [a.flash_situacao === 'ERRO' ? `Flash: ${a.flash_motivo || 'não chegou'}` : '', a.contab_situacao === 'ERRO' ? `Contabilidade: ${a.contab_motivo || 'não chegou'}` : '', a.flash_aviso || ''].filter(Boolean).join(' · ');
+    if (motivo) itens.push({ grupo: 'Admissão', o_que: 'Admissão', nome: p.nome, sub: p.unidade, detalhe: motivo, faltam_dias: 0, acao: irPara('cargos', 'Abrir cadastro') });
+  }
   // adiantamento não tem marca de envio no banco: depois do prazo não dá para dizer que ficou por fazer
   if (Array.isArray(H.calc)) for (const c of H.calc) {
     const f = cgFaltamDias(c.data_limite);
@@ -1424,7 +1566,7 @@ function cgAbaHoje() {
   const de = (g) => T.filter((x) => x.grupo === g);
   const card = (g) => { const n = de(g), pe = g === 'Pagar' ? cgR(n.reduce((a, x) => a + cgN(x.valor), 0)) : ''; return n.length ? `<div class="card neutral" style="cursor:pointer;${F.fcGrupo === g ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.fcGrupo=CARGOS_F.fcGrupo==='${g}'?null:'${g}';renderModuloCargos()"><div class="card-lbl">${g}</div><div class="card-val">${n.length}</div>${pe ? `<div class="card-pct">${pe}</div>` : ''}</div>` : ''; };
   const vis = F.fcGrupo && de(F.fcGrupo).length ? de(F.fcGrupo) : T;
-  return `${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
+  return `${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Admissão', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
     <div id="tabelaCgHoje" style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Quem</th><th>Detalhe</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>
     ${vis.map((x) => `<tr><td>${cgEsc(x.o_que || '')}</td>
       <td>${x.nome ? cgEsc(cgNome(x.nome)) : '–'}${x.sub ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.sub)}</div>` : ''}</td>
