@@ -694,7 +694,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['fora', 'Pagamento por fora · adiantamento dia 20 e saldo no 5º dia útil'], ['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
+           abas: [['adt', 'Adiantamento · paga dia 20'], ['fora', 'Pagamento por fora · adiantamento dia 20 e saldo no 5º dia útil'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
