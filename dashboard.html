@@ -215,10 +215,12 @@
       <button class="sidebar-btn" id="navBtnSeparacao" onclick="mostrarModulo('separacao')"><span class="mico">🧺</span>Separação</button>
       <button class="sidebar-btn" id="navBtnOrdens" onclick="mostrarModulo('ordens')"><span class="mico">⏱️</span>Ordens de produção</button>
       <button class="sidebar-btn" id="navBtnProducao" onclick="mostrarModulo('producao')"><span class="mico">🍳</span>Apontar produção</button>
+      <button class="sidebar-btn" id="navBtnFechaturno" onclick="mostrarModulo('fechaturno')"><span class="mico">🔒</span>Fechar o turno</button>
       <button class="sidebar-btn" id="navBtnProdhist" onclick="mostrarModulo('prodhist')"><span class="mico">📚</span>Históricos da produção</button>
       <button class="sidebar-btn" id="navBtnConferencias" onclick="mostrarModulo('conferencias')"><span class="mico">☑️</span>Conferências</button>
       <button class="sidebar-btn" id="navBtnControle" onclick="mostrarModulo('controle')"><span class="mico">📒</span>Controle de estoque</button>
       <button class="sidebar-btn" id="navBtnPosicao" onclick="mostrarModulo('posicao')"><span class="mico">💰</span>Posição de estoque</button>
+      <button class="sidebar-btn" id="navBtnComprateto" onclick="mostrarModulo('comprateto')"><span class="mico">🛒</span>Teto de compra</button>
       <button class="sidebar-btn" id="navBtnListas" onclick="mostrarModulo('listas')"><span class="mico">📦</span>Listas · Pedidos</button>
       <button class="sidebar-btn" id="navBtnListasFin" onclick="mostrarModulo('listasfin')"><span class="mico">🧾</span>Listas · Financeiro</button>
     </div>
@@ -423,6 +425,8 @@
       <div id="view-ordens"></div>
     </div>
 
+    <div id="modulo-fechaturno" class="modulo" style="display:none;"><div id="view-fechaturno"></div></div>
+    <div id="modulo-comprateto" class="modulo" style="display:none;"><div id="view-comprateto"></div></div>
     <div id="modulo-prodhist" class="modulo" style="display:none;">
       <div id="view-prodhist"></div>
     </div>
@@ -555,7 +559,7 @@
 
 <script src="nucleo/nucleo.js?v=20261101f"></script>
 <script src="listas/listas.js?v=20261029b"></script>
-<script src="estoque/estoque.js?v=20261102a"></script>
+<script src="estoque/estoque.js?v=20261102b"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script src="caixa/caixa.js?v=20261029a"></script>
 <script src="pessoas/pessoas.js?v=20261102c"></script>
@@ -1224,6 +1228,8 @@ function mostrarModulo(nome) {
     separacao: ['modulo-separacao', 'navBtnSeparacao'],
     ordens: ['modulo-ordens', 'navBtnOrdens'],
     producao: ['modulo-producao', 'navBtnProducao'],
+    fechaturno: ['modulo-fechaturno', 'navBtnFechaturno'],
+    comprateto: ['modulo-comprateto', 'navBtnComprateto'],
     prodhist: ['modulo-prodhist', 'navBtnProdhist'],
     conferencias: ['modulo-conferencias', 'navBtnConferencias'],
     controle: ['modulo-controle', 'navBtnControle'],
@@ -1338,6 +1344,8 @@ function mostrarModulo(nome) {
   if (nome === 'separacao') entrarSeparacao();
   if (nome === 'ordens') entrarOrdens();
   if (nome === 'producao') entrarApontar();
+  if (nome === 'fechaturno') entrarFechaTurno();
+  if (nome === 'comprateto') entrarCompraTeto();
   if (nome === 'prodhist') entrarProdHist();
   if (nome === 'conferencias') entrarConferencias();
   if (nome === 'controle') entrarControle();
@@ -1401,7 +1409,7 @@ function moduloAtivo() {
                               ['modulo-fichas','fichas'], ['modulo-engcard','engcard'],
                               ['modulo-plano','plano'],
                               ['modulo-reembolsos','reembolsos'], ['modulo-rh','rh'],
-                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-phoje','phoje'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
+                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-phoje','phoje'], ['modulo-fechaturno','fechaturno'], ['modulo-comprateto','comprateto'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
                               ['modulo-contaspagar','contaspagar'], ['modulo-contasreceber','contasreceber']]) {
     const el = document.getElementById(idm);
     if (el && el.style.display !== 'none') return nomem;
@@ -17284,7 +17292,7 @@ function aplicarAcesso() {
 
 // 24/10/2026 (bloco 1): telas que nao precisam da carga de vendas do iFood. Quem abre direto numa delas nao espera
 // a carga; ela acontece na primeira vez que a pessoa abre outra tela (garantirVendas, chamada pelo mostrarModulo).
-const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
+const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
 let VENDAS_CARREGADAS = false, VENDAS_PROMESSA = null;
 async function montarVendas() {
   await carregar();

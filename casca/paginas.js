@@ -19,6 +19,9 @@ window.CASCA_PAGINAS = {
   separacao: 'estoque/index.html#separacao',
   ordens: 'estoque/index.html#ordens',
   producao: 'estoque/index.html#producao',
+  // 02/11/2026: fechamento do turno (dono, 23/10) e teto de compra (dono, 02/11)
+  fechaturno: 'estoque/index.html#fechaturno',
+  comprateto: 'estoque/index.html#comprateto',
   prodhist: 'estoque/index.html#prodhist',
   // 29/10/2026 (dono): uma tela só de conferências, com abas (Embalagem, Receitas, Produtos, Bebidas)
   conferencias: 'estoque/index.html#conferencias',
@@ -57,7 +60,7 @@ window.CASCA_PAGINAS = {
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
 window.CASCA_TELAS_POR_LOJA = ['caixa',
-  'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'prodhist', 'controle', 'posicao',
+  'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao',
   'listas', 'listasfin',
   'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',

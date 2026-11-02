@@ -10,10 +10,10 @@ window.CASCA_MODULOS = [
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias'],
     acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', emConstrucao: true,
-    lancar: [], acompanhar: [] },
+  { id: 'compras', nome: 'Compras', icone: '🛒',
+    lancar: [], acompanhar: ['comprateto'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
-    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao'],   // o ciclo, na ordem (dono, 27/10/2026)
+    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'],   // o ciclo, na ordem (dono, 27/10/2026)
     acompanhar: ['prodhist'] },
   { id: 'listas', nome: 'Listas', icone: '🧺',
     lancar: ['listas'],

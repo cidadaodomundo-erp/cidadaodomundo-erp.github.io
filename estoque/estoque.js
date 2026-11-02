@@ -1712,6 +1712,121 @@ function histRender() {
 }
 
 // ---- ORDENS (tela própria, 27/10/2026): as ordens com o relógio e o apontar na linha + o histórico ----
+// ---------- FECHAR O TURNO (dono, 23/10/2026; proposta 2026-10-23-fechamento-do-turno.md) ----------
+// O líder confirma com o próprio login, no tablet da praça. O que o banco já sabe só aparece; marcar é só o que não se deduz. Nunca trava o ponto.
+let TURNO = null;
+const turnoHora = (t) => new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+async function entrarFechaTurno() {
+  const alvo = document.getElementById('view-fechaturno');
+  if (!alvo) return;
+  EST_TELA = 'fechaturno';
+  if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para fechar o turno.</div>`; return; }
+  alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  try {
+    const [P, rl, u] = await Promise.all([consultarTudo('vw_est_turno_pendencia?select=*&order=unidade,setor,turno,ordem'), trRpc('rh_eu_lider'), estUnidade(), estNomesCarregar()]);
+    const meus = rl.ok ? await rl.json() : [];
+    const chave = (x) => `${x.unidade}|${x.setor}|${x.turno}`;
+    const minhas = new Set(meus.map(chave));
+    const grupos = new Map();
+    for (const l of P) {
+      if (minhas.size ? !minhas.has(chave(l)) : (u && u !== LOJA_REDE_EST && l.unidade !== u)) continue;
+      if (!grupos.has(chave(l))) grupos.set(chave(l), []);
+      grupos.get(chave(l)).push(l);
+    }
+    // o aviso só conta da publicação da tela em diante: antes dela ninguém tinha por onde fechar
+    const avisos = minhas.size ? [] : (await consultarTudo('vw_est_turno_aviso?select=data,unidade,setor,turno,nome,apelido,aviso&data=gte.2026-11-02&order=data.desc,unidade').catch(() => []))
+      .filter((a) => /SEM FECHAR|ORDEM|DEPOIS DE SAIR|NAO FECHADO/.test(a.aviso || '') && (!u || u === LOJA_REDE_EST || a.unidade === u));
+    TURNO = { grupos: [...grupos.values()].sort((a, b) => Number(a[0].turno_fechado) - Number(b[0].turno_fechado)), avisos };
+    turnoDesenhar(alvo);
+  } catch (e) {
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui abrir a tela: ${trEscH(e.message)} <button class="preset-btn" onclick="entrarFechaTurno()">Tentar de novo</button></div>`;
+  }
+}
+function turnoDesenhar(alvo) {
+  let h = `<h2>Fechar o turno</h2>`;
+  if (!TURNO.grupos.length) h += `<div class="contexto" style="text-align:left;">Nenhum turno para fechar neste login.</div>`;
+  TURNO.grupos.forEach((ls, g) => {
+    const c = ls[0];
+    h += `<div class="contexto" style="text-align:left; margin:10px 0;">
+      <div style="font-size:17px; font-weight:800;">${trEscH(c.setor)} · ${trEscH(c.turno)} <span style="font-size:13px; font-weight:400; color:var(--tx-3);">${trEscH(estNomeLoja(c.unidade))}</span></div>
+      ${ls.map((t, k) => t.como_confere === 'CONFIRMA' && !c.turno_fechado
+        ? `<label style="display:flex; align-items:center; gap:10px; min-height:44px; cursor:pointer;"><input type="checkbox" id="tnoC_${g}_${k}" ${t.feita ? 'checked' : ''} style="width:22px; height:22px; flex:none;"><span>${trEscH(t.descricao)}</span></label>`
+        : `<div style="display:flex; align-items:center; gap:10px; min-height:36px;"><b style="width:22px; flex:none; text-align:center; color:${t.feita ? 'var(--farol-ok)' : 'var(--farol-fora)'};">${t.feita ? '✓' : '✗'}</b><span>${trEscH(t.descricao)}</span></div>`).join('')}
+      ${c.turno_fechado
+        ? `<div style="margin-top:8px; font-weight:700; color:var(--farol-ok);">✓ Turno fechado às ${turnoHora(c.fechado_em)} por ${trEscH(estNome(c.fechado_por) || c.fechado_por || '')}</div>`
+        : `<input id="tnoO_${g}" placeholder="Observação (opcional)" maxlength="300" style="display:block; width:100%; margin:8px 0; min-height:42px; padding:8px; font:inherit; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1);">
+           <button class="preset-btn active est-ciclo" style="min-height:46px; padding:0 22px; font-size:15px;" onclick="turnoFechar(${g})">Fechar o turno</button>`}
+    </div>`;
+  });
+  if (TURNO.avisos.length) {
+    h += `<div class="section-label" style="text-align:left;">Turnos que pedem atenção</div>
+      <div id="tabelaTurnoAviso" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Setor e turno</th><th>Líder</th><th>Aviso</th></tr></thead><tbody>
+      ${TURNO.avisos.map((a) => `<tr><td>${trEscH(plpDm(a.data).slice(0, 5))}</td><td>${trEscH(estNomeLoja(a.unidade))}</td><td>${trEscH(a.setor)} · ${trEscH(a.turno)}</td><td>${trEscH(a.apelido || a.nome || '–')}</td><td style="white-space:normal; color:var(--farol-perto); font-weight:700;">${trEscH(a.aviso)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+  alvo.innerHTML = h;
+}
+async function turnoFechar(g) {
+  const ls = TURNO.grupos[g], c = ls[0];
+  const confirmou = ls.filter((t, k) => { const e = document.getElementById(`tnoC_${g}_${k}`); return e && e.checked; }).map((t) => t.codigo);
+  const obs = ((document.getElementById(`tnoO_${g}`) || {}).value || '').trim();
+  if (!estTravar(true)) return;
+  avisoAcao('enviando', 'Fechando o turno…');
+  let r;
+  try { r = await trRpcSeguro('est_turno_fechar', { p_unidade: c.unidade, p_setor: c.setor, p_turno: c.turno, p_confirmou: confirmou, p_observacao: obs || null }); }
+  catch (e) { estTravar(false); return avisoAcao('erro', `✗ NÃO fechou: ${e.message}.`, () => turnoFechar(g)); }
+  estTravar(false);
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO fechou: ${await trErroDe(r)}.`, () => turnoFechar(g));
+  avisoAcao('ok', `✓ Turno fechado: ${c.setor} ${c.turno} — às ${avisoHora()}.`);
+  await entrarFechaTurno();
+}
+
+// ---------- TETO DE COMPRA DO MÊS (dono, 02/11/2026; proposta 2026-11-02-compras-teto-e-producao.md) ----------
+let CPT = { abertas: new Set() };
+async function entrarCompraTeto() {
+  const alvo = document.getElementById('view-comprateto');
+  if (!alvo) return;
+  EST_TELA = 'comprateto';
+  if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para ver o teto de compra.</div>`; return; }
+  alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  try {
+    const [L, u] = await Promise.all([consultarTudo('compra_orcamento_foto?select=*&order=mes.desc,unidade,grupo'), estUnidade()]);
+    CPT.linhas = L.filter((x) => L[0] && x.mes === L[0].mes);
+    CPT.unidade = u;
+    cptDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler o teto de compra: ${trEscH(e.message)} <button class="preset-btn" onclick="entrarCompraTeto()">Tentar de novo</button></div>`;
+  }
+}
+function cptAbrir(u) { if (CPT.abertas.has(u)) CPT.abertas.delete(u); else CPT.abertas.add(u); cptDesenhar(); }
+function cptDesenhar() {
+  const alvo = document.getElementById('view-comprateto');
+  if (!alvo) return;
+  let h = `<h2>Teto de compra do mês</h2>`;
+  if (!CPT.linhas.length) { alvo.innerHTML = h + `<div class="contexto" style="text-align:left;">Disponível para quem compra.</div>`; return; }
+  const umaLoja = CPT.unidade && CPT.unidade !== LOJA_REDE_EST;
+  const r$ = (v) => `R$ ${fmt(Number(v) || 0)}`;
+  const cor = { 'ACIMA DO TETO': 'var(--farol-fora)', 'ACIMA DO RITMO': 'var(--farol-perto)', DENTRO: 'var(--farol-ok)' };
+  const celulas = (x) => `<td style="text-align:right;">${r$(x.pode_comprar)}</td><td style="text-align:right;">${r$(x.comprado)}</td>
+    <td style="text-align:right; ${Number(x.falta_comprar) < 0 ? 'color:var(--farol-fora); font-weight:700;' : ''}">${r$(x.falta_comprar)}</td>
+    <td style="text-align:right; white-space:nowrap;">${fmt(Number(x.usado_pct) || 0)}% <span style="color:var(--tx-4);">· mês ${fmt(Number(x.mes_corrido_pct) || 0)}%</span></td>
+    <td style="color:${cor[x.situacao] || 'var(--tx-3)'}; font-weight:700;">${trEscH(x.situacao || '')}</td>`;
+  const totais = CPT.linhas.filter((x) => x.grupo === 'TOTAL' && (umaLoja ? x.unidade === CPT.unidade : true))
+    .sort((a, b) => (a.unidade === LOJA_REDE_EST ? -1 : b.unidade === LOJA_REDE_EST ? 1 : 0));
+  const m = CPT.linhas[0];
+  const quando = new Date(m.calculado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às');
+  h += `<div class="caption-label" style="text-align:left; margin-bottom:8px;">${new Date(String(m.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} em andamento, estimativa · calculado em ${quando}</div>
+    <div id="tabelaCompraTeto" style="overflow-x:auto;"><table><thead><tr><th></th><th>Loja</th><th style="text-align:right;">Pode comprar</th><th style="text-align:right;">Comprado</th><th style="text-align:right;">Falta comprar</th><th style="text-align:right;">Usado</th><th>Situação</th><th>Notas lançadas até</th></tr></thead><tbody>
+    ${totais.map((t) => {
+      const ab = CPT.abertas.has(t.unidade) || umaLoja;
+      const gr = CPT.linhas.filter((x) => x.unidade === t.unidade && x.grupo !== 'TOTAL');
+      return `<tr${gr.length ? ` style="cursor:pointer;" onclick="cptAbrir(this.dataset.u)" data-u="${trEscH(t.unidade)}"` : ''}><td style="color:var(--tx-3); font-size:12px; font-weight:600; white-space:nowrap;">${gr.length && !umaLoja ? (ab ? '▾ Fechar grupos' : '▸ Ver grupos') : ''}</td>
+          <td><b>${trEscH(t.unidade === LOJA_REDE_EST ? 'Rede' : estNomeLoja(t.unidade))}</b></td>${celulas(t)}<td>${t.notas_ate ? trEscH(plpDm(t.notas_ate).slice(0, 5)) : 'nenhuma nota no mês'}</td></tr>
+        ${ab ? gr.map((x) => `<tr><td></td><td style="padding-left:16px; color:var(--tx-2);">${trEscH(x.grupo)}</td>${celulas(x)}<td>${x.notas_ate ? trEscH(plpDm(x.notas_ate).slice(0, 5)) : '–'}</td></tr>`).join('') : ''}`;
+    }).join('')}</tbody></table></div>`;
+  alvo.innerHTML = h;
+}
+
 async function entrarOrdens() {
   EST_TELA = 'ordens';
   return entrarProducao();

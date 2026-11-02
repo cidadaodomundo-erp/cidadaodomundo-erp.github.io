@@ -335,6 +335,11 @@ window.CASCA_MENU = [
     "icone": "🍳"
    },
    {
+    "chave": "fechaturno",
+    "rotulo": "Fechar o turno",
+    "icone": "🔒"
+   },
+   {
     "chave": "prodhist",
     "rotulo": "Históricos da produção",
     "icone": "📚"
@@ -353,6 +358,11 @@ window.CASCA_MENU = [
     "chave": "posicao",
     "rotulo": "Posição de estoque",
     "icone": "💰"
+   },
+   {
+    "chave": "comprateto",
+    "rotulo": "Teto de compra",
+    "icone": "🛒"
    },
    {
     "chave": "listas",

@@ -35,6 +35,8 @@
     <div id="modulo-separacao" class="modulo papel lanc" style="display:none;"><div id="view-separacao"></div></div>
     <div id="modulo-ordens" class="modulo papel lanc" style="display:none;"><div id="view-ordens"></div></div>
     <div id="modulo-producao" class="modulo papel lanc" style="display:none;"><div id="view-producao"></div></div>
+    <div id="modulo-fechaturno" class="modulo" style="display:none;"><div id="view-fechaturno"></div></div>
+    <div id="modulo-comprateto" class="modulo" style="display:none;"><div id="view-comprateto"></div></div>
     <div id="modulo-prodhist" class="modulo" style="display:none;"><div id="view-prodhist"></div></div>
     <div id="modulo-conferencias" class="modulo papel lanc" style="display:none;"><div id="view-conferencias"></div></div>
     <div id="modulo-controle" class="modulo" style="display:none;"><div id="view-controle"></div></div>
@@ -44,12 +46,12 @@
 
 <script src="../nucleo/nucleo.js?v=20261101f"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="estoque.js?v=20261102a"></script>
+<script src="estoque.js?v=20261102b"></script>
 <script>
 // O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
 // 27/10/2026 (dono): o ciclo em quatro telas — Planejar, Separação, Ordens, Apontar
 const TELAS = { contagem: entrarContagem, processos: entrarProcessos, plprod: entrarPlprod, separacao: entrarSeparacao, ordens: entrarOrdens, producao: entrarApontar,
-                prodhist: entrarProdHist, conferencias: entrarConferencias,
+                fechaturno: entrarFechaTurno, comprateto: entrarCompraTeto, prodhist: entrarProdHist, conferencias: entrarConferencias,
                 controle: entrarControle, posicao: entrarPosicao };
 const TELA = TELAS[location.hash.slice(1)] ? location.hash.slice(1) : 'contagem';
 function exigirLogin(recado) {
