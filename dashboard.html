@@ -187,6 +187,7 @@
          rmb_gastos so com regra de leitura) e VOLTOU so de leitura: fila e historico. -->
     <button class="sidebar-secao" onclick="toggleGrupo('gRh')">Pessoas <span class="seta">▶</span></button>
     <div class="sidebar-grupo" id="gRh">
+      <button class="sidebar-btn" id="navBtnPhoje" onclick="mostrarModulo('phoje')"><span class="mico">📌</span>O que fazer hoje</button>
       <button class="sidebar-btn" id="navBtnCargos" onclick="mostrarModulo('cargos')"><span class="mico">🪪</span>Cargos e salários</button>
       <button class="sidebar-btn" id="navBtnPcalc" onclick="mostrarModulo('pcalc')"><span class="mico">🧮</span>Cálculos da folha</button>
       <button class="sidebar-btn" id="navBtnPferias" onclick="mostrarModulo('pferias')"><span class="mico">🏖️</span>Férias</button>
@@ -380,6 +381,7 @@
     <div id="modulo-cargos" class="modulo" style="display:none;">
       <div id="view-cargos"></div>
     </div>
+    <div id="modulo-phoje" class="modulo" style="display:none;"><div id="view-phoje"></div></div>
     <div id="modulo-pcalc" class="modulo" style="display:none;"><div id="view-pcalc"></div></div>
     <div id="modulo-pferias" class="modulo" style="display:none;"><div id="view-pferias"></div></div>
     <div id="modulo-macertos" class="modulo" style="display:none;"><div id="view-macertos"></div></div>
@@ -556,7 +558,7 @@
 <script src="estoque/estoque.js?v=20261030f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script src="caixa/caixa.js?v=20261029a"></script>
-<script src="pessoas/pessoas.js?v=20261102b"></script>
+<script src="pessoas/pessoas.js?v=20261102c"></script>
 <script src="atacado/atacado.js?v=20261101c"></script>
 <script src="cardapio/cardapio.js?v=20261028a"></script>
 <script>
@@ -1238,6 +1240,7 @@ function mostrarModulo(nome) {
     // forafolha nasceu 04/09 fora deste mapa e abriu em branco — mesma armadilha do rateio.
     forafolha: ['modulo-forafolha', 'navBtnForafolha'],
     cargos: ['modulo-cargos', 'navBtnCargos'],
+    phoje: ['modulo-phoje', 'navBtnPhoje'],
     pcalc: ['modulo-pcalc', 'navBtnPcalc'],
     pferias: ['modulo-pferias', 'navBtnPferias'],
     macertos: ['modulo-macertos', 'navBtnMacertos'],
@@ -1350,6 +1353,7 @@ function mostrarModulo(nome) {
   if (nome === 'rh') entrarRh();
   if (nome === 'forafolha') entrarForaFolha();
   if (nome === 'cargos') entrarPesCargos();
+  if (nome === 'phoje') entrarPesHoje();
   if (nome === 'pcalc') entrarPesCalc();
   if (nome === 'pferias') entrarPesFerias();
   if (nome === 'macertos') entrarMotoboyAcertos();
@@ -1397,7 +1401,7 @@ function moduloAtivo() {
                               ['modulo-fichas','fichas'], ['modulo-engcard','engcard'],
                               ['modulo-plano','plano'],
                               ['modulo-reembolsos','reembolsos'], ['modulo-rh','rh'],
-                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
+                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-phoje','phoje'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
                               ['modulo-contaspagar','contaspagar'], ['modulo-contasreceber','contasreceber']]) {
     const el = document.getElementById(idm);
     if (el && el.style.display !== 'none') return nomem;
@@ -17039,7 +17043,7 @@ function renderAll() {
   if (ativo === 'listasfin' && LISTAS !== null) renderModuloListasFin();
   if (ativo === 'reembolsos' && REEMBOLSOS !== null) renderModuloReembolsos(REEMBOLSOS);
   if (ativo === 'rh' && RH !== null) renderModuloRh();
-  if (['cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos'].includes(ativo) && CARGOS !== null) renderModuloCargos();
+  if (['phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos'].includes(ativo) && CARGOS !== null) renderModuloCargos();
   if (ativo === 'negociacoes' && NEGOCIACOES !== null) renderModuloNegociacoes();
   if (ativo === 'avaliacoes' && AVALIACOES !== null) renderModuloAvaliacoes();
   if (ativo === 'cardapio' && CARDAPIO !== null) renderModuloCardapio();
@@ -17280,7 +17284,7 @@ function aplicarAcesso() {
 
 // 24/10/2026 (bloco 1): telas que nao precisam da carga de vendas do iFood. Quem abre direto numa delas nao espera
 // a carga; ela acontece na primeira vez que a pessoa abre outra tela (garantirVendas, chamada pelo mostrarModulo).
-const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
+const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
 let VENDAS_CARREGADAS = false, VENDAS_PROMESSA = null;
 async function montarVendas() {
   await carregar();

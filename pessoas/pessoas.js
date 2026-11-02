@@ -670,7 +670,9 @@ const CG_ACOMP = [['custo', 'Custo por pessoa'], ['setor', 'Por setor'], ['saipo
 // 29/10/2026 13:51 (dono): cada passo é uma tela do menu Pessoas. Cada tela mostra só as suas abas (o código é o mesmo).
 const CG_TELAS = {
   cargos: { titulo: 'Cargos e salários', leg: 'A Flash é a base oficial da folha: aqui aparecem as diferenças entre ela, o nosso cadastro e a folha da contabilidade.',
-            abas: [['pessoas', 'Cargos e salários'], ['tabela', 'Tabela de cargos'], ['fcaixa', 'Pendências da Flash']] },
+            abas: [['pessoas', 'Cargos e salários'], ['tabela', 'Tabela de cargos']] },
+  // 02/11/2026 (dono): as Pendências da Flash ganham tela própria, junto com o resto do que está pendente no módulo
+  phoje: { titulo: 'O que fazer hoje', abas: [['hoje', 'O que fazer hoje']] },
   // 29/10/2026 14:24 (dono): o que era "Acompanhar" virou tela própria (custo) ou foi para o Financeiro (acertos)
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
@@ -684,6 +686,7 @@ const CG_TELAS = {
 function cgAlvo() { return document.getElementById('view-' + (CARGOS_F.tela || 'cargos')) || document.getElementById('view-cargos'); }
 let CG_ABA_PEDIDA = new URLSearchParams(location.search).get('aba');   // link direto na aba (sistema.html#cargos/fcaixa): vale uma vez
 function cgEntrarTela(t) {
+  if (t === 'cargos' && CG_ABA_PEDIDA === 'fcaixa') { CG_ABA_PEDIDA = null; mostrarModulo('phoje'); return; }   // link antigo, já enviado à Hellen
   CARGOS_F.tela = t;
   const ok = CG_TELAS[t].abas.map(([k]) => k).concat(CG_TELAS[t].acomp ? CG_ACOMP.map(([k]) => k) : []);
   if (CG_ABA_PEDIDA && ok.includes(CG_ABA_PEDIDA)) CARGOS_F.aba = CG_ABA_PEDIDA;
@@ -691,7 +694,7 @@ function cgEntrarTela(t) {
   if (!ok.includes(CARGOS_F.aba)) CARGOS_F.aba = CG_TELAS[t].abas[0][0];
   return entrarCargos();
 }
-const entrarPesCargos = () => cgEntrarTela('cargos'), entrarPesCalc = () => cgEntrarTela('pcalc'), entrarPesFerias = () => cgEntrarTela('pferias'),
+const entrarPesHoje = () => cgEntrarTela('phoje'), entrarPesCargos = () => cgEntrarTela('cargos'), entrarPesCalc = () => cgEntrarTela('pcalc'), entrarPesFerias = () => cgEntrarTela('pferias'),
       entrarPesResc = () => cgEntrarTela('presc'), entrarPesEnvio = () => cgEntrarTela('penvio'), entrarPesConf = () => cgEntrarTela('pconf'),
       entrarPesCusto = () => cgEntrarTela('pcusto'), entrarPesAcertos = () => cgEntrarTela('pacertos');
 
@@ -808,7 +811,7 @@ function renderModuloCargos() {
   else if (F.aba === 'vtva') h += cgAbaVtVa();
   else if (F.aba === 'folha') h += cgAbaFolha();
   else if (F.aba === 'ferias') h += cgAbaFerias();
-  else if (F.aba === 'fcaixa') h += cgAbaFlashCaixa();
+  else if (F.aba === 'hoje') h += cgAbaHoje();
   else if (F.aba === 'adt') h += cgAbaAdt();
   else if (F.aba === 'bonif') h += cgAbaBonif();
   else if (F.aba === 'saipos') h += cgAbaSaipos();
@@ -821,16 +824,22 @@ function renderModuloCargos() {
 }
 
 // ---------- PESSOAS (o cadastro) ----------
+function cgAlertaCurto(s) { const x = String(s || '').split(/[:(;]/)[0].trim(); return x.length > 38 ? x.slice(0, 36) + '…' : x; }
+// o que o cadastro acusa sozinho; a observação do RH é anotação, não pendência (fica só nos alertas de Cargos)
+function cgAlertasCadastro(p) {
+  const L = cgLista((CARGOS.cs.get(p.id) || {}).conferencia).map((x) => ({ t: cgAlertaCurto(x), todo: x }));
+  if (p.situacao_tabela === 'DIFERENTE DA TABELA') L.push({ t: `tabela diz ${cgR(p.salario_tabela)}`, todo: 'salário diferente da tabela de cargos' });
+  if (p.situacao_tabela === 'CARGO SEM CÉLULA') L.push({ t: 'cargo fora da tabela', todo: 'o cargo não existe na tabela de cargos' });
+  if (p.ativo && !p.setor_rateio) L.push({ t: 'sem setor', todo: 'sem setor: não entra no custo dos canais' });
+  return L;
+}
 function cgAbaPessoas() {
   // 29/10/2026 (dono): consulta e alertas, como num ERP — sem textos longos, sem edição (a base é a Flash)
   const F = CARGOS_F;
   const cs = (p) => CARGOS.cs.get(p.id) || null;
-  const curto = (s) => { const x = String(s || '').split(/[:(;]/)[0].trim(); return x.length > 38 ? x.slice(0, 36) + '…' : x; };
+  const curto = cgAlertaCurto;
   const alertas = (p) => {
-    const L = cgLista((cs(p) || {}).conferencia).map((x) => ({ t: curto(x), todo: x }));
-    if (p.situacao_tabela === 'DIFERENTE DA TABELA') L.push({ t: `tabela diz ${cgR(p.salario_tabela)}`, todo: 'salário diferente da tabela de cargos' });
-    if (p.situacao_tabela === 'CARGO SEM CÉLULA') L.push({ t: 'cargo fora da tabela', todo: 'o cargo não existe na tabela de cargos' });
-    if (p.ativo && !p.setor_rateio) L.push({ t: 'sem setor', todo: 'sem setor: não entra no custo dos canais' });
+    const L = cgAlertasCadastro(p);
     if (p.obs_rh) L.push({ t: curto(p.obs_rh), todo: p.obs_rh });
     return L;
   };
@@ -1327,15 +1336,23 @@ function cgAbaFerias() {
     </tbody></table></div>`;
   return h;
 }
-// PENDÊNCIAS DA FLASH (dono, 30/10/2026 16:14; proposta do chat RH): a Hellen acompanha aqui para entrar o mínimo na Flash. Nesta fase a ação é abrir a Flash ou copiar o PIX; pagar é dela.
-async function cgFlashCaixaCarregar() {
-  CARGOS.fcaixa = null;
+// O QUE FAZER HOJE (dono, 02/11/2026): tudo o que está pendente em Pessoas, numa lista só, por urgência. Inclui as Pendências da Flash
+// (dono, 30/10/2026 16:14; proposta do chat RH): a Hellen acompanha aqui para entrar o mínimo na Flash; a ação é abrir a Flash ou copiar o PIX; pagar é dela.
+async function cgHojeCarregar() {
+  CARGOS.hoje = null;
+  const ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   try {
-    const [L, r] = await Promise.all([consultarTudo('vw_rh_flash_caixa?select=*&order=faltam_dias.asc.nullslast,parado_dias.desc.nullslast'), trRpcSeguro('rh_flash_caixa_leitura', {})]);
+    const [L, r, calc, fer] = await Promise.all([ler('vw_rh_flash_caixa?select=*&order=faltam_dias.asc.nullslast,parado_dias.desc.nullslast'), trRpcSeguro('rh_flash_caixa_leitura', {}),
+      ler('vw_rh_calculos_mes?select=*&order=data_limite'), ler('vw_rh_ferias_alertas?select=*&order=limite_gozo')]);
     if (!r.ok) throw new Error(await trErroDe(r));
-    CARGOS.fcaixa = { L, leitura: (await r.json())[0] || {} };
-  } catch (e) { CARGOS.fcaixa = { erro: e.message }; }
-  if (CARGOS_F.aba === 'fcaixa') renderModuloCargos();
+    CARGOS.hoje = { L, calc, fer, leitura: (await r.json())[0] || {} };
+  } catch (e) { CARGOS.hoje = { erro: e.message }; }
+  if (CARGOS_F.aba === 'hoje') renderModuloCargos();
+}
+function cgFaltamDias(iso) {
+  if (!iso) return null;
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return Math.round((Date.parse(String(iso).slice(0, 10)) - Date.parse(hoje)) / 86400000);
 }
 function cgFcPrazo(x) {
   const f = x.faltam_dias === null || x.faltam_dias === undefined ? null : Number(x.faltam_dias), p = cgN(x.parado_dias), ferias = x.tipo === 'FERIAS', L = [];
@@ -1344,33 +1361,53 @@ function cgFcPrazo(x) {
     L.push(f === 0 ? `${v[0]} hoje` : f > 0 ? `${v[0]} em ${f} ${f === 1 ? 'dia' : 'dias'}` : `${v[1]} há ${-f} ${f === -1 ? 'dia' : 'dias'}`);
   }
   if (p) L.push(`parado há ${p} ${p === 1 ? 'dia' : 'dias'}`);
-  const alerta = (ferias && f !== null && f <= 15) || p >= 3;
+  const alerta = (/^FERIAS/.test(x.tipo || '') && f !== null && f <= 15) || p >= 3 || (f !== null && f <= 3);
   return `<span style="${alerta ? 'color:var(--farol-perto);font-weight:700;' : ''}">${L.join(' · ') || '–'}</span>`;
 }
-function cgAbaFlashCaixa() {
-  const F = CARGOS_F;
-  if (CARGOS.fcaixa === undefined) { cgFlashCaixaCarregar(); return '<div class="contexto">Lendo as pendências…</div>'; }
-  if (CARGOS.fcaixa === null) return '<div class="contexto">Lendo as pendências…</div>';
-  if (CARGOS.fcaixa.erro) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as pendências: ${cgEsc(CARGOS.fcaixa.erro)}</div>`;
-  const T = CARGOS.fcaixa.L.filter((x) => !F.unidade || x.empresa === F.unidade);
-  const { lido_em: lido, atrasada } = CARGOS.fcaixa.leitura;
-  const rodape = lido ? `<div class="caption-label" style="text-align:left;margin-top:6px;">Lido em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}</div>` : '';
-  // com a leitura atrasada, "nada pendente" não pode ser afirmado
-  const atraso = atrasada ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Leitura atrasada: pode faltar pendência nesta lista.</b></div>' : '';
-  if (!T.length) return `${atraso}${atrasada ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente na Flash.</b></div>'}${rodape}`;
-  const de = (g) => T.filter((x) => x.grupo === g);
-  const card = (g, pe) => `<div class="card neutral" style="cursor:pointer;${F.fcGrupo === g ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.fcGrupo=CARGOS_F.fcGrupo==='${g}'?null:'${g}';renderModuloCargos()"><div class="card-lbl">${g}</div><div class="card-val">${de(g).length}</div>${pe ? `<div class="card-pct">${pe}</div>` : ''}</div>`;
-  const vis = F.fcGrupo ? de(F.fcGrupo) : T;
-  const acao = (x) => {
+function cgHojeItens() {
+  const F = CARGOS_F, H = CARGOS.hoje, itens = [];
+  const irPara = (tela, r) => `<button type="button" class="preset-btn" onclick="mostrarModulo('${tela}')">${r}</button>`;
+  const daLoja = (u) => !F.unidade || !u || u === F.unidade;
+  const acaoFlash = (x) => {
     const emp = `<div style="font-size:11px;color:var(--tx-4);">${cgEsc(x.empresa || '')}</div>`;
     if (x.grupo === 'Pagar' && x.pix_copia_cola) return `<b>${cgR(x.valor)}</b> <button type="button" class="preset-btn" data-pix="${cgEsc(x.pix_copia_cola)}" onclick="cgFcCopiar(this)">Copiar PIX</button>`;
     return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${x.link_flash ? `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(x.link_flash)}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
   };
-  return `${atraso}<div class="cards" style="max-width:780px;">${card('Aprovar')}${card('Corrigir')}${card('Pagar', cgR(de('Pagar').reduce((a, x) => a + cgN(x.valor), 0)))}</div>
-    <div id="tabelaCgFlashCaixa" style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Quem</th><th>Detalhe</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>
+  if (Array.isArray(H.L)) for (const x of H.L) if (daLoja(x.empresa)) itens.push({ ...x, sub: [x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).join(' · '), acao: acaoFlash(x) });
+  for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: '<span style="font-size:12px;color:var(--tx-3);">Na tela da Flash</span>' });
+  for (const p of CARGOS.pessoas) if (p.ativo && daLoja(p.unidade)) for (const a of cgAlertasCadastro(p)) itens.push({ grupo: 'Cadastro', o_que: 'Cadastro', nome: p.nome, sub: p.unidade, detalhe: a.todo, acao: irPara('cargos', 'Abrir cadastro') });
+  // adiantamento não tem marca de envio no banco: depois do prazo não dá para dizer que ficou por fazer
+  if (Array.isArray(H.calc)) for (const c of H.calc) {
+    const f = cgFaltamDias(c.data_limite);
+    if (c.fechado_em || c.enviado_em || f === null || f > 30 || (c.calculo === 'ADIANTAMENTO' && f < 0)) continue;
+    itens.push({ grupo: 'Folha', o_que: c.nome, detalhe: c.calculado_em ? `calculado: ${cgN(c.pessoas)} pessoas, ${cgR(c.total)}` : 'ainda não calculado', faltam_dias: f, acao: irPara('pcalc', 'Abrir cálculos') });
+  }
+  if (Array.isArray(H.fer)) for (const x of H.fer) if (daLoja(x.unidade)) itens.push({ grupo: 'Férias', tipo: 'FERIAS_ALERTA', o_que: 'Férias', nome: x.nome, sub: x.unidade, detalhe: x.mensagem, faltam_dias: cgFaltamDias(x.limite_gozo), acao: irPara('pferias', 'Abrir férias') });
+  const urg = (x) => (x.faltam_dias !== null && x.faltam_dias !== undefined ? Number(x.faltam_dias) : cgN(x.parado_dias) ? -cgN(x.parado_dias) : 999);
+  return itens.sort((a, b) => urg(a) - urg(b));
+}
+function cgAbaHoje() {
+  const F = CARGOS_F;
+  if (CARGOS.hoje === undefined) { cgHojeCarregar(); return '<div class="contexto">Lendo as pendências…</div>'; }
+  if (CARGOS.hoje === null) return '<div class="contexto">Lendo as pendências…</div>';
+  if (CARGOS.hoje.erro) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as pendências: ${cgEsc(CARGOS.hoje.erro)} <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>`;
+  const H = CARGOS.hoje;
+  const { lido_em: lido, atrasada } = H.leitura;
+  const rodape = lido ? `<div class="caption-label" style="text-align:left;margin-top:6px;">Flash lida em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}</div>` : '';
+  // com a leitura atrasada ou uma fonte fora, "nada pendente" não pode ser afirmado
+  const falhou = [[H.L, 'a Flash'], [H.calc, 'os cálculos da folha'], [H.fer, 'as férias']].filter(([v]) => v && v.erro).map(([, r]) => r);
+  const atraso = (atrasada ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Leitura da Flash atrasada: pode faltar pendência nesta lista.</b></div>' : '')
+    + (falhou.length ? `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);"><b style="color:var(--farol-fora);">✗ Não consegui ler ${falhou.join(', ')}: pode faltar pendência.</b> <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>` : '');
+  const T = cgHojeItens();
+  if (!T.length) return `${atraso}${atrasada || falhou.length ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente em Pessoas.</b></div>'}${rodape}`;
+  const de = (g) => T.filter((x) => x.grupo === g);
+  const card = (g) => { const n = de(g), pe = g === 'Pagar' ? cgR(n.reduce((a, x) => a + cgN(x.valor), 0)) : ''; return n.length ? `<div class="card neutral" style="cursor:pointer;${F.fcGrupo === g ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.fcGrupo=CARGOS_F.fcGrupo==='${g}'?null:'${g}';renderModuloCargos()"><div class="card-lbl">${g}</div><div class="card-val">${n.length}</div>${pe ? `<div class="card-pct">${pe}</div>` : ''}</div>` : ''; };
+  const vis = F.fcGrupo && de(F.fcGrupo).length ? de(F.fcGrupo) : T;
+  return `${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
+    <div id="tabelaCgHoje" style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Quem</th><th>Detalhe</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>
     ${vis.map((x) => `<tr><td>${cgEsc(x.o_que || '')}</td>
-      <td>${cgEsc(cgNome(x.nome))}<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${[x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).map(cgEsc).join(' · ')}</div></td>
-      <td style="white-space:normal;">${cgEsc(x.detalhe || '')}</td><td>${cgFcPrazo(x)}</td><td>${acao(x)}</td></tr>`).join('')}
+      <td>${x.nome ? cgEsc(cgNome(x.nome)) : '–'}${x.sub ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.sub)}</div>` : ''}</td>
+      <td style="white-space:normal;">${cgEsc(x.detalhe || '')}</td><td>${cgFcPrazo(x)}</td><td>${x.acao}</td></tr>`).join('')}
     </tbody></table></div>${rodape}`;
 }
 async function cgFcCopiar(b) {
@@ -1730,7 +1767,7 @@ function cgListaFlash(lista) {
         ${k === 0 ? `<td rowspan="${p.itens.length}">${cgEsc(p.unidade)}</td><td rowspan="${p.itens.length}" style="font-weight:600;">${cgEsc(cgNome(nome))}</td>` : ''}
         <td>${cgEsc(CG_FLASH_TIPO[i.tipo] || i.tipo)}</td><td style="color:var(--tx-4);">${cgEsc(i.na_flash || '–')}</td>
         <td>${cgEsc(i.no_painel || '–')}</td><td style="font-size:12px;">${cgEsc(i.o_que_fazer)}</td>
-        <td style="font-size:12px;white-space:nowrap;">${i.como === 'API' ? '<span style="color:var(--tx-4);">API (com o sim do dono)</span>' : '<b>Arissa, na tela da Flash</b>'}</td></tr>`).join('')).join('')}</tbody>
+        <td style="font-size:12px;white-space:nowrap;">${i.como === 'API' ? '<span style="color:var(--tx-4);">API (com o sim do dono)</span>' : '<b>Hellen, na tela da Flash</b>'}</td></tr>`).join('')).join('')}</tbody>
     </table></div>`;
 }
 let FLASHRH = null;

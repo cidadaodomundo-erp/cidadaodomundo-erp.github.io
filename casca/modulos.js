@@ -26,7 +26,7 @@ window.CASCA_MODULOS = [
     acompanhar: ['projecao', 'dre', 'fluxo', 'despesas', 'lucrouni', 'evolucao', 'pacertos'] },
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
     // 29/10/2026 13:51 (dono): os passos da folha, cada um uma tela, na ordem
-    lancar: ['cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'forafolha', 'rh'],
+    lancar: ['phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'forafolha', 'rh'],
     acompanhar: ['reembolsos', 'pcusto'] },
   // 29/10/2026 15:35 (dono): módulo Atacado, tela Orçamentos
   { id: 'atacado', nome: 'Atacado', icone: '🚚',

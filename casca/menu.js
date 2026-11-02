@@ -228,6 +228,11 @@ window.CASCA_MENU = [
   "nome": "Pessoas",
   "itens": [
    {
+    "chave": "phoje",
+    "rotulo": "O que fazer hoje",
+    "icone": "📌"
+   },
+   {
     "chave": "cargos",
     "rotulo": "Cargos e salários",
     "icone": "🪪"
