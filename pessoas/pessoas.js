@@ -282,28 +282,40 @@ function rhSoltar() { RH_PESSOA = null; renderModuloRh(); }
 // (vw_fin_contas_pagar). Le e grava como a pessoa logada: RLS pode_ver_pessoal
 // (Neto, Fabio, Hellen); quem nao tem acesso ve a tela vazia.
 let FF = null;
+const ffAlvo = () => document.getElementById('cgFora') || document.getElementById('view-forafolha');
 async function entrarForaFolha() {
-  const alvo = document.getElementById('view-forafolha');
+  const alvo = ffAlvo();
   if (!alvo) return;
   if (!FF) alvo.innerHTML = '<div class="contexto">Carregando o pagamento fora da folha...</div>';
   // Baixa automatica (30/09/2026): o que o Saipos ja pagou AO CENTAVO fecha antes
   // de a tela abrir. Tambem roda no fim de toda carga do import_saipos.py; aqui e'
   // so para nao esperar a proxima carga. Falhar nao impede a tela.
   try { await trRpc('rh_ff_baixa_automatica', {}); } catch (e) {}
-  const [rp, rm, rc] = await Promise.all([
+  const [rp, rm, rc, rs] = await Promise.all([
     trFetch('rh_ff_pessoas?select=*&order=nome'),
     // futuro: desde 19/10/2026 a view vai 90 dias a frente (Fluxo projetado e robo); a tela fica ate o mes corrente
     trFetch('vw_rh_ff_meses?select=*&futuro=is.false&order=nome,mes.desc'),
     trFetch('vw_rh_ff_casamento_saipos?select=*'),
+    trFetch('vw_rh_saipos_acertos?select=quem,competencia,descricao,valor_saipos,id_titulo,acao&tipo=eq.FORA_DA_FOLHA'),
   ]);
   if (!rp.ok || !rm.ok) {
     alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">Não consegui carregar: ${await trErroDe(rp.ok ? rm : rp)}.
       Esta tela precisa de login (Neto, Fabio ou Hellen).</div>`;
     return;
   }
-  FF = { pessoas: await rp.json(), meses: await rm.json(), saipos: rc.ok ? await rc.json() : [], editando: FF ? FF.editando : null };
+  FF = { pessoas: await rp.json(), meses: await rm.json(), saipos: rc.ok ? await rc.json() : [], lancado: rs.ok ? await rs.json() : null, editando: FF ? FF.editando : null };
   renderForaFolha();
 }
+// quem lança, altera e baixa no Saipos é o robô (dono, 02/11/2026): a tela só mostra como está
+function ffNoSaipos(p, x) {
+  if (x.pagoEm) return '<span style="color:var(--tx-4);">—</span>';
+  if (!FF.lancado) return '<span style="color:var(--tx-4);">não consegui ler</span>';
+  const tipo = x.nome === 'SALDO' ? 'SALARIO' : 'ADIANTAMENTO';
+  const L = FF.lancado.find((s) => s.competencia === x.m.mes && String(s.descricao || '').startsWith(tipo) && String(p.nome).startsWith(s.quem) && s.id_titulo != null);
+  if (!L) return '<span style="color:var(--farol-perto);">falta lançar</span>';
+  return Number(L.valor_saipos) === Number(x.valor) ? '<span style="color:var(--farol-ok);">✓ lançado</span>' : `<span style="color:var(--farol-perto);">valor diferente: R$ ${fmt(Number(L.valor_saipos))}</span>`;
+}
+function ffOutroValor(id) { const e = document.getElementById(id); if (e) e.hidden = !e.hidden; }
 function ffMesTxt(d) { return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); }
 // Aceita "3.261,66", "3261,66", "298.19" e "298" — o campo mostra em pt-BR, mas
 // quem digita costuma usar ponto como decimal (foi assim que o 298,19 entrou).
@@ -317,7 +329,7 @@ function ffNum(v) {
 function ffDecidir(v) { return v === null || v === undefined ? '<i style="color:#e3b341;">a decidir</i>' : (Number(v) ? 'R$ ' + fmt(Number(v)) : 'não entra'); }
 
 function renderForaFolha() {
-  const alvo = document.getElementById('view-forafolha');
+  const alvo = ffAlvo();
   if (!alvo || !FF) return;
   const hoje = trHoje();
   if (!FF.pessoas.length) {
@@ -330,8 +342,8 @@ function renderForaFolha() {
     vale alimentação (vai pelo cartão da Flash) nem consumo (não se marca mais).
     O <b>adiantamento</b> sai no dia 20 e é descontado do <b>saldo</b>, pago no <b>5º dia útil</b> do mês seguinte
     (o 5º dia útil conta o sábado; se cair no fim de semana ou feriado, antecipa para o dia útil anterior).
-    As duas parcelas aparecem no Fluxo projetado e em Contas a pagar até serem pagas. <b>A baixa é automática</b>: quando o
-    pagamento chega do Saipos com o valor exato, a parcela fecha sozinha; se o valor for diferente, aparece o botão "confirmar".
+    As duas parcelas aparecem no Fluxo projetado e em Contas a pagar até serem pagas. <b>Quem lança e baixa no Saipos é o robô</b>: com o
+    valor exato, a parcela fecha sozinha; se o valor pago for diferente, aparece o botão "confirmar".
     <span id="ffMsg" style="margin-left:6px;"></span></div>`;
 
   // O TAMANHO DA SEMANA ANTES DAS PESSOAS (12/09/2026). O loop abaixo mostra uma
@@ -446,7 +458,7 @@ function renderForaFolha() {
     h += `</table></div>
       <div class="caption-label" style="margin-top:14px;"><b>Parcelas a pagar</b> — marque como paga quando o dinheiro sair; o recibo abre pronto para imprimir ou salvar em PDF.</div>
       <div style="overflow-x:auto;"><table style="white-space:nowrap;">
-      <tr><th>Mês</th><th>Parcela</th><th>Vencimento</th><th style="text-align:right;">Valor</th><th>Situação</th><th>Baixa</th><th>Recibo</th></tr>`;
+      <tr><th>Mês</th><th>Parcela</th><th>Vencimento</th><th style="text-align:right;">Valor</th><th>Situação</th><th>Baixa</th><th>No Saipos</th><th>Recibo</th></tr>`;
     const parcelas = [];
     meses.forEach(m => {
       if (Number(m.adiantamento) > 0) parcelas.push({ m, nome: 'ADIANTAMENTO', rot: 'Adiantamento', venc: m.vence_adiantamento, valor: Number(m.adiantamento), pagoEm: m.adiantamento_pago_em, valorPago: m.adiantamento_pago });
@@ -476,8 +488,11 @@ function renderForaFolha() {
             : cand
             ? `<span style="color:#e3b341;" title="${cand.saipos_descricao}">Saipos pagou R$ ${fmt(Number(cand.saipos_valor))} em ${ffDdmm(cand.saipos_data)} · ${Number(cand.diferenca) > 0 ? '+' : '−'}${fmt(Math.abs(Number(cand.diferenca)))}</span>
                <button class="preset-btn" onclick="ffConfirmarSaipos(${p.id}, '${x.m.mes}', '${x.nome}')">confirmar</button>`
-            : `<input type="date" id="ffDt_${key}_${x.nome}" value="${hoje}" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:3px 5px;">
-               <button class="preset-btn" onclick="ffBaixar(${p.id}, '${x.m.mes}', '${x.nome}', ${x.valor})">marcar paga</button>`}</td>
+            : `<a href="javascript:void(0)" style="color:#a5a49a;" onclick="ffOutroValor('ffOut_${key}_${x.nome}')">pago com outro valor</a>
+               <span id="ffOut_${key}_${x.nome}" hidden><input type="date" id="ffDt_${key}_${x.nome}" value="${hoje}" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:3px 5px;">
+               <input id="ffVl_${key}_${x.nome}" inputmode="decimal" value="${fmt(x.valor)}" style="width:84px; background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:3px 5px;">
+               <button class="preset-btn" onclick="ffBaixar(${p.id}, '${x.m.mes}', '${x.nome}', ${x.valor})">marcar paga</button></span>`}</td>
+        <td>${ffNoSaipos(p, x)}</td>
         <td><a href="javascript:void(0)" style="color:#a5a49a;" title="abre o recibo pronto para imprimir ou salvar em PDF" onclick="ffRecibo(${p.id}, '${x.m.mes}', '${x.nome}')">🧾 recibo</a></td>
       </tr>`;
     }
@@ -607,6 +622,8 @@ async function ffInformar(pessoa, mes) {
 }
 async function ffBaixar(pessoa, mes, parcela, valor) {
   const dt = document.getElementById(`ffDt_${pessoa}_${mes.slice(0, 7)}_${parcela}`);
+  const vl = document.getElementById(`ffVl_${pessoa}_${mes.slice(0, 7)}_${parcela}`);
+  if (vl) valor = ffNum(vl.value);
   avisoAcao('enviando', 'Gravando…');
   const r = await trRpcSeguro('rh_ff_baixar', { p_pessoa: pessoa, p_mes: mes, p_parcela: parcela, p_pago_em: (dt && dt.value) || trHoje(), p_valor: valor });
   if (!r.ok) { ffAviso('Não deu: ' + await trErroDe(r), false); return; }
@@ -677,7 +694,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
+           abas: [['fora', 'Pagamento por fora · adiantamento dia 20 e saldo no 5º dia útil'], ['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
@@ -688,6 +705,8 @@ let CG_ABA_PEDIDA = new URLSearchParams(location.search).get('aba');   // link d
 function cgEntrarTela(t) {
   if (t === 'cargos' && CG_ABA_PEDIDA === 'fcaixa') { CG_ABA_PEDIDA = null; mostrarModulo('phoje'); return; }   // link antigo, já enviado à Hellen
   CARGOS_F.tela = t;
+  // pedido de outra tela (Contas a pagar → Pagamento por fora): vale uma vez
+  try { const a = sessionStorage.getItem('pesAbaPedida'); if (a) { CG_ABA_PEDIDA = a; sessionStorage.removeItem('pesAbaPedida'); } } catch (e) {}
   const ok = CG_TELAS[t].abas.map(([k]) => k).concat(CG_TELAS[t].acomp ? CG_ACOMP.map(([k]) => k) : []);
   if (CG_ABA_PEDIDA && ok.includes(CG_ABA_PEDIDA)) CARGOS_F.aba = CG_ABA_PEDIDA;
   CG_ABA_PEDIDA = null;
@@ -812,6 +831,8 @@ function renderModuloCargos() {
   else if (F.aba === 'folha') h += cgAbaFolha();
   else if (F.aba === 'ferias') h += cgAbaFerias();
   else if (F.aba === 'hoje') h += cgAbaHoje();
+  // 02/11/2026 (dono): o Pagamento fora da folha é uma aba dos Cálculos; o desenho segue em renderForaFolha
+  else if (F.aba === 'fora') { h += '<div id="cgFora"><div class="contexto">Carregando o pagamento por fora…</div></div>'; Promise.resolve().then(entrarForaFolha); }
   else if (F.aba === 'adt') h += cgAbaAdt();
   else if (F.aba === 'bonif') h += cgAbaBonif();
   else if (F.aba === 'saipos') h += cgAbaSaipos();

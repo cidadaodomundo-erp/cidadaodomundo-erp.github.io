@@ -45,7 +45,6 @@ window.CASCA_PAGINAS = {
   pconf: 'pessoas/index.html#pconf',
   pcusto: 'pessoas/index.html#pcusto',
   pacertos: 'pessoas/index.html#pacertos',
-  forafolha: 'pessoas/index.html#forafolha',
   rh: 'pessoas/index.html#rh',
   flash: 'pessoas/index.html#flash',
   reembolsos: 'pessoas/index.html#reembolsos',

@@ -263,11 +263,6 @@ window.CASCA_MENU = [
     "icone": "✅"
    },
    {
-    "chave": "forafolha",
-    "rotulo": "Pagamento fora da folha",
-    "icone": "🧮"
-   },
-   {
     "chave": "rh",
     "rotulo": "Descontos em folha",
     "icone": "💳"

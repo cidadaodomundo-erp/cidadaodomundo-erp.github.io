@@ -1723,8 +1723,9 @@ async function entrarFechaTurno() {
   if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para fechar o turno.</div>`; return; }
   alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
   try {
-    const [P, rl, u] = await Promise.all([consultarTudo('vw_est_turno_pendencia?select=*&order=unidade,setor,turno,ordem'), trRpc('rh_eu_lider'), estUnidade(), estNomesCarregar()]);
-    const meus = rl.ok ? await rl.json() : [];
+    const [P, rl, ro, u] = await Promise.all([consultarTudo('vw_est_turno_pendencia?select=*&order=unidade,setor,turno,ordem'), trRpc('rh_eu_lider'), trRpc('est_pode_operar_producao'), estUnidade(), estNomesCarregar()]);
+    // o líder vê só o turno dele; Rita e Habrahan veem todos, para fechar por quem não fechou
+    const meus = rl.ok && !(ro.ok && (await ro.json()) === true) ? await rl.json() : [];
     const chave = (x) => `${x.unidade}|${x.setor}|${x.turno}`;
     const minhas = new Set(meus.map(chave));
     const grupos = new Map();

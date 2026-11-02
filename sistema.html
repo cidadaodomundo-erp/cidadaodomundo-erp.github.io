@@ -195,9 +195,9 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261102b"></script>
-<script src="casca/paginas.js?v=20261102b"></script>
-<script src="casca/modulos.js?v=20261102b"></script>
+<script src="casca/menu.js?v=20261102c"></script>
+<script src="casca/paginas.js?v=20261102c"></script>
+<script src="casca/modulos.js?v=20261102c"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -612,7 +612,8 @@ async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
   [PODE, DESC, , VE_PESSOAL, VE_GESTAO] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao()]);
   desenharLoja();
-  const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).split('/');
+  // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
+  const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
   const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link);
   if (pedido && visivel(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
   else if (PODE && minhas.length) abrir(minhas[0]);     // acesso restrito abre direto no que é dele, como o painel

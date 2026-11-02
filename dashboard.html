@@ -194,7 +194,7 @@
       <button class="sidebar-btn" id="navBtnPresc" onclick="mostrarModulo('presc')"><span class="mico">📄</span>Rescisões</button>
       <button class="sidebar-btn" id="navBtnPenvio" onclick="mostrarModulo('penvio')"><span class="mico">📤</span>Envio à contabilidade</button>
       <button class="sidebar-btn" id="navBtnPconf" onclick="mostrarModulo('pconf')"><span class="mico">✅</span>Conferência da folha</button>
-      <button class="sidebar-btn" id="navBtnForafolha" onclick="mostrarModulo('forafolha')"><span class="mico">🧮</span>Pagamento fora da folha</button>
+
       <button class="sidebar-btn" id="navBtnRh" onclick="mostrarModulo('rh')"><span class="mico">💳</span>Descontos em folha</button>
       <button class="sidebar-btn" id="navBtnReembolsos" onclick="mostrarModulo('reembolsos')"><span class="mico">💸</span>Reembolsos</button>
       <button class="sidebar-btn" id="navBtnPcusto" onclick="mostrarModulo('pcusto')"><span class="mico">📊</span>Custo da folha</button>
@@ -559,10 +559,10 @@
 
 <script src="nucleo/nucleo.js?v=20261101f"></script>
 <script src="listas/listas.js?v=20261029b"></script>
-<script src="estoque/estoque.js?v=20261102b"></script>
+<script src="estoque/estoque.js?v=20261102c"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script src="caixa/caixa.js?v=20261029a"></script>
-<script src="pessoas/pessoas.js?v=20261102c"></script>
+<script src="pessoas/pessoas.js?v=20261102d"></script>
 <script src="atacado/atacado.js?v=20261101c"></script>
 <script src="cardapio/cardapio.js?v=20261028a"></script>
 <script>
@@ -11526,7 +11526,7 @@ const PLC_TILES = [
     def: 'Custo dos canais = o que o iFood e a Rede cobraram: promoções pagas pela loja, anúncios, comissão e taxas. A venda conta cheia, antes da promoção. ',
     telas: [['resumo', 'Resumo do canal iFood'], ['rede', 'Taxas da maquininha'], ['promocoes', 'Promoções']] },
   { id: 'pess',  rot: 'Pessoas',                un: 'R$', meta: 'PESSOAL',     v: a => a.grupos.PESSOAL,
-    telas: [['despesas', 'Análise de despesas'], ['cargos', 'Cargos e salários'], ['forafolha', 'Pagamento fora da folha'], ['rh', 'Descontos em folha']] },
+    telas: [['despesas', 'Análise de despesas'], ['cargos', 'Cargos e salários'], ['pcalc', 'Cálculos da folha'], ['rh', 'Descontos em folha']] },
   { id: 'mc',    rot: 'Margem de contribuição', un: 'R$', meta: 'LUCRO_BRUTO', v: a => a.mc,
     def: 'Margem de contribuição = receita líquida − mercadoria, a mesma da DRE. A receita líquida já vem sem o custo dos canais (anúncios dentro), sem comissão de vendedor e sem ICMS. ',
     telas: [['dre', 'DRE'], ['rateio', 'Preço alvo por produto']] },
@@ -14001,7 +14001,7 @@ function projJanela(P, de, ate) {
 let CP = null;
 const CP_ORIGEM = {
   'SAIPOS':        { rot: 'Saipos',        baixa: 'no Saipos' },
-  'FORA DA FOLHA': { rot: 'Fora da folha', baixa: 'automática pelo Saipos', tela: 'forafolha' },
+  'FORA DA FOLHA': { rot: 'Fora da folha', baixa: 'automática pelo Saipos', tela: 'pcalc', aba: 'fora' },
   'LISTAS':        { rot: 'Listas',        baixa: 'Listas · Financeiro', tela: 'listasfin' },
   'EPADOCA':       { rot: 'ePadoca',       baixa: 'automática (portal)' },
   // 18/10/2026: a provisao mensal do Boqueirao enquanto a lista do mes nao fecha (estimativa, vw_fin_receita_mensal_prevista)
@@ -14288,7 +14288,7 @@ function cpTabela(sentido) {
     // "no Saipos" e' o caso comum: so aparece a baixa quando ela foge disso
     const baixa = r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
       ? `<span style="color:var(--amber-2);" title="o débito já apareceu no extrato do banco">saiu do banco em ${ffDdmm(r.saiuBanco)} — dar baixa no Saipos</span>`
-      : og.tela ? `<a href="javascript:void(0)" style="color:var(--tx-3);" onclick="mostrarModulo('${og.tela}')">${og.baixa} ›</a>`
+      : og.tela ? `<a href="javascript:void(0)" style="color:var(--tx-3);" onclick="${og.aba ? `sessionStorage.setItem('pesAbaPedida','${og.aba}');` : ''}mostrarModulo('${og.tela}')">${og.baixa} ›</a>`
       : `<span style="color:var(--tx-3);">${og.baixa}</span>`;
     const jaNoTitulo = r.fornecedor && String(r.descricao || '').toUpperCase().includes(String(r.fornecedor).toUpperCase());
     const sub = [agr !== 'fornecedor' && !jaNoTitulo ? r.fornecedor : '', cat(r.categoria), agr !== 'origem' && r.origem !== 'SAIPOS' ? og.rot : '']
@@ -14654,7 +14654,7 @@ function renderContasReceber() {
     <tbody>${quem.map(([k, g]) => { const og = CP_ORIGEM[g.origem] || { rot: g.origem, baixa: '—' };
       return `<tr><td style="text-align:left; white-space:normal;"><b>${trEscH(k)}</b> <span style="color:var(--tx-5); font-size:11px;">${og.rot}</span></td>
       <td class="negativo"><b>${fmt(g.v)}</b></td><td>${g.n}</td><td>${ffDdmm(g.desde)} · ${g.dias}d</td>
-      <td style="text-align:left;">${og.tela ? `<a href="javascript:void(0)" style="color:var(--brand);" onclick="mostrarModulo('${og.tela}')">${og.baixa} ›</a>` : og.baixa}</td></tr>`; }).join('')}</tbody></table></div>`
+      <td style="text-align:left;">${og.tela ? `<a href="javascript:void(0)" style="color:var(--brand);" onclick="${og.aba ? `sessionStorage.setItem('pesAbaPedida','${og.aba}');` : ''}mostrarModulo('${og.tela}')">${og.baixa} ›</a>` : og.baixa}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="contexto" style="border-color:var(--farol-ok);">Ninguém atrasado. ✔</div>'}`;
   alvo.innerHTML = `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contas a receber — o que vai entrar, de quem, e quem está atrasado · ${cpNomeLoja()}</div>
