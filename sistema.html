@@ -197,7 +197,7 @@
 
 <script src="casca/menu.js?v=20261102d"></script>
 <script src="casca/paginas.js?v=20261102d"></script>
-<script src="casca/modulos.js?v=20261102d"></script>
+<script src="casca/modulos.js?v=20261102e"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -521,6 +521,7 @@ function inicio() {
   }
   h += `<div class="cards">`;
   MODULOS.forEach((m) => {
+    if (m.externo) { h += `<a class="card" style="text-decoration:none;" href="${esc(m.externo)}" target="_blank" rel="noopener"><span class="t"><span>${esc(m.icone)}</span>${esc(m.nome)} ↗</span><span class="n">abre em outra aba</span></a>`; return; }
     const nl = telasDo(m, 'lancar').length, na = telasDo(m, 'acompanhar').length;
     if (!nl && !na && !m.emConstrucao) return;           // acesso restrito: só os módulos com tela dele
     if (!nl && !na && PODE) return;

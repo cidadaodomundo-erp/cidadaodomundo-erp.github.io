@@ -39,6 +39,8 @@ window.CASCA_MODULOS = [
     // Atendimento ao cliente fica aqui até ir para o portal do Fabio (05/10)
     acompanhar: ['vendasagora', 'resumo', 'cancelamentos', 'negociacoes', 'avaliacoes', 'qualidade', 'clientes', 'site', 'atrasos',
                  'frete', 'logfin', 'atendimento'] },
+  // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
+  { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: [],
     acompanhar: ['plano', 'atividades', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
