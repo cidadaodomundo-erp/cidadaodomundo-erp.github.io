@@ -4,22 +4,53 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Cidadão do Mundo · Pedidos</title>
+<title>Pedidos</title>
 <meta name="theme-color" content="#111110">
-<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="icon" id="icone" href="data:,">
 <!-- LOJINHA PÚBLICA DOS ORÇAMENTOS (30/10/2026, pedido 9 do Ajuda; proposta contexto/propostas-telas/2026-10-30-loja-online.md).
      Sem login, sem casca: só chama loja_catalogo e loja_pedir com a chave anônima. Preço e custo são do banco; a tela nunca manda preço.
      Abrir a loja é o loja_config.aberta, decisão do dono. Quem mexe: o chat "Telas do painel". -->
 <style>
   :root { --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#45443f; --tx-1:#fff; --tx-2:#c3c2b7; --tx-3:#a5a49a;
-          --marca-amarelo:#f6c63e; --marca-laranja:#ee8a3c; --ok:#3fb950; --erro:#ff6b6b; }
+          --marca-amarelo:#f6c63e; --marca-laranja:#ee8a3c; --ok:#3fb950; --erro:#ff6b6b;
+          --cartao:#fff; --cartao-tx:#111110; --cartao-tx-2:#55554f; --cartao-linha:#e2e1da; --aberto:#1a7f37; --fechado:#6b6b64; }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }
   body { margin:0; background:var(--bg); color:var(--tx-1); font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   main { max-width:1040px; margin:0 auto; padding:0 16px 110px; }
-  header { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }
-  header img { width:44px; height:44px; border-radius:10px; }
-  h1 { font-size:20px; margin:0; }
+  .topo { position:relative; }
+  .capa { position:absolute; left:0; right:0; top:0; height:270px; background:var(--surface-2); overflow:hidden; }
+  .capa img { display:block; width:100%; height:100%; object-fit:cover; }
+  .topo-dentro { position:relative; max-width:1040px; margin:0 auto; padding:200px 16px 14px; }
+  .cab { position:relative; display:grid; grid-template-columns:1fr 310px; gap:0 24px; min-height:190px; padding:20px; background:var(--cartao); color:var(--cartao-tx); border-radius:18px; }
+  .cab.so-um { grid-template-columns:1fr; }
+  .cab-logo { position:absolute; left:50%; top:-96px; width:160px; height:160px; margin-left:-80px; object-fit:cover; border-radius:14px; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .cab-esq { display:flex; flex-direction:column; min-width:0; }
+  .cab-dir { border-left:1px solid var(--cartao-linha); padding-left:24px; font-size:15px; }
+  h1 { font-size:30px; line-height:1.15; margin:0 0 10px; font-weight:800; }
+  .cab-end { font-size:15px; color:var(--cartao-tx-2); overflow-wrap:anywhere; }
+  .sit { font-weight:800; }
+  .sit i { display:inline-block; width:10px; height:10px; margin-left:6px; border-radius:50%; background:currentColor; }
+  .aberto { color:var(--aberto); }
+  .fechado { color:var(--fechado); }
+  .cab-min { margin-top:14px; color:var(--cartao-tx-2); }
+  .cab-min b { color:var(--cartao-tx); }
+  .abas { display:flex; flex-wrap:wrap; gap:4px 22px; margin-top:auto; padding-top:16px; }
+  .abas button { min-height:40px; padding:0 0 6px; font:inherit; font-size:15px; border:0; border-bottom:2px solid transparent; background:none; color:var(--cartao-tx-2); cursor:pointer; }
+  .abas button.on { color:var(--cartao-tx); font-weight:700; border-bottom-color:var(--cartao-tx); }
+  .painel { padding:14px; background:var(--surface); border:1px solid var(--line); border-radius:12px; }
+  .painel p { margin:0 0 8px; }
+  .painel p:last-child { margin-bottom:0; }
+  .painel a { color:var(--marca-amarelo); font-size:18px; font-weight:800; }
+  @media (max-width:760px) {
+    .capa { height:170px; }
+    .topo-dentro { padding-top:130px; }
+    .cab { display:block; min-height:0; padding:66px 16px 12px; text-align:center; }
+    .cab-logo { top:-55px; width:110px; height:110px; margin-left:-55px; }
+    .cab-dir { border-left:0; border-top:1px solid var(--cartao-linha); margin-top:12px; padding:12px 0 0; }
+    h1 { font-size:24px; margin-bottom:6px; }
+    .abas { justify-content:center; }
+  }
   h2 { font-size:15px; margin:22px 0 8px; color:var(--marca-amarelo); }
   .breve { text-align:center; font-size:26px; font-weight:800; padding:70px 0; }
   .barra { position:sticky; top:0; z-index:5; background:var(--bg); padding:8px 0 10px; }
@@ -75,8 +106,8 @@
 </style>
 </head>
 <body>
+<div class="topo" id="topo" hidden></div>
 <main>
-  <header><img src="icon-192.png" alt=""><div><h1 id="nomeLoja">Cidadão do Mundo</h1><div class="sub" id="resumo"></div></div></header>
   <div id="corpo"><p class="sub">Abrindo…</p></div>
 </main>
 <div class="rodape" id="rodape" hidden>
@@ -94,7 +125,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</
 const reais = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const numero = (t) => { const n = Number(String(t).trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
 const CHAVE = new URLSearchParams(location.search).get('c') || '';   // link próprio de uma empresa
-let CAT = null, FORMA = null, ENVIANDO = false, BUSCA = '', CATEG = '';
+let CAT = null, FORMA = null, ENVIANDO = false, BUSCA = '', CATEG = '', ABA = 'produtos';
 const QTD = {};               // id do produto → quantidade
 const KIT = new Set();        // ids marcados do kit
 
@@ -134,16 +165,33 @@ async function abrir() {
   if (!CAT.aberta) { $('corpo').innerHTML = `<div class="breve">${CHAVE ? 'Link indisponível. Fale com a gente.' : 'Em breve'}</div>`; $('rodape').hidden = true; return; }
   desenhar();
 }
-// a marca vem do catálogo: link de empresa = Brasa e Fumaça, link geral = Cidadão do Mundo. O cliente fica à parte, no resumo.
+// logo, nome e ícone só entram aqui, com o que o catálogo mandar: o HTML inicial não traz marca nenhuma, e campo que não vier não aparece
 function marca() {
   const nome = CAT.marca || CAT.empresa;
-  if (nome) { $('nomeLoja').textContent = nome; document.title = nome + ' · Pedidos'; }
+  if (nome) document.title = nome + ' · Pedidos';
+  if (CAT.logo) $('icone').href = CAT.logo;
+  const invalido = CHAVE && !CAT.aberta;
+  const local = [CAT.endereco, CAT.cidade].filter(Boolean).join(', ');
+  const situacao = invalido ? '' : CAT.aberta ? '<div class="sit aberto">Aberto<i></i></div><div class="aberto">disponível para encomendas</div>' : '<div class="sit fechado">Fechado</div>';
+  const minimo = Number(CAT.minimo) ? `<div class="cab-min"><b>Valor mínimo para encomendas</b><br>a partir de ${reais(CAT.minimo)}</div>` : '';
+  const aba = (k, r) => `<button type="button" data-aba="${k}" onclick="trocarAba('${k}')">${r}</button>`;
+  $('topo').innerHTML = `<div class="capa">${CAT.fundo ? `<img src="${esc(CAT.fundo)}" alt="" onerror="this.remove()">` : ''}</div>
+    <div class="topo-dentro"><div class="cab${situacao || minimo ? '' : ' so-um'}">
+      ${CAT.logo ? `<img class="cab-logo" src="${esc(CAT.logo)}" alt="" onerror="this.remove()">` : ''}
+      <div class="cab-esq"><h1>${esc(nome || '')}</h1>
+        ${local ? `<div class="cab-end">${esc(local)}</div>` : ''}
+        ${CHAVE && CAT.empresa ? `<div class="cab-end">Pedido de ${esc(CAT.empresa)}</div>` : ''}
+        ${CAT.aberta ? `<div class="abas">${aba('produtos', 'Produtos')}${aba('entrega', 'Área de Entrega')}${CAT.telefone ? aba('contato', 'Contato') : ''}</div>` : ''}</div>
+      ${situacao || minimo ? `<div class="cab-dir">${situacao}${minimo}</div>` : ''}
+    </div></div>`;
+  $('topo').hidden = false;
 }
+function trocarAba(a) { ABA = a; mostrar(); }
 function desenhar() {
   const P = CAT.produtos || [], K = CAT.kit || [];
   const frete = Number(CAT.frete || 0);
   const entrega = !CHAVE ? 'Retirada ou entrega · frete combinado depois' : frete ? `Retirada ou entrega · frete ${reais(frete)}` : 'Retirada ou entrega';
-  $('resumo').textContent = CAT.marca && CAT.empresa ? `Pedido de ${CAT.empresa} · ${entrega}` : entrega;
+  const retirada = [CAT.endereco, CAT.cidade].filter(Boolean).join(', ');
   // o filtro de categoria só aparece quando o catálogo trouxer a categoria
   const cats = [...new Set(P.map((p) => p.categoria).filter(Boolean))];
   let h = `<section id="vitrine"><div class="barra"><input id="busca" type="search" placeholder="Buscar produto" aria-label="Buscar produto" oninput="BUSCA=this.value;desenharGrade()">
@@ -153,7 +201,9 @@ function desenhar() {
     h += `<div id="caixaKit"><h2>Kit burger</h2>${CAT.kit_foto ? `<img src="${esc(CAT.kit_foto)}" alt="" loading="lazy" style="display:block;width:100%;max-width:360px;border-radius:12px;margin-bottom:10px;" onerror="this.remove()">` : ''}<label class="campo">Pessoas (mínimo ${Number(CAT.kit_minimo)})<input id="kitPessoas" inputmode="numeric" oninput="atualizar()"></label>`
       + K.map((k) => `<label class="ingr"><input type="checkbox" onchange="marcar(${k.id},this.checked)"><span>${esc(k.nome)}</span><span>${reais(k.preco_por_pessoa)} por pessoa</span></label>`).join('') + '</div>';
   }
-  h += `</section><section id="revisao" class="revisao" hidden>
+  h += `</section><section id="painelEntrega" class="painel" hidden><p>${esc(entrega)}</p>${CAT.endereco ? `<p>Retirada: ${esc(retirada)}</p>` : ''}</section>
+    ${CAT.telefone ? `<section id="painelContato" class="painel" hidden><a href="tel:+55${esc(String(CAT.telefone).replace(/\D/g, ''))}">${esc(CAT.telefone)}</a></section>` : ''}
+    <section id="revisao" class="revisao" hidden>
     <button type="button" class="voltar" onclick="location.hash=''">← Continuar comprando</button>
     <h2>Seu pedido</h2><div id="itens"></div>
     <h2>Seus dados</h2>
@@ -171,7 +221,11 @@ function desenhar() {
 function mostrar() {
   if (!$('vitrine')) return;   // pedido já enviado
   const rev = naRevisao();
-  $('vitrine').hidden = rev; $('revisao').hidden = !rev;
+  $('topo').hidden = rev;   // na revisão o cabeçalho sai, para a compra ficar curta
+  $('vitrine').hidden = rev || ABA !== 'produtos'; $('revisao').hidden = !rev;
+  $('painelEntrega').hidden = rev || ABA !== 'entrega';
+  if ($('painelContato')) $('painelContato').hidden = rev || ABA !== 'contato';
+  document.querySelectorAll('.abas button').forEach((b) => b.classList.toggle('on', b.dataset.aba === ABA));
   $('msg').textContent = '';
   if (rev) desenharItens(); else desenharGrade();
   window.scrollTo(0, 0);
@@ -257,6 +311,9 @@ async function enviar() {
   const np = pessoas(), kit = [...KIT];
   const nome = CHAVE ? '' : $('nome').value.trim(), contato = $('contato').value.trim(), local = $('local').value.trim(), quando = $('quando').value;
   if (!itens.length && !np) return erro('escolha pelo menos um item.');
+  // o mínimo é sobre os produtos, sem frete; o banco também barra
+  const soma = (CAT.produtos || []).reduce((s, p) => s + subtotal(p), 0);
+  if (CHAVE && Number(CAT.minimo) && soma < Number(CAT.minimo)) return erro(`o valor mínimo para encomendas é ${reais(CAT.minimo)}.`);
   if (np && np < Number(CAT.kit_minimo)) return erro(`o kit burger tem mínimo de ${Number(CAT.kit_minimo)} pessoas.`);
   if (np && !kit.length) return erro('escolha os ingredientes do kit.');
   if (!np && kit.length) return erro('diga para quantas pessoas é o kit.');
@@ -272,19 +329,12 @@ async function enviar() {
   try {
     const base = { p_contato: contato || null, p_itens: itens, p_entrega_forma: FORMA, p_entrega_quando: data.toISOString(), p_entrega_local: FORMA === 'ENTREGA' ? local : null, p_obs: $('obs').value.trim() || null };
     const d = await rpc('loja_pedir', CHAVE ? Object.assign(base, { p_nome: null, p_chave: CHAVE }) : Object.assign(base, { p_nome: nome, p_kit_pessoas: np || null, p_kit_itens: np ? kit : [] }));
-    $('rodape').hidden = true;
+    $('rodape').hidden = true; $('topo').hidden = true;
     $('corpo').innerHTML = `<div class="feito"><b>✓ Pedido nº ${Number(d.numero)} recebido</b>Total ${reais(CHAVE ? d.total_com_frete : d.total)}${CHAVE ? (Number(d.frete) ? `, com frete de ${reais(d.frete)}` : '') : FORMA === 'ENTREGA' ? ', frete combinado depois' : ''}.<br>${CHAVE ? 'Vamos confirmar com você.' : 'Vamos confirmar pelo telefone.'}</div>`;
     window.scrollTo(0, 0);
   } catch (e) {
     m.className = 'msg erro'; m.textContent = `✗ Não enviou: ${motivo(e)} Toque em Enviar pedido para tentar de novo.`;
   } finally { ENVIANDO = false; $('enviar').disabled = false; }
-}
-// link de empresa não leva o logo nem o nome do Cidadão do Mundo, nem enquanto abre
-if (CHAVE) {
-  document.querySelector('header img').remove();
-  document.querySelector('link[rel="icon"]').remove();
-  $('nomeLoja').textContent = '';
-  document.title = 'Pedidos';
 }
 $('enviar').addEventListener('click', () => { if (naRevisao()) enviar(); else location.hash = 'pedido'; });
 window.addEventListener('hashchange', mostrar);
