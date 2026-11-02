@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Controle das atividades · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- CONTROLE DAS ATIVIDADES (02/11/2026, dono: "talvez criar um controle das atividades e o status delas, isso vai facilitar a fazer destravar";
+     proposta contexto/propostas-telas/2026-11-02-controle-atividades.md). Só leitura e só do dono: vw_wa_atividade devolve linhas só ao neto@.
+     Quem muda o status é o robô. Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .at-pessoa { color:var(--tx-1); font-size:15px; font-weight:800; margin:18px 2px 6px; }
+  .at-mais { margin:16px 2px; font-size:13px; color:var(--tx-3); }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-atividades" class="modulo" style="display:none;">
+      <div id="view-atividades"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261101f"></script>
+<script>
+const AT_ABERTOS = ['Travada', 'Respondeu', 'Enviada', 'A enviar'];
+const AT_ORDEM = AT_ABERTOS.concat(['Feita', 'Cancelada']);
+const AT_COR = { Travada: 'var(--farol-fora)', Respondeu: 'var(--farol-perto)', Enviada: 'var(--tx-1)', 'A enviar': 'var(--tx-3)', Feita: 'var(--farol-ok)', Cancelada: 'var(--tx-4)' };
+const AT = { linhas: null, filtro: null, fechadas: false };
+
+const atHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+const atDia = (t) => (t ? new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null);
+const atDdmm = (d) => (d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '–');
+function atDias(x) {
+  const d = atDia(x.enviada_em);
+  if (!d || x.estado === 'A enviar' || x.estado === 'Feita' || x.estado === 'Cancelada') return '–';
+  const n = Math.round((Date.parse(atHoje()) - Date.parse(d)) / 86400000);
+  return n <= 0 ? 'hoje' : `${n} ${n === 1 ? 'dia' : 'dias'}`;
+}
+function atFalta(x) {
+  if (x.falta_agora == null && x.falta_inicial == null) return '–';
+  return x.falta_inicial == null ? String(x.falta_agora) : `${x.falta_agora == null ? '?' : x.falta_agora} de ${x.falta_inicial}`;
+}
+async function entrarAtividades() {
+  const alvo = document.getElementById('view-atividades');
+  alvo.innerHTML = '<div class="contexto">Carregando…</div>';
+  try {
+    AT.linhas = await consultarTudo('vw_wa_atividade?select=*&order=pessoa,id.desc');
+    atDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<h2>Controle das atividades</h2><div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler as atividades: ${trEscH(e.message)} <button type="button" class="preset-btn" onclick="entrarAtividades()">Tentar de novo</button></div>`;
+  }
+}
+function atFiltrar(e) { AT.filtro = AT.filtro === e ? null : e; atDesenhar(); }
+function atDesenhar() {
+  const alvo = document.getElementById('view-atividades');
+  let h = '<h2>Controle das atividades</h2>';
+  if (!AT.linhas.length) { alvo.innerHTML = h + '<div class="contexto" style="text-align:left;">Nenhuma atividade para este login.</div>'; return; }
+  const n = (e) => AT.linhas.filter((x) => x.estado === e).length;
+  h += `<div class="cards">${AT_ABERTOS.map((e) => `<div class="card ${e === 'Travada' && n(e) ? 'highlight' : 'neutral'}" style="cursor:pointer;${AT.filtro === e ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="atFiltrar('${e}')"><div class="card-lbl">${e}</div><div class="card-val">${n(e)}</div></div>`).join('')}</div>`;
+  const nFechadas = n('Feita') + n('Cancelada');
+  const vis = AT.linhas.filter((x) => (AT.filtro ? x.estado === AT.filtro : AT.fechadas || AT_ABERTOS.includes(x.estado)));
+  const ordem = (x) => { const i = AT_ORDEM.indexOf(x.estado); return i < 0 ? 99 : i; };
+  const pessoas = [...new Set(vis.map((x) => x.pessoa))].sort((a, b) => {
+    const m = (p) => Math.min(...vis.filter((x) => x.pessoa === p).map(ordem));
+    return m(a) - m(b) || String(a).localeCompare(String(b), 'pt-BR');
+  });
+  if (!vis.length) h += '<div class="contexto" style="text-align:left;">Nada neste status.</div>';
+  pessoas.forEach((p, i) => {
+    const L = vis.filter((x) => x.pessoa === p).sort((a, b) => ordem(a) - ordem(b));
+    h += `<div class="at-pessoa">${trEscH(p)}</div>
+      <div id="tabelaAt${i}" style="overflow-x:auto;"><table><thead><tr><th>Atividade</th><th>Status</th><th>Enviada em</th><th>Há quantos dias</th><th>Falta</th><th>Resposta</th></tr></thead><tbody>
+      ${L.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.atividade || '')}</td>
+        <td style="color:${AT_COR[x.estado] || 'var(--tx-3)'};font-weight:700;">${trEscH(x.estado || '')}</td>
+        <td>${x.estado === 'A enviar' ? (x.previsto_em ? 'previsto ' + atDdmm(atDia(x.previsto_em)) : '–') : atDdmm(atDia(x.enviada_em))}</td>
+        <td>${atDias(x)}</td><td>${trEscH(atFalta(x))}</td>
+        <td style="white-space:normal;">${trEscH(x.resposta || '')}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  });
+  if (!AT.filtro && nFechadas) h += `<div class="at-mais"><a href="javascript:void(0)" style="color:var(--tx-3);" onclick="AT.fechadas=!AT.fechadas;atDesenhar()">${AT.fechadas ? 'esconder' : 'ver'} feitas e canceladas (${nFechadas})</a></div>`;
+  alvo.innerHTML = h;
+  if (typeof barrasTopoTabelas === 'function') { try { barrasTopoTabelas(); } catch (e) {} }
+}
+
+const TELA = 'atividades';
+let MODULO_ATUAL = 'atividades';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-atividades').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarAtividades(); };
+entrarAtividades();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

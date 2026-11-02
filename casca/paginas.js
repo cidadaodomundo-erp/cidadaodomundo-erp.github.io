@@ -35,6 +35,7 @@ window.CASCA_PAGINAS = {
   // 26/10/2026 (bloco 4): Pessoas
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
+  atividades: 'atividades/index.html',
   cargos: 'pessoas/index.html#cargos',
   // 29/10/2026 (dono): cada passo da folha é uma tela
   pcalc: 'pessoas/index.html#pcalc',
@@ -64,4 +65,4 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
-  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora'];
+  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora', 'atividades'];

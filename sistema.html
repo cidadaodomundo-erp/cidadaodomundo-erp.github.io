@@ -195,9 +195,9 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261102c"></script>
-<script src="casca/paginas.js?v=20261102c"></script>
-<script src="casca/modulos.js?v=20261102c"></script>
+<script src="casca/menu.js?v=20261102d"></script>
+<script src="casca/paginas.js?v=20261102d"></script>
+<script src="casca/modulos.js?v=20261102d"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -353,12 +353,15 @@ const SO_PESSOAL = new Set(['macertos']);
 let VE_PESSOAL = null;
 // tela só de DONO e FINANCEIRO
 const SO_GESTAO = new Set(['lojaempresas']);
+// 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
+const SO_DONO = new Set(['atividades']);
 let VE_GESTAO = null;
 function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
+  if (SO_DONO.has(chave) && String((sessao() || {}).email || '').toLowerCase() !== 'neto@cidadaodomundo.com.br') return false;
   if (!PODE) return true;
   if (it.link) return false;                     // atalhos também somem para acesso restrito (igual ao painel)
   return PODE.includes(chave);

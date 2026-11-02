@@ -41,5 +41,5 @@ window.CASCA_MODULOS = [
                  'frete', 'logfin', 'atendimento'] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: [],
-    acompanhar: ['plano', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
+    acompanhar: ['plano', 'atividades', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];

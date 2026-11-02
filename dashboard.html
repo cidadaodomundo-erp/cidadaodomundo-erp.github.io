@@ -229,6 +229,7 @@
     <div class="sidebar-grupo" id="gSistema">
       <button class="sidebar-btn" id="navBtnRelatorios" onclick="mostrarModulo('relatorios')"><span class="mico">🗞️</span>Resumos semanais</button>
       <button class="sidebar-btn" id="navBtnConciliacao" onclick="mostrarModulo('conciliacao')"><span class="mico">✅</span>Conferência da base</button>
+      <button class="sidebar-btn" id="navBtnAtividades" onclick="mostrarModulo('atividades')"><span class="mico">📋</span>Controle das atividades</button>
       <button class="sidebar-btn" id="navBtnRotinas" onclick="mostrarModulo('rotinas')"><span class="mico">🤖</span>Rotinas</button>
       <button class="sidebar-btn" id="navBtnTelas" onclick="mostrarModulo('telas')"><span class="mico">🗺️</span>Telas do painel</button>
       <!-- Link, nao modulo: pagina publica do site, aberta em aba nova. Decisao
@@ -1159,6 +1160,7 @@ const MODULOS_COM_FILTRO_TOPO = new Set(['estasemana', 'resumo', 'cancelamentos'
 function mostrarModulo(nome) {
   // 01/11/2026: Vendas agora mora em pagina propria (docs/vendas/), aberta pela casca
   if (nome === 'vendasagora') { window.top.location.href = 'sistema.html#vendasagora'; return; }
+  if (nome === 'atividades') { window.top.location.href = 'sistema.html#atividades'; return; }
   // 09/09/2026: Conciliacao de cartao virou parte do Fechamento de Caixas — link
   // antigo cai no modulo unico em vez de quebrar. (Taxas da maquininha voltou a
   // ser modulo proprio no mesmo dia.)

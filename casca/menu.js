@@ -386,6 +386,11 @@ window.CASCA_MENU = [
     "icone": "✅"
    },
    {
+    "chave": "atividades",
+    "rotulo": "Controle das atividades",
+    "icone": "📋"
+   },
+   {
     "chave": "rotinas",
     "rotulo": "Rotinas",
     "icone": "🤖"
