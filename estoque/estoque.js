@@ -1430,7 +1430,7 @@ const EST_HIST_DET = {
     return (ls[0] && ls[0].o_que_produzir ? `<div style="color:var(--tx-3); margin-bottom:4px;">produzir: ${trEscH(ls[0].o_que_produzir)}</div>` : '')
       + estMini(['Insumo', 'Previsto', 'Separado', 'Observação'], ls.map((l) => [
         (l.etapa === 'CORTE' ? '<b style="color:var(--amber-2);">[corte]</b> ' : '') + trEscH(l.nome_base),
-        `${fmt(Number(l.qtd_prevista))} ${trEscH(l.un || '')}`, l.qtd_separada == null ? '—' : `${fmt(Number(l.qtd_separada))} ${trEscH(l.un || '')}`,
+        Number(l.qtd_prevista) ? `${fmt(Number(l.qtd_prevista))} ${trEscH(l.un || '')}` : 'a informar', l.qtd_separada == null ? '—' : `${fmt(Number(l.qtd_separada))} ${trEscH(l.un || '')}`,
         trEscH(l.observacao || '')]));
   },
   ordem: async (id) => {
@@ -2172,9 +2172,10 @@ function plpSepsHtml(fech) {
       <div id="tabelaSep${id}" style="overflow-x:auto; margin-top:6px;"><table><thead><tr><th>Insumo</th><th>Previsto</th><th>Separado de verdade</th><th>Diferença</th><th>Observação</th><th>No estoque</th></tr></thead><tbody>
         ${rows.map((l, k) => `<tr><td>${l.etapa === 'CORTE' ? '<b style="color:var(--amber-2);">[corte]</b> ' : ''}${trEscH(l.nome_base)}
               <div style="font-size:11px; color:var(--tx-5);">${trEscH(l.vem_de || '')}</div></td>
-            <td style="white-space:nowrap;">${fmt(Number(l.qtd_prevista))} ${trEscH(l.un || '')}</td>
-            <td style="white-space:nowrap;">${aberta ? `<input type="number" step="0.001" min="0" inputmode="decimal" id="plpSq_${id}_${k}" value="${Number(l.qtd_separada != null ? l.qtd_separada : l.qtd_prevista)}" style="width:84px; ${campo}">` : (l.qtd_separada == null ? '—' : fmt(Number(l.qtd_separada)))} ${trEscH(l.un || '')}</td>
-            <td style="color:${Number(l.diferenca) ? 'var(--farol-perto)' : 'var(--tx-5)'};">${l.diferenca == null || !Number(l.diferenca) ? '—' : fmt(Number(l.diferenca))}</td>
+            <td style="white-space:nowrap;">${Number(l.qtd_prevista) ? `${fmt(Number(l.qtd_prevista))} ${trEscH(l.un || '')}` : '<span style="color:var(--tx-4);">a informar</span>'}</td>
+            <td style="white-space:nowrap;">${aberta ? `<input type="number" step="0.001" min="0" inputmode="decimal" id="plpSq_${id}_${k}" value="${l.qtd_separada != null ? Number(l.qtd_separada) : Number(l.qtd_prevista) || ''}" style="width:84px; ${campo}">` : (l.qtd_separada == null ? '—' : fmt(Number(l.qtd_separada)))} ${trEscH(l.un || '')}</td>
+            ${''/* 02/11/2026: previsto 0 é o que a Rita informa (burger: acém, desossa, gordura), não é separação a mais */}
+            <td style="color:${Number(l.diferenca) && Number(l.qtd_prevista) ? 'var(--farol-perto)' : 'var(--tx-5)'};">${l.diferenca == null || !Number(l.diferenca) || !Number(l.qtd_prevista) ? '—' : fmt(Number(l.diferenca))}</td>
             <td>${aberta ? `<input id="plpSo_${id}_${k}" value="${trEscH(l.observacao || '')}" placeholder="opcional" style="width:150px; ${campo}">` : trEscH(l.observacao || '')}</td>
             ${sepSaldoTd(l)}</tr>`).join('')}
       </tbody></table></div></div>`;
@@ -2251,7 +2252,7 @@ function plpSepImprimir(id) {
       <p class="sub"><b>Produzir:</b> ${c.o_que_produzir || ''}</p>
       <p class="assina">Separou:<span></span>Conferiu:<span></span></p></div><div class="cod">${c.numero}</div></div>
     <table><thead><tr><th>#</th><th>Insumo</th><th class="q">Previsto</th><th>Separado de verdade</th></tr></thead><tbody>
-    ${ls.map((l, k) => `<tr><td>${k + 1}</td><td>${l.etapa === 'CORTE' ? '<b>[corte]</b> ' : ''}${l.nome_base}</td><td class="q">${fmt(Number(l.qtd_prevista))} ${l.un || ''}</td><td class="box"></td></tr>`).join('')}
+    ${ls.map((l, k) => `<tr><td>${k + 1}</td><td>${l.etapa === 'CORTE' ? '<b>[corte]</b> ' : ''}${l.nome_base}</td><td class="q">${Number(l.qtd_prevista) ? `${fmt(Number(l.qtd_prevista))} ${l.un || ''}` : 'a informar'}</td><td class="box"></td></tr>`).join('')}
     </tbody></table></body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 300);
@@ -2727,12 +2728,18 @@ async function entrarProducao() {
     if (!PRD || !PRD.papel) {
       const [rp, ru] = await Promise.all([trRpc('tr_meu_papel'), trRpc('tr_minha_unidade')]);
       const papel = rp.ok ? await rp.json() : null;
-      if (!papel) {
+      // 02/11/2026: o Habrahan e os líderes operam a produção sem papel em tr_usuarios (o banco confere em cada ação)
+      let opera = !!papel;
+      if (!opera) {
+        const [ro, rl] = await Promise.all([trRpc('est_pode_operar_producao'), trRpc('rh_eu_lider')]);
+        opera = (ro.ok && (await ro.json()) === true) || (rl.ok && (await rl.json()).length > 0);
+      }
+      if (!opera) {
         alvo.innerHTML = `<div class="contexto">Você está logado como <b>${sessao.email}</b>, mas este login ainda
           não tem papel na operação — sem isso o banco não aceita o apontamento. Quem cadastra é o Neto, em <b>tr_usuarios</b>.</div>`;
         return;
       }
-      PRD = { papel, unidade: null,
+      PRD = { papel: papel || 'OPERA', unidade: null,
               data: prdHoje(), busca: '', aberta: null, ingredientes: {} };
     }
     const uT = await estLojaDaTela(alvo, EST_TELA === 'ordens' ? entrarOrdens : entrarApontar); if (!uT) return;
