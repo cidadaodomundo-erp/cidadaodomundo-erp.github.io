@@ -299,7 +299,10 @@ function barrasTopoTabelas() {
     if (!cab) return;
     cab.classList.add('cel-cab');
     const nomes = [...cab.cells].map((c) => (c.firstChild ? c.firstChild.textContent : '').trim());   // o título, sem a legenda embaixo dele
-    [...t.rows].forEach((r) => { if (r !== cab) [...r.cells].forEach((c, i) => { if (c.dataset.rot !== nomes[i]) c.dataset.rot = nomes[i] || ''; }); });
+    [...t.rows].forEach((r) => { if (r !== cab) [...r.cells].forEach((c, i) => {
+      if (c.dataset.rot !== nomes[i]) c.dataset.rot = nomes[i] || '';
+      if (i > 0 && c.textContent.trim() === '—') c.classList.add('cel-vazio');   // no cartão, linha sem valor não ocupa lugar
+    }); });
   });
   document.querySelectorAll('div[id^="tabela"]').forEach((d) => {
     if (d.parentElement && d.parentElement.closest('div[id^="tabela"]')) return;   // tabela dentro de tabela: só a de fora
