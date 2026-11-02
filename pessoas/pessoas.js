@@ -1032,13 +1032,13 @@ function cgAbaTabela() {
     const u = p.unidade === 'SÃO BRAZ' ? 'SÃO BRAZ' : 'AGUA VERDE';
     const k = `${u}|${p.familia}|${p.nivel}|${p.horas}`; ocup[k] = (ocup[k] || 0) + 1;
   }
-  let h = `<div class="contexto">Salário base bruto depois do dissídio de 6,11% (vigência ${cgMesRot(CARGOS.tabela[0] && CARGOS.tabela[0].vigencia)}). O Ahú usa a tabela da Água Verde. O setor (Atendimento, Cozinha, Produção, Operacional, Limpeza) entra só no nome do cargo — o salário é o do cargo. Entre parênteses, quantas pessoas estão em cada célula.</div>
+  let h = `<div class="contexto">Salário base bruto depois do dissídio de 6,11% (vigência ${cgMesRot(CARGOS.tabela[0] && CARGOS.tabela[0].vigencia)}). O Ahú usa a tabela da Água Verde. O setor (Atendimento, Cozinha, Produção, Operacional, Limpeza) entra só no nome do cargo — o salário é o do cargo.</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;">`;
   for (const u of unid) {
     const linhas = {};
     for (const t of CARGOS.tabela.filter(t => t.unidade === u)) (linhas[t.cargo] = linhas[t.cargo] || { fam: t.familia, nivel: t.nivel, cargo: t.cargo })[t.horas] = t.salario;
     const ord = Object.values(linhas).sort((a, b) => (ordem.indexOf(a.fam) - ordem.indexOf(b.fam)) || (cgN(a.nivel) - cgN(b.nivel)));
-    const cel = (l, hs) => { const n = ocup[`${u}|${l.fam}|${l.nivel}|${hs}`]; return l[hs] != null ? `${cgR(l[hs])}${n ? ` <span style="color:var(--tx-4);font-size:11px;">(${n})</span>` : ''}` : '–'; };
+    const cel = (l, hs) => { const n = ocup[`${u}|${l.fam}|${l.nivel}|${hs}`]; return l[hs] != null ? `${cgR(l[hs])}${n ? ` <span style="color:var(--tx-4);font-size:11px;">· ${n} ${n === 1 ? 'pessoa' : 'pessoas'}</span>` : ''}` : '–'; };
     h += `<div><div style="font-size:12px;color:var(--tx-4);margin-bottom:4px;">${cgEsc(u)}</div>
       <div id="tabelaCgTabela${u.replace(/\W/g, '')}"><table><thead><tr><th>Cargo</th><th style="text-align:right;">180 h</th><th style="text-align:right;">220 h</th></tr></thead>
       <tbody>${ord.map(l => `<tr><td>${cgEsc(cgNome(l.cargo))}</td><td style="text-align:right;">${cel(l, 180)}</td><td style="text-align:right;">${cel(l, 220)}</td></tr>`).join('')}</tbody></table></div></div>`;
