@@ -918,6 +918,7 @@
   @media (max-width:760px) {
     /* tabela larga vira um cartão por linha (rótulo de cada célula: barrasTopoTabelas, no nucleo.js). A DRE segue com a primeira coluna fixa. */
     div.cel-cartao[id^="tabela"] { max-height:none; overflow:visible; }
+    .cel-cartao { padding-right:0 !important; }   /* o respiro que o encaixarTabela põe para a rolagem da coluna fixa */
     .cel-cartao > table, .cel-cartao > table > tbody, .cel-cartao > table > tbody > tr, .cel-cartao > table > tbody > tr > td { display:block; width:100%; }
     .cel-cartao > table { min-width:0 !important; }
     .cel-cartao > table > thead, .cel-cartao > table > tbody > tr.cel-cab { display:none; }

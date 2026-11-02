@@ -754,7 +754,9 @@ async function entrarCargos() {
     alvo.innerHTML = '<div class="contexto">Nada para mostrar — este login não vê dados de pessoal.</div>';
     return;
   }
-  renderModuloCargos();
+  // 01/11/2026: um erro ao desenhar deixava "Carregando a folha..." para sempre (Envio à contabilidade, desde 29/10)
+  try { renderModuloCargos(); }
+  catch (e) { alvo.innerHTML = `<div class="contexto">✗ Não consegui montar esta tela: ${cgEsc(e.message)}</div>`; }
 }
 async function cgRecarregar(aviso) { CARGOS = null; await entrarCargos(); if (aviso) cgAviso(aviso, true); }
 function cgAviso(txt, ok) {
@@ -870,6 +872,10 @@ function cgDetalhePessoa(p) {
       <span><b>Adiantamento</b> ${p.pega_adiantamento && p.contrato === 'CLT' ? 'sim' : 'não'}</span>${p.desligamento ? `<span><b>Saiu</b> ${cgData(p.desligamento)}</span>` : ''}
       <button type="button" class="preset-btn" onclick="cgFormAbrir(${p.id})">Editar</button></div>
     ${cgMovHtml(p)}`;
+}
+function cgEmMontagem(titulo, texto) {
+  return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>${cgEsc(titulo)} — em montagem.</b><div style="margin-top:6px;">${cgEsc(texto)}</div>
+    <div style="margin-top:6px;color:var(--tx-4);font-size:12px;">Os números estão sendo conferidos pelo RH; esta parte entra aqui quando estiverem prontos.</div></div>`;
 }
 function cgEditar(id) {
   CARGOS_F.editando = CARGOS_F.editando === id ? null : id; CARGOS_F.formando = null; renderModuloCargos();
