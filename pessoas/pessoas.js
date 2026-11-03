@@ -993,8 +993,8 @@ const CG_ADM_MAX = 15 * 1048576, CG_ADM_MAX_EMAIL = 22 * 1048576;
 const CG_ADM_DOCS = ['CTPS', 'RG', 'CPF', 'Título de eleitor', 'CNH', 'Comprovante de endereço (até 90 dias)', 'PIS', 'Certidão de nascimento ou casamento', 'Certidão e CPF dos dependentes', 'Exame admissional', 'Termo de opção sindical', 'Dados bancários', 'Foto 3x4'];
 const CG_ADM_BLOCOS = [
   ['Pessoais', [['cpf', 'CPF *'], ['nascimento', 'Nascimento *', 'date'], ['nome_mae', 'Nome da mãe *'], ['nome_pai', 'Nome do pai'], ['municipio_nascimento', 'Município de nascimento'],
-    ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'VIÚVO', 'UNIÃO ESTÁVEL']], ['raca_cor', 'Raça/cor', ['', 'BRANCA', 'PRETA', 'PARDA', 'AMARELA', 'INDÍGENA']],
-    ['grau_instrucao', 'Grau de instrução', ['', 'FUNDAMENTAL INCOMPLETO', 'FUNDAMENTAL COMPLETO', 'MÉDIO INCOMPLETO', 'MÉDIO COMPLETO', 'SUPERIOR INCOMPLETO', 'SUPERIOR COMPLETO']]]],
+    ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'VIÚVO', 'UNIÃO ESTÁVEL']], ['raca_cor', 'Raça/cor', ['', 'BRANCO', 'PARDO', 'AMARELO', 'NEGRO', 'NÃO INFORMADO']],
+    ['grau_instrucao', 'Grau de instrução', ['', 'ENSINO FUNDAMENTAL INCOMPLETO', 'ENSINO FUNDAMENTAL COMPLETO', 'ENSINO MÉDIO INCOMPLETO', 'ENSINO MÉDIO COMPLETO', 'ENSINO SUPERIOR INCOMPLETO', 'ENSINO SUPERIOR COMPLETO']]]],
   ['Endereço e contato', [['telefone', 'Telefone *'], ['email', 'E-mail'], ['cep', 'CEP'], ['rua', 'Rua'], ['numero', 'Número'], ['complemento', 'Complemento'], ['bairro', 'Bairro'], ['cidade', 'Cidade']]],
   ['Contrato', [['experiencia_dias', 'Experiência (dias)', 'number'], ['prorrogavel_dias', 'Prorrogável (dias)', 'number'], ['tipo_salario', 'Salário por', ['MENSAL', 'HORA']], ['entrada', 'Entrada', 'time'], ['intervalo', 'Intervalo'], ['saida', 'Saída', 'time'], ['folga', 'Folga']]],
   ['Documentos', [['pis', 'PIS'], ['ctps', 'CTPS'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF'], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'], ['rg_orgao', 'Órgão'], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'], ['cnh_categoria', 'Categoria']]],
@@ -1178,9 +1178,14 @@ async function cgSalvar(id) {
       const documentos = await cgAdmSubirDocs();
       const ra = await trRpcSeguro('rh_admissao_salvar', { p_id: adm.id || null, p: { cadastro: corpo, admissao: { ...cgAdmColher(), documentos } } });
       if (!ra.ok) throw new Error(await trErroDe(ra));
+      adm.id = adm.id || await ra.json();
     } catch (e) { avisoAcao('erro', `✗ Não gravou: ${e.message}`, () => cgSalvar(id)); return; }
     CARGOS_F.formando = null; CG_ADM = null;
     await cgRecarregar('Registro salvo. O robô envia à Flash e à contabilidade; a situação de cada um fica em Admissões em andamento.');
+    // sem apelido o contas a pagar não acha a pessoa: o banco põe o primeiro nome quando está livre na empresa
+    const pid = ((CARGOS.adm || []).find((a) => a.id === adm.id) || {}).pessoa_id;
+    const nova = CARGOS.pessoas.find((x) => x.id === pid);
+    if (nova && !nova.apelido) avisoAcao('atencao', `! Registro salvo, mas falta o apelido de ${cgNome(nova.nome)}: abra o cadastro e preencha "Como aparece no contas a pagar".`);
     return;
   }
   const r = await trRpcSeguro('rh_pessoa_salvar', { p_id: id || null, p: corpo });
