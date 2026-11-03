@@ -129,8 +129,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   const reaisCc = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const min = h => { const p = (h || '0:0:0').split(':'); return (+p[0]) * 60 + (+p[1]); };
   // minutos contados a partir da meia-noite do dia aberto (vespera negativa, seguinte > 1440)
-  // hora antes das 06h pertence ao FIM do turno (dia = turno, corte 06:00 — 10/09/2026)
-  trs.forEach(x => { const m0 = min(x.hora); x.t = m0 + (m0 < 360 ? 1440 : 0) + Math.round((new Date(x.dia + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; });
+  // hora antes das 10h pertence ao FIM do turno (dia = turno; corte 06:00 de 10/09/2026, 10:00 desde 03/11/2026 — dono: "o dia vai das 10:00 até o fechamento do caixa")
+  const CORTE_TURNO = 600;
+  trs.forEach(x => { const m0 = min(x.hora); x.t = m0 + (m0 < CORTE_TURNO ? 1440 : 0) + Math.round((new Date(x.dia + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; });
   const doDia = x => x.dia === dia;
 
   const saipos = trs.filter(t => t.origem === 'SAIPOS').map(t => ({ ...t, par: null }));
@@ -267,7 +268,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   const semForma = t => /pendente|n[aã]o cadastrado/i.test(t.detalhe || '');
   // Rede ainda nao entregou a madrugada deste turno? (a linha do dia sabe: rede_completa)
   const redeIncompleta = (CAIXA_CARTAO || []).some(r => r.unidade === unidade && r.dia === dia && r.rede_completa === false);
-  const madrugadaSemRede = s => redeIncompleta && min(s.hora) < 360;
+  const madrugadaSemRede = s => redeIncompleta && min(s.hora) < CORTE_TURNO;
   // Mesma forma, mesmo caixa, poucos minutos de distancia, valores DIFERENTES: e a mesma
   // venda com valor diferente (dono, 10/09/2026 noite: "tratar a diferenca por bandeira na
   // linha da venda"). Vira UMA linha com a diferenca, em vez de duas soltas que nao se explicam.
@@ -1148,9 +1149,11 @@ function cofreHtml() {
   const robo = E.filter((x) => x.situacao === 'ROBO VAI LANCAR');
   const naoChegou = E.filter((x) => String(x.situacao).startsWith('MARCADO'));
   const soma = (A) => A.reduce((s, x) => s + Number(x.valor || 0), 0);
+  // 03/11/2026 (dono, "pode aplicar"): o banco só aceita o "Não chegou" da Hellen e do dono; para os outros, o botão nem aparece
+  const marcaNaoChegou = ['hellen@cidadaodomundo.com.br', 'neto@cidadaodomundo.com.br'].includes(((rmbSessao() || {}).email || '').toLowerCase());
   const linha = (x) => {
     const id = Number(x.saida_id_titulo);
-    const acao = x.situacao === 'ROBO VAI LANCAR' ? `<button class="preset-btn" onclick="cofreNaoChegou(${id})">Não chegou</button>`
+    const acao = !marcaNaoChegou ? '' : x.situacao === 'ROBO VAI LANCAR' ? `<button class="preset-btn" onclick="cofreNaoChegou(${id})">Não chegou</button>`
       : String(x.situacao).startsWith('MARCADO') ? `<button class="preset-btn" onclick="cofreDesfazerNaoChegou(${id})">desfazer</button>` : '';
     return `<tr><td>${dm(x.data_envio)}</td><td style="text-align:right;">R$ ${fmt(Number(x.valor))}</td>
       <td>${x.situacao === 'ENTROU NA AV' ? '<span style="color:var(--farol-ok);">entrou na AV</span>'
@@ -1161,7 +1164,7 @@ function cofreHtml() {
   const blocoSB = E.length ? `<div class="section-label">Dinheiro do São Braz para a Água Verde</div>
     <div class="contexto" style="text-align:left;">${E.length} envios desde ${dm(E[E.length - 1].data_envio)}, R$ ${fmt(soma(E))}:
       <b style="color:var(--farol-ok);">${entrou.length} já entraram na AV (R$ ${fmt(soma(entrou))})</b>${robo.length ? ` · ${robo.length} o robô vai lançar (R$ ${fmt(soma(robo))})` : ''}${naoChegou.length ? ` · <b style="color:var(--farol-fora);">${naoChegou.length} marcados como não chegou</b>` : ''}.
-      <div class="caption-label" style="text-align:left;">O robô lança a entrada na AV sozinho. Se o dinheiro de um envio não chegou, marque "Não chegou" e o robô não lança.</div></div>
+      <div class="caption-label" style="text-align:left;">O robô lança a entrada na AV sozinho. Se o dinheiro de um envio não chegou, ${marcaNaoChegou ? 'marque "Não chegou"' : 'a Hellen marca "Não chegou"'} e o robô não lança.</div></div>
     ${pendentes.length ? `<div id="tabelaCofreSbPend"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${pendentes.map(linha).join('')}</tbody></table></div>` : ''}
     <details><summary style="cursor:pointer;">ver os ${entrou.length} que já entraram</summary>
       <div id="tabelaCofreSbOk"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${entrou.map(linha).join('')}</tbody></table></div></details>` : '';
