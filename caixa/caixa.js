@@ -123,9 +123,10 @@ async function abrirDiaConcartao(unidade, dia) {
   CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
 }
-function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
-  const cont = document.getElementById('concartao-dia');
-  if (!cont) return;
+// calc = { robo } (03/11/2026, lista da Hellen): faz o mesmo cruzamento sem desenhar e devolve as pendências do dia
+function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, calc) {
+  const cont = calc ? null : document.getElementById('concartao-dia');
+  if (!cont && !calc) return;
   const reaisCc = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const min = h => { const p = (h || '0:0:0').split(':'); return (+p[0]) * 60 + (+p[1]); };
   // minutos contados a partir da meia-noite do dia aberto (vespera negativa, seguinte > 1440)
@@ -218,7 +219,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   conferir.forEach(q => caixaDoPar(q.r, q.s));
   // troca de bandeira que o robô faz no Saipos: a venda já conta na forma em que passou e sai da diferença
   const roboDe = {};
-  ((CAIXA_DRILL_DADOS || {}).robo || []).forEach(x => { roboDe[String(x.id_sale) + '|' + (+x.valor).toFixed(2)] = x; });
+  ((calc ? calc.robo : (CAIXA_DRILL_DADOS || {}).robo) || []).forEach(x => { roboDe[String(x.id_sale) + '|' + (+x.valor).toFixed(2)] = x; });
   const roboT = x => roboDe[String(x.referencia || x.id_sale) + '|' + (+x.valor).toFixed(2)];
   const formaDe = x => roboT(x) ? formaPadrao(roboT(x).forma_nova) : formaPadrao(x.detalhe);
   // vespera/dia seguinte serviram so de candidatos: daqui em diante, so o dia aberto
@@ -332,10 +333,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   // memoria de validacao: o que ja foi explicado sai da lista e vai para "Explicadas"
   const valDe = {};
   (CAIXA_VALID || []).filter(v => v.unidade === unidade && v.dia === dia).forEach(v => { valDe[v.chave] = v; });
-  const noCaixa = x => !CAIXA_DRILL_CX || !x.caixa || x.caixa === CAIXA_DRILL_CX;
+  const noCaixa = x => calc || !CAIXA_DRILL_CX || !x.caixa || x.caixa === CAIXA_DRILL_CX;
   const abertas = pend.filter(x => !valDe[x.chave] && noCaixa(x));
   const explicadas = pend.filter(x => valDe[x.chave] && noCaixa(x)).map(x => ({ ...x, v: valDe[x.chave] }));
-  CAIXA_DRILL = { unidade, dia, rows: pend };
+  if (!calc) CAIXA_DRILL = { unidade, dia, rows: pend };
   const eu = ((rmbSessao() || {}).email || '').toLowerCase();
   const podeExplicar = (CAIXA_RESP || []).some(r => r.unidade === unidade && String(r.email).toLowerCase() === eu)
     || (typeof souODono === 'function' && souODono());
@@ -476,6 +477,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   const trocasRefs = new Set(trocas.map(t => t.ref));
   (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || roboT(f)) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
     trocas.push({ hora: hhmm(String(f.hora || '').slice(11)), venda: f.numero ? 'venda ' + f.numero : f.mesa ? 'mesa ' + f.mesa : 'salão', valor: +f.valor, de, para, pd: ehPendenteTxt(f.registrado), caixa: f.caixa || null, ref: String(f.id_sale) }); });
+  if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas, turnos };
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
   const viradas = [];
   casados.forEach(sRow => { if (sRow.par && !doDia(sRow.par)) viradas.push({ forma: formaPadrao(sRow.detalhe), caixa: sRow.caixa || null, contrib: +sRow.valor, texto: `${rotVenda(sRow)} ${reaisCc(sRow.valor)}: a maquininha registrou em ${String(sRow.par.dia).split('-').reverse().slice(0, 2).join('/')} às ${hhmm(sRow.par.hora)} (virada do dia)` }); });
@@ -762,6 +764,10 @@ function caixaModalExplicar(x, d) {
 async function caixaExplicar(i) {
   const d = CAIXA_DRILL, x = d && d.rows[i];
   if (!x) return;
+  await caixaExplicarItem(d, x);
+}
+// o miolo do explicar serve ao detalhe do dia e à lista "Para você resolver" (03/11/2026)
+async function caixaExplicarItem(d, x) {
   const s = rmbSessao();
   if (!s || !s.email) { avisoAcao('atencao', '! Sessão expirada — faça login de novo para registrar.'); return; }
   const r0 = await caixaModalExplicar(x, d);
@@ -921,6 +927,7 @@ async function entrarCaixa() {
     if (!CAIXA_OUVE_LOJA) { CAIXA_OUVE_LOJA = true; aoMudarLoja(() => { if (CAIXA_DIAS) renderModuloCaixa(); }); }
   }
   await cofreCarregar();   // 22/10/2026: o cofre de cada loja, no topo
+  const listaHellen = CAIXA_HELLEN === null;
   if (CAIXA_DIAS === null) {
     alvo.innerHTML = '<div class="contexto">Carregando fechamento de caixas (PDV × gaveta × maquininhas × banco)...</div>';
     await carregarEmailDono();   // o dono tambem pode explicar pendencias
@@ -960,6 +967,7 @@ async function entrarCaixa() {
                               'pdv_chave', 'recebido_chave', 'sem_par_chave', 'aguardando_chave'].forEach(k => { r[k] = Number(r[k]); }); });
   }
   renderModuloCaixa();
+  if (listaHellen) caixaHellenCarregar();
 }
 
 // Salva (ou corrige) a contagem do dia. Upsert por (unidade, data): contagem
@@ -1214,6 +1222,138 @@ async function cofreDesfazerNaoChegou(id) {
   } catch (e) { avisoAcao('erro', '✗ Não consegui desfazer: ' + e.message + '. Tente de novo.'); }
 }
 
+// ===== PARA VOCÊ RESOLVER (03/11/2026; dono 29/10 10:48: "mostrar pra ela no caixa somente as pendências que ela
+// precisa tomar alguma ação"; proposta contexto/propostas-telas/2026-10-29-fechamento-caixa-hellen.md). Uma lista das
+// lojas de quem confere, desde o recomeço de cada loja, mais antiga primeiro. O cruzamento é o mesmo do clique no dia
+// (renderDiaConcartao com calc); a troca que o robô faz e o que só espera (madrugada, PIX de fim de semana) não entram.
+let CAIXA_HELLEN = null, CAIXA_HELLEN_CALC = null;
+function caixaHellenLojas() {
+  const eu = String((rmbSessao() || {}).email || '').toLowerCase();
+  const dono = typeof souODono === 'function' && souODono();
+  return caixaLojas().map(([u]) => u).filter(u => dono || (CAIXA_RESP || []).some(r => r.unidade === u && String(r.email).toLowerCase() === eu));
+}
+// recomeço limpo de cada loja (21/10/2026): o corte travado do cofre
+const caixaHellenCorte = u => ((COFRE_DIA || []).find(r => r.unidade === u && r.tem_corte) || {}).dia || '2026-10-20';
+const caixaHellenMais = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toLocaleDateString('en-CA'); };
+async function caixaHellenCarregar() {
+  const lojas = caixaHellenLojas();
+  if (!lojas.length) { CAIXA_HELLEN = { lojas: [] }; return; }
+  const mais = caixaHellenMais;
+  const hoje = new Date().toLocaleDateString('en-CA');
+  const ate = mais(hoje, -1), des = lojas.map(caixaHellenCorte).sort()[0];
+  const un = 'unidade=in.(' + lojas.map(u => '"' + encodeURIComponent(u) + '"').join(',') + ')';
+  const faixa = (a, b) => '&dia=gte.' + a + '&dia=lte.' + b + '&' + un;
+  try {
+    const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
+      consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
+      consultarTudo('vw_pix_conciliacao?select=dia,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco' + faixa(des, ate) + '&order=entrega'),
+      consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
+      consultarTudo('vw_cartao_bandeira_divergente?select=dia,unidade,hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale' + faixa(des, ate) + '&order=hora'),
+      consultarTudo('vw_caixa_online_dia?select=*&canal_ok=not.is.true' + faixa(des, ate) + '&order=hora'),
+      consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA)').catch(() => []),
+      consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
+    ]);
+    CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras };
+  } catch (e) { CAIXA_HELLEN = { lojas, erro: e.message }; }
+  CAIXA_HELLEN_CALC = null;
+  renderModuloCaixa();
+}
+function caixaHellenItens() {
+  const H = CAIXA_HELLEN;
+  if (!H || H.erro || !H.lojas.length || !H.trs) return [];
+  if (CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.valid === CAIXA_VALID && CAIXA_HELLEN_CALC.envios === COFRE_ENVIOS) return CAIXA_HELLEN_CALC.itens;
+  const reais = v => 'R$ ' + fmt(Math.abs(+v));
+  const mais = caixaHellenMais;
+  const dm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
+  const itens = [];
+  const add = o => itens.push({ caixa: '', valor: null, ...o });
+  H.lojas.forEach(u => {
+    const deLoja = H.trs.filter(x => x.unidade === u), corte = caixaHellenCorte(u);
+    for (let dia = corte; dia <= H.ate; dia = mais(dia, 1)) {
+      const viz = [mais(dia, -1), dia, mais(dia, 1)];
+      const doDia = A => (A || []).filter(x => x.unidade === u && x.dia === dia);
+      let r;
+      try { r = renderDiaConcartao(u, dia, deLoja.filter(x => viz.includes(String(x.dia))), doDia(H.pix), doDia(H.cobr), doDia(H.forma), [], [], { robo: doDia(H.robo) }); }
+      catch (e) { add({ u, dia, ordem: 9, oque: 'não consegui conferir este dia (' + e.message + ')', acao: 'abrir' }); continue; }
+      if (!r) continue;
+      r.turnos.filter(t => t.fechado === false).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
+        oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa' }));
+      r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
+        botao: t.pd ? 'fechar a venda com ' + t.para : 'trocar para ' + t.para }));
+      r.abertas.forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
+        oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x }));
+    }
+    // online pago com a forma errada (canal do pedido ≠ forma registrada)
+    (H.onl || []).filter(x => x.unidade === u && x.dia >= corte).forEach(x => add({ u, dia: x.dia, caixa: x.caixa || '', ordem: 2, valor: +x.valor,
+      oque: `venda ${x.numero || ''} registrada como ${x.tipo}, mas o pedido é do canal ${x.canal}`, acao: 'abrir', botao: x.canal_ok === false ? 'trocar a forma' : 'conferir' }));
+    // cofre: contado diferente do Saipos, e hoje sem contagem
+    const cof = (COFRE_DIA || []).filter(r => r.unidade === u && r.dia >= corte);
+    cof.filter(r => r.contagem_cobre_cofre === true && r.diferenca != null && Math.abs(+r.diferenca) >= 0.01).forEach(r => add({ u, dia: r.dia, ordem: 3, valor: +r.diferenca,
+      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'cofre', botao: 'ver o cofre' }));
+    const ult = cof[cof.length - 1];
+    if (ult && ult.contado == null) {
+      const ultC = [...cof].reverse().find(r => r.contado != null);
+      add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'cofre', botao: 'contar' });
+    }
+    // quebra explicada que ninguém repôs nem descontou
+    (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
+      oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir' }));
+  });
+  // dinheiro do SB para a AV parado há mais de 2 dias, ou marcado como não chegou
+  const doisDias = mais(H.hoje, -2);
+  if (H.lojas.includes('AGUA VERDE') || H.lojas.includes('SÃO BRAZ')) (COFRE_ENVIOS || []).forEach(x => {
+    if (x.situacao === 'ROBO VAI LANCAR' && x.data_envio <= doisDias) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio do São Braz para a Água Verde: o dinheiro chegou?', acao: 'naochegou', id: +x.saida_id_titulo });
+    else if (String(x.situacao).startsWith('MARCADO')) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio para a Água Verde marcado como não chegou' + (x.nao_recebido_obs ? ' (' + x.nao_recebido_obs + ')' : '') + ': explicar a diferença no São Braz', acao: 'cofre', botao: 'ver o cofre' });
+  });
+  itens.sort((a, b) => (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0) || a.u.localeCompare(b.u) || a.ordem - b.ordem);
+  itens.forEach((x, i) => { x.i = i; });
+  CAIXA_HELLEN_CALC = { valid: CAIXA_VALID, envios: COFRE_ENVIOS, itens };
+  return itens;
+}
+function caixaHellenHtml() {
+  const H = CAIXA_HELLEN;
+  if (H === null) return caixaHellenLojas().length ? '<div class="section-label">Para você resolver</div><div class="contexto">Montando a sua lista…</div>' : '';
+  if (!H.lojas.length) return '';
+  if (H.erro) return `<div class="section-label">Para você resolver</div><div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar a lista: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
+  const itens = caixaHellenItens();
+  const dm = d => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+  const rotCx = cx => cx === 'SALÃO' ? 'Salão' : cx === 'DELIVERY' ? 'Delivery' : '—';
+  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
+  const marca = ['hellen@cidadaodomundo.com.br', 'neto@cidadaodomundo.com.br'].includes(String((rmbSessao() || {}).email || '').toLowerCase());
+  const btn = x => x.acao === 'explicar' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenExplicar(${x.i})">Explicar</button>`
+    : x.acao === 'naochegou' ? (marca ? `<button class="preset-btn" onclick="event.stopPropagation(); cofreNaoChegou(${x.id})">Não chegou</button>` : '')
+    : x.acao === 'cofre' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenCofre()">${x.botao}</button>`
+    : `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenAbrir(${x.i})">${x.botao || 'abrir o dia'}</button>`;
+  const linhas = itens.map(x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="abre o dia com as vendas lado a lado">
+      <td style="white-space:nowrap;">${nomeLoja(x.u)}</td><td style="white-space:nowrap;">${dm(x.dia)}</td><td>${rotCx(x.caixa)}</td>
+      <td style="text-align:left;">${trEscH(x.oque)}</td><td style="text-align:right; white-space:nowrap;">${x.valor == null ? '—' : 'R$ ' + fmt(Math.abs(x.valor))}</td><td style="white-space:nowrap;">${btn(x)}</td></tr>`).join('');
+  const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao === 'FEITO_AGUARDA_CARGA');
+  const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
+  const rodape = rb.length ? `<div class="caption-label" style="text-align:left; margin-top:6px;">🤖 ${vai.length ? `o robô vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''} — não precisa fazer nada.</div>` : '';
+  return `<div class="section-label">Para você resolver (${itens.length})</div>
+    <div class="contexto" style="text-align:left; border-color:${itens.length ? '#f5a623' : 'var(--farol-ok)'};">
+      ${itens.length ? `<div style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Dia</th><th>Caixa</th><th style="text-align:left;">O que aconteceu</th><th style="text-align:right;">Valor</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`
+        : `<b style="color:var(--farol-ok);">✓ Nada para você resolver</b> — desde o recomeço de cada loja até ontem, tudo bateu ou já foi explicado.`}
+      ${rodape}
+    </div>`;
+}
+function caixaHellenDeNovo() { CAIXA_HELLEN = null; renderModuloCaixa(); caixaHellenCarregar(); }
+async function caixaHellenAbrir(i) {
+  const x = CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.itens[i];
+  if (!x) return;
+  if (x.acao === 'cofre' || x.acao === 'naochegou') { caixaHellenCofre(); return; }
+  await abrirDiaConcartao(x.u, x.dia);
+  if (x.caixa) caixaDrillFiltro(x.caixa);
+}
+function caixaHellenCofre() {
+  const el = document.querySelector('#view-caixa .cards') || document.getElementById('tabelaCofreSbPend');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function caixaHellenExplicar(i) {
+  const x = CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.itens[i];
+  if (x && x.pend) await caixaExplicarItem({ unidade: x.u, dia: x.dia }, x.pend);
+}
+
 function renderModuloCaixa() {
   const alvo = document.getElementById('view-caixa');
   // data local de verdade (toISOString e' UTC e vira amanha depois das 21h)
@@ -1371,6 +1511,7 @@ function renderModuloCaixa() {
   alvo.innerHTML = `
     <div class="section-label">Fechamento de Caixas${visao ? ' · ' + (typeof lojaNome === 'function' ? lojaNome(visao) : visao) : ''}</div>
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>' : ''}
+    ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar a lista "Para você resolver": ' + trEscH(e.message) + '</div>'; } })()}
     ${cofreHtml()}
     <details style="margin-top:14px;"><summary style="cursor:pointer;"><b>Conferência do dia a dia</b> — PDV × maquininha × banco${pendTotal ? ` · ${pendTotal} dia(s) para conferir` : ' · nada pendente'}</summary>
     <div class="contexto" style="text-align:left;">
@@ -1382,7 +1523,7 @@ function renderModuloCaixa() {
         <b>Turno não fechou</b> = o caixa que fez as vendas ainda está aberto no Saipos (o clique no dia diz qual). <b>Dinheiro</b>: venda em dinheiro no PDV × o que a contagem da gaveta registrou como enviado, caixa a caixa
         (Arissa: Água Verde e Ahú · Diego: São Braz); dia sem contagem aparece como "falta contar" — a contagem se registra dentro do dia, na linha <b>Dinheiro</b>. <b>Maquininha</b>: cartão e vale × transações
         da Rede, mais o PIX QR da maquininha × crédito no banco (cai linha a linha, "PIX QRS"). <b>PIX chave</b>: avulso
-        na chave CNPJ × transferência no banco. <b>O dia é o turno</b>: das 10h às 2h da manhã seguinte (corte às 6h), igual ao caixa do
+        na chave CNPJ × transferência no banco. <b>O dia é o turno</b>: das 10h até o fechamento do caixa (corte às 10h), igual ao caixa do
         Saipos. A Rede só entrega as transações no dia seguinte, então a madrugada do turno de ontem aparece como
         "aguardando" e fecha sozinha amanhã; o vale demora dias para aparecer na Rede. Regra do dono: <b>caixa bom não tem quebra</b> — toda diferença aparece e pede investigação.
         Clique no dia para ver as transações lado a lado e o que cada caixa (Salão / Delivery) fechou. Fora daqui:
