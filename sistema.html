@@ -197,7 +197,7 @@
 
 <script src="casca/menu.js?v=20261102d"></script>
 <script src="casca/paginas.js?v=20261102d"></script>
-<script src="casca/modulos.js?v=20261102e"></script>
+<script src="casca/modulos.js?v=20261103a"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -214,13 +214,17 @@ MENU.forEach((g) => g.itens.forEach((i) => { ITENS[i.chave] = Object.assign({ gr
 // Quando o dono validar, a tela ganha botão no painel e sai daqui.
 const SO_NA_CASCA = [{ chave: 'hoje', rotulo: 'Hoje na rede', icone: '📍' }];
 SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i); });
+// 03/11/2026 (dono 14:48 e 14:54, junção com o Fabio: "a parte financeira no nosso, operacional no dele"): Avaliações,
+// Qualidade & Super e Negociações saem do menu e viram um atalho para o portal da operação; o endereço antigo ainda abre
+const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes']);
+ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
 
 // FORMATO A (22/10/2026): os módulos de casca/modulos.js. Tela do menu que não está em nenhum módulo cai em "Outras
 // telas" — nada some por esquecimento.
 const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []).map((m) => Object.assign({}, m));
 (function outrasTelas() {
   const usadas = new Set(MODULOS.flatMap((m) => [...(m.lancar || []), ...(m.acompanhar || [])]));
-  const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k));
+  const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k) && !FORA_DO_MENU.has(k));
   if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Outras telas', icone: '📁', lancar: [], acompanhar: sobra });
 })();
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';

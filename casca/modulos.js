@@ -36,8 +36,8 @@ window.CASCA_MODULOS = [
     acompanhar: ['engcard', 'rateio', 'cardapio', 'promocoes'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: ['contestacoes', 'macertos'],
-    // Atendimento ao cliente fica aqui até ir para o portal do Fabio (05/10)
-    acompanhar: ['vendasagora', 'resumo', 'cancelamentos', 'negociacoes', 'avaliacoes', 'qualidade', 'clientes', 'site', 'atrasos',
+    // Atendimento ao cliente fica aqui até ir para o portal do Fabio (05/10); 03/11/2026: avaliações, qualidade e negociações já foram (atalho)
+    acompanhar: ['vendasagora', 'resumo', 'cancelamentos', 'link:portal-qualidade', 'clientes', 'site', 'atrasos',
                  'frete', 'logfin', 'atendimento'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
