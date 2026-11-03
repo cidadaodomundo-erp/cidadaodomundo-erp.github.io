@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prévia do menu único</title>
+<style>
+  :root { --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --line-2:#45443f;
+    --tx-1:#fff; --tx-2:#c3c2b7; --tx-3:#a5a49a; --tx-5:#82817a; --brand:#c8102e;
+    --marca-amarelo:#f6c63e; --marca-laranja:#ee8a3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx-1); font-family:'Inter','Segoe UI',system-ui,sans-serif; font-size:14px; padding:16px; }
+  .aviso { max-width:900px; margin:0 auto 14px; background:var(--surface-2); border:1px solid var(--line-2); border-radius:10px; padding:10px 14px; color:var(--tx-2); font-size:13px; line-height:1.5; }
+  .aviso b { color:var(--tx-1); }
+  .leg { display:inline-block; font-size:11px; font-weight:700; border-radius:999px; padding:1px 8px; margin-left:4px; }
+  .leg.novo { background:var(--marca-laranja); color:var(--bg); }
+  .leg.seu { background:var(--line-2); color:var(--tx-1); }
+  h1 { max-width:900px; margin:0 auto; font-size:18px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; max-width:900px; margin:12px auto 0; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; text-align:left; color:var(--tx-1); cursor:pointer; font:inherit; display:flex; flex-direction:column; gap:4px; }
+  .card:hover, .card.on { border-color:var(--brand); }
+  .card.tem-novo { border-left:4px solid var(--marca-laranja); }
+  .card .t { font-weight:800; font-size:14.5px; display:flex; gap:8px; align-items:center; }
+  .card .n { color:var(--tx-5); font-size:11.5px; }
+  .det { max-width:900px; margin:14px auto 0; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; display:none; }
+  .det.on { display:block; }
+  .det h2 { margin:0 0 8px; font-size:15px; }
+  .det ul { margin:0; padding-left:18px; line-height:1.9; }
+  .det li.novo { color:var(--marca-laranja); }
+  .det li.novo::after { content:"  · vem do portal do Fabio"; color:var(--tx-5); font-size:12px; }
+  .fora { max-width:900px; margin:18px auto 0; color:var(--tx-3); font-size:13px; line-height:1.6; }
+  .fora b { color:var(--tx-1); }
+</style></head><body>
+<div class="aviso"><b>Prévia, nada foi mudado.</b> É o Início do seu menu com as telas do Fabio já dentro. Clique num cartão para ver as telas dele.
+Cartão com borda laranja <span class="leg novo">ganha telas do Fabio</span>; os outros ficam como hoje <span class="leg seu">só suas</span>.</div>
+<h1>Início</h1>
+<div class="cards" id="cards"></div>
+<div class="det" id="det"></div>
+<div class="fora"><b>Telas do portal que NÃO entram</b> (já existem no seu menu, que fica com o dinheiro): Contas a Pagar, Escritório, Conferência da Maquininha, Cobrança na Porta, Pagar Motoboys, Estoque, Produção e Desperdício. Elas saem do portal uma por vez, quando a sua mostrar o mesmo número.<br>
+<b>Some do Início:</b> o cartão "Portal da operação", porque o portal passa a estar dentro.</div>
+<script>
+const M = [
+ ['📍','Hoje na rede',['Hoje na rede','Esta semana','O Placar','Indicadores e metas','A semana','Fechamento do mês'],['Um olho no negócio','Reunião Semanal']],
+ ['🛵','Delivery (operação)',[],['Central do Delivery · Agora','Mapa de Pedidos','Chegada do dia','Tempo de entrega','Resolver hoje','Turno do Delivery','Escala do delivery e do mês','Motoboys (ficha e documentos)']],
+ ['⭐','Qualidade',['Cancelamentos (valor e contestação)'],['Qualidade do Delivery (avaliações, Super, chamados)','Avaliações do dia','Cancelamentos (motivo e quem cancelou)','Placar do Delivery']],
+ ['🍽️','Cozinha e salão',[],['Central Cozinha','TV Cozinha','Central Salão','Produtos pausados']],
+ ['💬','Atendimento',['O que dizer ao cliente'],['Precisa de Resposta','Central do SAC','O WhatsApp diz que…','WhatsApp das lojas']],
+ ['📦','Estoque',['Contagem','Conferências','Controle','Posição de estoque'],[]],
+ ['🛒','Compras',['(em construção)'],['Compras no Mercado Livre']],
+ ['🍳','Produção',['Processos','Planejar produção','Separação','Ordens','Apontar produção','Histórico'],[]],
+ ['🧺','Listas',['Listas','Listas · Financeiro'],[]],
+ ['🗃️','Caixa',['Fechamento de Caixas','Taxas da maquininha'],[]],
+ ['💰','Financeiro',['Conciliação bancária','Contas a pagar','Contas a receber','Fluxo projetado','DRE','Fluxo realizado','Análise de despesas','Lucro por unidade','Evolução de vendas','Acertos dos motoboys'],[]],
+ ['👥','Pessoas',['Hoje no RH','Cargos e salários','Cálculos da folha','Férias','Rescisão','Envio','Conferência','Fora da folha','RH','Reembolsos','Custo de pessoal'],['Ponto e Painel RH','Ponto e pagamento das taxas','Banco de taxas e freelas']],
+ ['🔧','Manutenção',[],['Manutenção','Quem conserta']],
+ ['🚚','Atacado',['Orçamentos','Loja para empresas'],['Encomendas grandes','Brasa e Fumaça']],
+ ['📋','Cardápio',['Fichas técnicas','Engenharia de cardápio','Rateio','Cardápio','Promoções'],[]],
+ ['📊','Vendas e canais',['Vendas agora','Resumo do canal iFood','Clientes','Site próprio','Atrasos e turnos','Frete por distância','Financeiro da logística'],[]],
+ ['⚙️','Sistema',['Plano','Atividades','Rotinas','Telas do painel','Conciliação','Relatórios','Calendário de promos'],['Acessos','Mapa do Sistema','Painel do Dono','Minha Agenda']],
+];
+const cards = document.getElementById('cards'), det = document.getElementById('det');
+M.forEach((m, i) => {
+  const b = document.createElement('button');
+  b.className = 'card' + (m[3].length ? ' tem-novo' : '');
+  const n = [m[2].length ? m[2].length + ' suas' : '', m[3].length ? m[3].length + ' do Fabio' : ''].filter(Boolean).join(' · ');
+  b.innerHTML = `<span class="t"><span>${m[0]}</span>${m[1]}</span><span class="n">${n}</span>`;
+  b.onclick = () => {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('on')); b.classList.add('on');
+    det.innerHTML = `<h2>${m[0]} ${m[1]}</h2><ul>${m[2].map(t => `<li>${t}</li>`).join('')}${m[3].map(t => `<li class="novo">${t}</li>`).join('')}</ul>`;
+    det.classList.add('on'); det.scrollIntoView({behavior:'smooth', block:'nearest'});
+  };
+  cards.appendChild(b);
+});
+</script>
+</body></html>
