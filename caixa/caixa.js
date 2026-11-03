@@ -100,7 +100,7 @@ async function abrirDiaConcartao(unidade, dia) {
   // comanda fechada 00:29 nao pode aparecer sem par nos dois dias — dono, 09/09/2026);
   // so as linhas do proprio dia sao mostradas.
   const diaMais = k => { const x = new Date(dia + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toLocaleDateString('en-CA'); };
-  const [trs, pix, cobr, forma, descs, onl] = await Promise.all([
+  const [trs, pix, cobr, forma, descs, onl, robo] = await Promise.all([
     consultarTudo('vw_cartao_transacoes?select=*&dia=in.(' + [diaMais(-1), dia, diaMais(1)].join(',') + ')' +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=dia,hora'),
     // PIX do dia (09/09/2026): QR da maquininha e chave, com o credito do banco que casou
@@ -116,8 +116,11 @@ async function abrirDiaConcartao(unidade, dia) {
     consultarTudo('vw_descontos_dia?select=*&dia=eq.' + dia + '&unidade=eq.' + encodeURIComponent(unidade) + '&order=hora'),
     // online por caixa (10/09/2026 noite): a conferencia e "forma bate com o canal do pedido"
     consultarTudo('vw_caixa_online_dia?select=*&dia=eq.' + dia + '&unidade=eq.' + encodeURIComponent(unidade) + '&order=hora'),
+    // troca de bandeira provada que o robô faz no Saipos (dono, 03/11/2026: "que vá pra diferença do caixa apenas diferenças de valores")
+    consultarTudo('vw_caixa_troca_bandeira_robo?select=id_sale,valor,caixa,hora_venda,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em&dia=eq.' + dia +
+      '&unidade=eq.' + encodeURIComponent(unidade) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA)').catch(() => []),
   ]);
-  CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl };
+  CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
 }
 function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
@@ -206,6 +209,17 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   });
   semParS = semParS.filter(t => !t._quase);
   semParR = semParR.filter(t => !t._quase);
+  // o total soma as mesmas transações que o par usou (dono, 03/11/2026, via Financeiro): a maquininha casada conta
+  // no caixa da venda — o TOTEM do delivery passa em terminal SD, que a base chama de Salão (AV 31/10: R$ 105,97 de "sobra")
+  const caixaDoPar = (r, s) => { if (s && s.caixa) r.caixa = s.caixa; };
+  rede.forEach(r => caixaDoPar(r, r.parDe));
+  compostos.forEach(c => { if (c.alvo.origem === 'REDE') caixaDoPar(c.alvo, c.itens[0]); else c.itens.forEach(it => caixaDoPar(it, c.alvo)); });
+  conferir.forEach(q => caixaDoPar(q.r, q.s));
+  // troca de bandeira que o robô faz no Saipos: a venda já conta na forma em que passou e sai da diferença
+  const roboDe = {};
+  ((CAIXA_DRILL_DADOS || {}).robo || []).forEach(x => { roboDe[String(x.id_sale) + '|' + (+x.valor).toFixed(2)] = x; });
+  const roboT = x => roboDe[String(x.referencia || x.id_sale) + '|' + (+x.valor).toFixed(2)];
+  const formaDe = x => roboT(x) ? formaPadrao(roboT(x).forma_nova) : formaPadrao(x.detalhe);
   // vespera/dia seguinte serviram so de candidatos: daqui em diante, so o dia aberto
   semParS = semParS.filter(doDia); semParR = semParR.filter(doDia); casados = casados.filter(doDia);
   compostos.splice(0, compostos.length, ...compostos.filter(c => c.alvo.dia === dia));
@@ -453,13 +467,13 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
   // — nao dependem da varredura materializada; a varredura entra so no que faltar (PIX etc.)
   const trocas = [];
   const ehPendenteTxt = t => /pendente|n[aã]o cadastrado/i.test(t || '');
-  const addTroca = (sRow, rRow, valor, venda) => { const de = formaPadrao(sRow.detalhe), para = formaPadrao(rRow.detalhe); if (de === para) return;
+  const addTroca = (sRow, rRow, valor, venda) => { const de = formaPadrao(sRow.detalhe), para = formaPadrao(rRow.detalhe); if (de === para || roboT(sRow)) return;
     trocas.push({ hora: hhmm(sRow.hora), venda, valor: +valor, de, para, pd: ehPendenteTxt(sRow.detalhe), caixa: sRow.caixa || rRow.caixa || null, ref: String(sRow.referencia) }); };
   casados.forEach(sRow => { if (sRow.par) addTroca(sRow, sRow.par, sRow.valor, rotVenda(sRow)); });
   arredond.forEach(q => addTroca(q.s, q.r, q.s.valor, rotVenda(q.s)));
   compostos.forEach(c => { if (c.alvo.origem === 'REDE') c.itens.forEach(it => addTroca(it, c.alvo, it.valor, rotVenda(it))); else c.itens.forEach(it => addTroca(c.alvo, it, it.valor, rotVenda(c.alvo))); });
   const trocasRefs = new Set(trocas.map(t => t.ref));
-  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale))) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
+  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || roboT(f)) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
     trocas.push({ hora: hhmm(String(f.hora || '').slice(11)), venda: f.numero ? 'venda ' + f.numero : f.mesa ? 'mesa ' + f.mesa : 'salão', valor: +f.valor, de, para, pd: ehPendenteTxt(f.registrado), caixa: f.caixa || null, ref: String(f.id_sale) }); });
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
   const viradas = [];
@@ -502,7 +516,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
       else { l.realTxt = dia >= hojeStr ? 'turno em aberto' : '<span style="color:#f5a623;">não contado</span>'; l.semReal = true; }
     });
     // CARTAO / VALE / PENDENTE: registrado no Saipos x passou na Rede (so o proprio dia)
-    saipos.filter(doDia).filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaPadrao(x.detalhe)); l.saipos += +x.valor; l.nS++; if (ehPendente(x.detalhe)) l.ordem = 4; });
+    saipos.filter(doDia).filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaDe(x)); l.saipos += +x.valor; l.nS++; if (ehPendente(x.detalhe)) l.ordem = 4; });
     rede.filter(doDia).filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaPadrao(x.detalhe)); l.real += +x.valor; l.nR++; });
     // PIX x banco
     pix.filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaPadrao(x.tipo)); l.ordem = 2; l.pix = true; l.saipos += +x.valor; l.nS++; if (x.recebido) { l.real += +x.valor; l.nR++; } });
@@ -571,7 +585,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
         // detalhe por venda, comparando com o que esta no banco") — TODAS as vendas da forma,
         // cada uma com o par na maquininha / banco / canal, o sinal na diferenca e a acao.
         const det = [];
-        saipos.filter(doDia).filter(x => noCxItem(x, cx) && formaPadrao(x.detalhe) === l.forma).forEach(x => {
+        saipos.filter(doDia).filter(x => noCxItem(x, cx) && formaDe(x) === l.forma).forEach(x => {
           const px = pendPorRef[l.forma + '|' + String(x.referencia)];
           let passou = '—', contrib = 0, status = '<span style="color:#9aa4af;">—</span>', cor = '#8a897e', bg = '';
           if (px) { passou = px.real; contrib = contribDe(px); ({ status, cor, bg } = statusPend(px)); }
@@ -587,6 +601,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
               else if (!doDia(r)) { contrib = +x.valor; status = '<span style="color:#9aa4af;">✔ bateu · virada do dia: a maquininha registrou em outro dia</span>'; }
               else status = '<span style="color:#7bc47f;">✔ bateu</span>';
             }
+            const rb = roboT(x);
+            if (rb) { contrib = 0; cor = '#8a897e'; bg = ''; status = `<span style="color:#9aa4af;">🤖 o robô ${rb.acao === 'FEITO_AGUARDA_CARGA' ? 'trocou' : 'troca'} no Saipos: ${formaPadrao(rb.forma_no_saipos)} → ${formaPadrao(rb.forma_nova)} · não entra na diferença</span>`; }
           }
           det.push({ ord: min(x.hora), hora: hhmm(x.hora), venda: rotVenda(x) + (moto[x.referencia] ? ' · 🛵 ' + moto[x.referencia] : ''), reg: `${limpa(x.detalhe)} ${reaisCc(x.valor)}`, passou, contrib, status, cor, bg });
         });
@@ -621,6 +637,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
         <td style="${tdF} text-align:left; border-right:0; white-space:normal;">${resumo || (ok ? '' : leitura ? `<span style="color:${corDif};">${leitura}</span>` : '')}${resumo && leitura ? ` <span style="color:#8a897e;">· ${leitura}</span>` : ''}</td></tr>${sub.join('')}`;
     };
     const somaS = lista.reduce((a, l) => a + l.saipos, 0), somaR = lista.reduce((a, l) => a + (l.semReal ? 0 : l.real), 0);
+    const roboCx = ((CAIXA_DRILL_DADOS || {}).robo || []).filter(x => saipos.some(s => doDia(s) && noCxItem(s, cx) && roboT(s) === x));
+    const roboHtml = !roboCx.length ? '' : `<div style="margin-top:4px; font-size:12px; color:#9aa4af;">🤖 o robô troca no Saipos (não entra na diferença): ${roboCx.map(x => `${x.numero ? 'nº ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'} ${reaisCc(x.valor)} ${formaPadrao(x.forma_no_saipos)} → ${formaPadrao(x.forma_nova)}${x.acao === 'FEITO_AGUARDA_CARGA' ? ' (feito)' : ''}`).join(' · ')}</div>`;
     const descsCx = (descs || []).filter(x => !x.caixa || x.caixa === cx);
     const semMotivo = descsCx.filter(x => !x.motivo && !x.cupom).length;
     const descHtml = !descsCx.length ? '' : `<details style="margin-top:4px; font-size:12px;"><summary style="cursor:pointer; color:#a5a49a;">Descontos manuais: ${descsCx.length}, ${reaisCc(descsCx.reduce((a, x) => a + +x.desconto, 0))}${semMotivo ? ` · <span style="color:#f5a623;">${semMotivo} sem motivo</span>` : ''} <span style="color:#6f6e64;">(informação; não entra na conferência)</span></summary>
@@ -643,6 +661,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl) {
         ${lista.map((l, i) => linhaForma(l, i)).join('')}
         <tr style="border-top:2px solid rgba(154,164,175,.35);"><td style="${tdF} text-align:left;"><b>Total</b></td><td style="${tdF}"><b>${reaisCc(somaS)}</b></td><td style="${tdF}"><b>${reaisCc(somaR)}</b></td><td style="${tdF}"><b style="color:${Math.abs(somaS - somaR) < 0.01 ? '#7bc47f' : '#f5a623'};">${reaisCc(somaS - somaR)}</b></td><td style="${tdF} border-right:0;"></td></tr>
       </table></div>
+      ${roboHtml}
       ${descHtml}
     </div>`;
   };
