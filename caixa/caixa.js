@@ -1268,7 +1268,7 @@ function caixaHellenItens() {
   const itens = [];
   const add = o => itens.push({ caixa: '', valor: null, ...o });
   H.lojas.forEach(u => {
-    const deLoja = H.trs.filter(x => x.unidade === u), corte = caixaHellenCorte(u);
+    const deLoja = H.trs.filter(x => x.unidade === u), corte = caixaHellenCorte(u), abertos = new Set();
     for (let dia = corte; dia <= H.ate; dia = mais(dia, 1)) {
       const viz = [mais(dia, -1), dia, mais(dia, 1)];
       const doDia = A => (A || []).filter(x => x.unidade === u && x.dia === dia);
@@ -1276,11 +1276,13 @@ function caixaHellenItens() {
       try { r = renderDiaConcartao(u, dia, deLoja.filter(x => viz.includes(String(x.dia))), doDia(H.pix), doDia(H.cobr), doDia(H.forma), [], [], { robo: doDia(H.robo) }); }
       catch (e) { add({ u, dia, ordem: 9, oque: 'não consegui conferir este dia (' + e.message + ')', acao: 'abrir' }); continue; }
       if (!r) continue;
-      r.turnos.filter(t => t.fechado === false).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
+      // caixa esquecido aberto aparece em todo turno seguinte: uma linha só, no dia em que abriu
+      r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
         oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa' }));
       r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
         botao: t.pd ? 'fechar a venda com ' + t.para : 'trocar para ' + t.para }));
-      r.abertas.forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
+      // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
+      r.abertas.filter(x => !String(x.chave).startsWith('dinheiro:')).forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
         oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x }));
     }
     // online pago com a forma errada (canal do pedido ≠ forma registrada)
