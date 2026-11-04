@@ -75,7 +75,7 @@ function orcMontarHtml() {
   const cx = (r, c, ex) => `<label style="${rot}">${r}<input style="${ORC_CAMPO}width:100%;" value="${trEscH(ORC[c])}" ${/oninput=/.test(ex || '') ? '' : `oninput="ORC.${c}=this.value"`} ${ex || ''}></label>`;
   const nu = (r, c, id, ex) => `<label style="${rot}">${r}<input id="${id}" type="number" style="${ORC_CAMPO}width:100%;" value="${trEscH(ORC[c])}" oninput="ORC.${c}=this.value;orcAgendar()" ${ex}></label>`;
   return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:10px;">
-      ${cx('Cliente', 'cliente', `id="orcCliente" autocomplete="off" oninput="ORC.cliente=this.value;orcBuscarCliente(this)" onfocus="orcBuscarCliente(this)" onblur="orcSairCliente(this)" onkeydown="orcTeclaCliente(event, this)"`)}${cx('Contato do cliente', 'contato', 'id="orcContato"')}
+      ${cx('Cliente', 'cliente', `id="orcCliente" autocomplete="off" oninput="ORC.cliente=this.value;orcBuscarCliente(this)" onfocus="orcBuscarCliente(this)" onblur="orcSairCliente(this)" onkeydown="orcTeclaCliente(event, this)"`)}${cx('Telefone do cliente', 'contato', 'id="orcContato" inputmode="tel" placeholder="(41) 99999-9999" oninput="this.value=orcFone(this.value);ORC.contato=this.value"')}
       <label style="${rot}">Forma de entrega<select style="${ORC_CAMPO}width:100%;" onchange="ORC.forma=this.value"><option value="">escolha</option>${Object.entries(ORC_FORMA).map(([k, r]) => `<option value="${k}"${ORC.forma === k ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
       <label style="${rot}">Quando<input type="datetime-local" style="${ORC_CAMPO}width:100%;" value="${trEscH(ORC.quando)}" oninput="ORC.quando=this.value"></label>
       ${cx('Onde', 'local', 'placeholder="local da retirada ou endereço"')}${cx('Cobrança', 'cobranca')}
@@ -152,10 +152,22 @@ function orcBuscarCliente(el) {
   s.innerHTML = ORC.sug.map((c, k) => `<div data-k="${k}" onmousedown="event.preventDefault();orcEscolherCliente(${k})" style="padding:7px 10px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);"><span>${trEscH(c.nome)}</span><span style="color:var(--tx-4);">${trEscH(c.contato || '')}</span></div>`).join('');
   document.body.appendChild(s);
 }
+// telefone vira (41) 99999-9999 enquanto se digita; fixo vira (41) 3333-4444; com letra ou @ (e-mail) fica como foi digitado (04/11/2026)
+function orcFone(v) {
+  v = String(v || '');
+  if (/[a-z@]/i.test(v)) return v;
+  let d = v.replace(/\D/g, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (!d) return '';
+  if (d.length <= 2) return '(' + d;
+  const ddd = d.slice(0, 2), r = d.slice(2), corte = d.length === 11 ? 5 : 4;
+  return `(${ddd}) ` + (r.length > corte ? r.slice(0, corte) + '-' + r.slice(corte) : r);
+}
 function orcEscolherCliente(k) {
   const c = ORC.sug[k]; if (!c) return;
   ORC.cliente = c.nome;
-  if (c.contato) ORC.contato = c.contato;
+  if (c.contato) ORC.contato = orcFone(c.contato);
   const n = orcEl('orcCliente'), ct = orcEl('orcContato');
   if (n) n.value = ORC.cliente;
   if (ct) ct.value = ORC.contato;
