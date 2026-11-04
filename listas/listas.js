@@ -110,14 +110,7 @@ function renderModuloListasFin() {
   const derivas = historico.filter(r => Math.abs(nu(r.deriva_custo)) > 0.05);
   const derivaTotal = derivas.reduce((s, r) => s + nu(r.deriva_custo), 0);
 
-  const linhaMes = (r, situacao) => `<tr>
-    <td>${mesTxt(r.mes)}</td><td>${r.unidade}</td><td>${r.listas}</td>
-    <td>R$ ${fmt(nu(r.valor_lista))}</td>
-    <td>${nu(r.frete) ? 'R$ ' + fmt(nu(r.frete)) : '—'}</td>
-    <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) + ' <span style="color:#8a897e; font-size:11px;">(regra)</span>' : '—'}</td>
-    <td><b>R$ ${fmt(trHistDevido(r))}</b>${trHistDevidoAviso(r)}</td>
-    ${situacao}
-  </tr>`;
+  window._trHist = historico;
 
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Listas · Financeiro</div>
@@ -166,10 +159,7 @@ function renderModuloListasFin() {
         Do corte de ago/26 em diante; o anterior vive nas planilhas aposentadas (e no banco, para consulta).
         <b>Devido, Pago e Falta</b> são os mesmos de <b>Contas a pagar</b>: o pagamento é lido do lançamento do Saipos.
       </div>
-      <div id="tabelaTrMensal"><table>
-        <tr><th>Mês</th><th>Filial</th><th>Listas</th><th>Itens (R$)</th><th>Frete</th><th>Royalty</th><th>Devido</th><th>Pago</th><th>Falta</th><th>Situação</th></tr>
-        ${historico.map(r => linhaMes(r, trHistCelulas(r))).join('')}
-      </table></div>
+      <div id="tabelaTrMensal">${trHistTabelaHtml()}</div>
       ${trHistNotas(historico, mesTxt)}
       ${derivas.length ? `<div class="caption-label" style="color:#ff6b6b;" title="A conta é o custo recalculado hoje menos o valor congelado no fechamento do mês. Diferença positiva quer dizer que a filial foi cobrada a menos do que o custo de hoje; negativa, a mais.">⚠ A planilha reescreveu depois o custo de ${derivas.length} mês(es) já fechado(s): R$ ${fmt(Math.abs(derivaTotal))} ${derivaTotal >= 0 ? 'cobrado a menos' : 'cobrado a mais'} — vale o valor congelado no fechamento.</div>` : ''}
     </details>`;
@@ -189,7 +179,67 @@ function trHistDevidoAviso(r) {
   if (r.cobranca_total == null || Math.abs(Number(r.cobranca_total) - (Number(r.total_devido) || 0)) <= 0.005) return '';
   return ` <span class="tr-tag" title="A cobrança deste mês foi fechada em R$ ${fmt(Number(r.cobranca_total))}; a conta refeita hoje (itens + frete + royalty) dá R$ ${fmt(Number(r.total_devido) || 0)}. Vale o cobrado.">≠ conta de hoje</span>`;
 }
-function trHistCelulas(r) {
+// Ordem e ordenadores (dono, 04/11/2026 18:35: "organiza por mês e filial, ahu, sb e boqueirao, e coloca os
+// ordenadores no cabeçalho da tabela"). Padrão: mês do mais novo ao mais antigo e, dentro do mês, sempre
+// AHU → SÃO BRAZ → BOQUEIRÃO (outra filial, se vier, depois). Clique no cabeçalho ordena; de novo, inverte;
+// o empate cai na ordem padrão. Redesenha só a tabela (o <details> do histórico continua aberto).
+const TR_HIST_FILIAIS = ['AHU', 'SAO BRAZ', 'BOQUEIRAO'];
+let TR_HIST_ORD = { col: null, dir: 1 };
+function trHistFilialPos(u) {
+  const k = String(u || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+  const i = TR_HIST_FILIAIS.indexOf(k);
+  return i < 0 ? 90 : i;
+}
+function trHistMesTxt(m) { const [a, mm] = String(m).split('-'); return MESES_ABREV[Number(mm) - 1] + '/' + a.slice(2); }
+const TR_HIST_COLS = [
+  ['mes', 'Mês', r => String(r.mes || '')],
+  ['filial', 'Filial', r => trHistFilialPos(r.unidade)],
+  ['listas', 'Listas', r => Number(r.listas) || 0],
+  ['itens', 'Itens (R$)', r => Number(r.valor_lista) || 0],
+  ['frete', 'Frete', r => Number(r.frete) || 0],
+  ['royalty', 'Royalty', r => Number(r.royalty) || 0],
+  ['devido', 'Devido', r => trHistDevido(r)],
+  ['pago', 'Pago', r => r.total_pago == null ? -1 : Number(r.total_pago)],
+  ['falta', 'Falta', r => r.falta == null ? -Infinity : Number(r.falta)],
+  ['situacao', 'Situação', r => trHistSituacao(r)[0]],
+];
+function trHistPadrao(a, b) {
+  return String(b.mes || '').localeCompare(String(a.mes || '')) || trHistFilialPos(a.unidade) - trHistFilialPos(b.unidade)
+    || String(a.unidade || '').localeCompare(String(b.unidade || ''));
+}
+function trHistTabelaHtml() {
+  const nu = v => Number(v) || 0;
+  const o = TR_HIST_ORD;
+  const col = TR_HIST_COLS.find(c => c[0] === o.col);
+  const linhas = (window._trHist || []).slice().sort((a, b) => {
+    if (col) {
+      const va = col[2](a), vb = col[2](b);
+      const d = typeof va === 'string' ? va.localeCompare(vb, 'pt-BR') : va - vb;
+      if (d) return d * o.dir;
+    }
+    return trHistPadrao(a, b);
+  });
+  const th = c => `<th onclick="trHistOrdenar('${c[0]}')" style="cursor:pointer; user-select:none;${o.col === c[0] ? ' color:var(--tx-1);' : ''}" title="Clique para ordenar; de novo, inverte.">${c[1]}${o.col === c[0] ? (o.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  return `<table>
+        <tr>${TR_HIST_COLS.map(th).join('')}</tr>
+        ${linhas.map(r => `<tr>
+    <td>${trHistMesTxt(r.mes)}</td><td>${r.unidade}</td><td>${r.listas}</td>
+    <td>R$ ${fmt(nu(r.valor_lista))}</td>
+    <td>${nu(r.frete) ? 'R$ ' + fmt(nu(r.frete)) : '—'}</td>
+    <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) + ' <span style="color:#8a897e; font-size:11px;">(regra)</span>' : '—'}</td>
+    <td><b>R$ ${fmt(trHistDevido(r))}</b>${trHistDevidoAviso(r)}</td>
+    ${trHistCelulas(r)}
+  </tr>`).join('')}
+      </table>`;
+}
+function trHistOrdenar(c) {
+  // mês e valores começam do maior; filial e situação, do primeiro da ordem
+  if (TR_HIST_ORD.col === c) TR_HIST_ORD.dir = -TR_HIST_ORD.dir;
+  else TR_HIST_ORD = { col: c, dir: ['filial', 'situacao'].includes(c) ? 1 : -1 };
+  const el = document.getElementById('tabelaTrMensal');
+  if (el) el.innerHTML = trHistTabelaHtml();
+}
+function trHistSituacao(r) {
   const dm = d => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
   const pago = r.total_pago == null ? null : Number(r.total_pago);
   const falta = r.falta == null ? null : Number(r.falta);
@@ -202,6 +252,14 @@ function trHistCelulas(r) {
   else if (!aberto) sit = 'fechado · pago' + (r.data_pagamento ? ' em ' + dm(r.data_pagamento) : '');
   else if (pago > 0) sit = 'fechado · pago em parte';
   else sit = 'fechado · em aberto';
+  return [sit, cls];
+}
+function trHistCelulas(r) {
+  const dm = d => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+  const pago = r.total_pago == null ? null : Number(r.total_pago);
+  const falta = r.falta == null ? null : Number(r.falta);
+  const aberto = r.cobranca_total != null && falta > 0.005;
+  const [sit, cls] = trHistSituacao(r);
   const venc = aberto && r.cobranca_vencimento
     ? ` <span class="dre-av">${r.cobranca_vencimento < trHoje() ? 'venceu' : 'vence'} ${dm(r.cobranca_vencimento)}</span>` : '';
   const faltaTxt = falta == null || Math.abs(falta) <= 0.005 ? '—'
