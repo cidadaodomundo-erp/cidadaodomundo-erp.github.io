@@ -5901,9 +5901,10 @@ let CONCB_CONTAS_REGRA = null;
 async function concbContasRegra() {
   if (CONCB_CONTAS_REGRA) return CONCB_CONTAS_REGRA;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/vw_fin_contas_para_regra`
-    + '?select=conta&order=usos.desc', { headers: rmbHeaders() });
+    + '?select=conta,nome&order=usos.desc', { headers: rmbHeaders() });
   if (!r.ok) { await concbAvisaLista('contas', r); return []; }
-  CONCB_CONTAS_REGRA = (await r.json()).map(x => x.conta).filter(Boolean);
+  // mostra o nome (fin_contas.apelido, 04/11/2026); grava a CHAVE (conta), que é o que o robô lê
+  CONCB_CONTAS_REGRA = (await r.json()).filter(x => x.conta).map(x => ({ v: x.conta, t: x.nome || x.conta }));
   return CONCB_CONTAS_REGRA;
 }
 
@@ -5935,7 +5936,9 @@ async function concbFormEnsinar(d) {
     + '<select id="' + id + '" style="width:100%;padding:6px 8px;font-size:13px;'
     + 'border:1px solid #8a897e;border-radius:4px;background:#1a1a19;color:inherit;'
     + 'box-sizing:border-box"><option value="">\u2014 escolha \u2014</option>'
-    + itens.map(v => '<option>' + seguro(v) + '</option>').join('')
+    + itens.map(v => v && typeof v === 'object'
+      ? '<option value="' + seguro(v.v) + '">' + seguro(v.t) + '</option>'
+      : '<option>' + seguro(v) + '</option>').join('')
     + (aberta ? '<option value="__OUTRA__">n\u00e3o est\u00e1 na lista\u2026</option>' : '')
     + '</select></div>';
   const categorias = await concbCategorias();
