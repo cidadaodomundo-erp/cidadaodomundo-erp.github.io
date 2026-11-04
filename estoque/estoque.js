@@ -456,13 +456,12 @@ async function ctgAplicarFoto(id, semPergunta) {
   const gravar = campos.filter((c) => c.qtd !== null);
   if (!gravar.length) { avisoAcao('atencao', '! Nenhum número para gravar.'); return; }
   if (!semPergunta && !confirm(`Gravar ${gravar.length} itens contados na folha ${CTG.folha.id}?`)) return;
-  const escopo = new Map(CTG.escopo.map((i) => [i.nome_saipos, i]));
   avisoAcao('enviando', `Gravando ${gravar.length} ${gravar.length === 1 ? 'item' : 'itens'} da foto…`);
   try {
     await ctgFetch('est_inventario_itens?on_conflict=id_inventario,nome_saipos', {
       method: 'POST', extra: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(gravar.map((c) => {
-        const i = escopo.get(c.nome_saipos) || {};
+        const i = ctgEscopoDe(c.nome_saipos) || {};   // a foto já traz o nome da base; o custo é traduzido
         return { id_inventario: CTG.folha.id, nome_saipos: c.nome_saipos, un: i.un || null,
                  qtd_contada: c.qtd, custo: i.custo || null, custo_fonte: i.custo_fonte || null,
                  contado_por: (rmbSessao() || {}).email };
@@ -606,6 +605,18 @@ const CTG_GRUPO_ORDEM = ['CARNES', 'CONGELADOS', 'LATICINIOS', 'HORTIFRUTI', 'SE
 // 21/10/2026: a folha vem de vw_est_folha_contagem — UMA linha por nome da base (as etiquetas do Saipos que viram o
 // mesmo nome somam numa linha), com o grupo e a ordem decididos no banco. nome_saipos aqui e' a etiqueta que RECEBE a
 // contagem (nome_saipos_conta); a tela mostra so o nome da base.
+// 04/11/2026 (Organizador: "ficou em branco" gravava o nome velho do Saipos e dobrou 17 itens na folha 19 da AV):
+// a contagem grava SEMPRE o nome da base. O custo (vw_est_curva) ainda vem pelo nome do Saipos, então a busca
+// traduz: o próprio nome; senão o item da folha com aquele nome_base → nome_saipos_conta / nomes_saipos.
+function ctgEscopoDe(nome) {
+  const esc = CTG.escopo || [];
+  const e = esc.find((x) => x.nome_saipos === nome);
+  if (e) return e;
+  const b = (CTG.base || []).find((x) => x.nome_base === nome);
+  if (!b) return null;
+  const nomes = [b.nome_saipos].concat(Array.isArray(b.nomes_saipos) ? b.nomes_saipos : String(b.nomes_saipos || '').split(/\s*[,;|]\s*/));
+  return esc.find((x) => nomes.includes(x.nome_saipos)) || null;
+}
 function ctgDaFolha(r) {
   return { nome_saipos: r.nome_saipos_conta, nome_base: r.nome_base, nomes_saipos: r.nomes_saipos, un_saipos: r.un,
            qtd: r.qtd, tipo: r.tipo, situacao: r.situacao, grupo: r.grupo, ordem_grupo: r.ordem_grupo };
@@ -1044,16 +1055,18 @@ async function ctgConferirOk() {
 
 // o que ficou em branco no papel e ainda não foi preenchido aqui (some da lista assim que grava)
 function ctgHtmlBrancos() {
+  // 04/11/2026: grava e compara pelo NOME DA BASE (b.nome da vw_est_contagem_grade), nunca pelo nome_saipos_conta.
+  // Linha antiga gravada com o nome do Saipos também conta como preenchida (não reaparece para digitar de novo).
   const ja = new Set(CTG.itens.map((i) => i.nome_saipos));
-  const L = (CTG.brancos || []).filter((b) => !ja.has(b.nome_saipos_conta));
+  const L = (CTG.brancos || []).filter((b) => !ja.has(b.nome) && !ja.has(b.nome_saipos_conta));
   if (!L.length) return '';
   let h = `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); margin-bottom:10px;">
     <b style="color:var(--farol-perto);">${L.length} ${L.length === 1 ? 'item ficou em branco' : 'itens ficaram em branco'} no papel</b>
     <div style="font-size:12.5px; margin-top:2px;">Se não tinha, digite <b>0</b>; se tinha, digite o que foi contado. Grava ao sair do campo.</div>
     <div id="tabelaBrancos" style="margin-top:6px;"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th>Página</th><th style="text-align:right;">Contado</th></tr></thead><tbody>`;
   L.forEach((b) => {
-    const nome = JSON.stringify(b.nome_saipos_conta).replace(/"/g, '&quot;');
-    const e = (CTG.escopo || []).find((x) => x.nome_saipos === b.nome_saipos_conta) || {};
+    const nome = JSON.stringify(b.nome).replace(/"/g, '&quot;');
+    const e = ctgEscopoDe(b.nome) || (CTG.escopo || []).find((x) => x.nome_saipos === b.nome_saipos_conta) || {};
     h += `<tr><td style="color:var(--tx-5);">${b.linha == null ? '' : b.linha}</td>
       <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}</td>
       <td style="color:var(--tx-4);">${trEscH(b.grupo || '')}</td>
@@ -1092,7 +1105,7 @@ function ctgHtmlConferir() {
   h += `<div id="tabelaConferir"><table><thead><tr>
       <th style="width:34px;">✓</th><th>Item</th><th style="text-align:right;">Contado</th><th>Hora</th><th></th></tr></thead><tbody>`;
   feitos.forEach((j) => {
-    const i = porNome.get(j.nome_saipos) || {};
+    const i = porNome.get(j.nome_saipos) || ctgEscopoDe(j.nome_saipos) || {};   // linha pelo nome da base: custo traduzido
     const id = btoa(unescape(encodeURIComponent(j.nome_saipos))).replace(/[^A-Za-z0-9]/g, '');
     h += `<tr${j.conferido_em ? ' style="opacity:.72;"' : ''}>
       <td>${j.conferido_em

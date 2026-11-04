@@ -2695,16 +2695,16 @@ async function trTelaFechamento() {
 
   alvo.innerHTML = `
     <div id="trFechFaixa"></div>
-    <div class="contexto" style="max-width:620px;">
-      <b>Fechar o mês de uma filial</b> — só fecha se todas as listas do mês estiverem conferidas item a item.
-      <div style="margin-top:8px;">
-        <select id="trFechUn" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:5px 8px; max-width:100%;">
-          ${regras.map(g => `<option value="${g.unidade}">${g.unidade} — ${Number(g.dia_pagamento) >= 31 ? 'vence no último dia do mês seguinte' : 'vence dia ' + (g.dia_pagamento || '?') + ' do mês seguinte'}</option>`).join('')}
-        </select>
-        <input type="month" id="trFechMes" min="${TR_FECH_DOC_INICIO}" value="${mesPassado}" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:4px 6px; margin-left:6px;">
-        <button class="preset-btn" onclick="trFecharMes()">fechar mês</button>
-      </div>
-      <div id="trFechMsg" style="font-size:12px; margin-top:8px;"></div>
+    <!-- 04/11/2026 (dono: "essa tabela de cima fechar mês tem necessidade? fechar cada bloco de cada empresa já não faz
+         a mesma coisa?"): faz — o "fechar o mês" de cada cartão chama o mesmo tr_fechar_mes. Do quadro de cima fica só o
+         MÊS, que escolhe o mês dos cartões. O select de filial fica escondido: é dele que sai a lista de filiais dos cartões. -->
+    <div style="text-align:center; margin:4px 0 6px;">
+      <label for="trFechMes" style="font-size:13px; color:var(--tx-2);">Mês:</label>
+      <input type="month" id="trFechMes" min="${TR_FECH_DOC_INICIO}" value="${mesPassado}" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:4px 6px; margin-left:6px;">
+      <select id="trFechUn" hidden>
+        ${regras.map(g => `<option value="${g.unidade}">${g.unidade}</option>`).join('')}
+      </select>
+      <div id="trFechMsg" style="font-size:12px; margin-top:6px;"></div>
     </div>
 
     <div id="trFechGeral"></div>
@@ -2714,7 +2714,7 @@ async function trTelaFechamento() {
     <div class="section-label">Esperando validação</div>
     ${!esperando.length ? '<div class="contexto">Nada esperando. Todo mês fechado já virou conta a pagar.</div>' : `
     <div class="caption-label">Confira o total e as diferenças antes de validar. Depois de validado vira conta a pagar
-      e aparece para a Hellen — a regra atual cobra o que <b>saiu</b> da Água Verde; diferença é acerto do dono.</div>
+      — a regra atual cobra o que <b>saiu</b> da Água Verde; diferença é acerto do dono.</div>
     <div id="tabelaTrFech"><table>
       <tr><th>Filial</th><th>Mês</th><th>Listas</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Vence</th><th>Diferenças</th><th></th></tr>
       ${esperando.map(f => `<tr>
@@ -2760,7 +2760,7 @@ async function trAvulsosExtra(avulsos) {
     const [ro, rq, rc, rs] = await Promise.all([
       ids.length ? trRpc('tr_avulso_opcoes') : null,
       ids.length ? trFetch(`tr_lista_itens?id=in.(${ids.join(',')})&select=id,qtd_solicitada,qtd_separada,qtd_recebida,emb_separada,emb_recebida`) : null,
-      trRpc('tr_avulso_corrigidos', { p_dias: 30 }),
+      null,   // tr_avulso_corrigidos: o bloco saiu da tela em 04/11/2026
       Promise.all(ids.map(sugDe)),
     ]);
     if (ids.length && !(ro && ro.ok)) return { pode: true, semFuncoes: true, corrigidos: [] };
@@ -2777,20 +2777,23 @@ async function trAvulsosExtra(avulsos) {
 function trAvulsosCorrigidosHtml(cs) {
   if (!cs || !cs.length) return '';
   const quando = s => new Date(s).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  const nSaiu = cs.filter(c => c.acao === 'LIGOU' && c.saiu_mercadoria).length;
-  return `<details style="text-align:left;"><summary style="cursor:pointer;"><b>Corrigidos nos últimos 30 dias: ${cs.length}</b>${nSaiu
-      ? ` · <span style="color:var(--farol-perto);">${nSaiu} ${nSaiu === 1 ? 'ligação' : 'ligações'} com mercadoria que já tinha saído: confira o item e o valor</span>` : ''}</summary>
+  // 04/11/2026 (dono: "se já foi corrigido e ainda aparece, confunde, dá a impressão que o usuário ainda tem que
+  // fazer algo"): saiu o aviso laranja "N ligações com mercadoria que já tinha saído" e a marca por linha.
+  // O registro fica só para consulta.
+  return `<details style="text-align:left;"><summary style="cursor:pointer;"><b>Corrigidos nos últimos 30 dias: ${cs.length}</b></summary>
     ${cs.map(c => `<div style="border-top:1px solid var(--line); padding:5px 0; font-size:12px; line-height:1.5;">
       ${quando(c.feito_em)} · lista #${c.id_lista} · ${trEscH(c.unidade)} · “${trEscH(c.escrito)}” ${c.acao === 'LIGOU'
         ? `→ <b>${trEscH(c.item)}</b>${c.cobranca === 'NAO_COBRA' ? ' · não cobra' : c.cobranca === 'COBRA_NF' ? ' · cobra pela nota (sem 19%)' : c.cobranca === 'COBRA' ? ' · cobra' : ''}${
             c.sem_cobranca && !c.cobranca ? ' · sem cobrança' : (c.preco != null && c.cobranca !== 'NAO_COBRA' ? ` · R$ ${Number(c.preco).toLocaleString('pt-BR', { maximumFractionDigits: 4 })} por ${trEscH(c.un)}` : '')}${c.valor != null ? ` · valor R$ ${fmt(Number(c.valor))}` : ''}`
         : `→ tirada da lista · motivo: ${trEscH(c.motivo)}`}
-      · ${trEscH(c.feito_por)}${c.acao === 'LIGOU' && c.saiu_mercadoria ? ' · <span style="color:var(--farol-perto);">já tinha saído mercadoria</span>' : ''}</div>`).join('')}
+      · ${trEscH(c.feito_por)}</div>`).join('')}
   </details>`;
 }
 function trAvulsosBloco(avulsos, extra) {
   const lista = avulsos || [];
-  const feitos = trAvulsosCorrigidosHtml(extra && extra.corrigidos);
+  // 04/11/2026 (dono: "pode eliminar tudo, o que foi corrigido já foi, não vejo motivo para consultar esses itens"):
+  // o bloco "Corrigidos nos últimos 30 dias" saiu da tela. O registro continua no banco (tr_avulso_corrigidos).
+  const feitos = '';
   if (!lista.length) return feitos ? `<div class="contexto" style="margin-top:12px; text-align:left;">${feitos}</div>` : '';
   const n = lista.length;
   const topo = `<b>⚠️ ${n} ${n === 1 ? 'item escrito' : 'itens escritos'} à mão, sem preço</b> — o mês não fecha com ${n === 1 ? 'ele' : 'eles'}.`;
@@ -3424,11 +3427,12 @@ function trFechFaixa(linhas, filiais, mes, av) {
     if (x.cobranca_status === 'EM VALIDACAO') {
       const e = esp.find(z => z.unidade === u && String(z.mes_referencia || '').slice(0, 7) === mes);
       detalhe = `fechado — falta validar${e && nu(e.itens_divergentes) ? ` · <span style="color:var(--farol-perto);">${e.itens_divergentes} item(ns) com diferença</span>` : ''}`;
-      acao = e ? btn('validar e mandar à Hellen', `trValidarFechamento(${e.id})`, true) : '';
+      // 04/11/2026 (dono: "esse mandar à Hellen não precisa, ele fecha e lança no Saipos"): o botão diz só a ação
+      acao = e ? btn('validar', `trValidarFechamento(${e.id})`, true) : '';
     } else if (trFechBateu(x)) {
       bateram.push(ix);
       detalhe = '<span style="color:var(--farol-ok);">bateu: todas as listas conferidas, nada travando</span>';
-      acao = btn('fechar e mandar à Hellen', `trFechFecharEValidar([${ix}])`, true);
+      acao = btn('fechar', `trFechFecharEValidar([${ix}])`, true);
     } else if (x.situacao === 'PREVIA' && x.pode_fechar) {
       detalhe = `<span style="color:var(--farol-perto);">pode fechar, com aviso: ${trEscH([...(x.avisos || []), nu(x.valor_itens_abertas) ? 'tem item de lista ainda não conferida' : ''].filter(Boolean).join('; '))}</span>`;
       acao = btn('fechar', `trFechFecharDaqui(${ix})`, false);
@@ -3447,7 +3451,7 @@ function trFechFaixa(linhas, filiais, mes, av) {
   return `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);">
     <b>O que falta para fechar ${trFechMesTxt(mes)}</b>${aviso}
     <div style="margin-top:6px;">${linhasHtml.join('')}</div>
-    ${bateram.length > 1 ? `<div style="padding-top:8px; border-top:1px solid var(--line);"><button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharEValidar([${bateram.join(',')}])">fechar e mandar à Hellen as ${bateram.length} que bateram</button></div>` : ''}
+    ${bateram.length > 1 ? `<div style="padding-top:8px; border-top:1px solid var(--line);"><button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharEValidar([${bateram.join(',')}])">fechar as ${bateram.length} que bateram</button></div>` : ''}
   </div>`;
 }
 // fecha e valida as filiais escolhidas (as que bateram), uma pergunta só para todas
@@ -3457,7 +3461,7 @@ async function trFechFecharEValidar(ixs) {
   const nu = (v) => Number(v) || 0;
   const alvos = ixs.map(ix => ({ un: g.filiais[ix], r: g.linhas.find(x => x.unidade === g.filiais[ix]) })).filter(a => trFechBateu(a.r));
   if (!alvos.length) return;
-  if (!confirm(`Fechar ${trFechMesTxt(g.mes)} e mandar à Hellen como conta a pagar?\n\n`
+  if (!confirm(`Fechar ${trFechMesTxt(g.mes)}? Vira conta a pagar.\n\n`
       + alvos.map(a => `${a.un}: R$ ${fmt(nu(a.r.valor_total))} · vence em ${trFechData(a.r.vencimento)}`).join('\n')
       + '\n\nSó manda se o valor gravado for igual a este e sem diferença; senão para e avisa.')) return;
   const foi = [], parou = [];
@@ -3480,7 +3484,7 @@ async function trFechFecharEValidar(ixs) {
     foi.push(`${a.un} R$ ${fmt(Math.abs(nu(v.valor_total)))}`);
   }
   window._trFechAviso = { ok: !parou.length,
-    txt: [foi.length ? `Mandado à Hellen (já está em Contas a pagar): ${foi.join(' · ')}.` : '', ...parou].filter(Boolean).join(' ') };
+    txt: [foi.length ? `Fechado (já está em Contas a pagar): ${foi.join(' · ')}.` : '', ...parou].filter(Boolean).join(' ') };
   LISTAS = null;
   trTelaFechamento();
 }
