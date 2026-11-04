@@ -421,7 +421,8 @@ function trRenderOperacao() {
   // 04/11/2026 (dono: "esse contas a pagar precisa estar aqui? não dá pra mandar tudo pro módulo contas a pagar?"):
   // a aba saiu — a cobrança em aberto das listas já está no módulo Contas a pagar (vw_fin_contas_pagar, origem
   // LISTAS); o pago e o que falta de cada mês ficam no "Histórico fechado"; o documento, nos cartões do Fechamento.
-  telas.push(['cmv', '📈 CMV semanal']);
+  // 04/11/2026 (dono: "pode tirar o CMV sim"): a aba CMV semanal saiu — o mesmo número (vw_tr_cmv_semanal) já
+  // entra no módulo "A semana", junto com vendas e despesas
   // login operacional sem valores (05/09/2026): as abas de dinheiro somem —
   // e o banco ja devolve NULL nos precos mesmo que alguem chame a API na mao
   if (TR_OP.veValores === false) {
@@ -431,7 +432,8 @@ function trRenderOperacao() {
   telas = telas.filter(([id]) => TR_TELAS_MODULO[TR_MODULO].includes(id));
   if (!telas.length) {
     alvo.innerHTML = `<div class="contexto">Logado como <b>${rmbSessao().email}</b> (papel ${papel}).
-      As telas do seu papel ficam no módulo <b>Listas · ${TR_MODULO === 'pedidos' ? 'Financeiro' : 'Pedidos'}</b>.
+      ${TR_MODULO === 'pedidos' ? 'As telas do seu papel ficam no módulo <b>Listas · Financeiro</b>.'
+        : 'O que a filial deve das listas fica no módulo <b>Contas a pagar</b>; o pedido e a conferência, em <b>Listas · Pedidos</b>.'}
       <button class="preset-btn" onclick="trSair()">sair</button></div>`;
     return;
   }

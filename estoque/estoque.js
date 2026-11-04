@@ -129,8 +129,10 @@ async function ctgCarregar() {
     // EM BRANCO NO PAPEL (dono, 22/10/2026: "esses itens que vêm em branco na contagem deveriam aparecer na grade de
     // conferência pra Rita; se realmente não tinha, ela preenche zero, caso contrário preenche o valor contado").
     // Célula em branco não gera linha na leitura da foto: a grade do Estoque (vw_est_contagem_grade) é que sabe.
-    CTG.brancos = await consultarTudo(`vw_est_contagem_grade?select=linha,grupo,ordem_grupo,nome,nome_saipos_conta,un,situacao` +
-      `&id_inventario=eq.${CTG.folha.id}&qtd_lida=is.null&situacao=in.(%22EM%20BRANCO%20NA%20FOTO%22,%22EM%20BRANCO%20NO%20FIM%20DA%20PAGINA%22,%22ESPERANDO%20CONFERENCIA%22)&order=ordem_grupo,linha`).catch(() => []);   // 22/10: o Estoque criou as linhas vazias (ESPERANDO CONFERENCIA, sem quantidade)
+    // 04/11/2026 (Organizador: FRANGO GRELHADO RECEITA, folha 19 — a foto leu 16,7 mas a linha foi gravada vazia e ficou
+    // sem lugar): entra também a linha LIDA e não gravada. Quem decide se já está contado é ctgHtmlBrancos (pela contagem).
+    CTG.brancos = await consultarTudo(`vw_est_contagem_grade?select=linha,grupo,ordem_grupo,nome,nome_saipos_conta,un,situacao,qtd_lida,id_foto` +
+      `&id_inventario=eq.${CTG.folha.id}&situacao=in.(%22EM%20BRANCO%20NA%20FOTO%22,%22EM%20BRANCO%20NO%20FIM%20DA%20PAGINA%22,%22ESPERANDO%20CONFERENCIA%22)&order=ordem_grupo,linha`).catch(() => []);   // 22/10: o Estoque criou as linhas vazias (ESPERANDO CONFERENCIA, sem quantidade)
   } else CTG.brancos = [];
   // 28/10/2026: notas com data até a contagem, lançadas no Saipos depois dela — a mercadoria já estava na prateleira?
   CTG.nfDepois = await consultarTudo(`vw_est_nf_apos_contagem?select=*&unidade=eq.${u}&order=data_da_nota,nf`).catch(() => null);
@@ -455,7 +457,10 @@ async function ctgAplicarFoto(id, semPergunta) {
   if (ruim) { avisoAcao('atencao', '! Tem número inválido em ' + ruim.nome_saipos); return; }
   const gravar = campos.filter((c) => c.qtd !== null);
   if (!gravar.length) { avisoAcao('atencao', '! Nenhum número para gravar.'); return; }
-  if (!semPergunta && !confirm(`Gravar ${gravar.length} itens contados na folha ${CTG.folha.id}?`)) return;
+  // 04/11/2026: linha que fica vazia não some calada — vai para o quadro "ainda sem contagem", e a pergunta diz isso
+  const vazias = campos.length - gravar.length;
+  const avisoVazias = vazias ? `\n\n${vazias} ${vazias === 1 ? 'linha está vazia e não vai ser gravada' : 'linhas estão vazias e não vão ser gravadas'}: ${vazias === 1 ? 'ela fica' : 'elas ficam'} no quadro "ainda sem contagem", para digitar depois.` : '';
+  if (!semPergunta && !confirm(`Gravar ${gravar.length} itens contados na folha ${CTG.folha.id}?${avisoVazias}`)) return;
   avisoAcao('enviando', `Gravando ${gravar.length} ${gravar.length === 1 ? 'item' : 'itens'} da foto…`);
   try {
     await ctgFetch('est_inventario_itens?on_conflict=id_inventario,nome_saipos', {
@@ -1058,17 +1063,24 @@ function ctgHtmlBrancos() {
   // 04/11/2026: grava e compara pelo NOME DA BASE (b.nome da vw_est_contagem_grade), nunca pelo nome_saipos_conta.
   // Linha antiga gravada com o nome do Saipos também conta como preenchida (não reaparece para digitar de novo).
   const ja = new Set(CTG.itens.map((i) => i.nome_saipos));
-  const L = (CTG.brancos || []).filter((b) => !ja.has(b.nome) && !ja.has(b.nome_saipos_conta));
+  // linha de foto ainda esperando "Gravar estes itens" já tem campo na conferência da foto: não repete aqui
+  const fotoPendente = new Set((CTG.fotos || []).filter((f) => f.status === 'TRANSCRITA').map((f) => f.id));
+  const L = (CTG.brancos || []).filter((b) => !ja.has(b.nome) && !ja.has(b.nome_saipos_conta)
+    && !(b.qtd_lida != null && fotoPendente.has(b.id_foto)));
   if (!L.length) return '';
+  const nLidas = L.filter((b) => b.qtd_lida != null).length;
   let h = `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); margin-bottom:10px;">
-    <b style="color:var(--farol-perto);">${L.length} ${L.length === 1 ? 'item ficou em branco' : 'itens ficaram em branco'} no papel</b>
-    <div style="font-size:12.5px; margin-top:2px;">Se não tinha, digite <b>0</b>; se tinha, digite o que foi contado. Grava ao sair do campo.</div>
+    <b style="color:var(--farol-perto);">${L.length} ${L.length === 1 ? 'item ainda sem contagem' : 'itens ainda sem contagem'}</b>
+    <div style="font-size:12.5px; margin-top:2px;">${nLidas === L.length ? 'A foto leu, mas o número não foi gravado.'
+      : nLidas ? 'Ficaram em branco no papel, ou a foto leu e o número não foi gravado.' : 'Ficaram em branco no papel.'}
+      Se não tinha, digite <b>0</b>; se tinha, digite o que foi contado. Grava ao sair do campo.</div>
     <div id="tabelaBrancos" style="margin-top:6px;"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th>Página</th><th style="text-align:right;">Contado</th></tr></thead><tbody>`;
   L.forEach((b) => {
     const nome = JSON.stringify(b.nome).replace(/"/g, '&quot;');
     const e = ctgEscopoDe(b.nome) || (CTG.escopo || []).find((x) => x.nome_saipos === b.nome_saipos_conta) || {};
     h += `<tr><td style="color:var(--tx-5);">${b.linha == null ? '' : b.linha}</td>
-      <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}</td>
+      <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}${
+        b.qtd_lida != null ? `<div class="caption-label" style="color:var(--farol-perto);">a foto leu ${fmt(Number(b.qtd_lida))} ${trEscH(b.un || '')} — confira e digite</div>` : ''}</td>
       <td style="color:var(--tx-4);">${trEscH(b.grupo || '')}</td>
       <td style="text-align:right; white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
            onchange="ctgSalvar(this, ${nome}, ${JSON.stringify(b.un || '').replace(/"/g, '&quot;')}, ${e.custo || 'null'}, ${JSON.stringify(e.custo_fonte || '').replace(/"/g, '&quot;')})"
