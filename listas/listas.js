@@ -784,17 +784,19 @@ function trMedidaEmb(v, un) { return trEmbDesc({ un_medida: un, emb_fator: Math.
 // Sem itens, o bloco nao existe.
 function trPesoAlertaHtml(alerta) {
   if (!Array.isArray(alerta) || !alerta.length) return '';
-  return `<div class="contexto" style="border-color:var(--farol-perto); margin-top:14px;">
-    <b>⚖️ Peso diferente do combinado</b> — nos últimos 60 dias estes itens saíram com um peso diferente do
+  // 04/11/2026 18:20 (dono: "separar ele da grade dos pedidos, aparecer logo abaixo"): um quadro só, com
+  // borda e título próprios — a tabela fica DENTRO do quadro, para não parecer continuação da fila
+  return `<div class="contexto" style="border-color:var(--farol-perto); margin-top:22px; text-align:left;">
+    <div><b>⚖️ Peso diferente do combinado</b> — nos últimos 60 dias estes itens saíram com um peso diferente do
     que está combinado para a embalagem. Vale rever com o Neto o peso combinado (ou a porção na produção).</div>
-    <div id="tabelaTrPesoFora"><table>
+    <div id="tabelaTrPesoFora" style="margin-top:10px;"><table>
       <tr><th>Item</th><th>Combinado</th><th>Vem dando</th><th>Em quantos envios</th></tr>
       ${alerta.map(a => { const d = Number(a.desvio_pct); const emb = String(a.emb_nome || 'volume').split(' (')[0]; return `<tr>
         <td>${a.item}</td>
         <td>${emb} de ${trMedidaEmb(a.peso_combinado, a.un_medida)}</td>
         <td><b>${trMedidaEmb(a.peso_medio, a.un_medida)}</b> <span class="tr-tag">${trNum(Math.abs(d), 1)}% ${d < 0 ? 'a menos' : 'a mais'}</span></td>
         <td>${a.envios} ${Number(a.envios) === 1 ? 'envio' : 'envios'} <span class="tr-det">· ${trNum(a.embalagens)} ${trEmbPlural(emb, a.embalagens)}</span></td></tr>`; }).join('')}
-    </table></div>`;
+    </table></div></div>`;
 }
 // Letreiro da linha (24/09/2026, dono): conversao da embalagem E o valor do
 // item conforme digita — "2 × 700 g ≈ 1,4 kg = R$ 26,51". Login sem valores
@@ -1816,8 +1818,9 @@ async function trTelaSeparacao() {
     if (n >= 2) return `<span class="tr-tag">${txt}</span>`;
     return txt;
   };
-  // 04/11/2026 (dono: "subir o aviso de divergência de peso para o topo"): o alerta vem ANTES da fila
-  alvo.innerHTML = trPesoAlertaHtml(alerta) + (fila.length ? `
+  // 04/11/2026: o alerta de peso foi ao topo às 18:00 e, às 18:20, o dono preferiu "separar ele da grade
+  // dos pedidos, aparecer logo abaixo": vem logo depois da fila, num quadro próprio (trPesoAlertaHtml)
+  alvo.innerHTML = (fila.length ? `
     <div id="tabelaTrOpFila"><table>
       <tr><th>Lista</th><th>Filial</th><th>Pedida em</th><th title="Dias corridos desde o pedido. A partir de 2 dias avisa; de 3 em diante aponta.">Parada há</th><th>Status</th><th>Itens</th><th>Separados</th><th>Valor estimado</th><th></th></tr>
       ${fila.map(l => `<tr>
@@ -1830,7 +1833,7 @@ async function trTelaSeparacao() {
     </table></div>
     <div class="caption-label">Excluir é para pedido lançado errado — some para todo mundo, sem volta.
       De ENVIADA em diante não dá mais (já tem frete e conferência no meio): fale com o Neto.</div>` :
-    '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>');
+    '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>') + trPesoAlertaHtml(alerta);
 }
 
 // exclusao de lista lancada errada (dono, 04/09/2026): so ate SEPARADA — a
