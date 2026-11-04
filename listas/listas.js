@@ -3139,7 +3139,10 @@ function trFechDocHtml(d, opc = {}) {
   if (!fecha) notas.push('ATENÇÃO: a soma das linhas não fechou com o total — não envie este documento e avise o Neto.');
 
   // --- as listas do mes ---
+  // 04/11/2026 (dono, 18:33: "porque a lista 30779 está como falta fechar?"): RECEBIDA conferida inteira e com
+  // preço fecha sozinha no fechamento do mês (tr_fechar_mes) e já não vem `aberta` → só "conferida"
   const sitLista = (l) => l.fonte !== 'PAINEL' ? '—'
+    : l.status === 'RECEBIDA' ? (l.aberta ? 'conferida — falta preço ou conferência de item' : 'conferida')
     : ({ SOLICITADA: 'pedida — falta separar', SEPARADA: 'separada — falta enviar', ENVIADA: 'enviada — falta conferir', RECEBIDA: 'conferida — falta fechar', FECHADA: 'conferida' }[l.status] || e(l.status));
   const listas = (d.listas || []).map(l => `<tr><td>${l.fonte === 'PAINEL' ? '#' + l.id_lista : 'planilha'}${l.aberta ? ' *' : ''}</td><td>${dm(l.data_pedido)}</td><td>${dm(l.data_entrega)}</td>
       <td>${sitLista(l)}</td><td>${l.michiro ? 'sim' + (l.frete_outro_mes ? ' (frete de ' + dm(l.frete_data) + ')' : '') : (l.fonte === 'PAINEL' ? 'não' : '—')}</td>
