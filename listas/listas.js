@@ -1816,7 +1816,8 @@ async function trTelaSeparacao() {
     if (n >= 2) return `<span class="tr-tag">${txt}</span>`;
     return txt;
   };
-  alvo.innerHTML = (fila.length ? `
+  // 04/11/2026 (dono: "subir o aviso de divergência de peso para o topo"): o alerta vem ANTES da fila
+  alvo.innerHTML = trPesoAlertaHtml(alerta) + (fila.length ? `
     <div id="tabelaTrOpFila"><table>
       <tr><th>Lista</th><th>Filial</th><th>Pedida em</th><th title="Dias corridos desde o pedido. A partir de 2 dias avisa; de 3 em diante aponta.">Parada há</th><th>Status</th><th>Itens</th><th>Separados</th><th>Valor estimado</th><th></th></tr>
       ${fila.map(l => `<tr>
@@ -1829,7 +1830,7 @@ async function trTelaSeparacao() {
     </table></div>
     <div class="caption-label">Excluir é para pedido lançado errado — some para todo mundo, sem volta.
       De ENVIADA em diante não dá mais (já tem frete e conferência no meio): fale com o Neto.</div>` :
-    '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>') + trPesoAlertaHtml(alerta);
+    '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>');
 }
 
 // exclusao de lista lancada errada (dono, 04/09/2026): so ate SEPARADA — a
@@ -2818,6 +2819,10 @@ function trAvulsoFatorVer(id) {
   if (!a || !campo || !wrap) return;
   const v = (campo.value || '').trim();
   const s = ((window._trAvulsoSug || {})[id] || []).find(x => x.pode_escolher && (x.origem === 'BASE' ? x.nome_base : x.item_da_grade) === v);
+  // 04/11/2026 (dono: "senti falta da marcação cobra pela NF"): item de fornecedor → a opção diz "pela NF".
+  // O valor enviado continua COBRA; quem grava COBRA_NF é o banco (tr_avulso_corrigir).
+  const optC = document.querySelector('#travc_' + id + ' option[value="COBRA"]');
+  if (optC) optC.textContent = s && s.fornecedor ? 'cobra pela NF (sem 19%)' : 'cobra';
   let de = null, para = null;
   if (s && s.precisa_fator) { de = s.un_escrita; para = s.un_item; }
   else if (!s) {
@@ -2856,6 +2861,7 @@ async function trAvulsoCorrigir(id) {
   const s = await rs.json();
   const reais = v => v == null ? '—' : 'R$ ' + fmt(Number(v));
   const preco = s.cobranca === 'NAO_COBRA' ? 'não cobra (marcado na correção)'
+    : s.cobranca === 'COBRA_NF' && s.preco != null ? `cobra pela NF (sem 19%) · R$ ${Number(s.preco).toLocaleString('pt-BR', { maximumFractionDigits: 4 })} por ${s.un}`
     : s.sem_cobranca ? 'sem cobrança (a grade diz que este item não é cobrado desta filial)'
     : s.preco == null ? 'o da grade' : `R$ ${Number(s.preco).toLocaleString('pt-BR', { maximumFractionDigits: 4 })} por ${s.un}`;
   const valores = s.valor_linha == null && s.total_lista_antes == null ? ''
@@ -2873,7 +2879,7 @@ async function trAvulsoCorrigir(id) {
   if (!r.ok) return trAvulsoAvisa('Não deu: ' + await trErroDe(r), 'var(--farol-fora)');
   LISTAS = null;   // o Histórico e as listas leem o mesmo valor: recarregam na próxima entrada
   await trTelaFechamento();
-  trAvulsoAvisa(`Corrigido: “${s.escrito}” agora é ${s.item}${s.conversao ? ' · ' + s.conversao : ''} · ${cobra === 'NAO_COBRA' ? 'não cobra' : 'cobra'}.`, 'var(--farol-ok)');
+  trAvulsoAvisa(`Corrigido: “${s.escrito}” agora é ${s.item}${s.conversao ? ' · ' + s.conversao : ''} · ${cobra === 'NAO_COBRA' ? 'não cobra' : s.cobranca === 'COBRA_NF' ? 'cobra pela NF (sem 19%)' : 'cobra'}.`, 'var(--farol-ok)');
 }
 // o botão da sugestão só preenche o campo; quem corrige é o "corrigir" (com a simulação e a pergunta)
 function trAvulsoEscolhe(id, k) {
