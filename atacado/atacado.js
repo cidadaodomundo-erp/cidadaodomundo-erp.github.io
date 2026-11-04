@@ -301,9 +301,9 @@ function orcPintar() {
       if (c5) c5.style.color = x && Number(x.lucro_linha) < 0 ? 'var(--farol-fora)' : '';
     }
   });
-  const k = orcKitConta(), vp = orcEl('orcValorPessoa'), sp = orcEl('orcSugPessoa');
-  if (vp && k && !ORC.valorManual && document.activeElement !== vp) vp.value = k.sugerido.toFixed(2);
-  if (sp) sp.textContent = k ? `· sugerido ${orcR(k.sugerido)}` : '';
+  const kc = orcKitConta(), vp = orcEl('orcValorPessoa'), sp = orcEl('orcSugPessoa');
+  if (vp && kc && !ORC.valorManual && document.activeElement !== vp) vp.value = kc.sugerido.toFixed(2);
+  if (sp) sp.textContent = kc ? `· sugerido ${orcR(kc.sugerido)}` : '';
   const t = orcEl('orcTotais');
   if (t) { t.style.opacity = ''; t.innerHTML = orcTotaisHtml(); }
 }
