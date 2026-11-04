@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Trazendo o rascunho · Cidadão do Mundo</title>
+<!-- 04/11/2026 (Organizador): o rascunho das conferências ficou no aparelho, no endereço antigo (netoavft.github.io).
+     O redirecionar.js de lá manda as chaves conferencia_*_rascunho/_respostas no # para esta página, que junta no
+     aparelho SEM sobrescrever o que já existe aqui, limpa o # e segue para Conferências. Quem mexe: chat "Telas do painel". -->
+<style>
+  :root { --fundo:#12120f; --tx:#c3c2b7; --tx-1:#f2f1ea; --ok:#5fb37a; --erro:#e0334f; --marca:#f5c518; }
+  body { background:var(--fundo); color:var(--tx); font-family:Inter,Helvetica,Arial,sans-serif; display:flex; align-items:center;
+         justify-content:center; min-height:100vh; margin:0; padding:16px; box-sizing:border-box; }
+  main { max-width:460px; text-align:center; font-size:16px; line-height:1.5; }
+  b { color:var(--tx-1); } .ok { color:var(--ok); } .erro { color:var(--erro); }
+  a.botao { display:inline-block; margin-top:14px; padding:12px 18px; border:1px solid var(--marca); border-radius:10px; color:var(--tx-1); text-decoration:none; font-weight:700; }
+</style></head>
+<body><main id="msg">Trazendo o que você escreveu…</main>
+<script>
+(function () {
+  var DESTINO = 'sistema.html#conferencias';
+  var el = document.getElementById('msg');
+  var botao = '<br><a class="botao" href="' + DESTINO + '">Abrir as Conferências</a>';
+  var h = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, '', location.pathname);   // o pacote não fica no endereço nem no histórico
+  var v = h.get('v'), n = Number(h.get('n'));
+  if (!v) { location.replace(DESTINO); return; }
+  try {
+    var b64 = v.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var json = decodeURIComponent(escape(atob(b64)));
+    if (json.length !== n) throw new Error('chegou incompleto (' + json.length + ' de ' + n + ')');
+    var pac = JSON.parse(json), cartoes = {}, novos = 0;
+    Object.keys(pac).forEach(function (k) {
+      if (!/^conferencia_.+_(rascunho|respostas)$/.test(k)) return;
+      var velho; try { velho = JSON.parse(pac[k]); } catch (e) { return; }
+      if (!velho || typeof velho !== 'object') return;
+      var atual = {}; try { atual = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { atual = null; }
+      if (!atual || typeof atual !== 'object') return;   // o que está aqui não é lido: não mexe
+      Object.keys(velho).forEach(function (c) {
+        if (Object.prototype.hasOwnProperty.call(atual, c)) return;   // o daqui manda
+        atual[c] = velho[c]; novos++;
+        cartoes[k.replace(/_(rascunho|respostas)$/, '') + '|' + String(c).split('|')[0]] = 1;
+      });
+      localStorage.setItem(k, JSON.stringify(atual));
+    });
+    var nc = Object.keys(cartoes).length;
+    if (!nc) { el.innerHTML = 'O que estava no endereço antigo <b>já está aqui</b>.' + botao; setTimeout(function () { location.replace(DESTINO); }, 2500); return; }
+    el.innerHTML = '<span class="ok">✓</span> Trouxemos <b>' + nc + (nc === 1 ? ' ficha' : ' fichas') + '</b> que você tinha escrito no endereço antigo.<br>' +
+      'Abra <b>Conferências</b>, escolha a aba (Receitas, Produtos ou Bebidas) e aperte <b>Marcar como conferida</b> em cada ficha.' + botao;
+  } catch (e) {
+    el.innerHTML = '<span class="erro">✗</span> O rascunho <b>não chegou</b>: ' + String(e.message || e) +
+      '.<br>Nada foi apagado do endereço antigo. Avise o Neto.' + botao;
+  }
+})();
+</script></body></html>
