@@ -59,9 +59,16 @@ async function entrarOrcamentos() {
   if (!orcAdmin()) { ORC.aba = 'equipe'; orcRender(); orcEquipe(); return; }
   try {
     if (!ORC.base) ORC.base = await consultarTudo('vw_orc_item_escolha?select=item,un,custo_un,custo_fonte,custo_data,grupo&order=item');
-    // preço sugerido do item = vitrine da lojinha, convertido para a unidade da base (pacote de 2,5 kg → por kg)
-    if (!ORC.sugerido) ORC.sugerido = new Map((await consultarTudo('loja_produto?select=item,qtd_por_venda,preco_venda&tipo=eq.PRODUTO&ativo=is.true&preco_venda=not.is.null').catch(() => []))
-      .filter((x) => Number(x.qtd_por_venda) > 0).map((x) => [x.item, Math.round(Number(x.preco_venda) / Number(x.qtd_por_venda) * 100) / 100]));
+    // 04/11/2026 11:15 (dono): a aba Itens usa os produtos do atacado (costelinha 1 kg, 500 g...), a mesma lista do ePadoca e da lojinha.
+    // Preço sugerido do pacote = o mais alto entre as tabelas modelo do atacado (dono, 30/10 18:59: "a tabela mais alta do atacado").
+    if (!ORC.produtos) {
+      const [prods, modelos] = await Promise.all([
+        consultarTudo('loja_produto?select=id,nome_vitrine,un_vitrine,qtd_por_venda,un&tipo=eq.ATACADO&ativo=is.true&order=nome_vitrine'),
+        consultarTudo('loja_empresa?select=id&modelo=is.true').catch(() => [])]);
+      const precos = modelos.length ? await consultarTudo(`loja_preco?select=produto_id,preco&empresa_id=in.(${modelos.map((m) => m.id).join(',')})`).catch(() => []) : [];
+      const alto = {}; precos.forEach((p) => { alto[p.produto_id] = Math.max(alto[p.produto_id] || 0, Number(p.preco)); });
+      ORC.produtos = prods.map((p) => ({ id: p.id, item: p.nome_vitrine, un: p.un_vitrine || String(p.un || '').toLowerCase(), sug: alto[p.id] || null }));
+    }
   } catch (e) { v.innerHTML = `<h2>Orçamentos</h2><div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler a lista de itens: ${trEscH(e.message)}</div>`; return; }
   await orcLerClientes();
   orcRender();
@@ -105,29 +112,33 @@ function orcMontarHtml() {
     </div>
     <div id="tabelaOrcItens" class="cel-cartao"><table><thead><tr>${ORC.modo === 'kit'
       ? '<th>Item</th><th style="text-align:right;">Quantidade por lanche</th><th style="text-align:right;">Total</th><th style="text-align:right;">Custo do item</th><th>Origem</th><th style="text-align:right;">Custo</th><th></th>'
-      : '<th>Item</th><th style="text-align:right;">Quantidade</th><th style="text-align:right;">Preço (R$ por un)</th><th style="text-align:right;">Total</th><th style="text-align:right;">Custo</th><th style="text-align:right;">Lucro</th><th></th>'}</tr></thead>
+      : '<th>Item</th><th style="text-align:right;">Quantidade</th><th style="text-align:right;">Preço de cada (R$)</th><th style="text-align:right;">Total</th><th style="text-align:right;">Custo</th><th style="text-align:right;">Lucro</th><th></th>'}</tr></thead>
       <tbody>${ORC.linhas.map(orcLinhaHtml).join('')}</tbody></table></div>
     <div id="orcTotais" style="margin-top:12px;">${orcTotaisHtml()}</div>`;
 }
 function orcLinhaHtml(l, i) {
   return `<tr id="orcL${i}">
-      <td style="min-width:260px;"><input style="${ORC_CAMPO}width:100%;" value="${trEscH(l.item)}" placeholder="buscar na base" autocomplete="off" oninput="orcBuscar(${i}, this)" onfocus="orcBuscar(${i}, this)" onblur="orcSairBusca(${i}, this)" onkeydown="orcTeclaBusca(event, ${i}, this)"></td>
+      <td style="min-width:260px;"><input style="${ORC_CAMPO}width:100%;" value="${trEscH(l.item)}" placeholder="${ORC.modo === 'kit' ? 'buscar na base' : 'buscar produto do atacado'}" autocomplete="off" oninput="orcBuscar(${i}, this)" onfocus="orcBuscar(${i}, this)" onblur="orcSairBusca(${i}, this)" onkeydown="orcTeclaBusca(event, ${i}, this)"></td>
       <td style="text-align:right;white-space:nowrap;"><input type="number" min="0" step="0.001" style="${ORC_CAMPO}width:90px;text-align:right;" value="${trEscH(l.qtd)}" oninput="orcLinha(${i},'qtd',this.value)"> <span class="orc-un" style="font-size:12px;color:var(--tx-3);">${trEscH(orcUn(l.item))}</span></td>
       ${ORC.modo === 'kit'
         ? `<td class="orc-c1" style="text-align:right;"></td><td class="orc-c2" style="text-align:right;"></td><td class="orc-c3" style="font-size:12px;color:var(--tx-3);"></td><td class="orc-c4" style="text-align:right;"></td>`
-        : `<td style="text-align:right;"><input class="orc-preco" type="number" min="0" step="0.01" style="${ORC_CAMPO}width:100px;text-align:right;" value="${trEscH(l.preco)}" placeholder="${orcCustoBase(l.item) != null ? 'custo ' + orcQ(orcCustoBase(l.item)) : ''}" oninput="orcLinha(${i},'preco',this.value)"><div class="orc-c3" style="font-size:11px;color:var(--tx-4);"></div></td>
+        : `<td style="text-align:right;"><input class="orc-preco" type="number" min="0" step="0.01" style="${ORC_CAMPO}width:100px;text-align:right;" value="${trEscH(l.preco)}" oninput="orcLinha(${i},'preco',this.value)"><div class="orc-c3" style="font-size:11px;color:var(--tx-4);"></div></td>
            <td class="orc-c1" style="text-align:right;"></td><td class="orc-c4" style="text-align:right;"></td><td class="orc-c5" style="text-align:right;"></td>`}
       <td><button type="button" class="preset-btn" title="Tirar a linha" onclick="orcTirar(${i})">×</button></td></tr>`;
 }
 // 30/10/2026 (dono): acha "tbone" e "t-bone" em "FILE C MIGNON (T BONE) MP": compara sem hífen, espaço e acento
 function orcFecharBusca() { const s = orcEl('orcSug'); if (s) s.remove(); ORC.sug = []; }
+// kit: itens da base (ingredientes); Itens: produtos do atacado
+const orcOpcoes = () => ORC.modo === 'kit' ? (ORC.base || []) : (ORC.produtos || []);
 function orcBuscar(i, el) {
   ORC.linhas[i].item = el.value;
+  const igual = orcOpcoes().find((b) => b.item === el.value);
+  ORC.linhas[i].produto_id = ORC.modo === 'kit' ? null : igual ? igual.id : null;
   orcAgendar();
   const q = orcNorm(el.value);
   orcFecharBusca();
   if (!q) return;
-  ORC.sug = (ORC.base || []).filter((b) => orcNorm(b.item).includes(q)).sort((a, b) => orcNorm(b.item).startsWith(q) - orcNorm(a.item).startsWith(q)).slice(0, 10);
+  ORC.sug = orcOpcoes().filter((b) => orcNorm(b.item).includes(q)).sort((a, b) => orcNorm(b.item).startsWith(q) - orcNorm(a.item).startsWith(q)).slice(0, 10);
   if (!ORC.sug.length || (ORC.sug.length === 1 && ORC.sug[0].item === el.value)) return;
   const r = el.getBoundingClientRect(), s = document.createElement('div');
   s.id = 'orcSug';
@@ -138,23 +149,22 @@ function orcBuscar(i, el) {
 function orcEscolher(i, k) {
   const b = ORC.sug[k]; if (!b) return;
   ORC.linhas[i].item = b.item;
+  ORC.linhas[i].produto_id = ORC.modo === 'kit' ? null : b.id;
   orcFecharBusca();
   const tr = orcEl('orcL' + i), inp = tr && tr.querySelector('input');
   if (inp) inp.value = b.item;
   orcItemEscolhido(i);
   orcAgendar();
 }
-const orcUn = (item) => { const b = (ORC.base || []).find((x) => x.item === item); return b ? String(b.un || '').toLowerCase() : ''; };
-const orcCustoBase = (item) => { const b = (ORC.base || []).find((x) => x.item === item); return b && b.custo_un != null ? Number(b.custo_un) : null; };
-// item escolhido: unidade ao lado da quantidade e, na aba Itens, o preço sugerido da vitrine (só se a linha ainda não tem preço)
+const orcUn = (item) => { const b = orcOpcoes().find((x) => x.item === item); return b ? String(b.un || '').toLowerCase() : ''; };
+// item escolhido: unidade ao lado da quantidade e, na aba Itens, o preço sugerido do pacote (só se a linha ainda não tem preço)
 function orcItemEscolhido(i) {
   const l = ORC.linhas[i], tr = orcEl('orcL' + i); if (!l) return;
-  const sug = ORC.sugerido && ORC.sugerido.get(l.item);
-  if (ORC.modo === 'itens' && l.preco === '' && sug != null) l.preco = String(sug);
+  const pr = ORC.modo === 'itens' && (ORC.produtos || []).find((x) => x.id === l.produto_id);
+  if (pr && l.preco === '' && pr.sug != null) l.preco = String(pr.sug);
   if (!tr) return;
   const un = tr.querySelector('.orc-un'); if (un) un.textContent = orcUn(l.item);
-  const p = tr.querySelector('.orc-preco');
-  if (p) { p.value = l.preco; const c = orcCustoBase(l.item); p.placeholder = c != null ? 'custo ' + orcQ(c) : ''; }
+  const p = tr.querySelector('.orc-preco'); if (p) p.value = l.preco;
 }
 function orcModo(m) {
   if (ORC.modo === m) return;
@@ -164,8 +174,10 @@ function orcModo(m) {
   orcRender(); orcAgendar();
 }
 function orcSairBusca(i, el) {
-  const q = orcNorm(el.value), iguais = (ORC.base || []).filter((b) => orcNorm(b.item) === q);
-  if (iguais.length === 1 && iguais[0].item !== el.value) { el.value = iguais[0].item; ORC.linhas[i].item = iguais[0].item; orcAgendar(); }
+  const q = orcNorm(el.value), iguais = orcOpcoes().filter((b) => orcNorm(b.item) === q);
+  if (iguais.length === 1 && (iguais[0].item !== el.value || (ORC.modo === 'itens' && ORC.linhas[i].produto_id !== iguais[0].id))) {
+    el.value = iguais[0].item; ORC.linhas[i].item = iguais[0].item; ORC.linhas[i].produto_id = ORC.modo === 'kit' ? null : iguais[0].id; orcAgendar();
+  }
   orcItemEscolhido(i);
   orcFecharBusca();
 }
@@ -244,7 +256,10 @@ function orcTeclaCliente(e, el) {
   [...s.children].forEach((d, k) => { d.style.background = k === ORC.sugK ? 'var(--surface-2)' : ''; if (k === ORC.sugK) d.scrollIntoView({ block: 'nearest' }); });
 }
 const orcTemPreco = (l) => String(l.preco ?? '').trim() !== '' && Number(l.preco) >= 0;
-function orcValida(l) { return l.item && Number(l.qtd) > 0 && (ORC.base || []).some((b) => b.item === l.item) && (ORC.modo === 'kit' || orcTemPreco(l)); }
+function orcValida(l) {
+  if (!l.item || !(Number(l.qtd) > 0)) return false;
+  return ORC.modo === 'kit' ? (ORC.base || []).some((b) => b.item === l.item) : !!l.produto_id && orcTemPreco(l);
+}
 function orcLinha(i, campo, valor) { ORC.linhas[i][campo] = valor; orcAgendar(); }
 function orcLinhaNova() { return { item: '', qtd: '', por: ORC.modo === 'kit' ? 'LANCHE' : 'TOTAL', preco: '' }; }
 function orcMaisItem() { ORC.linhas.push(orcLinhaNova()); orcRender(); orcPintar(); }
@@ -257,7 +272,7 @@ function orcPadrao() {
 }
 // Itens: quantidade total com o preço da linha. Kit: quantidade por lanche, sem preço na linha (o preço é o valor por pessoa).
 function orcItensDe() {
-  return ORC.linhas.filter(orcValida).map((l) => ORC.modo === 'kit' ? { item: l.item, qtd: Number(l.qtd), por: 'LANCHE' } : { item: l.item, qtd: Number(l.qtd), por: 'TOTAL', preco_un: Number(l.preco) });
+  return ORC.linhas.filter(orcValida).map((l) => ORC.modo === 'kit' ? { item: l.item, qtd: Number(l.qtd), por: 'LANCHE' } : { produto_id: l.produto_id, qtd: Number(l.qtd), preco: Number(l.preco) });
 }
 const orcPessoasDe = () => ORC.modo === 'kit' ? Number(ORC.pessoas) : 1;
 // kit: o banco devolve o custo e o sugerido a 132%; o valor por pessoa digitado decide o preço e o lucro
@@ -286,10 +301,10 @@ function orcPintar() {
     const tr = orcEl('orcL' + i); if (!tr) return;
     const ok = orcValida(l), x = ok && ORC.calc && (ORC.calc.itens || [])[k];
     if (ok) k++;
-    const foraDaBase = l.item && !(ORC.base || []).some((b) => b.item === l.item);
+    const foraDaBase = l.item && (ORC.modo === 'kit' ? !(ORC.base || []).some((b) => b.item === l.item) : !l.produto_id);
     const semPreco = ORC.modo === 'itens' && l.item && !foraDaBase && Number(l.qtd) > 0 && !orcTemPreco(l);
     const set = (cl, v) => { const e = tr.querySelector(cl); if (e) e.textContent = v; return e; };
-    const c3 = set('.orc-c3', x ? orcFonte(x) : foraDaBase ? 'escolha na lista' : semPreco ? 'informe o preço' : '');
+    const c3 = set('.orc-c3', x ? (ORC.modo === 'kit' ? orcFonte(x) : `custo ${orcR(x.custo_produto)} o ${orcUn(l.item) || 'pacote'}`) : foraDaBase ? 'escolha na lista' : semPreco ? 'informe o preço' : '');
     if (c3) c3.style.color = foraDaBase || semPreco ? 'var(--farol-fora)' : '';
     set('.orc-c4', x ? orcR(x.custo_linha) : '');
     if (ORC.modo === 'kit') {
@@ -354,7 +369,7 @@ async function orcHistorico() {
   if (ORC.aba === 'historico') orcRender();
 }
 async function orcLerItens(id) {
-  ORC.itens[id] = await consultarTudo(`orc_orcamento_item?select=ordem,item,un,qtd_informada,por,qtd_total,preco_un,custo_un,custo_fonte,custo_data,custo_linha&orcamento_id=eq.${Number(id)}&order=ordem`).catch(() => []);
+  ORC.itens[id] = await consultarTudo(`orc_orcamento_item?select=ordem,item,un,qtd_informada,por,qtd_total,preco_un,custo_un,custo_fonte,custo_data,custo_linha,produto_nome,produto_qtd,produto_preco&orcamento_id=eq.${Number(id)}&order=ordem`).catch(() => []);
 }
 async function orcAbrir(id) {
   ORC.aberto = ORC.aberto === id ? null : id;
@@ -388,11 +403,13 @@ function orcSeparacaoHtml(o) {
   const L = ORC.itens[o.id] || [];
   return `<h3 style="margin:0 0 8px;font-size:15px;">Lista de separação · orçamento nº ${o.id}${o.cliente ? ' · ' + trEscH(o.cliente) : ''}</h3>
     ${orcEntregaHtml(o)}<table><thead><tr><th>Item</th><th style="text-align:right;">Quantidade</th><th>Un</th></tr></thead>
-    <tbody>${L.map((x) => `<tr><td>${trEscH(x.item)}</td><td style="text-align:right;">${orcQ(x.qtd_total)}</td><td>${trEscH(x.un)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${L.map((x) => `<tr><td>${x.produto_nome ? `${orcQ(x.produto_qtd)} × ${trEscH(x.produto_nome)}` : trEscH(x.item)}</td><td style="text-align:right;">${orcQ(x.qtd_total)}</td><td>${trEscH(x.un)}</td></tr>`).join('')}</tbody></table>`;
 }
 // pedido do link: a linha tem o preço de venda (preco_un); no kit ele é por pessoa
 function orcLinhasPreco(o, lin) {
   return (ORC.itens[o.id] || []).filter((x) => x.preco_un != null).map((x) => {
+    // produto do atacado (04/11/2026): quantidade em pacotes e preço do pacote
+    if (x.produto_nome) return lin(`${trEscH(x.produto_nome)} · ${orcQ(x.produto_qtd)} × ${orcR(x.produto_preco)}`, orcR(Number(x.produto_qtd) * Number(x.produto_preco)));
     const q = x.por === 'LANCHE' ? Number(o.n_lanches) : Number(x.qtd_informada);
     return lin(`${trEscH((ORC.vitrine && ORC.vitrine.get(x.item)) || x.item)} · ${orcQ(q)} × ${orcR(x.preco_un)}`, orcR(q * Number(x.preco_un)));
   }).join('');
