@@ -3088,7 +3088,9 @@ async function trFechGeral() {
   // 29/10/2026: o resultado do fechamento vai à barra do resultado (a faixa se redesenhava e o recado sumia)
   if (av) avisoAcao(av.ok ? 'ok' : 'erro', `${av.ok ? '✓' : '✗'} ${av.txt} Às ${avisoHora()}.`);
   const fx = document.getElementById('trFechFaixa');
-  if (fx) fx.innerHTML = trFechFaixa(linhas, filiais, mes, null);   // o aviso do que acabou de acontecer vai na faixa
+  // 04/11/2026 (dono: "gosto dos cards por filial… não tem como deixar somente eles?"): a faixa de cima repetia o
+  // "fechar" dos cartões — fica vazia; o que trava e os avisos já estão em cada cartão
+  if (fx) fx.innerHTML = '';
   const temPrevia = linhas.some(x => x.situacao === 'PREVIA');
   alvo.innerHTML = `
     <div class="section-label">${temPrevia || !linhas.length ? 'Conferência antes de fechar' : 'Fechamento'} — ${trFechMesTxt(mes)}</div>
