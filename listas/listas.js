@@ -418,7 +418,9 @@ function trRenderOperacao() {
   if (papel === 'FILIAL' || papel === 'DONO' || papel === 'SEPARACAO') telas.push(['conferencia', '✅ Conferência']);
   telas.push(['precos', '💰 Tabela de preços']);
   if (papel === 'SEPARACAO' || papel === 'DONO') telas.push(['fechamento', '🧾 Fechamento do mês']);
-  telas.push(['contas', '💳 Contas a pagar']);
+  // 04/11/2026 (dono: "esse contas a pagar precisa estar aqui? não dá pra mandar tudo pro módulo contas a pagar?"):
+  // a aba saiu — a cobrança em aberto das listas já está no módulo Contas a pagar (vw_fin_contas_pagar, origem
+  // LISTAS); o pago e o que falta de cada mês ficam no "Histórico fechado"; o documento, nos cartões do Fechamento.
   telas.push(['cmv', '📈 CMV semanal']);
   // login operacional sem valores (05/09/2026): as abas de dinheiro somem —
   // e o banco ja devolve NULL nos precos mesmo que alguem chame a API na mao
