@@ -1359,9 +1359,12 @@ const CG_PESOU = [['horas_extras', 'horas extras'], ['adicional_noturno', 'adici
 async function cgFolhaCarregar() {
   CARGOS.folha = null;
   try {
-    const [emp, pes] = await Promise.all([consultarTudo('vw_rh_folha_conferencia_empresa?select=*&order=competencia.desc,empresa'),
-                                          consultarTudo('vw_rh_folha_conferencia_pessoa?select=*&order=competencia.desc,unidade,nome')]);
-    CARGOS.folha = { emp, pes, rub: {} };
+    const [emp, pes, arq] = await Promise.all([consultarTudo('vw_rh_folha_conferencia_empresa?select=*&order=competencia.desc,empresa'),
+                                          consultarTudo('vw_rh_folha_conferencia_pessoa?select=*&order=competencia.desc,unidade,nome'),
+                                          consultarTudo('rh_folha_mensal?select=competencia,arquivo&arquivo=ilike.PREVIA*').catch(() => [])]);
+    // 05/11/2026 (RH): outubro entrou como PRÉVIA da contabilidade; a folha final regrava o mês. A prévia é marcada pelo arquivo.
+    const previa = new Set(arq.map((x) => String(x.competencia).slice(0, 10)));
+    CARGOS.folha = { emp, pes, rub: {}, previa };
   } catch (e) { CARGOS.folha = { erro: e.message }; }
   if (CARGOS_F.aba === 'folha') renderModuloCargos();
 }
@@ -1378,8 +1381,10 @@ function cgAbaFolha() {
   const P = pes.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
   const ok = (a, b) => Math.abs(cgN(a) - cgN(b)) < 0.01;
   let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).map((c) =>
-      `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}</button>`).join('')}</div>
-    <div class="caption-label" style="text-align:left;">A folha fechada que a contabilidade devolveu, conferida contra as guias do mês e o cadastro. Só consulta.</div>
+      `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}${(CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : ''}</button>`).join('')}</div>
+    ${(CARGOS.folha.previa || new Set()).has(comp)
+      ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números mudam quando a folha final chegar; o que aparece para conferir aqui ainda não é erro.</div>`
+      : `<div class="caption-label" style="text-align:left;">A folha fechada que a contabilidade devolveu, conferida contra as guias do mês e o cadastro. Só consulta.</div>`}
     <div class="cards">${E.map((x) => `<div class="card ${cgLista(x.conferencia).length ? 'highlight' : 'neutral'}" style="text-align:left;">
       <div class="card-lbl">${cgEsc(String(x.empresa).replace(/^\d+\s*-\s*/, ''))}</div>
       <div class="card-val" style="font-size:18px;">${cgR0(x.liquido)} <span style="font-size:12px;color:var(--tx-4);font-weight:600;">líquido · ${cgN(x.pessoas)} pessoas</span></div>
