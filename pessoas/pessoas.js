@@ -1383,7 +1383,7 @@ function cgAbaFolha() {
   let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).map((c) =>
       `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}${(CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : ''}</button>`).join('')}</div>
     ${(CARGOS.folha.previa || new Set()).has(comp)
-      ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números mudam quando a folha final chegar; o que aparece para conferir aqui ainda não é erro.</div>`
+      ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números podem mudar quando a folha final chegar; o que está em "conferir" já vale para pedir à contabilidade.</div>`
       : `<div class="caption-label" style="text-align:left;">A folha fechada que a contabilidade devolveu, conferida contra as guias do mês e o cadastro. Só consulta.</div>`}
     <div class="cards">${E.map((x) => `<div class="card ${cgLista(x.conferencia).length ? 'highlight' : 'neutral'}" style="text-align:left;">
       <div class="card-lbl">${cgEsc(String(x.empresa).replace(/^\d+\s*-\s*/, ''))}</div>
