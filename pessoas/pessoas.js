@@ -1392,7 +1392,12 @@ async function cgFolhaCarregar() {
       consultarTudo('vw_rh_folha_quadro?select=*&order=competencia.desc,empresa,matricula').catch(() => null),
       consultarTudo('vw_rh_pagamento_mes?select=*&order=competencia.desc,empresa,nome,pessoa_id').catch(() => null),
       consultarTudo('rh_folha_validada?select=*&order=competencia').catch(() => [])]);
-    CARGOS.folha = { emp, pes, rub: {}, previa, quadro, pag, valid };
+    // 05/11/2026 (dono, chat RH): correções para a contabilidade (lista + mensagem pronta) e horas base de cada um
+    const [corr, corrTxt, hbase] = await Promise.all([
+      consultarTudo('vw_rh_folha_correcao?select=*&order=competencia.desc,empresa_cod,nome,chave').catch(() => null),
+      consultarTudo('vw_rh_folha_correcao_texto?select=*&order=competencia.desc,empresa_cod').catch(() => null),
+      consultarTudo('vw_rh_folha_horas_base?select=competencia,empresa_cod,matricula,carga,horas_normais,horas_ferias_afastamento,mes_cheio&order=competencia.desc,empresa_cod,matricula').catch(() => null)]);
+    CARGOS.folha = { emp, pes, rub: {}, previa, quadro, pag, valid, corr, corrTxt, hbase };
   } catch (e) { CARGOS.folha = { erro: e.message }; }
   if (CARGOS_F.aba === 'folha') renderModuloCargos();
 }
@@ -1422,6 +1427,7 @@ function cgAbaFolha() {
         INSS da guia ${x.inss_guia == null ? '—' : cgR(x.inss_guia)}${x.guia_vencimento ? ` · vence ${cgData(x.guia_vencimento)}` : ''}</div>
       ${cgLista(x.conferencia).length ? `<div style="font-size:11.5px;color:var(--farol-perto);margin-top:4px;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</div>` : ''}</div>`).join('')}</div>
     ${cgFolhaValidacaoHtml(comp)}
+    ${cgFolhaCorrecoesHtml(comp)}
     ${cgFiltroUnidade(CARGOS.pessoas)}`;
   // 05/11/2026 (dono, chat RH): "o que entra por dentro da folha até o líquido [...] e um quadro novo abaixo com o por fora"
   h += cgFolhaQuadroDentro(comp, P) + cgFolhaQuadroFora(comp);
@@ -1433,6 +1439,51 @@ const CG_Q_PROV = [['salario', 'Salário'], ['horas_extras', 'Horas extras'], ['
   ['ferias', 'Férias'], ['afastamento', 'Afastamento'], ['rescisao_proventos', 'Rescisão'], ['outros_proventos', 'Outros']];
 const CG_Q_DESC = [['inss', 'INSS'], ['irrf', 'IRRF'], ['vt', 'VT'], ['adiantamento', 'Adiantamento'], ['adiant_ferias', 'Adiant. férias'], ['faltas', 'Faltas'],
   ['consignado', 'Consignado'], ['sindical', 'Sindical'], ['rescisao_descontos', 'Rescisão'], ['outros_descontos', 'Outros']];
+function cgFolhaGrupo() {
+  try { const g = JSON.parse(localStorage.getItem('cgFolhaGrupo') || 'null'); if (g && typeof g === 'object') return { prov: !!g.prov, desc: !!g.desc }; } catch (e) {}
+  return { prov: false, desc: false };
+}
+function cgFolhaGrupoTroca(b) {
+  const g = cgFolhaGrupo(); g[b] = !g[b];
+  try { localStorage.setItem('cgFolhaGrupo', JSON.stringify(g)); } catch (e) {}
+  renderModuloCargos();
+}
+// CORREÇÕES PARA A CONTABILIDADE (dono 05/11/2026: "as diferenças me manda em texto pra eu passar pra contabilidade [...] se houver
+// erro deles, enviamos a correção, eles devolvem corrigida e vc confere"). A situação muda sozinha quando a folha é relida.
+const CG_CORR_SIT = { 'A ENVIAR': 'var(--farol-perto)', 'ENVIADO': 'var(--tx-3)', 'CORRIGIDO': 'var(--farol-ok)', 'NÃO CORRIGIDO': 'var(--farol-fora)', 'NAO CORRIGIDO': 'var(--farol-fora)' };
+function cgFolhaCorrecoesHtml(comp) {
+  const C = (CARGOS.folha.corr || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
+  if (CARGOS.folha.corr === null) return '<div class="contexto">Não consegui ler as correções para a contabilidade (vw_rh_folha_correcao).</div>';
+  if (!C.length) return '';
+  const T = (CARGOS.folha.corrTxt || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
+  const aEnviar = C.filter((x) => x.situacao === 'A ENVIAR').length;
+  const sitTxt = (x) => x.situacao === 'ENVIADO' && x.enviado_em ? `ENVIADO em ${cgData(x.enviado_em)}` : /N[ÃA]O CORRIGIDO/.test(x.situacao) && x.folha_lida_em ? `NÃO CORRIGIDO (folha relida em ${cgData(x.folha_lida_em)})` : x.situacao;
+  let h = `<div class="contexto" style="text-align:left;border-color:${aEnviar ? 'var(--farol-perto)' : 'var(--line)'};"><b>Correções para a contabilidade</b> — ${C.length} ${C.length === 1 ? 'item' : 'itens'}${aEnviar ? `, ${aEnviar} a enviar` : ''}. Quando a folha corrigida volta, a situação muda sozinha.
+    <div id="tabelaCgCorr" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Quem</th><th>O quê</th><th>Esperado</th><th>Na folha</th><th>Situação</th></tr></thead><tbody>
+    ${C.map((x) => `<tr><td>${x.nome ? cgEsc(cgNome(x.nome)) : 'todos'}<div style="font-size:11px;color:var(--tx-4);">${cgEsc(String(x.empresa || '').replace(/^\d+\s*-\s*/, ''))}</div></td>
+      <td style="white-space:normal;min-width:220px;">${cgEsc(x.texto || x.item || '')}</td><td>${cgEsc(x.esperado == null ? '–' : x.esperado)}</td><td>${cgEsc(x.na_folha == null ? '–' : x.na_folha)}</td>
+      <td><span style="font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;border:1px solid ${CG_CORR_SIT[x.situacao] || 'var(--line)'};color:${CG_CORR_SIT[x.situacao] || 'var(--tx-3)'};white-space:nowrap;">${cgEsc(sitTxt(x))}</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+  if (T.length) h += `<div style="margin-top:10px;"><b style="font-size:12.5px;">Mensagem pronta para a contabilidade</b> (só o que falta corrigir)</div>
+    ${T.map((t, i) => `<div style="margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
+      <div style="font-size:12px;color:var(--tx-3);margin-bottom:4px;">${cgEsc(t.empresa)} · ${cgN(t.itens)} ${cgN(t.itens) === 1 ? 'item' : 'itens'}</div>
+      <pre id="cgCorrTxt${i}" style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;margin:0 0 8px;">${cgEsc(t.texto)}</pre>
+      ${cgBotaoPasso('Copiar mensagem', `cgFolhaCorrCopiar(${i})`, true)} ${cgBotaoPasso('Marquei como enviado', `cgFolhaCorrEnviada('${comp}','${cgEsc(t.empresa_cod)}')`, true)}</div>`).join('')}`;
+  return h + '</div>';
+}
+async function cgFolhaCorrCopiar(i) {
+  const el = document.getElementById('cgCorrTxt' + i);
+  try { await navigator.clipboard.writeText(el ? el.textContent : ''); avisoAcao('ok', `✓ Mensagem copiada — às ${avisoHora()}. Cole no WhatsApp ou no e-mail da contabilidade e depois clique em "Marquei como enviado".`); }
+  catch (e) { avisoAcao('erro', '✗ Não copiou. Selecione o texto com o mouse e copie.', () => cgFolhaCorrCopiar(i)); }
+}
+async function cgFolhaCorrEnviada(comp, emp) {
+  avisoAcao('atencao', '… marcando como enviado');
+  const r = await trRpcSeguro('rh_folha_correcao_marcar_enviada', { p_competencia: comp, p_empresa_cod: emp });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaCorrEnviada(comp, emp));
+  const n = await r.json().catch(() => null);
+  await cgFolhaCarregar();
+  avisoAcao('ok', `✓ ${n != null ? `${n} ${Number(n) === 1 ? 'item marcado' : 'itens marcados'}` : 'Marcado'} como enviado à contabilidade — às ${avisoHora()}. Quando a folha corrigida voltar, a situação muda sozinha.`);
+}
 function cgFolhaValidacaoHtml(comp) {
   const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
   if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
@@ -1459,7 +1510,21 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   const alertas = (x) => (conf.get(`${x.empresa}|${x.matricula}`) || []).concat(x.fecha === false ? ['as rubricas não somam o extrato'] : [],
     cgLista(x.rubricas_sem_grupo).map((r) => 'rubrica nova: ' + r), x.conferir_texto ? [x.conferir_texto] : []);
   const Q = Qall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
-  const PV = CG_Q_PROV.filter(([k]) => Q.some((x) => cgN(x[k]))), DS = CG_Q_DESC.filter(([k]) => Q.some((x) => cgN(x[k])));
+  // 05/11/2026 (dono): "um agrupar igual do excel" — fechado (padrão) mostra só o total do bloco; a escolha fica guardada
+  const G = cgFolhaGrupo();
+  const PV = G.prov ? CG_Q_PROV.filter(([k]) => Q.some((x) => cgN(x[k]))) : [], DS = G.desc ? CG_Q_DESC.filter(([k]) => Q.some((x) => cgN(x[k]))) : [];
+  // horas base (dono: "pegar os erros da contabilidade"): normais + férias/afastamento contra a carga do contrato
+  const HB = new Map((CARGOS.folha.hbase || []).filter((h) => String(h.competencia).slice(0, 10) === comp).map((h) => [`${h.empresa_cod}|${h.matricula}`, h]));
+  const temHB = HB.size > 0;
+  const hbCel = (x) => {
+    if (!temHB) return '';
+    const h = HB.get(`${String(x.empresa).slice(0, 3)}|${x.matricula}`);
+    if (!h) return '<td style="color:var(--tx-5);">–</td>';
+    const fz = (v) => { const n = cgN(v); return Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }); };
+    const tot = cgN(h.horas_normais) + cgN(h.horas_ferias_afastamento), ok = Math.abs(tot - cgN(h.carga)) < 0.01;
+    const marca = h.mes_cheio === false ? '' : ok ? ' <span style="color:var(--farol-ok);">✓</span>' : ' <span style="color:var(--farol-fora);font-weight:700;">✗</span>';
+    return `<td title="normais ${fz(h.horas_normais)} + férias/afastamento ${fz(h.horas_ferias_afastamento)} · carga ${fz(h.carga)}${h.mes_cheio === false ? ' · entrou ou saiu no mês' : ''}" style="${!ok && h.mes_cheio !== false ? 'color:var(--farol-fora);' : ''}">${fz(tot)}/${fz(h.carga)}${marca}</td>`;
+  };
   const nConf = Q.filter((x) => alertas(x).length).length;
   const vis = Q.filter((x) => F.folhaCol !== 'conf' || alertas(x).length);
   const v0 = (v) => cgN(v) ? cgR(v) : '<span style="color:var(--tx-5);">–</span>';
@@ -1467,9 +1532,9 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   // 05/11/2026 (dono, ajuste): "os por fora entrar na mesma tabela após o líquido CLT, a soma final que a Hellen deve pagar
   // para cada um seria o CLT + os por fora" — combinado · empréstimo/vale · bonificação → A pagar (vw_rh_folha_quadro)
   const comFora = Q.some((x) => 'valor_a_pagar' in x);
-  const ncol = PV.length + DS.length + 5 + (comFora ? 4 : 0);
+  const ncol = PV.length + DS.length + 5 + (comFora ? 4 : 0) + (temHB ? 1 : 0);
   const foraTot = (arr) => comFora ? `<td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td>` : '';
-  const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td>${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
+  const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td>${temHB ? '<td></td>' : ''}${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
     ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td>${foraTot(arr)}<td></td></tr>`;
   const socio = (x) => x.vinculo && /diretor/i.test(x.vinculo), saiu = (x) => /demiti|rescis|deslig/i.test(String(x.situacao || ''));
   const foraCel = (x) => {
@@ -1485,8 +1550,8 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       ? `<button type="button" class="preset-btn ${F.folhaCol === 'conf' ? 'active' : ''}" style="border-color:var(--farol-perto);" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='conf'?null:'conf';renderModuloCargos()">a conferir ${nConf}${F.folhaCol === 'conf' ? ' ✕' : ''}</button>`
       : '<span style="font-size:12px;color:var(--farol-ok);">✓ todas as rubricas entraram e cada pessoa fecha com o extrato</span>'}</div>
     <div id="tabelaCgFolha" style="overflow-x:auto;"><table><thead>
-      <tr><th rowspan="2">Nome</th><th colspan="${PV.length + 1}" style="text-align:center;">Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;">Descontos</th><th rowspan="2">Líquido CLT</th>${comFora ? '<th colspan="4" style="text-align:center;">Depois do líquido</th>' : ''}<th rowspan="2">Conferir</th></tr>
-      <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${comFora ? '<th>Combinado</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th>' : ''}</tr></thead><tbody>`;
+      <tr><th rowspan="2">Nome</th>${temHB ? '<th rowspan="2" title="horas normais + férias/afastamento na folha, contra a carga do contrato">Horas base</th>' : ''}<th colspan="${PV.length + 1}" style="text-align:center;cursor:pointer;" title="${G.prov ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('prov')">${G.prov ? '⊟' : '⊞'} Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;cursor:pointer;" title="${G.desc ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('desc')">${G.desc ? '⊟' : '⊞'} Descontos</th><th rowspan="2">Líquido CLT</th>${comFora ? '<th colspan="4" style="text-align:center;">Depois do líquido</th>' : ''}<th rowspan="2">Conferir</th></tr>
+      <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.prov ? 'Total' : 'Proventos'}</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.desc ? 'Total' : 'Descontos'}</th>${comFora ? '<th>Combinado</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th>' : ''}</tr></thead><tbody>`;
   const emps = [...new Set(vis.map((x) => x.empresa))];
   emps.forEach((e) => {
     const lin = vis.filter((x) => x.empresa === e).sort((a, b) => String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
@@ -1495,7 +1560,7 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k, al = alertas(x);
       const sit = String(x.situacao || '').toLowerCase();
       h += `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
-        <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
+        <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>${hbCel(x)}
         ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
         ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
         <td style="font-weight:700;">${cgR(x.liquido)}</td>${foraCel(x)}
@@ -1920,9 +1985,12 @@ function cgHojeItens() {
   // 05/11/2026: férias já programadas vencem no PAGAMENTO (2 dias antes do início, a mesma data que a mensagem diz),
   // não no primeiro dia — "pagamento até 08/11 vence em 5 dias" contava até 10/11. E "30.00 dias" vira "30 dias".
   if (Array.isArray(H.fer)) for (const x of H.fer) if (daLoja(x.unidade)) {
-    const prog = x.situacao === 'programada' && x.limite_gozo;
-    const ref = prog ? new Date(Date.parse(String(x.limite_gozo).slice(0, 10)) - 2 * 86400000).toISOString().slice(0, 10) : x.limite_gozo;
-    itens.push({ grupo: 'Férias', tipo: 'FERIAS_ALERTA', o_que: 'Férias', nome: x.nome, sub: x.unidade, detalhe: String(x.mensagem || '').replace(/(\d+)\.00\b/g, '$1'), faltam_dias: cgFaltamDias(ref), acao: irPara('pferias', 'Abrir férias') });
+    // 05/11/2026 (RH): programada vence no PAGAMENTO, que o banco já dá em pagar_ate (dia útil: a sexta 06/11, não o domingo 08/11)
+    const prog = x.situacao === 'programada' && (x.pagar_ate || x.limite_gozo);
+    const ref = prog ? (x.pagar_ate || new Date(Date.parse(String(x.limite_gozo).slice(0, 10)) - 2 * 86400000).toISOString().slice(0, 10)) : x.limite_gozo;
+    itens.push({ grupo: prog ? 'Pagar' : 'Férias', tipo: 'FERIAS_ALERTA', o_que: prog ? 'Pagar as férias' : 'Férias', nome: x.nome, sub: x.unidade, valor: prog ? x.valor_estimado : null,
+      detalhe: String(x.mensagem || '').replace(/(\d+)\.00\b/g, '$1'), faltam_dias: cgFaltamDias(ref),
+      acao: prog ? `${x.valor_estimado != null ? `<b>cerca de ${cgR(x.valor_estimado)}</b><div style="font-size:11px;color:var(--tx-4);">o valor certo é o do recibo</div>` : ''}${irPara('pferias', 'Abrir férias')}` : irPara('pferias', 'Abrir férias') });
   }
   const urg = (x) => (x.faltam_dias !== null && x.faltam_dias !== undefined ? Number(x.faltam_dias) : cgN(x.parado_dias) ? -cgN(x.parado_dias) : 999);
   return itens.sort((a, b) => urg(a) - urg(b));
@@ -1934,7 +2002,8 @@ function cgAbaHoje() {
   if (CARGOS.hoje.erro) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as pendências: ${cgEsc(CARGOS.hoje.erro)} <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>`;
   const H = CARGOS.hoje;
   const { lido_em: lido, atrasada } = H.leitura;
-  const rodape = lido ? `<div class="caption-label" style="text-align:left;margin-top:6px;">Flash lida em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}</div>` : '';
+  const rodape = `<div class="caption-label" style="text-align:left;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">${lido ? `Flash lida em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}` : ''}
+    ${cgFlashPedidoHtml()}</div>`;
   // com a leitura atrasada ou uma fonte fora, "nada pendente" não pode ser afirmado
   const falhou = [[H.L, 'a Flash'], [H.calc, 'os cálculos da folha'], [H.fer, 'as férias']].filter(([v]) => v && v.erro).map(([, r]) => r);
   const atraso = (atrasada ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Leitura da Flash atrasada: pode faltar pendência nesta lista.</b></div>' : '')
@@ -1950,6 +2019,39 @@ function cgAbaHoje() {
       <td>${x.nome ? cgEsc(cgNome(x.nome)) : '–'}${x.sub ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.sub)}</div>` : ''}</td>
       <td style="white-space:normal;">${cgEsc(x.detalhe || '')}</td><td>${cgFcPrazo(x)}</td><td>${x.acao}</td></tr>`).join('')}
     </tbody></table></div>${rodape}`;
+}
+// LER A FLASH AGORA (dono 05/11/2026: "se conseguirmos efetivar essas mudanças de forma mais rápida seria uma boa"). O pedido vai
+// para rh_flash_leitura_pedido; o robô do mini PC atende em até 5 min. A tela relê o pedido de 30 em 30 s.
+let CG_FLASH_PED = null, CG_FLASH_TIMER = null;
+const cgHM = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
+function cgFlashPedidoHtml() {
+  const P = CG_FLASH_PED;
+  if (P && P.estado === 'pedido') return `<span style="color:var(--info);">pedido às ${cgHM(P.em)} — o robô lê em até 5 min</span>`;
+  if (P && P.estado === 'falhou') return `<span style="color:var(--farol-fora);">✗ não consegui ler a Flash</span> ${cgBotaoPasso('Tentar de novo', 'cgFlashLerAgora()', true)}`;
+  return `${P && P.estado === 'ok' ? `<span style="color:var(--farol-ok);">✓ Flash lida às ${cgHM(P.em)}</span>` : ''} ${cgBotaoPasso('Ler a Flash agora', 'cgFlashLerAgora()', true)}`;
+}
+async function cgFlashLerAgora() {
+  const r = await trRpcSeguro('rh_flash_ler_agora', {});
+  if (!r.ok) return avisoAcao('erro', `✗ Não pedi a leitura: ${await trErroDe(r)}`, cgFlashLerAgora);
+  const em = await r.json().catch(() => null);
+  CG_FLASH_PED = { estado: 'pedido', em: em || new Date().toISOString() };
+  avisoAcao('ok', `✓ Leitura da Flash pedida às ${cgHM(CG_FLASH_PED.em)} — o robô lê em até 5 min; esta tela atualiza sozinha.`);
+  renderModuloCargos();
+  clearInterval(CG_FLASH_TIMER);
+  CG_FLASH_TIMER = setInterval(cgFlashPedidoVer, 30000);
+}
+async function cgFlashPedidoVer() {
+  try {
+    const r = await trFetch('rh_flash_leitura_pedido?select=id,pedido_em,atendido_em,resultado&order=id.desc&limit=1');
+    if (!r.ok) return;
+    const x = (await r.json())[0];
+    if (!x || !x.atendido_em) return;
+    clearInterval(CG_FLASH_TIMER); CG_FLASH_TIMER = null;
+    if (/^FALHOU/i.test(String(x.resultado || ''))) { CG_FLASH_PED = { estado: 'falhou' }; avisoAcao('erro', '✗ Não consegui ler a Flash.', cgFlashLerAgora); renderModuloCargos(); return; }
+    CG_FLASH_PED = { estado: 'ok', em: x.atendido_em };
+    await cgHojeCarregar();
+    avisoAcao('ok', `✓ Flash lida às ${cgHM(x.atendido_em)}: as pendências já estão atualizadas.`);
+  } catch (e) {}
 }
 async function cgFcCopiar(b) {
   try {
