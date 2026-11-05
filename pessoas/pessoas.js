@@ -1902,7 +1902,14 @@ function cgAbaSaipos() {
   const linhas = todas.filter(s => s.acao !== 'JA_CERTO');   // "já certo" não pede nada: só a contagem embaixo
   if (!linhas.length) return `<div class="contexto">Nada da folha esperando acerto no Saipos${nCerto ? ` (${nCerto} lançamentos já certos)` : ''}.</div>`;
   const n = (a, m) => linhas.filter(s => s.acao === a && (!m || s.motivo_codigo === m)).length;
-  const nExcl = linhas.filter(cgSaiposExcluir).length, nAbrir = linhas.filter(s => s.acao === 'ABRIR').length;
+  // a mesma recorrência (pessoa + tipo + conta) sai inteira com "excluir este e os próximos" na primeira: as seguintes
+  // não contam e dizem "sai junto" (Financeiro 05/11; o aviso do robô à Hellen já agrupa assim)
+  const grupoExcl = {}, junto = new Map(), temMais = new Set();
+  [...linhas].filter(cgSaiposExcluir).sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento))).forEach((s) => {
+    const k = [s.quem, s.tipo, s.conta].join('|');
+    if (grupoExcl[k]) { junto.set(s, grupoExcl[k]); temMais.add(grupoExcl[k]); } else grupoExcl[k] = s;
+  });
+  const nExcl = Object.keys(grupoExcl).length, nAbrir = linhas.filter(s => s.acao === 'ABRIR').length;
   const nParado = linhas.filter(s => s.acao === 'PARE' && !cgSaiposExcluir(s) && s.motivo_codigo !== 'NAO_FECHADO').length;
   const rot = { FOLHA_ADIANTAMENTO: 'Adiantamento', FOLHA_VT: 'Vale-transporte', FOLHA_VA: 'Vale-alimentação', FOLHA_BONIFICACAO: 'Bonificação', FORA_DA_FOLHA: 'Salário por fora', FOLHA_SALARIO: 'Salário' };
   const ordem = (s) => cgSaiposExcluir(s) ? 0 : s.acao === 'PARE' && s.motivo_codigo !== 'NAO_FECHADO' ? 1 : s.acao === 'ALTERAR' ? 2 : s.acao === 'ABRIR' ? 3 : 4;
@@ -1920,7 +1927,9 @@ function cgAbaSaipos() {
       <tbody>${ord.map(s => `<tr>
         <td>${cgData(s.vencimento)}</td><td>${cgEsc(rot[s.tipo] || s.tipo)}</td><td>${cgEsc(s.unidade_pagadora)}</td><td>${cgEsc(cgNome(s.quem))}</td>
         <td style="text-align:right;">${cgR(s.valor_painel)}</td><td style="text-align:right;color:var(--tx-4);">${s.valor_saipos != null ? cgR(s.valor_saipos) : '–'}</td>
-        <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? `<div style="margin-top:3px;color:var(--tx-2);" title="título ${cgEsc(s.id_titulo || '')}">No Saipos: <b>${cgEsc(cgSaiposAchar(s))}</b></div>` : ''}</td></tr>`).join('')}</tbody>
+        <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? (junto.has(s)
+          ? `<div style="margin-top:3px;color:var(--tx-3);">sai junto com a de ${cgData(junto.get(s).vencimento)} (mesma recorrência)</div>`
+          : `<div style="margin-top:3px;color:var(--tx-2);" title="título ${cgEsc(s.id_titulo || '')}">No Saipos: <b>${cgEsc(cgSaiposAchar(s))}</b>${temMais.has(s) ? ` — excluir "este e os próximos"` : ''}</div>`) : ''}</td></tr>`).join('')}</tbody>
     </table></div>
     <div class="contexto" style="margin-top:8px;">É a fila que o robô do contas a pagar lê: ele troca valores e abre provisão; excluir é só da Hellen, e o robô avisa no aviso do dia.${nCerto ? ` ${nCerto} lançamentos já estão certos.` : ''} O Saipos mostra a troca na hora, a carga do painel só umas 2 horas depois.</div>`;
 }
