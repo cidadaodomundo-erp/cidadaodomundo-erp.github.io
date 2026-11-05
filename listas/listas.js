@@ -3079,6 +3079,7 @@ async function trFechGeral() {
       ${comValor ? `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
         <button class="preset-btn" onclick="trFechDocVer(${ix})">ver o documento</button>
         <button class="preset-btn" onclick="trFechDocPdf(${ix})">Gerar PDF</button>
+        <button class="preset-btn" onclick="trConfListaPdf(${ix})" title="Uma lista por folha e, no fim, o resumo do mês com o mesmo total do documento">Conferência por lista</button>
         ${x.pode_fechar ? `<button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharDaqui(${ix})">fechar o mês</button>` : ''}
       </div>` : ''}
     </div>`;
@@ -3333,6 +3334,123 @@ async function trFechDocImprimir(un, mes) {
   w.document.close();
   w.focus();
   setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+}
+
+// CONFERÊNCIA POR LISTA (dono, 05/11/2026 13:02: "pode pedir o botão no painel, mas antes separa um pedido por folha no
+// PDF"; proposta 2026-11-05-listas-conferencia-por-lista.md, modelo script/conferencia_por_lista.py). Uma lista por folha
+// (pedido × recebido × preço × total) e, na última, o resumo do mês com o MESMO total do documento de fechamento
+// (vw_tr_fech_doc_resumo). Só lê; a filial lê só as listas dela (tr_lista_itens já filtra).
+async function trConfListaPdf(ix) {
+  const g = window._trFechGeral;
+  if (!g) return;
+  const un = g.filiais[ix], mes = g.mes;
+  if (TR_OP && TR_OP.veValores === false) { alert('Seu login não vê valores — a conferência por lista não é gerada.'); return; }
+  const w = window.open('', '_blank');
+  if (!w) { alert('O navegador bloqueou a janela de impressão — libere pop-ups para este site.'); return; }
+  w.document.write('<p style="font-family:Arial, sans-serif;">Montando a conferência por lista...</p>');
+  const d = await trConfListaDados(un, mes);
+  w.document.open();
+  if (d.erro) { w.document.write('<p style="font-family:Arial, sans-serif;">' + trEscH(d.erro) + '</p>'); w.document.close(); return; }
+  w.document.write(trConfListaHtml(d));
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
+}
+async function trConfListaDados(unidade, mes) {
+  if (String(mes) < TR_FECH_DOC_INICIO) return { erro: `A conferência por lista começa em ${trFechMesTxt(TR_FECH_DOC_INICIO)}.` };
+  const f = `unidade=eq.${encodeURIComponent(unidade)}&mes=eq.${mes}-01`;
+  try {
+    const rs = await Promise.all([trFetch(`vw_tr_fech_doc_resumo?${f}`), trFetch(`vw_tr_fech_doc_listas?${f}&order=data_pedido,id_lista`)]);
+    for (const x of rs) if (!x.ok) return { erro: 'Não consegui montar a conferência: ' + await trErroDe(x) };
+    const res = (await rs[0].json())[0], listas = await rs[1].json();
+    if (!res || !listas.length) return { erro: `Não há lista de ${unidade} em ${trFechMesTxt(mes)}.` };
+    if (res.valor_total == null) return { erro: 'Seu login não vê valores — a conferência por lista não é gerada.' };
+    const ids = listas.map((l) => l.id_lista).join(',');
+    // paginado com chave única (o PostgREST corta em 1.000 linhas)
+    let ri, rt;
+    try {
+      [ri, rt] = await Promise.all([
+        consultarTudo(`tr_lista_itens?select=id,id_lista,categoria,item,un_medida,qtd_solicitada,qtd_separada,qtd_recebida,preco_custo,valor_total,avulso&id_lista=in.(${ids})&order=id_lista,id`),
+        consultarTudo('tr_itens?select=item,nome_base,classe&order=item')]);
+    } catch (x) { return { erro: 'Não consegui ler os itens das listas: ' + x.message }; }
+    const base = new Map(rt.map((t) => [t.item, t]));
+    const itens = ri.map((i) => { const t = base.get(i.item) || {};
+      return { ...i, categoria: i.categoria || t.classe || 'SEM CATEGORIA', nome: t.nome_base || i.item }; });
+    return { res, listas, itens };
+  } catch (e) { return { erro: 'Não consegui falar com o banco — tente de novo.' }; }
+}
+function trConfListaHtml(d) {
+  const r = d.res, e = trEscH, nu = (v) => Number(v) || 0;
+  const brl = (v) => nu(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qt = (v) => v == null ? '—' : nu(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+  const dm = (x) => x ? String(x).slice(8, 10) + '/' + String(x).slice(5, 7) : '—';
+  const mesTxt = `${trMesNome(r.mes)} de ${String(r.mes).slice(0, 4)}`;
+  const previa = r.situacao === 'PREVIA';
+  let somaListas = 0;
+  const secoes = d.listas.map((l) => {
+    const its = d.itens.filter((i) => i.id_lista === l.id_lista)
+      .sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)) || String(a.nome).localeCompare(String(b.nome)));
+    let cat = null; const linhas = [];
+    its.forEach((i) => {
+      const q = nu(i.qtd_recebida != null ? i.qtd_recebida : i.qtd_separada), vt = nu(i.valor_total);
+      if (!q && !vt && !i.qtd_solicitada) return;   // nem foi, nem foi pedida
+      if (i.categoria !== cat) { linhas.push(`<tr class="cat"><td colspan="6">${e(i.categoria)}</td></tr>`); cat = i.categoria; }
+      const tot = i.preco_custo == null ? 'sem preço' : (q && !vt ? 'sem cobrança' : brl(vt));
+      const dif = i.qtd_solicitada != null && nu(i.qtd_solicitada) !== q;
+      linhas.push(`<tr><td>${e(i.nome)}${i.avulso ? ' (avulso)' : ''}</td><td>${e(i.un_medida || '')}</td><td class="n">${qt(i.qtd_solicitada)}</td>
+        <td class="n${dif ? ' dif' : ''}">${qt(q)}</td><td class="n">${q && vt ? brl(vt / q) : '—'}</td><td class="n">${tot}</td></tr>`);
+    });
+    somaListas += Math.round(nu(l.valor) * 100);
+    const sit = ['FECHADA', 'RECEBIDA'].includes(l.status) ? 'conferida' : String(l.status || '').toLowerCase();
+    return `<div class="lista"><div class="cab"><b>Lista #${l.id_lista}</b> · ${e(r.unidade)} · pedida em ${dm(l.data_pedido)} · entregue em ${dm(l.data_entrega)} · ${e(sit)} · ${l.michiro ? `Michiro levou (frete R$ ${brl(l.frete)})` : 'Michiro não levou'}</div>
+      <table><thead><tr><th>Item</th><th>Un.</th><th class="n">Pedido</th><th class="n">Recebido</th><th class="n">Preço (R$)</th><th class="n">Total (R$)</th></tr></thead>
+      <tbody>${linhas.join('') || '<tr><td colspan="6">Nenhum item.</td></tr>'}
+        <tr class="tot"><td colspan="5">TOTAL DA LISTA #${l.id_lista}</td><td class="n">${brl(l.valor)}</td></tr></tbody></table></div>`;
+  });
+  const arred = (Math.round(nu(r.valor_itens) * 100) - somaListas) / 100;
+  const q = d.listas.map((l) => `<tr><td>Lista #${l.id_lista} (${dm(l.data_pedido)})</td><td class="n">${brl(l.valor)}</td></tr>`);
+  if (arred) q.push(`<tr class="aj"><td>Arredondamento de centavos</td><td class="n">${brl(arred)}</td></tr>`);
+  q.push(`<tr class="sub"><td>LISTAS DO MÊS</td><td class="n">${brl(r.valor_itens)}</td></tr>`);
+  if (nu(r.royalty)) q.push(`<tr><td>ROYALTIES</td><td class="n">${brl(r.royalty)}</td></tr>`);
+  if (nu(r.frete)) q.push(`<tr><td>FRETE MICHIRO</td><td class="n">${brl(r.frete)}</td></tr>`);
+  if (nu(r.ajustes)) q.push(`<tr><td>AJUSTES</td><td class="n">${brl(r.ajustes)}</td></tr>`);
+  q.push(`<tr class="tot"><td>TOTAL DO MÊS</td><td class="n">R$ ${brl(r.valor_total)}</td></tr>`);
+  const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const titulo = `Conferência por lista — ${r.unidade} — ${mesTxt}`;
+  // outro documento, sem o :root do painel: as mesmas cores escritas à mão do documento de fechamento
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(titulo)}</title><style>
+    @page { size:A4 portrait; margin:12mm; }
+    body { font-family:Arial, Helvetica, sans-serif; color:#000; background:#fff; margin:0; font-size:11.5px; line-height:1.3; }
+    .topo { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:8px; }
+    .marca { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#45443f; }
+    h1 { font-size:19px; margin:2px 0 3px; } h2 { font-size:15px; margin:0 0 4px; }
+    .sub { color:#45443f; }
+    .sit { border:2px solid #000; padding:6px 12px; font-weight:bold; font-size:14px; text-align:center; }
+    .sit.previa { border-style:dashed; } .sit small { display:block; font-size:10px; font-weight:normal; }
+    .lista { margin-top:16px; }
+    .lista + .lista, .final { page-break-before:always; break-before:page; }
+    .cab { font-size:12.5px; padding:5px 6px; border-top:2px solid #000; border-bottom:1.5px solid #000; }
+    table { width:100%; border-collapse:collapse; } thead { display:table-header-group; } tr { page-break-inside:avoid; }
+    td, th { border-bottom:1px solid #bbb; padding:3px 6px; text-align:left; vertical-align:top; }
+    th { font-size:10px; text-transform:uppercase; color:#45443f; border-bottom:1.5px solid #000; }
+    .n { text-align:right; white-space:nowrap; } .dif { font-weight:bold; }
+    tr.cat td { font-weight:bold; text-transform:uppercase; font-size:10.5px; padding-top:7px; }
+    tr.sub td { font-weight:bold; border-top:1.5px solid #000; } tr.aj td { font-style:italic; color:#45443f; }
+    tr.tot td { font-weight:bold; font-size:13px; border-top:2px solid #000; border-bottom:2px solid #000; }
+    .quadro { width:380px; margin:12px 0 0 0; border:2px solid #000; page-break-inside:avoid; } .quadro td { padding:5px 10px; }
+    .rodape { margin-top:14px; font-size:10px; color:#45443f; }
+    .bt { margin:10px 0; } @media print { .bt { display:none; } }
+  </style></head><body>
+    <div class="bt"><button onclick="window.print()">Imprimir / salvar em PDF</button></div>
+    <div class="topo"><div><div class="marca">Cidadão do Mundo</div><h1>Conferência por lista — ${e(r.unidade)}</h1>
+      <div class="sub">${mesTxt.charAt(0).toUpperCase() + mesTxt.slice(1)} · ${d.listas.length} ${d.listas.length === 1 ? 'lista' : 'listas'} · emitido em ${hoje}${r.vencimento ? ' · vencimento ' + trFechData(r.vencimento) : ''}</div></div>
+      <div class="sit${previa ? ' previa' : ''}">${previa ? 'PRÉVIA' : 'FECHADO'}<small>${previa ? 'mês ainda não fechado' : ''}</small></div></div>
+    ${secoes.join('')}
+    <div class="final"><h2>Resumo do mês — ${e(r.unidade)} — ${mesTxt}</h2><table class="quadro">${q.join('')}</table>
+      <div class="rodape">Este arquivo abre o resumo do mês lista por lista; o total do mês é o mesmo do documento de fechamento.
+        Pedido = o que a loja pediu; Recebido = o que chegou na conferência (sem conferência, o separado) — em negrito quando é diferente do pedido.
+        Preço = valor ÷ quantidade. Itens com o nome da base.</div></div>
+  </body></html>`;
 }
 // EMBALAGENS NO DOCUMENTO (dono, 01/10/2026: "sim"). A quantidade sai na unidade do painel
 // (2.000 un) e, ao lado, em embalagens (8 rolos) — como no documento que ele montava a mao
