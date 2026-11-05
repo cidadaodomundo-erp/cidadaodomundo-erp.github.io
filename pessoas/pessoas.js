@@ -2090,7 +2090,9 @@ function cgAbaBonif() {
   const pk = (x) => String(x.pessoa_id != null ? x.pessoa_id : x.nome);
   const emps = [...new Set(doPag.map((x) => x.empresa))];
   const soma = (arr) => arr.reduce((a, x) => a + cgN(x.valor), 0);
-  const corDe = (x) => x.ajuste === 'ZERAR' ? 'AJUSTE' : x.cor;
+  // com MANTER a view devolve cor nula: a cor original sai do motivo, com a marca "mantido" (RH 05/11)
+  const corDoMotivo = (m) => /ADVERTENCIA|SUSPENSAO/.test(m || '') ? 'ADVERTENCIA' : /FALTA|ATESTADO/.test(m || '') ? 'FALTA_ATESTADO' : /FERIAS/.test(m || '') ? 'FERIAS' : null;
+  const corDe = (x) => x.ajuste === 'ZERAR' ? 'AJUSTE' : x.ajuste === 'MANTER' ? corDoMotivo(x.motivo) : x.cor;
   const cel = (x) => {
     if (!x) return '<td style="color:var(--tx-5);">–</td>';
     const c = CG_BON_COR[corDe(x)], k = pk(x) + '|' + x.n, sel = F.bonifCel === k;
