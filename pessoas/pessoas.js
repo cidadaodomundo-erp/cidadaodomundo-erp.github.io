@@ -1623,6 +1623,35 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   h += `</tbody><tfoot>${linhaTot(`Total · ${vis.length} ${vis.length === 1 ? 'pessoa' : 'pessoas'}`, vis, 'liq')}</tfoot></table></div>`;
   return h;
 }
+// 05/11/2026 (dono 19:47): a conta de quem é por fora, campo a campo até o valor pago (proposta 2026-11-05-rh-rita-conta-detalhada)
+function cgFfDoMes(x, comp) {
+  if (x.liquido_folha != null) return null;
+  if (CARGOS.adtFora === undefined) { cgAdtForaCarregar(); return null; }
+  const nm = String(x.nome || '').trim().toUpperCase();
+  return (CARGOS.adtFora || []).find((y) => String(y.nome || '').trim().toUpperCase() === nm && String(y.mes).slice(0, 10) === comp) || null;
+}
+function cgFfDescontos(ff) {   // vw_rh_a_descontar: a parcela da dívida que cai neste pagamento e os descontos marcados para depois
+  const pn = String(ff.nome || '').trim().toUpperCase().split(/\s+/)[0], ven = String(ff.vence_saldo || '').slice(0, 10), mesV = ven.slice(0, 7);
+  const D = (CARGOS.ffDescontar || []).filter((y) => String(y.colaborador || '').trim().toUpperCase() === pn && String(y.mes).slice(0, 7) === mesV);
+  const divida = D.find((y) => y.credor !== 'EMPRESA' && String(y.data_desconto).slice(0, 10) <= ven) || null;
+  const fora = D.filter((y) => String(y.data_desconto).slice(0, 10) > ven);
+  return { divida, fora };
+}
+function cgFfContaHtml(ff, x) {
+  const n = cgN, { divida } = cgFfDescontos(ff), L = [];
+  const lin = (s, rot, v, sub) => L.push(`<tr${s === '=' ? ' class="sub"' : ''}><td style="width:18px;color:var(--tx-4);">${s}</td><td>${rot}${sub ? ` <span style="font-size:11px;color:var(--tx-4);">${sub}</span>` : ''}</td><td>${cgR(v)}</td></tr>`);
+  lin('+', 'Salário', n(ff.salario), Number(ff.dias) < 30 ? `${ff.dias}/30 dias` : '');
+  lin('+', 'Gratificação fixa', n(ff.gratificacao_fixa));
+  lin('+', 'Gratificação salão', n(ff.gratificacao_salao));
+  if (n(ff.ajuste)) lin(n(ff.ajuste) > 0 ? '+' : '−', 'Ajuste', Math.abs(n(ff.ajuste)), cgEsc(ff.ajuste_motivo || ''));
+  lin('−', 'Vale-transporte', n(ff.vale_transporte));
+  if (n(ff.desconto_consumo)) lin('−', 'Consumo', n(ff.desconto_consumo));
+  lin('−', 'Adiantamento', n(ff.adiantamento), ff.adiantamento_pago_em ? `pago ${cgDiaMes(String(ff.adiantamento_pago_em))}` : `vence ${cgDiaMes(String(ff.vence_adiantamento || ''))}`);
+  if (n(ff.desconto_divida)) lin('−', divida && divida.credor ? `Reembolso à ${cgNome(divida.credor)}` : 'Dívida', n(ff.desconto_divida), divida ? `vale ${divida.parcela}/${divida.parcelas_no_plano}` : cgEsc(ff.desconto_divida_motivo || ''));
+  lin('=', '<b>Saldo por fora</b>', n(ff.saldo));
+  if (n(x.bonificacao)) { lin('+', 'Bonificação trimestral', n(x.bonificacao)); lin('=', `<b>A pagar</b>`, n(x.valor_a_pagar), ff.vence_saldo ? `vence ${cgData(ff.vence_saldo)}` : ''); }
+  return `<div style="max-width:460px;margin:2px 0 6px 18px;"><table style="font-size:12.5px;"><tbody>${L.join('')}</tbody></table></div>`;
+}
 function cgFolhaQuadroFora(comp) {
   const F = CARGOS_F, Rall = CARGOS.folha.pag;
   if (!Rall) return '<div class="contexto">Não consegui ler o pagamento do mês (vw_rh_pagamento_mes).</div>';
@@ -1647,7 +1676,11 @@ function cgFolhaQuadroFora(comp) {
         <td>${v0(x.liquido_folha)}</td>
         <td>${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${x.combinado_tipo === 'TOTAL' ? 'total combinado ' + cgR(x.combinado_valor) : 'acréscimo fixo'}${x.combinado_motivo ? ' — ' + cgEsc(x.combinado_motivo) : ''}</div>` : ''}</td>
         <td>${v0(x.saldo_fora)}</td>
-        <td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
+        ${(() => { const ff = cgFfDoMes(x, comp);
+          if (!ff) return `<td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>`;
+          const { divida, fora } = cgFfDescontos(ff);
+          return `<td>${cgN(ff.desconto_divida) ? `− ${cgR(ff.desconto_divida)}<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${divida ? `vale ${divida.parcela}/${divida.parcelas_no_plano}, ` : ''}já no saldo</div>` : v0(0)}
+            ${fora.map((y) => `<div style="font-size:11px;color:var(--tx-5);white-space:normal;">${cgEsc(String(y.descricao || '').toLowerCase())} ${cgR(y.valor)}: desconto marcado para ${cgDiaMes(String(y.data_desconto))}, fora deste pagamento</div>`).join('')}</td>`; })()}
         <td>${v0(x.bonificacao)}</td>
         <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}${(() => {
           if (x.liquido_folha != null) return '';
@@ -1658,7 +1691,7 @@ function cgFolhaQuadroFora(comp) {
           return `<div style="font-size:11px;font-weight:400;color:var(--tx-4);">${ffSituacaoTxt(f, 'SALDO')}</div>${f.saldo_pago_em ? `<button type="button" class="preset-btn" style="margin-top:4px;" onclick="ffReciboAbrir(${f.pessoa_id},'${comp}','SALDO')">🧾 Recibo</button>` : ''}`;
         })()}</td>
         <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;" title="título de salário no Saipos: ${x.saipos_salario == null ? 'nenhum' : cgR(x.saipos_salario)}">${cgEsc(x.conferir_texto || '')}</td></tr>
-`;
+${(() => { const ff = cgFfDoMes(x, comp); return ff ? `<tr><td colspan="8">${cgFfContaHtml(ff, x)}</td></tr>` : ''; })()}`;
     });
     h += tot(`Subtotal ${cgEsc(e)}`, lin, 'sub');
   });
@@ -2521,9 +2554,11 @@ function cgAbaAdt() {
 async function cgAdtForaCarregar() {
   CARGOS.adtFora = null;
   try {
-    const [m, p] = await Promise.all([consultarTudo('vw_rh_ff_meses?select=pessoa_id,mes,salario,dias,adiantamento,vence_adiantamento,adiantamento_pago_em,adiantamento_pago,saldo,vence_saldo,saldo_pago_em,saldo_pago&order=pessoa_id,mes'),
-      consultarTudo('rh_ff_pessoas?select=id,nome,unidade,conta&order=id')]);
+    const [m, p, d] = await Promise.all([consultarTudo('vw_rh_ff_meses?select=pessoa_id,mes,salario,dias,gratificacao_fixa,gratificacao_salao,ajuste,ajuste_motivo,desconto_consumo,vale_transporte,desconto_divida,desconto_divida_motivo,adiantamento,vence_adiantamento,adiantamento_pago_em,adiantamento_pago,saldo,vence_saldo,saldo_pago_em,saldo_pago&order=pessoa_id,mes'),
+      consultarTudo('rh_ff_pessoas?select=id,nome,unidade,conta&order=id'),
+      consultarTudo('vw_rh_a_descontar?select=mes,data_desconto,colaborador,descricao,credor,parcela,parcelas_no_plano,valor,chave&order=data_desconto.asc,chave').catch(() => [])]);
     CARGOS.adtFora = m.map((x) => { const q = p.find((y) => y.id === x.pessoa_id) || {}; return { ...x, nome: q.nome, unidade: q.unidade, conta: q.conta }; });
+    CARGOS.ffDescontar = d || [];
   } catch (e) { CARGOS.adtFora = []; }
   if (CARGOS_F.aba === 'adt' || CARGOS_F.aba === 'folha') renderModuloCargos();
 }
