@@ -1550,7 +1550,13 @@ function cgHojeItens() {
     if (c.fechado_em || c.enviado_em || f === null || f > 30 || (c.calculo === 'ADIANTAMENTO' && f < 0)) continue;
     itens.push({ grupo: 'Folha', o_que: c.nome, detalhe: c.calculado_em ? `calculado: ${cgN(c.pessoas)} pessoas, ${cgR(c.total)}` : 'ainda não calculado', faltam_dias: f, acao: irPara('pcalc', 'Abrir cálculos') });
   }
-  if (Array.isArray(H.fer)) for (const x of H.fer) if (daLoja(x.unidade)) itens.push({ grupo: 'Férias', tipo: 'FERIAS_ALERTA', o_que: 'Férias', nome: x.nome, sub: x.unidade, detalhe: x.mensagem, faltam_dias: cgFaltamDias(x.limite_gozo), acao: irPara('pferias', 'Abrir férias') });
+  // 05/11/2026: férias já programadas vencem no PAGAMENTO (2 dias antes do início, a mesma data que a mensagem diz),
+  // não no primeiro dia — "pagamento até 08/11 vence em 5 dias" contava até 10/11. E "30.00 dias" vira "30 dias".
+  if (Array.isArray(H.fer)) for (const x of H.fer) if (daLoja(x.unidade)) {
+    const prog = x.situacao === 'programada' && x.limite_gozo;
+    const ref = prog ? new Date(Date.parse(String(x.limite_gozo).slice(0, 10)) - 2 * 86400000).toISOString().slice(0, 10) : x.limite_gozo;
+    itens.push({ grupo: 'Férias', tipo: 'FERIAS_ALERTA', o_que: 'Férias', nome: x.nome, sub: x.unidade, detalhe: String(x.mensagem || '').replace(/(\d+)\.00\b/g, '$1'), faltam_dias: cgFaltamDias(ref), acao: irPara('pferias', 'Abrir férias') });
+  }
   const urg = (x) => (x.faltam_dias !== null && x.faltam_dias !== undefined ? Number(x.faltam_dias) : cgN(x.parado_dias) ? -cgN(x.parado_dias) : 999);
   return itens.sort((a, b) => urg(a) - urg(b));
 }
