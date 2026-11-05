@@ -877,6 +877,8 @@
   #view-conferencias .preset-btn:hover { border-color:var(--brand); color:var(--brand); }
   #view-conferencias .preset-btn.active { background:var(--brand); border-color:var(--brand); color:#fdfbf7; }
   #view-conferencias div[id^="tabela"] th { color:#6f675c; }
+  #view-conferencias div[id^="tabela"] tr { --linha-fundo:#fff; }
+  #view-conferencias div[id^="tabela"] tr:nth-child(even) { --linha-fundo:#f6f1e7; }
   /* Tabela de precos das listas (dono, 01/10/2026): cabe na largura da area, sem rolar
      de lado. "Como vem" e "Custo" sao colunas no computador; em area estreita descem
      para baixo do nome do item. A medida e a largura da AREA (container), nao a da
