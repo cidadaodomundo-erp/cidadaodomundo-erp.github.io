@@ -1452,7 +1452,12 @@ function cgEnvMin(v) { const n = cgN(v), h = Math.trunc(n); return h * 60 + Math
 function cgEnvHM(min) { if (!min) return ''; return Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0'); }
 async function cgEnvioCarregar() {
   CARGOS.envio = null;
-  try { CARGOS.envio = { lin: await consultarTudo('vw_rh_fechamento_folha?select=*&order=competencia.desc,empresa_codigo,matricula,rubrica,medida') }; }
+  try {
+    const [lin, prev] = await Promise.all([consultarTudo('vw_rh_fechamento_folha?select=*&order=competencia.desc,empresa_codigo,matricula,rubrica,medida'),
+      // 05/11/2026 (RH): o adiantamento do painel confere com o que a contabilidade descontou na folha (prévia ou fechada)
+      consultarTudo('vw_rh_folha_conferencia_pessoa?select=competencia,empresa,matricula,nome,adiantamento&order=competencia,empresa,matricula').catch(() => [])]);
+    CARGOS.envio = { lin, prev };
+  }
   catch (e) { CARGOS.envio = { erro: e.message }; }
   if (CARGOS_F.aba === 'envio') renderModuloCargos();
 }
@@ -1513,16 +1518,32 @@ function cgAbaEnvio() {
   h += cgFiltroUnidade(CARGOS.pessoas);
   const P = cgEnvioPessoas(M.filter((x) => !F.envioEmp || x.empresa_codigo === F.envioEmp));
   const fora = P.filter((p) => p.fora).length;
+  // adiantamento: o do painel × o que a folha da contabilidade descontou (só quando a folha do mês já voltou)
+  const prevC = (CARGOS.envio.prev || []).filter((x) => String(x.competencia).slice(0, 10) === comp
+    && (!F.envioEmp || String(x.empresa).split(' ')[0] === F.envioEmp));
+  const adtDif = [];
+  if (prevC.length) {
+    const pm = new Map(P.map((p) => [p.k, p]));
+    const prevK = new Map(prevC.map((x) => [String(x.empresa).split(' ')[0] + '|' + x.matricula, x]));
+    new Set([...prevK.keys(), ...P.filter((p) => p.adt).map((p) => p.k)]).forEach((k) => {
+      const p = pm.get(k), x = prevK.get(k), a = (p && p.adt) || 0, b = cgN(x && x.adiantamento);
+      if (F.unidade && !p) return;
+      if (Math.abs(a - b) >= 0.01) adtDif.push({ k, nome: (p && p.nome) || (x && x.nome), a, b });
+    });
+  }
+  const adtDifK = new Set(adtDif.map((d) => d.k));
   h += `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
       ${(F.envioEmp ? [F.envioEmp] : emps).map((e) => cgBotaoPasso(`Baixar arquivo de TESTE · empresa ${cgEsc(e)}`, `cgEnvioArquivo('${cgEsc(e)}')`)).join('')}
       ${cgBotaoPasso('Baixar planilha de conferência', 'cgEnvioPlanilha()', true)}</div>
     ${fora ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">${fora} ${fora === 1 ? 'matrícula da Flash não está' : 'matrículas da Flash não estão'} no cadastro: conferir antes de enviar.</div>` : ''}
+    ${adtDif.length ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Adiantamento: o painel e a folha da contabilidade não batem em ${adtDif.length} ${adtDif.length === 1 ? 'pessoa' : 'pessoas'}.</b>
+      <div style="margin-top:4px;">${adtDif.map((d) => `${cgEsc(cgNome(d.nome))}: painel ${d.a ? cgR(d.a) : 'sem adiantamento'} × contabilidade ${d.b ? cgR(d.b) : 'sem desconto'}`).join('<br>')}</div></div>` : ''}
     <div id="tabelaCgEnvio" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Empresa · matr.</th>${CG_ENV_COLS.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
     ${P.map((p) => { const ab = F.envioAberta === p.k;
       return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(p.k))}?null:${cgEsc(JSON.stringify(p.k))};renderModuloCargos()'>
         <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
-        ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, p[k])}</td>`).join('')}</tr>
+        ${CG_ENV_COLS.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"' : ''}>${cgEnvVal(k, p[k])}</td>`).join('')}</tr>
         ${ab ? `<tr><td colspan="${CG_ENV_COLS.length + 2}">${cgEnvioLinhasHtml(p)}</td></tr>` : ''}`; }).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="2">${P.length} ${P.length === 1 ? 'pessoa' : 'pessoas'}</td>
       ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, P.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
