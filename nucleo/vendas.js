@@ -549,7 +549,8 @@ function selecionarTodasUnidades() {
 // e de entrega (loja = só ela; Rede = as 3). Fora da casca (painel aberto direto) os botões de unidade continuam.
 let CANAL_OUVE_LOJA = false;
 function canalComSeletor() {
-  return window.parent !== window && new URLSearchParams(location.search).has('casca')
+  // NA_CASCA: o painel antigo marca com ?casca=1; a página própria, por estar numa moldura (05/11/2026)
+  return typeof NA_CASCA !== 'undefined' && NA_CASCA
     && typeof lojaAtual === 'function' && typeof LOJA_INFO !== 'undefined' && !!LOJA_INFO && !!lojaAtual();
 }
 function canalLojaAplicar() {
