@@ -139,27 +139,35 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const saipos = trs.filter(t => t.origem === 'SAIPOS').map(t => ({ ...t, par: null }));
   const rede = trs.filter(t => t.origem === 'REDE').map(t => ({ ...t, usado: false }));
   // 05/11/2026 (Financeiro, auditoria da AV: 19 trocas falsas): o par era guloso, venda a venda, e cruzava duas vendas do
-  // mesmo valor. Agora monta todos os pares possíveis e casa do melhor para o pior — primeiro o MESMO cartão (bandeira +
-  // crédito/débito/vale), depois o menor tempo — e só com venda que já existia na hora da cobrança (cobrança mais de
-  // 20 min antes da venda é de outra venda: a troca é real). Pagamento criado depois no Saipos (pago_em, ex. cobrado na
-  // entrega) vale como segunda hora da venda, até 2 dias, no mesmo valor e na mesma forma.
+  // mesmo valor e do mesmo horário. Agora monta todos os pares possíveis e casa do melhor para o pior: menor tempo, com o
+  // MESMO cartão (bandeira + crédito/débito/vale) como desempate — forma diferente pesa como 15 min a mais. No delivery,
+  // a cobrança tem de ser depois de o pedido existir (pago_em = criação do pagamento no pedido): a cobrança das 20:00
+  // não é do pedido criado às 22:08 (21/10, 38,38: a troca é real). No salão a maquininha cobra antes de a comanda
+  // fechar, então ali não há essa trava.
   const minDe = (ts) => { if (!ts) return null; const d = String(ts).slice(0, 10), h = String(ts).slice(11, 16); if (!h) return null;
-    const m0 = min(h); return m0 + Math.round((new Date(d + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; };
-  saipos.forEach(s => { s.tPago = minDe(s.pago_em); });
+    return min(h) + Math.round((new Date(d + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; };
+  saipos.forEach(s => { s.tPago = minDe(s.pago_em); s.entrega = /hora da entrega/.test(s.detalhe || ''); });
   const pares = [];
   saipos.forEach(s => rede.forEach(r => {
     if (Math.abs(+r.valor - +s.valor) > 0.005) return;
+    const dt = Math.abs(r.t - s.t);
+    if (dt > 180) return;                              // tolerância: 3 h
+    if (s.entrega && s.tPago !== null && s.tPago <= s.t && r.t < s.tPago - 5) return;   // cobrou antes de o pedido existir
     const mesma = formaPadrao(r.detalhe) === formaPadrao(s.detalhe);
-    let dt = Math.abs(r.t - s.t);
-    if (dt > 180 || r.t < s.t - 20) {   // fora da janela, ou cobrança antes da venda existir
-      if (!(mesma && s.tPago !== null && Math.abs(r.t - s.tPago) <= 2880)) return;
-      dt = 1000 + Math.abs(r.t - s.tPago);   // vem depois de qualquer par normal
-    }
     // mesmo valor em dois caixas: prefere a maquininha do caixa da venda (SD = salao — dono, 10/09/2026)
-    pares.push({ s, r, ordem: (mesma ? 0 : 100000) + dt + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0) });
+    pares.push({ s, r, d: dt + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0), ordem: dt + (mesma ? 0 : 15) + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0) });
   }));
   pares.sort((a, b) => a.ordem - b.ordem);
-  pares.forEach(({ s, r, ordem }) => { if (s.par || r.usado) return; r.usado = true; r.parDe = s; s.par = r; s.dist = ordem % 100000; });
+  pares.forEach(({ s, r, d }) => { if (s.par || r.usado) return; r.usado = true; r.parDe = s; s.par = r; s.dist = d; });
+  // pagamento lançado no Saipos depois da cobrança (pago_em em outro dia, ex. 19,79 cobrado 31/10 e lançado 03/11) ou
+  // cobrado na entrega bem depois (pedido 7901): segunda rodada, só MESMO valor e MESMA forma, até 2 dias de distância
+  saipos.filter(s => !s.par).forEach(s => {
+    const fs = formaPadrao(s.detalhe);
+    const c = rede.filter(r => !r.usado && Math.abs(+r.valor - +s.valor) < 0.005 && formaPadrao(r.detalhe) === fs
+      && (Math.abs(r.t - s.t) <= 2880 || (s.tPago !== null && Math.abs(r.t - s.tPago) <= 2880)))
+      .sort((a, b) => Math.min(Math.abs(a.t - s.t), s.tPago !== null ? Math.abs(a.t - s.tPago) : 1e9) - Math.min(Math.abs(b.t - s.t), s.tPago !== null ? Math.abs(b.t - s.tPago) : 1e9))[0];
+    if (c) { c.usado = true; c.parDe = s; s.par = c; s.dist = Math.abs(c.t - s.t); }
+  });
   let semParS = saipos.filter(s => !s.par);
   let semParR = rede.filter(r => !r.usado);
   let casados = saipos.filter(s => s.par);
