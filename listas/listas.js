@@ -3369,9 +3369,15 @@ async function trConfListaDados(unidade, mes) {
     // paginado com chave única (o PostgREST corta em 1.000 linhas)
     let ri, rt;
     try {
-      [ri, rt] = await Promise.all([
-        consultarTudo(`tr_lista_itens?select=id,id_lista,categoria,item,un_medida,qtd_solicitada,qtd_separada,qtd_recebida,preco_custo,valor_total,avulso&id_lista=in.(${ids})&order=id_lista,id`),
-        consultarTudo('tr_itens?select=item,nome_base,classe&order=item')]);
+      // preço e total do item são protegidos coluna a coluna: o valor vem de vw_tr_conferencia_valores (preco_efetivo),
+      // e quantidade × preço efetivo = valor_total item a item (conferido em out/26 nas 3 filiais, 686 itens, 0 diferenças)
+      let rv;
+      [ri, rt, rv] = await Promise.all([
+        consultarTudo(`tr_lista_itens?select=id,id_lista,categoria,item,un_medida,qtd_solicitada,qtd_separada,qtd_recebida,avulso&id_lista=in.(${ids})&order=id_lista,id`),
+        consultarTudo('tr_itens?select=item,nome_base,classe&order=item'),
+        consultarTudo(`vw_tr_conferencia_valores?select=id,preco_efetivo&id_lista=in.(${ids})&order=id`)]);
+      const pv = new Map(rv.map((v) => [v.id, v.preco_efetivo]));
+      ri.forEach((i) => { i.preco = pv.has(i.id) ? pv.get(i.id) : null; });
     } catch (x) { return { erro: 'Não consegui ler os itens das listas: ' + x.message }; }
     const base = new Map(rt.map((t) => [t.item, t]));
     const itens = ri.map((i) => { const t = base.get(i.item) || {};
@@ -3392,13 +3398,13 @@ function trConfListaHtml(d) {
       .sort((a, b) => String(a.categoria).localeCompare(String(b.categoria)) || String(a.nome).localeCompare(String(b.nome)));
     let cat = null; const linhas = [];
     its.forEach((i) => {
-      const q = nu(i.qtd_recebida != null ? i.qtd_recebida : i.qtd_separada), vt = nu(i.valor_total);
+      const q = nu(i.qtd_recebida != null ? i.qtd_recebida : i.qtd_separada), vt = i.preco == null ? 0 : q * nu(i.preco);
       if (!q && !vt && !i.qtd_solicitada) return;   // nem foi, nem foi pedida
       if (i.categoria !== cat) { linhas.push(`<tr class="cat"><td colspan="6">${e(i.categoria)}</td></tr>`); cat = i.categoria; }
-      const tot = i.preco_custo == null ? 'sem preço' : (q && !vt ? 'sem cobrança' : brl(vt));
+      const tot = i.preco == null ? 'sem preço' : (q && !vt ? 'sem cobrança' : brl(vt));
       const dif = i.qtd_solicitada != null && nu(i.qtd_solicitada) !== q;
       linhas.push(`<tr><td>${e(i.nome)}${i.avulso ? ' (avulso)' : ''}</td><td>${e(i.un_medida || '')}</td><td class="n">${qt(i.qtd_solicitada)}</td>
-        <td class="n${dif ? ' dif' : ''}">${qt(q)}</td><td class="n">${q && vt ? brl(vt / q) : '—'}</td><td class="n">${tot}</td></tr>`);
+        <td class="n${dif ? ' dif' : ''}">${qt(q)}</td><td class="n">${q && vt ? brl(nu(i.preco)) : '—'}</td><td class="n">${tot}</td></tr>`);
     });
     somaListas += Math.round(nu(l.valor) * 100);
     const sit = ['FECHADA', 'RECEBIDA'].includes(l.status) ? 'conferida' : String(l.status || '').toLowerCase();
