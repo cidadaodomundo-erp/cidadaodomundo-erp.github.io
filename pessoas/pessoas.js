@@ -860,11 +860,10 @@ function cgAbaPessoas() {
   const F = CARGOS_F;
   const cs = (p) => CARGOS.cs.get(p.id) || null;
   const curto = cgAlertaCurto;
-  const alertas = (p) => {
-    const L = cgAlertasCadastro(p);
-    if (p.obs_rh) L.push({ t: curto(p.obs_rh), todo: p.obs_rh });
-    return L;
-  };
+  // 05/11/2026 (RH): a observação do RH é anotação, não alerta — "MUDOU PARA NIVEL 3 EM AGOSTO" contava como pendência.
+  // Fica na mesma coluna, em cinza, e não entra no "Com alerta".
+  const alertas = (p) => cgAlertasCadastro(p);
+  const nota = (p) => p.obs_rh ? `<span title="${cgEsc(p.obs_rh)}" style="display:inline-block;font-size:11.5px;color:var(--tx-3);margin:1px 0;">${cgEsc(curto(p.obs_rh))}</span>` : '';
   const base = CARGOS.pessoas.filter((p) => (F.desligados ? !p.ativo : p.ativo) && (!F.unidade || p.unidade === F.unidade));
   const nAl = base.filter((p) => alertas(p).length).length;
   const vis = F.soConferir ? base.filter((p) => alertas(p).length) : base;
@@ -890,7 +889,7 @@ function cgAbaPessoas() {
         <td>${p.setor_rateio ? cgEsc(p.setor_rateio) : '–'}</td><td>${cgEsc(p.turno || '–')}</td>
         <td style="text-align:right;">${p.horas ? p.horas + 'h' : '–'}</td>
         <td class="cg-sal" style="text-align:right;">${cgR(p.salario)}</td>
-        <td class="cg-al" style="white-space:normal;min-width:160px;">${A.map((a) => `<span title="${cgEsc(a.todo)}" style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--farol-perto);border:1px solid var(--farol-perto);border-radius:999px;padding:1px 8px;margin:1px 3px 1px 0;">${cgEsc(a.t)}</span>`).join('')}</td></tr>
+        <td class="cg-al" style="white-space:normal;min-width:160px;">${A.map((a) => `<span title="${cgEsc(a.todo)}" style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--farol-perto);border:1px solid var(--farol-perto);border-radius:999px;padding:1px 8px;margin:1px 3px 1px 0;">${cgEsc(a.t)}</span>`).join('')}${nota(p)}</td></tr>
         ${ab ? `<tr><td colspan="${comLoja ? 9 : 8}">${cgDetalhePessoa(p)}</td></tr>` : ''}`; }).join('')}</tbody></table></div>`;
   if (F.soConferir && cgFlashDaLoja(CARGOS.flash).length) h += `<div class="section-label" style="text-align:left;">Corrigir na Flash</div>` + cgListaFlash(CARGOS.flash);
   return h;
