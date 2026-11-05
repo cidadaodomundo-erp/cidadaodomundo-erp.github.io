@@ -685,3 +685,197 @@ function formatarDataCurta(iso) {
 }
 
 
+
+// O RODAPÉ do Líquido entra no lugar do <div id="rodapeVendas"> (05/11/2026: saiu do painel com o Canal).
+(function () {
+  const lugar = document.getElementById('rodapeVendas');
+  if (lugar) lugar.outerHTML = `
+    <div class="footer">
+      Líquido usa o valor calculado pelo iFood (coluna Valor Liquido do relatorio). "Recebido direto" estima o valor que nao passa pelo repasse do iFood
+      (pagamento na entrega e vale-refeicao, liquidados direto pela operadora de cartao/beneficio). Cancelamentos totais sao excluidos do Bruto e do Liquido;
+      cancelamentos parciais entram pelo valor efetivamente realizado. Dados ao vivo, direto do banco Supabase.
+    </div>
+`;
+})();
+
+// Peças que as telas do Canal e as do painel antigo (Esta semana, Hoje, Placar, Indicadores) leem juntas (05/11/2026).
+// iniAlt/fimAlt permitem calcular as mesmas metricas para outro periodo (o anterior), sem
+// mexer nos filtros da tela — e assim mostrar a variacao em cada card.
+function computeMetrics(iniAlt = null, fimAlt = null) {
+  const rows = linhasFiltradas(true, iniAlt, fimAlt);
+  const fin = rows.filter(r => r[6] !== 1);
+
+  const totalPedidosFin = fin.reduce((s,r)=>s+r[7],0);
+  const itens = fin.reduce((s,r)=>s+(r[8]-r[9]),0);
+  const frete = fin.reduce((s,r)=>s+r[10],0);
+  const bruto = itens + frete;
+
+  const idxOnline = TIPOS_PAGAMENTO.indexOf('ONLINE');
+  const idxCartao = TIPOS_PAGAMENTO.indexOf('CARTAO');
+  const vendasOnline = fin.filter(r=>r[18]===idxOnline).reduce((s,r)=>s+(r[8]-r[9])+r[10],0);
+  const vendasCartao = fin.filter(r=>r[18]===idxCartao).reduce((s,r)=>s+(r[8]-r[9])+r[10],0);
+
+  const promoIfoodRede = fin.reduce((s,r)=>s+r[11]+r[12],0);
+  const promoLoja = fin.reduce((s,r)=>s+r[13],0);
+  const freteSobDemanda = fin.reduce((s,r)=>s+r[16],0);
+  const ticketMedio = totalPedidosFin ? bruto/totalPedidosFin : 0;
+
+  // Grupo 1: taxas e comissoes (tudo positivo = custo). Vem da conciliacao, ja separado por
+  // categoria (fato_pedidos so tinha um valor combinado de taxas_comissoes). OUTROS_AJUSTES
+  // aqui e so o lado de debito (taxa de parcelamento, retencao VR/VA, correcoes) — os
+  // ressarcimentos de cancelamento viraram uma entrada, contabilizados abaixo.
+  const taxaOnline = -somaConciliacaoRaw('TAXA_CARTAO', iniAlt, fimAlt);
+  const comissaoVendas = -somaConciliacaoRaw('COMISSAO_VENDAS', iniAlt, fimAlt);
+  // Mensalidade e um valor pequeno e esporadico — na APRESENTACAO ela entra dentro de
+  // "Outros ajustes". No banco continua classificada a parte (grupo MENSALIDADE), entao
+  // da pra destrinchar quando quiser.
+  const mensalidade = -somaConciliacaoRaw('MENSALIDADE', iniAlt, fimAlt);
+  const outrosAjustes = -somaConciliacaoRaw('OUTROS_AJUSTES', iniAlt, fimAlt) + mensalidade;
+  const totalTaxasComissoes = taxaOnline + comissaoVendas + outrosAjustes;
+  // Entrega do iFood na loja em Full Service (dono, 15/10/2026: linha propria): taxa de entrega
+  // repassada + comissao por raio. Antes caia em Outros ajustes; a DRE poe em Logistica. Resultado igual.
+  const entregaIfood = -somaConciliacaoRaw('ENTREGA_IFOOD', iniAlt, fimAlt);
+  // Total de descontos exibido no card soma tambem o frete sob demanda e a entrega do iFood.
+  const totalDescontos = totalTaxasComissoes + freteSobDemanda + entregaIfood;
+
+  // Grupo 2: marketing pago pela loja (promo + anuncios).
+  const anuncios = -somaConciliacaoRaw('ANUNCIOS', iniAlt, fimAlt);
+  const totalMkt = promoLoja + anuncios;
+  const custoMktPorPedido = totalPedidosFin ? totalMkt/totalPedidosFin : 0;
+
+  // Ressarcimento de pedidos/itens cancelados: dinheiro que volta pra loja — entra no
+  // Bloco 1 (entradas), nao no Bloco 2. Ja vem positivo do banco (credito), sem inverter sinal.
+  const ressarcimentoCancelamento = somaConciliacaoRaw('RESSARCIMENTO_CANCELAMENTO', iniAlt, fimAlt);
+  // O card "Total de descontos" tambem soma o ressarcimento.
+  const totalDescontosComRessarcimento = totalDescontos - ressarcimentoCancelamento;
+
+  // Custo iFood = Total de descontos (ja com ressarcimento) + Total investido em mkt —
+  // exatamente os dois totais mostrados nos blocos acima.
+  const custoIfood = totalDescontosComRessarcimento + totalMkt;
+  const liquido = bruto - custoIfood;
+
+  // Bloco 3 (Composicao de Promos) usa outra base de mkt: quem pagou (loja x plataforma).
+  const totalMktGeral = promoIfoodRede + promoLoja;
+
+  const cancelFull = rows.filter(r=>r[6]===1);
+  const cancelParcial = rows.filter(r=>r[6]===2);
+  const nFull = cancelFull.reduce((s,r)=>s+r[7],0);
+  const nParcial = cancelParcial.reduce((s,r)=>s+r[7],0);
+  const vFull = cancelFull.reduce((s,r)=>s+r[8],0);
+  const vParcial = cancelParcial.reduce((s,r)=>s+r[9],0);
+  const valorCancelado = vFull + vParcial;
+  const totalCancelados = nFull + nParcial;
+  const totalPedidosGeral = rows.reduce((s,r)=>s+r[7],0);
+
+  // O que a operacao realmente perdeu com cancelamentos: o valor cancelado menos o que o
+  // iFood devolveu (ressarcimento). E o numero que importa pro resultado, nao o valor bruto
+  // cancelado — parte dele volta.
+  const valorPerdidoReal = valorCancelado - ressarcimentoCancelamento;
+
+  const safeBruto = bruto || 1;
+  const safeTotal = totalPedidosGeral || 1;
+  const safeMktGeral = totalMktGeral || 1;
+
+  return {
+    valorPerdidoReal, valorPerdidoRealPct: valorPerdidoReal/safeBruto*100,
+    itens, itensPct: itens/safeBruto*100,
+    frete, fretePct: frete/safeBruto*100,
+    bruto,
+    vendasOnline, vendasOnlinePct: vendasOnline/safeBruto*100,
+    vendasCartao, vendasCartaoPct: vendasCartao/safeBruto*100,
+    ressarcimentoCancelamento, ressarcimentoCancelamentoPct: ressarcimentoCancelamento/safeBruto*100,
+    taxaOnline, taxaOnlinePct: taxaOnline/safeBruto*100,
+    comissaoVendas, comissaoVendasPct: comissaoVendas/safeBruto*100,
+    mensalidade, mensalidadePct: mensalidade/safeBruto*100,
+    outrosAjustes, outrosAjustesPct: outrosAjustes/safeBruto*100,
+    totalTaxasComissoes, totalTaxasComissoesPct: totalTaxasComissoes/safeBruto*100,
+    totalDescontos, totalDescontosPct: totalDescontos/safeBruto*100,
+    totalDescontosComRessarcimento, totalDescontosComRessarcimentoPct: totalDescontosComRessarcimento/safeBruto*100,
+    freteSobDemanda, freteSobDemandaPct: freteSobDemanda/safeBruto*100,
+    entregaIfood, entregaIfoodPct: entregaIfood/safeBruto*100,
+    promoLoja, promoLojaPct: promoLoja/safeBruto*100,
+    anuncios, anunciosPct: anuncios/safeBruto*100,
+    totalMkt, totalMktPct: totalMkt/safeBruto*100,
+    custoMktPorPedido,
+    liquido, liquidoPct: liquido/safeBruto*100,
+    custoIfood, custoIfoodPct: custoIfood/safeBruto*100,
+    totalPedidos: totalPedidosFin, ticketMedio,
+    totalMktGeral, totalMktGeralPct: totalMktGeral/safeBruto*100,
+    investLoja: promoLoja, investLojaPct: promoLoja/safeMktGeral*100,
+    investPlataforma: promoIfoodRede, investPlataformaPct: promoIfoodRede/safeMktGeral*100,
+    valorCancelado, valorCanceladoPct: valorCancelado/safeBruto*100,
+    totalCancelados, totalCanceladosPct: totalCancelados/safeTotal*100,
+    nFull, nFullPct: nFull/safeTotal*100, vFull,
+    nParcial, nParcialPct: nParcial/safeTotal*100, vParcial,
+  };
+}
+
+// ------------------------------------------------------------------
+// MODULO INDICADORES E METAS — placar semanal vs metas_kpi (banco)
+// ------------------------------------------------------------------
+let METAS_KPI = null;
+
+// Ultima semana completa seg-dom (mesmo recorte do resumo semanal e do repasse iFood).
+function ultimaSemanaCompleta() {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const dow = (hoje.getDay() + 6) % 7; // 0 = segunda
+  const segAtual = new Date(hoje); segAtual.setDate(segAtual.getDate() - dow);
+  const dom = new Date(segAtual); dom.setDate(dom.getDate() - 1);
+  const seg = new Date(dom); seg.setDate(seg.getDate() - 6);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return { ini: iso(seg), fim: iso(dom) };
+}
+
+// Meta de volume da semana (líquido, pedidos) é só da Rede: não existe alvo por loja, então numa loja o número aparece
+// sem farol e fora da contagem. Meta de percentual, nota e razão vale igual em qualquer loja.
+const METAS_SO_REDE = new Set(['liquido_semana', 'pedidos_semana']);
+
+const metaSoRede = (k) => METAS_SO_REDE.has(k.chave) && canalComSeletor() && lojaFin() !== 'REDE';
+
+function farolKpi(meta, valor) {
+  if (metaSoRede(meta)) return ['#8a897e', 'alvo só da Rede'];
+  // As metas foram calibradas para o perimetro "Minha gestao" (sem Boqueirao,
+  // recalibradas em 12/08/2026). Na visao Rede completa, farol colorido
+  // mentiria — vira cinza com o motivo no rotulo.
+  if (typeof PERIMETRO !== 'undefined' && PERIMETRO === 'rede') return ['#8a897e', 'metas valem p/ Minha gestão'];
+  if (valor === null || valor === undefined) return ['#8a897e', 'sem dado'];
+  const m = Number(meta.meta), m2 = meta.meta2 !== null ? Number(meta.meta2) : null;
+  const tol = (x) => Math.abs(x) > 0 ? Math.abs(x) * 0.10 : 5; // 10% (ou 5 p.p. quando a meta e zero)
+  if (meta.sentido === 'acima') {
+    if (valor >= m) return ['#3fb950', 'na meta'];
+    if (valor >= m - tol(m)) return ['#f5a623', 'perto'];
+    return ['#ff6b6b', 'fora'];
+  }
+  if (meta.sentido === 'abaixo') {
+    if (valor <= m) return ['#3fb950', 'na meta'];
+    if (valor <= m + tol(m)) return ['#f5a623', 'perto'];
+    return ['#ff6b6b', 'fora'];
+  }
+  // faixa
+  if (valor >= m && valor <= m2) return ['#3fb950', 'na faixa'];
+  if (valor >= m - tol(m) && valor <= m2 + tol(m2)) return ['#f5a623', 'perto'];
+  return ['#ff6b6b', 'fora'];
+}
+
+function fmtKpi(unidade, v) {
+  if (v === null || v === undefined) return '—';
+  if (unidade === 'rs') return 'R$ ' + fmt(v);
+  if (unidade === 'pct') return pct(v) + '%';
+  if (unidade === 'nota') return v.toFixed(2).replace('.', ',');
+  if (unidade === 'x') return v.toFixed(2).replace('.', ',') + 'x';
+  return Math.round(v).toLocaleString('pt-BR');
+}
+
+function fmtMeta(meta) {
+  const f = (v) => fmtKpi(meta.unidade, Number(v));
+  if (meta.sentido === 'faixa') return `${f(meta.meta)} – ${f(meta.meta2)}`;
+  return (meta.sentido === 'acima' ? '≥ ' : '≤ ') + f(meta.meta);
+}
+
+// ===== A loja do financeiro =====
+// 31/10/2026 (dono: "pode levar o seletor pro financeiro e resultado"): a loja é a do seletor do topo (nucleo/loja.js), fim do
+// padrão Água Verde de 18/08. Somar as três continua sendo escolha visível: "Rede (as 3)" no topo.
+// LOJA_PLC só vale dentro de plcComLoja, que roda a mesma conta trocando a loja por um instante.
+let LOJA_PLC = null;
+
+const lojaFin = () => LOJA_PLC || (typeof lojaAtual === 'function' ? lojaAtual() : null);

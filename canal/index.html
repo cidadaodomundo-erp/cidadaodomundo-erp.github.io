@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Canal · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PÁGINA PRÓPRIA DO CANAL (05/11/2026, bloco 6 do painel em módulos), no molde de cardapio/index.html.
+     A casca abre canal/index.html#<tela> (docs/casca/paginas.js). A página carrega o núcleo (nucleo.js, graficos.js,
+     vendas.js) e docs/canal/canal.js, o mesmo código que o painel antigo usa. Uma tela por vez: trocar de tela
+     é a casca que faz. Quem mexe: o chat "Telas do painel". -->
+<script>
+  // aqui a casca abre a página sem ?casca=1: dentro de moldura da mesma origem é casca
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261105b">
+<style>
+  .na-casca body::before { display:none !important; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="loadingMsg">Carregando dados do banco...</div>
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="painel" style="display:none;">
+      <div id="barraVendas"></div>
+      <div id="modulo-resumo" class="modulo" style="display:none;"><div id="view-content"></div></div>
+      <div id="modulo-cancelamentos" class="modulo" style="display:none;"><div id="view-cancelamentos"></div></div>
+      <div id="modulo-promocoes" class="modulo" style="display:none;"><div id="view-promocoes"></div></div>
+      <div id="modulo-negociacoes" class="modulo" style="display:none;"><div id="view-negociacoes"></div></div>
+      <div id="modulo-contestacoes" class="modulo" style="display:none;"><div id="view-contestacoes"></div></div>
+      <div id="modulo-atendimento" class="modulo" style="display:none;"><div id="view-atendimento"></div></div>
+      <div id="modulo-avaliacoes" class="modulo" style="display:none;"><div id="view-avaliacoes"></div></div>
+      <div id="modulo-relatorios" class="modulo" style="display:none;"><div id="view-relatorios"></div></div>
+      <div id="modulo-qualidade" class="modulo" style="display:none;"><div id="view-qualidade"></div></div>
+      <div id="modulo-cardapio" class="modulo" style="display:none;"><div id="view-cardapio"></div></div>
+      <div id="modulo-clientes" class="modulo" style="display:none;"><div id="view-clientes"></div></div>
+      <div id="modulo-site" class="modulo" style="display:none;"><div id="view-site"></div></div>
+      <div id="modulo-atrasos" class="modulo" style="display:none;"><div id="view-atrasos"></div></div>
+      <div id="modulo-frete" class="modulo" style="display:none;"><div id="view-frete"></div></div>
+      <div id="modulo-logfin" class="modulo" style="display:none;"><div id="view-logfin"></div></div>
+      <div id="rodapeVendas"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105a"></script>
+<script src="../nucleo/graficos.js?v=20261105a"></script>
+<script src="../nucleo/vendas.js?v=20261105b"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="canal.js?v=20261105a"></script>
+<script>
+// O que é desta página: qual tela abrir, a carga de vendas antes dela e o que o painel antigo fazia ao trocar filtro.
+const TELAS_CANAL = ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'atendimento', 'negociacoes', 'avaliacoes',
+  'relatorios', 'qualidade', 'cardapio', 'clientes', 'site', 'atrasos', 'frete', 'logfin'];
+const TELA = TELAS_CANAL.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'resumo';
+// as mesmas listas do painel antigo, só com as telas daqui
+const MODULOS_COM_RODAPE = new Set(['resumo', 'cancelamentos', 'promocoes', 'negociacoes', 'avaliacoes', 'relatorios', 'contestacoes']);
+const MODULOS_COM_FILTRO_TOPO = new Set(['resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site']);
+let VENDAS_CARREGADAS = false;
+// O Placar, o Fluxo projetado e as Contas moram no painel antigo: aqui o núcleo de vendas os encontra vazios.
+let CP = null, PROJ_PAGAR = null, PLC_UNID_ANTES = null;
+function plcCtxSolta() {}
+function plcCabecalhoQuebra() { return ''; }
+function plcSoltaEAplica(id) { aplicarJanela(id); }
+function aplicarLojaFin() {}
+function moduloAtivo() { return TELA; }
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;   // aberta solta (botão "abrir"): a porta é a da casca
+}
+
+function renderAll() {
+  limparFiltrosVer(TELA);
+  const m = computeMetrics();
+  const ant = periodoAnterior();
+  const a = ant ? computeMetrics(ant.ini, ant.fim) : null;
+  renderPresets();
+  renderAllCanal(m, a, ant, linhaContexto(ant), TELA);
+}
+
+// atalho para outra tela: a mesma, redesenha (troca de loja no seletor da casca); outra, a casca abre
+function mostrarModulo(nome) {
+  if (nome === TELA) { entrarTela(); return; }
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-modulo', nome }); return; }
+  location.href = '../sistema.html#' + nome;
+}
+
+// O que o mostrarModulo do painel antigo faz ao entrar numa tela do Canal, sem o recorte que vem do Placar.
+function entrarTela() {
+  MODULO_ATUAL = TELA;
+  const rodape = document.querySelector('.footer');
+  if (rodape) rodape.style.display = MODULOS_COM_RODAPE.has(TELA) ? '' : 'none';
+  const filtros = document.getElementById('filtrosTopo');
+  if (filtros) filtros.style.display = MODULOS_COM_FILTRO_TOPO.has(TELA) ? 'flex' : 'none';
+  const barraPerim = document.getElementById('perimetroBar');
+  if (barraPerim) barraPerim.style.display = TELAS_SEM_BARRA_FILTRO.includes(TELA) ? 'none' : 'flex';
+  limparFiltrosVer(TELA);
+  const janPadrao = JANELA_DO_MODULO[TELA];
+  if (janPadrao) aplicarJanela(janPadrao); else { renderJanelas(); renderAll(); }
+  entrarTelaCanal(TELA);
+}
+
+async function abrirTela() {
+  try {
+    await rmbGarantirTokenValido();
+    await carregar();
+    montarFiltrosBase();
+    renderPerimetro();
+    renderTopNav();
+    rebuildLojaOptions();
+    VENDAS_CARREGADAS = true;
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('painel').style.display = 'block';
+    document.getElementById('modulo-' + TELA).style.display = '';
+    registrarUso(TELA);
+    avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+    entrarTela();
+    avisarCasca({ tipo: 'casca-pronto', modulo: TELA });
+  } catch (e) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    const el = document.getElementById('erroMsg');
+    el.style.display = 'block'; el.textContent = 'Erro ao carregar dados do Supabase: ' + e.message;
+  }
+}
+// a casca reabre a tela já carregada: recarrega os dados da tela, como o painel antigo faz no mostrarModulo
+window.reentrarTela = () => { try { entrarTela(); } catch (e) {} };
+window.addEventListener('hashchange', () => location.reload());
+abrirTela();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
