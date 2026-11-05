@@ -1830,11 +1830,14 @@ function cgEnvioPessoas(M) {
     const c = CG_ENV_COLS.find(([, , f]) => f(x));
     if (c) p[c[0]] = (p[c[0]] || 0) + (x.medida === 'horas' ? cgEnvMin(x.valor) : cgN(x.valor));
     if (c && c[0] === 'dsr') p.dsrOrigem = x.origem;
+    // 05/11/2026 (dono): o 0048 vai à contabilidade como "desconta 5%" (medida %), não em reais — o VT é pago por nós
+    if (c && c[0] === 'vt' && x.medida === '%') { p.vt = cgN(x.valor); p.vtPct = true; }
   });
   return [...P.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
 }
-function cgEnvVal(k, v) {
+function cgEnvVal(k, v, pct) {
   if (!v) return '<span style="color:var(--tx-5);">–</span>';
+  if (k === 'vt' && pct) return `desconta ${String(v).replace('.', ',')}%`;
   if (k === 'dsr') return `${cgN(v)} ${cgN(v) === 1 ? 'dia' : 'dias'}`;
   return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
 }
@@ -1874,7 +1877,7 @@ function cgAbaEnvio() {
         <div class="card-lbl">Empresa ${cgEsc(e)}${us ? ' · ' + cgEsc(us) : ''}${ativo ? ' ✕' : ''}</div>
         <div class="card-val" style="font-size:18px;">${P.length} <span style="font-size:12px;color:var(--tx-4);font-weight:600;">${P.length === 1 ? 'pessoa' : 'pessoas'} · ${L.length} lançamentos</span></div>
         <div class="card-pct" style="line-height:1.6;">horas extras ${cgEnvHM(soma('he100') + soma('he70')) || '–'} · faltas ${cgEnvHM(soma('falta') + soma('atraso')) || '–'}<br>
-          gratificações ${cgR0(soma('grat'))} · VT ${cgR0(soma('vt'))} · adiantamento ${cgR0(soma('adt'))}</div></div>`; }).join('')}</div>`;
+          gratificações ${cgR0(soma('grat'))} · VT ${P.some((p) => p.vtPct) ? P.filter((p) => p.vt).length + ' com desconto' : cgR0(soma('vt'))} · adiantamento ${cgR0(soma('adt'))}</div></div>`; }).join('')}</div>`;
   h += cgFiltroUnidade(CARGOS.pessoas);
   const P = cgEnvioPessoas(M.filter((x) => !F.envioEmp || x.empresa_codigo === F.envioEmp));
   const fora = P.filter((p) => p.fora).length;
@@ -1904,10 +1907,11 @@ function cgAbaEnvio() {
         <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
         ${C.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"'
-          : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k])}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}</tr>
+          : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k], p.vtPct)}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}</tr>
         ${ab ? `<tr><td colspan="${C.length + 2}">${cgEnvioLinhasHtml({ ...p, lin: p.lin.filter((x) => { const c = CG_ENV_COLS.find(([, , f]) => f(x)); return c && ks.includes(c[0]); }) })}</td></tr>` : ''}`; }).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="2">${Q.length} ${Q.length === 1 ? 'pessoa' : 'pessoas'}</td>
-      ${C.map(([k]) => `<td>${cgEnvVal(k, Q.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
+      ${C.map(([k]) => { const pct = k === 'vt' && Q.some((p) => p.vtPct), n = Q.filter((p) => p[k]).length;
+        return `<td>${pct ? `${n} ${n === 1 ? 'pessoa' : 'pessoas'}` : cgEnvVal(k, Q.reduce((a, p) => a + (p[k] || 0), 0))}</td>`; }).join('')}</tr></tfoot></table></div>`;
   };
   h += avisos + `<div class="section-label" style="margin-top:14px;">1 · Arquivo da Flash — baixar na Flash</div>
     <div class="caption-label" style="text-align:left;line-height:1.7;">Flash › Controle de jornada › Integrações › Domínio › <b>Exportar arquivo</b> › código da empresa (945 / 944 / 413) › Período fechado (mês/ano) ›
@@ -2039,9 +2043,10 @@ function cgEnvioXlsx() {
       const E = L.filter((x) => x.empresa_codigo === e).sort((a, b) => String(a.nome).localeCompare(String(b.nome)) || String(a.rubrica).localeCompare(String(b.rubrica)));
       const linhas = [[`Empresa ${e} · ${cgMesRot(comp)}`], [], ['Matrícula', 'Nome', 'Rubrica', 'Descrição', 'Valor', 'Observação']];
       E.forEach((x) => linhas.push([String(x.matricula), cgNome(x.nome), String(x.rubrica), x.descricao || '', Math.round(cgN(x.valor) * 100) / 100,
-        x.rubrica === 'DSR' ? `${cgN(x.valor)} dia(s) — ${String(x.origem || '').replace(/^.*?:\s*/, '')}` : 'R$']));
+        x.rubrica === 'DSR' ? `${cgN(x.valor)} dia(s) — ${String(x.origem || '').replace(/^.*?:\s*/, '')}` : x.medida === '%' ? '% (desconta em folha)' : 'R$']));
       linhas.push([], ['Total por rubrica']);
       [...new Set(E.map((x) => x.rubrica))].forEach((r) => { const R = E.filter((x) => x.rubrica === r);
+        if (R[0].medida === '%') { linhas.push(['', '', String(r), R[0].descricao || '', R.length, 'pessoas']); return; }
         linhas.push(['', '', String(r), R[0].descricao || '', Math.round(R.reduce((a, x) => a + cgN(x.valor), 0) * 100) / 100, r === 'DSR' ? 'dias' : 'R$']); });
       return { nome: 'Empresa ' + e, linhas };
     });
