@@ -88,6 +88,10 @@ window.CASCA_PAGINAS = {
   contasreceber: 'gestao/index.html#contasreceber',
   projecao: 'gestao/index.html#projecao',
   rede: 'gestao/index.html#rede',
+  // 05/11/2026 (último bloco): Sistema
+  plano: 'sistema/index.html#plano',
+  rotinas: 'sistema/index.html#rotinas',
+  telas: 'sistema/index.html#telas',
 };
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
