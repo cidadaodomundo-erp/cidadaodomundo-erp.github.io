@@ -105,13 +105,13 @@ async function abrirDiaConcartao(unidade, dia) {
     consultarTudo('vw_cartao_transacoes?select=*&dia=in.(' + [diaMais(-1), dia, diaMais(1)].join(',') + ')' +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=dia,hora'),
     // PIX do dia (09/09/2026): QR da maquininha e chave, com o credito do banco que casou
-    consultarTudo('vw_pix_conciliacao?select=id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco&dia=eq.' + dia +
+    consultarTudo('vw_pix_conciliacao?select=id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco&dia=eq.' + dia +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=entrega'),
     // quem entregou cada venda de cartao/vale (para dizer "confirmar com o motoboy X")
     consultarTudo('vw_cartao_entrega_cobranca?select=id_sale,entregador&dia=eq.' + dia +
       '&unidade=eq.' + encodeURIComponent(unidade)),
     // forma registrada no PDV diferente da que passou (absorvida pela base; aqui so informa)
-    consultarTudo('vw_cartao_bandeira_divergente?select=hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale&dia=eq.' + dia +
+    consultarTudo('vw_cartao_bandeira_divergente?select=hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale,referencia&dia=eq.' + dia +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=hora'),
     // descontos MANUAIS do turno (salao e balcao) — a API diz valor e motivo, nao quem liberou (10/09/2026)
     consultarTudo('vw_descontos_dia?select=*&dia=eq.' + dia + '&unidade=eq.' + encodeURIComponent(unidade) + '&order=hora'),
@@ -385,9 +385,11 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   });
   // o casamento do PIX nao e 1 para 1: dois PIX do mesmo valor podem apontar para o
   // MESMO credito do banco. Quando isso acontece, avisa em vez de esconder.
+  // 05/11/2026 (Financeiro): a vw_pix_conciliacao virou um-para-um e traz o fitid do crédito; a chave antiga só vale sem ele (PIX QR do portal da Rede)
   const usoBanco = {};
-  pix.filter(x => x.recebido).forEach(x => { const k = String(x.data_banco) + '|' + String(x.memo_banco) + '|' + (+x.valor).toFixed(2); usoBanco[k] = (usoBanco[k] || 0) + 1; });
-  const pixRepetidos = pix.filter(x => x.recebido && usoBanco[String(x.data_banco) + '|' + String(x.memo_banco) + '|' + (+x.valor).toFixed(2)] > 1);
+  const chaveBanco = x => x.fitid_banco ? 'fitid:' + x.fitid_banco : String(x.data_banco) + '|' + String(x.memo_banco) + '|' + (+x.valor).toFixed(2);
+  pix.filter(x => x.recebido).forEach(x => { const k = chaveBanco(x); usoBanco[k] = (usoBanco[k] || 0) + 1; });
+  const pixRepetidos = pix.filter(x => x.recebido && usoBanco[chaveBanco(x)] > 1);
   pixRepetidos.forEach(x => pend.push({ forma: formaPadrao(x.tipo), caixa: x.caixa || null, chave: 'pixdup:' + x.id_sale + ':' + (+x.valor).toFixed(2), bloco: x.subgrupo === 'CHAVE' ? 'pix_chave' : 'maquininha', efeito: 0,
     p: 2, cor: '#f5a623', hora: hhmm(String(x.entrega || '').slice(11)), saipos: x.tipo + ' · ' + rotVenda(x) + (x.entregador ? ' · motoboy ' + x.entregador : ''),
     real: 'crédito de ' + reaisCc(x.valor) + ' em ' + String(x.data_banco || '').split('-').reverse().slice(0, 2).join('/') + ' usado por mais de um PIX',
@@ -544,7 +546,16 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // (par, conta dividida ou quase-par) não entra pela varredura (a varredura reaproveitava a NSU de outra venda)
   const pareadosRefs = new Set([...casados.map(x => String(x.referencia)), ...compostos.flatMap(c => [c.alvo, ...c.itens]).filter(x => x.origem === 'SAIPOS').map(x => String(x.referencia)),
     ...conferir.map(q => String(q.s.referencia))]);
-  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || pareadosRefs.has(String(f.id_sale)) || roboT(f)) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
+  // 05/11/2026 (Financeiro): a varredura diz qual cobrança usou (referencia = 'NSU …' da Rede; no PIX QR do banco, 'extrato <data>'
+  // + passou + valor). Uma cobrança, uma venda: a que o cruzamento já casou não serve, e a segunda venda que a reaproveita sai.
+  const redeUsada = new Set([...rede.filter(r => r.usado).map(r => String(r.referencia)), ...compostos.flatMap(c => [c.alvo, ...c.itens]).filter(x => x.origem === 'REDE').map(x => String(x.referencia)),
+    ...conferir.map(q => String(q.r.referencia))]);
+  const varrUsada = new Set();
+  const chaveVarr = f => !f.referencia ? null : /^NSU/i.test(String(f.referencia)) ? String(f.referencia) : String(f.referencia) + '|' + String(f.passou) + '|' + (+f.valor).toFixed(2);
+  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || pareadosRefs.has(String(f.id_sale)) || roboT(f)) return;
+    const kv = chaveVarr(f);
+    if (kv && (redeUsada.has(String(f.referencia)) || varrUsada.has(kv))) return;
+    if (kv) varrUsada.add(kv); const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
     trocas.push({ hora: hhmm(String(f.hora || '').slice(11)), venda: f.numero ? 'venda ' + f.numero : f.mesa ? 'mesa ' + f.mesa : 'salão', valor: +f.valor, de, para, pd: ehPendenteTxt(f.registrado), caixa: f.caixa || null, ref: String(f.id_sale) }); });
   if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas, turnos };
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
@@ -1358,9 +1369,9 @@ async function caixaHellenCarregar() {
   try {
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
-      consultarTudo('vw_pix_conciliacao?select=dia,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco' + faixa(des, ate) + '&order=entrega'),
+      consultarTudo('vw_pix_conciliacao?select=dia,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
-      consultarTudo('vw_cartao_bandeira_divergente?select=dia,unidade,hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale' + faixa(des, ate) + '&order=hora'),
+      consultarTudo('vw_cartao_bandeira_divergente?select=dia,unidade,hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale,referencia' + faixa(des, ate) + '&order=hora'),
       consultarTudo('vw_caixa_online_dia?select=*&canal_ok=not.is.true' + faixa(des, ate) + '&order=hora'),
       consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
