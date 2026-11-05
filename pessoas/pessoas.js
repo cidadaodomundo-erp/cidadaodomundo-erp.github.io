@@ -336,15 +336,9 @@ function renderForaFolha() {
     alvo.innerHTML = '<div class="contexto">Ninguém cadastrado para receber fora da folha — ou este login não tem acesso a dados de pessoal (é do Neto, do Fabio e da Hellen).</div>';
     return;
   }
-  let h = `<div class="caption-label" style="max-width:820px;">
-    <b>Como funciona:</b> quem está sem registro recebe pelo cálculo daqui, não pela folha. Entram salário, gratificação fixa e a
-    <b>gratificação do salão</b> (vem da aba Gratificações salão); desconta-se a parte dela do vale transporte. Não entram INSS,
-    vale alimentação (vai pelo cartão da Flash) nem consumo (não se marca mais).
-    O <b>adiantamento</b> sai no dia 20 e é descontado do <b>saldo</b>, pago no <b>5º dia útil</b> do mês seguinte
-    (o 5º dia útil conta o sábado; se cair no fim de semana ou feriado, antecipa para o dia útil anterior).
-    As duas parcelas aparecem no Fluxo projetado e em Contas a pagar até serem pagas. <b>Quem lança e baixa no Saipos é o robô</b>: com o
-    valor exato, a parcela fecha sozinha; se o valor pago for diferente, aparece o botão "confirmar".
-    <span id="ffMsg" style="margin-left:6px;"></span></div>`;
+  // 05/11/2026 (dono, chat RH): sem "Como funciona" nem parâmetros — os valores vêm das bases; a pessoa vira UMA linha
+  // por mês nas colunas da Conferência da folha, com a origem de cada valor no título (passar o mouse)
+  let h = '<span id="ffMsg"></span>';
 
   // O TAMANHO DA SEMANA ANTES DAS PESSOAS (12/09/2026). O loop abaixo mostra uma
   // pessoa de cada vez; quem abre a tela precisa saber primeiro quanto sai nos
@@ -386,7 +380,7 @@ function renderForaFolha() {
 
     h += `<div class="contexto" id="ff-p${p.id}" style="margin-top:14px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div><b style="font-size:15px;">${p.nome}</b> <span style="color:#a5a49a;">· ${p.unidade} · sai da conta ${p.conta}</span></div>
+        <div><b style="font-size:15px;">${p.nome}</b> <span style="color:var(--tx-3);">· ${p.unidade} · sem registro desde ${ffDdmm(p.inicio)}/${p.inicio.slice(0, 4)} · sai da conta ${p.conta}</span></div>
       </div>
       <div class="cards" style="margin-top:10px;">
         <div class="card ${vencidas.length ? 'red' : 'blue'}"><div class="card-lbl">Próximo pagamento</div>
@@ -395,13 +389,7 @@ function renderForaFolha() {
         <div class="card neutral"><div class="card-lbl">Em aberto</div>
           <div class="card-val">R$ ${fmt(abertas.reduce((s, a) => s + a.valor, 0))}</div>
           <div class="card-pct">${abertas.length} parcela(s)${vencidas.length ? ' · ' + vencidas.length + ' vencida(s)' : ''}</div></div>
-        <div class="card neutral"><div class="card-lbl">Parâmetros</div>
-          <div class="card-pct" style="line-height:1.6;">Salário R$ ${fmt(Number(p.salario_base))} · Gratificação fixa R$ ${fmt(Number(p.gratificacao))} ·
-            Adiantamento R$ ${fmt(Number(p.adiantamento))}<br>Desconto consumo: ${ffDecidir(p.desconto_consumo)} · Vale transporte: ${ffDecidir(p.vale_transporte)}<br>
-            ${Number(p.desconto_divida) ? `<span title="${p.desconto_divida_motivo || ''}">Desconto dívida: R$ ${fmt(Number(p.desconto_divida))}/mês</span><br>` : ''}
-            Fora da folha desde ${ffDdmm(p.inicio)}/${p.inicio.slice(0, 4)}${p.fim ? ' até ' + ffDdmm(p.fim) + '/' + p.fim.slice(0, 4) : ''}</div></div>
-      </div>
-      ${p.observacao ? `<div class="caption-label" style="margin-top:6px;">${p.observacao}</div>` : ''}`;
+      </div>`;
 
     if (false) {   // 05/11/2026 (dono): sem campos editáveis aqui — os valores vêm das bases (vw_rh_ff_meses)
       const inp = (id, v, extra = '') => `<input id="${id}" value="${v ?? ''}" ${extra} style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:5px 8px; width:120px;">`;
@@ -435,25 +423,24 @@ function renderForaFolha() {
     const temAjuste = meses.some(m => Number(m.ajuste));
     const ori = { sal: 'cadastro (Cargos e salários)', gra: '40% do salário: a gratificação de função da gerente na folha', salao: 'aba Gratificações salão',
       vt: 'fixo do cadastro (6,13 por passagem)', adi: 'lista do adiantamento do painel', div: p.desconto_divida_motivo || 'dívida' };
-    h += `<div class="caption-label" style="margin-top:14px;"><b>Cálculo do mês</b> — vem das bases; passe o mouse no valor para ver de onde ele sai.</div>
+    h += `<div class="caption-label" style="margin-top:14px;"><b>Cálculo do mês</b> — passe o mouse no valor para ver de onde ele sai.</div>
       <div id="tabelaFfCalculo" style="overflow-x:auto;"><table style="white-space:nowrap;">
       <tr><th>Mês</th><th title="${ori.sal}">Salário</th><th title="${ori.gra}">Gratificação</th><th title="${ori.salao}">Salão</th>
-          ${temAjuste ? '<th>Ajuste</th>' : ''}${temConsumo ? '<th>Consumo</th>' : ''}<th title="${ori.vt}">VT</th>${temDivida ? `<th title="${ori.div}">Dívida</th>` : ''}
-          <th>Bruto</th><th title="${ori.adi}">Adiantamento</th><th>Saldo</th></tr>`;
+          ${temAjuste ? '<th>Ajuste</th>' : ''}${temConsumo ? '<th>Consumo</th>' : ''}<th title="${ori.vt}">VT</th><th title="${ori.adi}">Adiantamento</th>
+          ${temDivida ? `<th title="${ori.div}">Dívida</th>` : ''}<th title="bruto menos VT, adiantamento e dívida: o que se paga no 5º dia útil">Saldo</th></tr>`;
     for (const m of meses) {
       const key = `${p.id}_${m.mes.slice(0, 7)}`;
       h += `<tr>
         <td><b>${ffMesTxt(m.mes)}</b>${Number(m.fracao) < 1 ? `<br><small style="color:#e3b341;">${m.dias}/30 dias (${ffDdmm(m.periodo_ini)} a ${ffDdmm(m.periodo_fim)})</small>` : ''}
-            ${m.informado_por ? `<br><small style="color:#a5a49a;">salão por ${m.informado_por.split('@')[0].split(' ')[0]}${m.informado_em ? ' em ' + ffDdmm(m.informado_em.slice(0, 10)) : ''}</small>` : ''}</td>
+</td>
         <td title="${ori.sal}">${fmt(Number(m.salario))}</td>
         <td title="${ori.gra}">${fmt(Number(m.gratificacao_fixa))}</td>
         <td title="${ori.salao}">${m.gratificacao_salao === null ? '<span style="color:var(--farol-perto);">aguardando</span>' : fmt(Number(m.gratificacao_salao))}</td>
         ${temAjuste ? `<td title="${trEscH(m.ajuste_motivo || '')}">${Number(m.ajuste) ? fmt(Number(m.ajuste)) : '—'}</td>` : ''}
         ${temConsumo ? `<td>${desc(m.desconto_consumo)}</td>` : ''}
         <td title="${ori.vt}">${desc(m.vale_transporte)}</td>
-        ${temDivida ? `<td title="${ori.div}">${desc(m.desconto_divida)}</td>` : ''}
-        <td><b>${fmt(Number(m.bruto))}</b></td>
         <td title="${ori.adi}">−${fmt(Number(m.adiantamento))}</td>
+        ${temDivida ? `<td title="${ori.div}">${desc(m.desconto_divida)}</td>` : ''}
         <td><b>${fmt(Number(m.saldo))}</b>${(m.pendencias || []).length ? '<br><small style="color:var(--farol-perto);">' + m.pendencias.map((t) => /sal[aã]o.*n[aã]o informad/i.test(t) ? 'aguardando as gratificações do salão do mês' : t).join('<br>') + '</small>' : ''}</td>
       </tr>`;
     }
