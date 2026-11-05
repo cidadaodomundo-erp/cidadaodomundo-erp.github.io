@@ -70,6 +70,24 @@ window.CASCA_PAGINAS = {
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
+  // 05/11/2026 (bloco 7): Começar por aqui, Resultado e Financeiro
+  estasemana: 'gestao/index.html#estasemana',
+  hoje: 'gestao/index.html#hoje',
+  placar: 'gestao/index.html#placar',
+  indicadores: 'gestao/index.html#indicadores',
+  semana: 'gestao/index.html#semana',
+  fechamento: 'gestao/index.html#fechamento',
+  evolucao: 'gestao/index.html#evolucao',
+  dre: 'gestao/index.html#dre',
+  fluxo: 'gestao/index.html#fluxo',
+  despesas: 'gestao/index.html#despesas',
+  lucrouni: 'gestao/index.html#lucrouni',
+  concbanco: 'gestao/index.html#concbanco',
+  conciliacao: 'gestao/index.html#conciliacao',
+  contaspagar: 'gestao/index.html#contaspagar',
+  contasreceber: 'gestao/index.html#contasreceber',
+  projecao: 'gestao/index.html#projecao',
+  rede: 'gestao/index.html#rede',
 };
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
