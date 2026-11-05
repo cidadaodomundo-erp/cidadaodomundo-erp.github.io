@@ -1731,8 +1731,8 @@ function cgAbaDez() {
 }
 
 // ---------- ENVIO À CONTABILIDADE (05/11/2026, proposta do RH de 29/10: contexto/propostas-telas/2026-10-29-rh-fechamento-folha.md) ----------
-// Lê vw_rh_fechamento_folha (uma linha por lançamento). Horas da Flash: a parte inteira é hora e os 2 decimais são MINUTOS, que
-// passam de 60 ("48.99" = 48 h + 99 min = 49:39). Na tela vira HH:MM e a soma é em minutos; o arquivo leva o número cru (× 1000).
+// Lê vw_rh_fechamento_folha (uma linha por lançamento). Horas da Flash: horas DECIMAIS (ver cgEnvMin). Na tela vira HH:MM e a
+// soma é em minutos; o arquivo leva o número cru (× 1000).
 const CG_ENV_COLS = [
   ['he100', 'HE 100%', (x) => x.rubrica === '0200'],
   ['he70', 'HE 70%', (x) => x.medida === 'horas' && (x.rubrica === '0205' || x.rubrica === '0209')],
@@ -1743,7 +1743,9 @@ const CG_ENV_COLS = [
   ['vt', 'VT do mês', (x) => x.rubrica === '0048'],
   ['adt', 'Adiantamento', (x) => x.rubrica === '0981'],
 ];
-function cgEnvMin(v) { const n = cgN(v), h = Math.trunc(n); return h * 60 + Math.round((n - h) * 100); }   // "48.99" → 2979 min
+// 05/11/2026 ~16h (RH, CORRIGIDO): as horas da Flash são DECIMAIS — minutos = valor × 60 (7,85 = 7:51; 18,80 = 18:48). A API da
+// Flash dá, para o mesmo lançamento, 10.27 e 10:16. A leitura "hora + minutos" (48.99 = 49:39) estava errada.
+function cgEnvMin(v) { return Math.round(cgN(v) * 60); }
 function cgEnvHM(min) { if (!min) return ''; return Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0'); }
 async function cgEnvioCarregar() {
   CARGOS.envio = null;
