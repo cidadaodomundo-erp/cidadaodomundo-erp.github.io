@@ -338,7 +338,7 @@ function renderForaFolha() {
   }
   let h = `<div class="caption-label" style="max-width:820px;">
     <b>Como funciona:</b> quem está sem registro recebe pelo cálculo daqui, não pela folha. Entram salário, gratificação fixa e a
-    <b>gratificação do salão</b> (varia — informe aqui todo mês); desconta-se a parte dela do vale transporte. Não entram INSS,
+    <b>gratificação do salão</b> (vem da aba Gratificações salão); desconta-se a parte dela do vale transporte. Não entram INSS,
     vale alimentação (vai pelo cartão da Flash) nem consumo (não se marca mais).
     O <b>adiantamento</b> sai no dia 20 e é descontado do <b>saldo</b>, pago no <b>5º dia útil</b> do mês seguinte
     (o 5º dia útil conta o sábado; se cair no fim de semana ou feriado, antecipa para o dia útil anterior).
@@ -387,7 +387,6 @@ function renderForaFolha() {
     h += `<div class="contexto" id="ff-p${p.id}" style="margin-top:14px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div><b style="font-size:15px;">${p.nome}</b> <span style="color:#a5a49a;">· ${p.unidade} · sai da conta ${p.conta}</span></div>
-        <button class="preset-btn" onclick="ffEditar(${p.id})">${FF.editando === p.id ? 'fechar' : 'editar parâmetros'}</button>
       </div>
       <div class="cards" style="margin-top:10px;">
         <div class="card ${vencidas.length ? 'red' : 'blue'}"><div class="card-lbl">Próximo pagamento</div>
@@ -404,7 +403,7 @@ function renderForaFolha() {
       </div>
       ${p.observacao ? `<div class="caption-label" style="margin-top:6px;">${p.observacao}</div>` : ''}`;
 
-    if (FF.editando === p.id) {
+    if (false) {   // 05/11/2026 (dono): sem campos editáveis aqui — os valores vêm das bases (vw_rh_ff_meses)
       const inp = (id, v, extra = '') => `<input id="${id}" value="${v ?? ''}" ${extra} style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:5px 8px; width:120px;">`;
       h += `<div class="contexto" style="margin-top:10px; max-width:760px;">
         <b>Parâmetros do cálculo</b> (valores mensais, em reais — copiados do último holerite cheio)
@@ -431,28 +430,31 @@ function renderForaFolha() {
     const temConsumo = meses.some(m => m.desconto_consumo === null || Number(m.desconto_consumo) > 0);
     const temDivida = meses.some(m => Number(m.desconto_divida) > 0);
     const desc = (v) => v === null ? '<i style="color:#e3b341;">a decidir</i>' : (Number(v) ? '−' + fmt(Number(v)) : '—');
-    h += `<div class="caption-label" style="margin-top:14px;"><b>Cálculo do mês</b> — informe o salão (e um ajuste, se houver) e clique em salvar; o saldo recalcula na hora.</div>
-      <div style="overflow-x:auto;"><table style="white-space:nowrap;">
-      <tr><th>Mês</th><th style="text-align:right;">Salário</th><th style="text-align:right;">Grat. fixa</th><th style="text-align:right;">Salão do mês</th>
-          <th style="text-align:right;">Ajuste (+/−)</th><th>Motivo</th><th></th>${temConsumo ? '<th style="text-align:right;">Consumo</th>' : ''}<th style="text-align:right;">VT</th>${temDivida ? `<th style="text-align:right;" title="${p.desconto_divida_motivo || ''}">Dívida</th>` : ''}
-          <th style="text-align:right;">Bruto</th><th style="text-align:right;">Adiantamento</th><th style="text-align:right;">Saldo</th></tr>`;
+    // 05/11/2026 (dono, chat RH): "os cálculos vem da folha, não faz sentido ter campos editáveis aqui" — só leitura,
+    // nas colunas da Conferência da folha, com a origem de cada valor no título (passar o mouse)
+    const temAjuste = meses.some(m => Number(m.ajuste));
+    const ori = { sal: 'cadastro (Cargos e salários)', gra: '40% do salário: a gratificação de função da gerente na folha', salao: 'aba Gratificações salão',
+      vt: 'fixo do cadastro (6,13 por passagem)', adi: 'lista do adiantamento do painel', div: p.desconto_divida_motivo || 'dívida' };
+    h += `<div class="caption-label" style="margin-top:14px;"><b>Cálculo do mês</b> — vem das bases; passe o mouse no valor para ver de onde ele sai.</div>
+      <div id="tabelaFfCalculo" style="overflow-x:auto;"><table style="white-space:nowrap;">
+      <tr><th>Mês</th><th title="${ori.sal}">Salário</th><th title="${ori.gra}">Gratificação</th><th title="${ori.salao}">Salão</th>
+          ${temAjuste ? '<th>Ajuste</th>' : ''}${temConsumo ? '<th>Consumo</th>' : ''}<th title="${ori.vt}">VT</th>${temDivida ? `<th title="${ori.div}">Dívida</th>` : ''}
+          <th>Bruto</th><th title="${ori.adi}">Adiantamento</th><th>Saldo</th></tr>`;
     for (const m of meses) {
       const key = `${p.id}_${m.mes.slice(0, 7)}`;
       h += `<tr>
         <td><b>${ffMesTxt(m.mes)}</b>${Number(m.fracao) < 1 ? `<br><small style="color:#e3b341;">${m.dias}/30 dias (${ffDdmm(m.periodo_ini)} a ${ffDdmm(m.periodo_fim)})</small>` : ''}
             ${m.informado_por ? `<br><small style="color:#a5a49a;">salão por ${m.informado_por.split('@')[0].split(' ')[0]}${m.informado_em ? ' em ' + ffDdmm(m.informado_em.slice(0, 10)) : ''}</small>` : ''}</td>
-        <td style="text-align:right;">${fmt(Number(m.salario))}</td>
-        <td style="text-align:right;">${fmt(Number(m.gratificacao_fixa))}</td>
-        <td style="text-align:right;">${inp('ffSalao_' + key, m.gratificacao_salao === null ? '' : fmt(Number(m.gratificacao_salao)), 'informar', 90, m.gratificacao_salao === null ? '#e3b341' : null)}</td>
-        <td style="text-align:right;">${inp('ffAj_' + key, Number(m.ajuste) ? fmt(Number(m.ajuste)) : '', '0', 70)}</td>
-        <td><input id="ffMot_${key}" value="${m.ajuste_motivo || ''}" placeholder="motivo" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:4px 6px; width:120px;"></td>
-        <td><button class="preset-btn" onclick="ffInformar(${p.id}, '${m.mes}')">salvar</button></td>
-        ${temConsumo ? `<td style="text-align:right;">${desc(m.desconto_consumo)}</td>` : ''}
-        <td style="text-align:right;">${desc(m.vale_transporte)}</td>
-        ${temDivida ? `<td style="text-align:right;">${desc(m.desconto_divida)}</td>` : ''}
-        <td style="text-align:right;"><b>${fmt(Number(m.bruto))}</b></td>
-        <td style="text-align:right;">−${fmt(Number(m.adiantamento))}</td>
-        <td style="text-align:right;"><b>${fmt(Number(m.saldo))}</b>${(m.pendencias || []).length ? '<br><small style="color:#e3b341;">' + m.pendencias.join('<br>') + '</small>' : ''}</td>
+        <td title="${ori.sal}">${fmt(Number(m.salario))}</td>
+        <td title="${ori.gra}">${fmt(Number(m.gratificacao_fixa))}</td>
+        <td title="${ori.salao}">${m.gratificacao_salao === null ? '<span style="color:var(--farol-perto);">aguardando</span>' : fmt(Number(m.gratificacao_salao))}</td>
+        ${temAjuste ? `<td title="${trEscH(m.ajuste_motivo || '')}">${Number(m.ajuste) ? fmt(Number(m.ajuste)) : '—'}</td>` : ''}
+        ${temConsumo ? `<td>${desc(m.desconto_consumo)}</td>` : ''}
+        <td title="${ori.vt}">${desc(m.vale_transporte)}</td>
+        ${temDivida ? `<td title="${ori.div}">${desc(m.desconto_divida)}</td>` : ''}
+        <td><b>${fmt(Number(m.bruto))}</b></td>
+        <td title="${ori.adi}">−${fmt(Number(m.adiantamento))}</td>
+        <td><b>${fmt(Number(m.saldo))}</b>${(m.pendencias || []).length ? '<br><small style="color:var(--farol-perto);">' + m.pendencias.map((t) => /sal[aã]o.*n[aã]o informad/i.test(t) ? 'aguardando as gratificações do salão do mês' : t).join('<br>') + '</small>' : ''}</td>
       </tr>`;
     }
     h += `</table></div>
@@ -751,7 +753,7 @@ async function entrarCargos() {
   alvo.innerHTML = '<div class="contexto">Carregando a folha...</div>';
   try {
     const desde = cgMesIso(-5);
-    const [pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, cs, faltasFF, foraCadastro, adm] = await Promise.all([
+    const [pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, cs, faltasFF, foraCadastro, adm, comb] = await Promise.all([
       consultarTudo('vw_rh_pessoas?select=*&order=unidade,nome'),
       consultarTudo('vw_rh_cargos_tabela?select=*&order=unidade,familia,nivel,horas'),
       consultarTudo(`vw_rh_custo_pessoa_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,nome`),
@@ -766,8 +768,10 @@ async function entrarCargos() {
       consultarTudo('vw_rh_faltas_flash_folha?select=*&order=mes.desc,unidade,nome').catch(() => []),
       consultarTudo('vw_rh_ferias?select=nome&situacao=like.fora%20do%20cadastro*&order=nome').catch(() => []),
       consultarTudo('rh_admissao?select=*&order=criado_em.desc').catch(() => []),
+      // 05/11/2026 (dono, chat RH): o combinado além da folha se muda na ficha da pessoa, não na conferência
+      consultarTudo('rh_folha_combinado?select=*&order=pessoa_id').catch(() => []),
     ]);
-    CARGOS = { pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, adm: adm || [],
+    CARGOS = { pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, adm: adm || [], comb: new Map((comb || []).map((c) => [c.pessoa_id, c])),
                cs: new Map((cs || []).map((x) => [x.pessoa_id, x])), mov: {}, faltasFF: faltasFF || [], foraCadastro: [...new Set((foraCadastro || []).map((x) => x.nome))] };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar a folha: ${cgEsc(e.message)}</div>`;
@@ -903,7 +907,26 @@ function cgDetalhePessoa(p) {
       <span><b>VT</b> ${p.vt_por_dia ? `${p.vt_por_dia} por dia` : 'não pega'}</span><span><b>VA</b> ${p.recebe_va ? 'sim' : 'não'}</span>
       <span><b>Adiantamento</b> ${p.pega_adiantamento && p.contrato === 'CLT' ? 'sim' : 'não'}</span>${p.desligamento ? `<span><b>Saiu</b> ${cgData(p.desligamento)}</span>` : ''}
       <button type="button" class="preset-btn" onclick="cgFormAbrir(${p.id})">Editar</button></div>
+    ${cgCombinadoFicha(p)}
     ${cgMovHtml(p)}`;
+}
+// "Combinado além da folha" (dono 05/11/2026, chat RH): valor total combinado (paga a diferença do líquido) ou acréscimo
+// fixo. Quem muda é esta ficha; a Conferência da folha só mostra (rh_folha_combinado / rh_folha_combinado_salvar).
+function cgCombinadoFicha(p) {
+  const c = (CARGOS.comb || new Map()).get(p.id), ab = CARGOS_F.combEd === p.id;
+  const txt = c ? `${c.tipo === 'TOTAL' ? 'valor total combinado' : 'acréscimo fixo'} ${cgR(c.valor)} — ${cgEsc(c.motivo || '')}` : 'nenhum';
+  let h = `<div style="font-size:12.5px;margin:2px 0 8px;"><b>Combinado além da folha</b> ${txt}
+    <a href="javascript:void(0)" onclick="CARGOS_F.combEd=CARGOS_F.combEd===${p.id}?null:${p.id};renderModuloCargos()" style="color:var(--tx-4);margin-left:6px;">${ab ? 'fechar' : (c ? 'mudar' : 'combinar')}</a></div>`;
+  if (!ab) return h;
+  const t = c ? c.tipo : '';
+  return h + `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;max-width:820px;margin-bottom:8px;">
+    <select id="cgCombTipo" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      <option value="TOTAL"${t === 'TOTAL' ? ' selected' : ''}>valor total combinado (paga a diferença do líquido)</option>
+      <option value="ACRESCIMO"${t === 'ACRESCIMO' ? ' selected' : ''}>acréscimo fixo</option></select>
+    <input id="cgCombValor" type="number" step="0.01" min="0" value="${c ? cgN(c.valor) : ''}" placeholder="valor" style="width:120px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+    <input id="cgCombMotivo" type="text" value="${cgEsc(c ? c.motivo || '' : '')}" placeholder="motivo (obrigatório)" style="flex:1 1 200px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+    ${cgBotaoPasso('Gravar', `cgFolhaCombSalvar(${p.id},false)`)}
+    ${c ? cgBotaoPasso('Tirar o combinado', `cgFolhaCombSalvar(${p.id},true)`, true) : ''}</div>`;
 }
 function cgEmMontagem(titulo, texto) {
   return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>${cgEsc(titulo)} — em montagem.</b><div style="margin-top:6px;">${cgEsc(texto)}</div>
@@ -1487,15 +1510,14 @@ function cgFolhaQuadroFora(comp) {
     const lin = R.filter((x) => x.empresa === e);
     h += `<tr class="sub"><td colspan="7"><b>${cgEsc(e)}</b></td></tr>`;
     lin.forEach((x) => {
-      const ed = F.folhaComb === x.pessoa_id;
       h += `<tr><td>${cgEsc(cgNome(x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
         <td>${v0(x.liquido_folha)}</td>
-        <td style="cursor:pointer;" title="${cgEsc(x.combinado_motivo || 'clique para combinar um valor')}" onclick="CARGOS_F.folhaComb=CARGOS_F.folhaComb===${x.pessoa_id}?null:${x.pessoa_id};renderModuloCargos()">${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);">${x.combinado_tipo === 'TOTAL' ? 'total combinado ' + cgR(x.combinado_valor) : 'acréscimo fixo'}</div>` : '<div style="font-size:11px;color:var(--tx-5);">combinar</div>'}</td>
+        <td>${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${x.combinado_tipo === 'TOTAL' ? 'total combinado ' + cgR(x.combinado_valor) : 'acréscimo fixo'}${x.combinado_motivo ? ' — ' + cgEsc(x.combinado_motivo) : ''}</div>` : ''}</td>
         <td>${v0(x.saldo_fora)}</td>
         <td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
         <td>${v0(x.bonificacao)}</td>
         <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}</td></tr>
-        ${ed ? `<tr><td colspan="7">${cgFolhaCombForm(x)}</td></tr>` : ''}`;
+`;
     });
     h += tot(`Subtotal ${cgEsc(e)}`, lin, 'sub');
   });
@@ -1521,8 +1543,9 @@ async function cgFolhaCombSalvar(pessoa, tirar) {
   avisoAcao('atencao', '… gravando o combinado');
   const r = await trRpcSeguro('rh_folha_combinado_salvar', { p_pessoa: pessoa, p_tipo: tipo, p_valor: valor, p_motivo: motivo });
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaCombSalvar(pessoa, tirar));
-  CARGOS_F.folhaComb = null;
-  await cgFolhaCarregar();
+  CARGOS_F.combEd = null;
+  CARGOS.comb = new Map((await consultarTudo('rh_folha_combinado?select=*&order=pessoa_id').catch(() => [])).map((c) => [c.pessoa_id, c]));
+  if (CARGOS.folha) await cgFolhaCarregar(); else renderModuloCargos();
   avisoAcao('ok', `✓ ${tirar ? 'Combinado tirado' : 'Combinado gravado'}: o valor a pagar já mudou — às ${avisoHora()}.`);
 }
 async function cgFolhaAbrir(k) {
