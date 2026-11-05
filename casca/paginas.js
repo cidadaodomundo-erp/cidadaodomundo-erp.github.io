@@ -55,6 +55,21 @@ window.CASCA_PAGINAS = {
   rateio: 'cardapio/index.html#rateio',
   // 01/11/2026 (dono): acompanhamento do dia, sem a carga de vendas do painel
   vendasagora: 'vendas/index.html',
+  // 05/11/2026 (bloco 6): Canal · iFood, Site próprio e Entrega
+  resumo: 'canal/index.html#resumo',
+  promocoes: 'canal/index.html#promocoes',
+  cancelamentos: 'canal/index.html#cancelamentos',
+  contestacoes: 'canal/index.html#contestacoes',
+  atendimento: 'canal/index.html#atendimento',
+  negociacoes: 'canal/index.html#negociacoes',
+  avaliacoes: 'canal/index.html#avaliacoes',
+  qualidade: 'canal/index.html#qualidade',
+  cardapio: 'canal/index.html#cardapio',
+  clientes: 'canal/index.html#clientes',
+  site: 'canal/index.html#site',
+  atrasos: 'canal/index.html#atrasos',
+  frete: 'canal/index.html#frete',
+  logfin: 'canal/index.html#logfin',
 };
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
