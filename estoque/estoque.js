@@ -3976,3 +3976,204 @@ async function cfEnviar(id, iid, naofaz) {
   cfRender(id);
   confAbasPintar();
 }
+
+// ==================================================================
+// REQUISIÇÃO DE MATERIAL (dono, 05/11/2026: "os usuários do delivery, salão e cozinhas farão pedido por esse canal";
+// proposta contexto/propostas-telas/2026-10-29-requisicao-de-material.md). Duas telas:
+//   reqpedir   — o líder pede o que a praça precisa (a praça vem de quem ele é: rh_eu_lider; quem separa escolhe a praça)
+//   reqseparar — Habrahan, Rita e o dono: a lista do dia somada por item, cada requisição com o que saiu, e os itens fora
+//                da base, que vão ao dono.
+// Banco do chat Estoque: est_requisicao_pedir / _separar / _cancelar, vw_est_requisicao(_item, _do_dia, _fora_da_base).
+// Regra do dono (29/10 13:15): a praça pede TUDO; o que sai pela ficha aparece na linha mas não baixa. Enquanto o banco
+// não marcar sai_por_ficha, a tela mostra o rótulo pela classe da base (MP e EMBALAGEM) e repete a recusa do banco.
+// ==================================================================
+const REQ = { itens: null, classe: null, carrinho: {}, busca: '', manda: false, lider: null, praca: '', minhas: [], unidade: null };
+const REQ_PRACAS = ['COZINHA', 'DELIVERY', 'SALÃO', 'PRODUÇÃO'];
+const reqSaiPelaFicha = (nb) => ['MP', 'EMBALAGEM'].includes((REQ.classe || {})[nb]);
+const reqFmt = (v) => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+function reqQuando(ts) { if (!ts) return ''; const d = new Date(ts); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); }
+function reqSituacao(r) {
+  const s = String(r.leitura || r.situacao || '');
+  const cor = /CANCEL/.test(s) ? 'var(--tx-4)' : /SEPARADA|ENTREGUE/.test(s) ? 'var(--farol-ok)' : 'var(--farol-perto)';
+  return `<span style="color:${cor}; font-weight:700;">${trEscH(s.toLowerCase())}</span>`;
+}
+
+async function entrarReqPedir() {
+  const alvo = document.getElementById('view-reqpedir');
+  if (!alvo) return;
+  EST_TELA = 'reqpedir';
+  if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para pedir material.</div>`; return; }
+  alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  const u = await estLojaDaTela(alvo, entrarReqPedir); if (!u) return;
+  try {
+    const [itens, base, rl, rm] = await Promise.all([
+      consultarTudo(`est_saldo_item?select=nome_base,un&unidade=eq.${encodeURIComponent(u)}&nome_base=not.is.null&order=nome_base`),
+      consultarTudo('ft_item_base?select=nome_base,classe&nao_usa=is.false'),
+      trRpcSeguro('rh_eu_lider', {}), trRpcSeguro('est_vejo_todas_as_pracas', {})]);
+    const vistos = new Set();
+    REQ.itens = itens.filter((x) => x.nome_base && !vistos.has(x.nome_base) && vistos.add(x.nome_base));
+    REQ.classe = {}; for (const b of base) if (b.nome_base) REQ.classe[b.nome_base] = b.classe;
+    REQ.itens = REQ.itens.filter((x) => REQ.classe[x.nome_base] !== 'MERCADORIA');   // revenda não é material (banco recusa)
+    const lid = rl.ok ? await rl.json() : [];
+    REQ.lider = (Array.isArray(lid) ? lid : []).find((x) => x.unidade === u) || null;
+    REQ.manda = rm.ok ? !!(await rm.json()) : false;
+    REQ.unidade = u;
+    if (!REQ.praca) REQ.praca = REQ.lider ? REQ.lider.setor : '';
+    await reqMinhasCarregar();
+    reqPedirDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui abrir a requisição: ${trEscH(e.message)} <button class="preset-btn" onclick="entrarReqPedir()">Tentar de novo</button></div>`;
+  }
+}
+async function reqMinhasCarregar() {
+  const s = rmbSessao() || {};
+  const filtro = REQ.manda ? '' : `&pedido_por=eq.${encodeURIComponent(s.email || '')}`;
+  REQ.minhas = await consultarTudo(`vw_est_requisicao?select=*&unidade=eq.${encodeURIComponent(REQ.unidade)}${filtro}&order=criado_em.desc&limit=20`).catch(() => []);
+}
+function reqPedirDesenhar() {
+  const alvo = document.getElementById('view-reqpedir');
+  if (!alvo) return;
+  const podePedir = REQ.lider || REQ.manda;
+  const b = REQ.busca.trim().toLowerCase();
+  const noCarrinho = Object.entries(REQ.carrinho).filter(([, q]) => Number(q) > 0);
+  const lista = b.length < 2 ? [] : REQ.itens.filter((x) => x.nome_base.toLowerCase().includes(b)).slice(0, 40);
+  const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:8px 10px; font:inherit;';
+  const linhaItem = (nb, un) => {
+    const q = REQ.carrinho[nb] || '';
+    return `<div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line);">
+      <div style="flex:1 1 auto; min-width:0;"><b>${trEscH(nb)}</b>${reqSaiPelaFicha(nb) ? ' <span style="font-size:11.5px; color:var(--tx-4);">· sai pela ficha</span>' : ''}</div>
+      <input inputmode="decimal" value="${trEscH(q)}" placeholder="qtd" oninput='reqQtd(${JSON.stringify(nb)}, this.value)' style="width:76px; text-align:right; ${campo}">
+      <span style="width:34px; font-size:12px; color:var(--tx-3);">${trEscH(String(un || '').toLowerCase())}</span></div>`;
+  };
+  const unDe = (nb) => (REQ.itens.find((x) => x.nome_base === nb) || {}).un || '';
+  alvo.innerHTML = `<h2>Pedir material</h2>
+    <div class="caption-label">${trEscH(estNomeLoja(REQ.unidade))}${REQ.praca ? ' · praça <b>' + trEscH(REQ.praca) + '</b>' : ''}. Peça tudo o que a praça precisa; quem separa entrega e dá a baixa no estoque.</div>
+    ${!podePedir ? `<div class="contexto" style="border-color:var(--farol-perto); text-align:left;">Seu login não está como líder de praça em ${trEscH(estNomeLoja(REQ.unidade))}. Peça ao Neto para cadastrar você como líder no RH.</div>` : ''}
+    ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='REQ.praca=${JSON.stringify(p)}; reqPedirDesenhar();'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
+    <input id="reqBusca" type="search" placeholder="buscar o item (2 letras ou mais)" value="${trEscH(REQ.busca)}" oninput="reqBuscar(this.value)" style="width:100%; max-width:420px; margin:8px 0; ${campo}">
+    <div id="reqLista">${lista.map((x) => linhaItem(x.nome_base, x.un)).join('') || (b.length >= 2 ? `<div class="caption-label">Nenhum item com "${trEscH(REQ.busca)}" na base desta loja. <a href="javascript:void(0)" onclick="reqForaDaBase()">Pedir mesmo assim (vai para o Neto validar)</a></div>` : '')}</div>
+    <div class="section-label" style="margin-top:14px;">No pedido: ${noCarrinho.length} ${noCarrinho.length === 1 ? 'item' : 'itens'}</div>
+    ${noCarrinho.map(([nb]) => linhaItem(nb, unDe(nb))).join('')}
+    <textarea id="reqObs" placeholder="observação (opcional)" style="width:100%; min-height:44px; margin-top:8px; ${campo}"></textarea>
+    <div style="margin:10px 0;"><button class="preset-btn" id="reqBtPedir" ${noCarrinho.length && podePedir ? '' : 'disabled'} style="font-size:15px; padding:10px 18px; border-color:var(--marca-amarelo);" onclick="reqEnviar()">Pedir</button></div>
+    <div class="section-label" style="margin-top:18px;">${REQ.manda ? 'Requisições desta loja' : 'Minhas requisições'}</div>
+    ${REQ.minhas.length ? `<div id="tabelaReqMinhas" style="overflow-x:auto;"><table><thead><tr><th>Número</th><th>Quando</th><th>Praça</th><th style="text-align:right;">Itens</th><th>Situação</th></tr></thead><tbody>
+      ${REQ.minhas.map((r) => `<tr><td>${trEscH(r.numero)}</td><td>${trEscH(reqQuando(r.criado_em))}</td><td>${trEscH(String(r.praca || '').toLowerCase())}</td><td style="text-align:right;">${r.itens}${r.itens_a_menos ? ` <span style="color:var(--farol-perto);">(${r.itens_a_menos} a menos)</span>` : ''}</td><td>${reqSituacao(r)}${r.situacao === 'ABERTA' ? ` <button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="caption-label">Nenhuma requisição ainda.</div>'}`;
+}
+function reqBuscar(v) {
+  REQ.busca = v; clearTimeout(window._reqB);
+  window._reqB = setTimeout(() => { reqPedirDesenhar(); const e = document.getElementById('reqBusca'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 250);
+}
+function reqQtd(nb, v) {
+  const s = String(v).trim();
+  if (s === '') delete REQ.carrinho[nb]; else REQ.carrinho[nb] = s.replace(',', '.');
+  const n = Object.values(REQ.carrinho).filter((q) => Number(q) > 0).length;
+  const bt = document.getElementById('reqBtPedir'); if (bt) bt.disabled = !n || !(REQ.lider || REQ.manda);
+}
+function reqForaDaBase() {
+  const nome = REQ.busca.trim().toUpperCase(); if (!nome) return;
+  if (!REQ.itens.some((x) => x.nome_base === nome)) REQ.itens.push({ nome_base: nome, un: '', fora: true });
+  REQ.busca = nome.toLowerCase(); reqPedirDesenhar();
+  avisoAcao('atencao', `! "${nome}" não está na base: digite a quantidade. Ele vai no pedido e o Neto valida antes de sair do estoque.`);
+}
+async function reqEnviar() {
+  const itens = Object.entries(REQ.carrinho).filter(([, q]) => Number(q) > 0)
+    .map(([nb, q]) => ({ item: nb, qtd: Number(q), un: (REQ.itens.find((x) => x.nome_base === nb) || {}).un || null }));
+  if (!itens.length) return avisoAcao('atencao', '! Digite a quantidade de pelo menos um item.');
+  if (itens.some((x) => !(x.qtd > 0))) return avisoAcao('atencao', '! Quantidade tem de ser um número maior que zero.');
+  if (REQ.manda && !REQ.praca) return avisoAcao('atencao', '! Escolha a praça que está pedindo.');
+  const obs = (document.getElementById('reqObs') || {}).value || null;
+  const bt = document.getElementById('reqBtPedir'); if (bt) { bt.disabled = true; bt.textContent = 'Enviando…'; }
+  avisoAcao('enviando', 'Enviando a requisição…');
+  const r = await trRpcSeguro('est_requisicao_pedir', { p_unidade: REQ.unidade, p_itens: itens, p_praca: REQ.manda ? REQ.praca : null, p_observacao: obs ? obs.trim() || null : null });
+  if (!r.ok) {
+    if (bt) { bt.disabled = false; bt.textContent = 'Pedir'; }
+    return avisoAcao('erro', `✗ A requisição NÃO chegou: ${await trErroDe(r)}. O que você digitou continua aqui.`, reqEnviar);
+  }
+  const x = ((await r.json()) || [])[0] || {};
+  REQ.carrinho = {}; REQ.busca = '';
+  avisoAcao('ok', `✓ Requisição ${x.numero || ''} enviada às ${avisoHora()}, ${x.itens} ${x.itens === 1 ? 'item' : 'itens'}${x.fora_da_base ? ` (${x.fora_da_base} fora da base: o Neto valida)` : ''}.`);
+  await reqMinhasCarregar(); reqPedirDesenhar();
+}
+async function reqCancelar(id, numero) {
+  const motivo = prompt(`Cancelar ${numero}? Diga o motivo:`); if (motivo === null) return;
+  avisoAcao('enviando', `Cancelando ${numero}…`);
+  const r = await trRpcSeguro('est_requisicao_cancelar', { p_id: id, p_motivo: motivo.trim() || null });
+  if (!r.ok) return avisoAcao('erro', `✗ ${numero} NÃO foi cancelada: ${await trErroDe(r)}.`, () => reqCancelar(id, numero));
+  avisoAcao('ok', `✓ ${numero} cancelada às ${avisoHora()}.`);
+  if (EST_TELA === 'reqseparar') entrarReqSeparar(); else { await reqMinhasCarregar(); reqPedirDesenhar(); }
+}
+
+// ---- Separar: quem entrega (Habrahan, Rita, dono) ----
+const REQS = { abertas: [], itens: [], dia: [], fora: [], separado: {}, unidade: null };
+async function entrarReqSeparar() {
+  const alvo = document.getElementById('view-reqseparar');
+  if (!alvo) return;
+  EST_TELA = 'reqseparar';
+  if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para separar as requisições.</div>`; return; }
+  alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  const u = await estLojaDaTela(alvo, entrarReqSeparar); if (!u) return;
+  try {
+    const q = encodeURIComponent(u);
+    const [ab, dia, fora, base] = await Promise.all([
+      consultarTudo(`vw_est_requisicao?select=*&unidade=eq.${q}&situacao=eq.ABERTA&order=criado_em`),
+      consultarTudo(`vw_est_requisicao_do_dia?select=*&unidade=eq.${q}&order=nome_base`).catch(() => []),
+      consultarTudo('vw_est_requisicao_fora_da_base?select=*&order=ultima_vez.desc').catch(() => []),
+      REQ.classe ? Promise.resolve(null) : consultarTudo('ft_item_base?select=nome_base,classe&nao_usa=is.false')]);
+    if (base) { REQ.classe = {}; for (const b of base) if (b.nome_base) REQ.classe[b.nome_base] = b.classe; }
+    REQS.abertas = ab; REQS.dia = dia; REQS.fora = fora; REQS.unidade = u;
+    REQS.itens = ab.length ? await consultarTudo(`vw_est_requisicao_item?select=*&id_requisicao=in.(${ab.map((r) => r.id).join(',')})&order=id`) : [];
+    reqSepararDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler as requisições: ${trEscH(e.message)} <button class="preset-btn" onclick="entrarReqSeparar()">Tentar de novo</button></div>`;
+  }
+}
+function reqSepararDesenhar() {
+  const alvo = document.getElementById('view-reqseparar');
+  if (!alvo) return;
+  const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
+  const diaAberto = REQS.dia.filter((x) => !x.situacao || /ABERT|SEPARAR/i.test(x.situacao));
+  alvo.innerHTML = `<h2>Separar requisições</h2>
+    <div class="caption-label">${trEscH(estNomeLoja(REQS.unidade))}: ${REQS.abertas.length} ${REQS.abertas.length === 1 ? 'requisição esperando' : 'requisições esperando'}. Separe, ajuste a quantidade que saiu e clique em <b>Entreguei</b>: a baixa no estoque é pelo que saiu.</div>
+    ${diaAberto.length ? `<div class="section-label">Somado por item</div><div id="tabelaReqDia" style="overflow-x:auto;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Saldo</th><th>Praças</th></tr></thead><tbody>
+      ${diaAberto.map((x) => `<tr><td>${trEscH(x.nome_base)}${reqSaiPelaFicha(x.nome_base) ? ' <span style="font-size:11px; color:var(--tx-4);">· sai pela ficha</span>' : ''}</td><td style="text-align:right;">${reqFmt(x.qtd_pedida)} ${trEscH(String(x.un || '').toLowerCase())}</td>
+        <td style="text-align:right;${Number(x.saldo) < Number(x.qtd_pedida) ? ' color:var(--farol-fora); font-weight:700;' : ''}">${x.saldo == null ? '–' : reqFmt(x.saldo)}</td><td style="white-space:normal;">${trEscH(String(x.pracas || '').toLowerCase())}</td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+    ${REQS.abertas.map((r) => {
+      const L = REQS.itens.filter((i) => i.id_requisicao === r.id);
+      return `<div class="contexto" style="text-align:left; margin:12px 0;">
+        <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><b>${trEscH(r.numero)} · ${trEscH(String(r.praca || '').toLowerCase())}</b>
+          <span style="font-size:12px; color:var(--tx-4);">${trEscH(String(r.pedido_por || '').split('@')[0])} · ${trEscH(reqQuando(r.criado_em))}</span></div>
+        ${r.observacao ? `<div style="font-size:12.5px; color:var(--tx-3); margin-top:2px;">${trEscH(r.observacao)}</div>` : ''}
+        <div id="tabelaReq${r.id}" style="overflow-x:auto; margin-top:6px;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Saiu</th></tr></thead><tbody>
+          ${L.map((i) => `<tr><td style="white-space:normal;">${trEscH(i.nome_base || i.nome_pedido)}${i.fora_da_base ? ' <span style="font-size:11px; color:var(--farol-perto);">· fora da base: não sai, o Neto valida</span>' : reqSaiPelaFicha(i.nome_base) ? ' <span style="font-size:11px; color:var(--tx-4);">· sai pela ficha</span>' : ''}</td>
+            <td style="text-align:right;">${reqFmt(i.qtd_pedida)} ${trEscH(String(i.un || '').toLowerCase())}</td>
+            <td style="text-align:right;">${i.fora_da_base ? '–' : `<input inputmode="decimal" value="${trEscH(REQS.separado[i.id] != null ? REQS.separado[i.id] : reqFmt(i.qtd_pedida))}" oninput="REQS.separado[${i.id}]=this.value" style="width:76px; text-align:right; ${campo}">`}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"><button class="preset-btn" style="border-color:var(--marca-amarelo);" onclick="reqEntregar(${r.id})">Entreguei</button>
+          <button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button></div></div>`;
+    }).join('') || '<div class="contexto">Nenhuma requisição esperando nesta loja.</div>'}
+    ${REQS.fora.length ? `<div class="section-label" style="margin-top:18px;">Pedidos fora da base: o Neto valida</div><div id="tabelaReqFora" style="overflow-x:auto;"><table><thead><tr><th>Como pediram</th><th style="text-align:right;">Vezes</th><th>Desde</th><th>Quem pediu</th></tr></thead><tbody>
+      ${REQS.fora.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.nome_pedido)}</td><td style="text-align:right;">${x.vezes_pedido}</td><td>${trEscH(reqQuando(x.primeira_vez))}</td><td style="white-space:normal;">${trEscH(String(x.quem_pediu || '').replace(/@[^,\s]+/g, ''))}</td></tr>`).join('')}
+    </tbody></table></div>` : ''}`;
+}
+async function reqEntregar(id) {
+  const r0 = REQS.abertas.find((r) => r.id === id) || {};
+  const L = REQS.itens.filter((i) => i.id_requisicao === id && !i.fora_da_base);
+  const sep = [];
+  for (const i of L) {
+    const s = REQS.separado[i.id];
+    if (s == null) continue;
+    const t = String(s).trim(), n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t);
+    if (String(s).trim() === '' || !(n >= 0)) return avisoAcao('atencao', `! A quantidade que saiu de ${i.nome_base} não é um número.`);
+    sep.push({ id_item: i.id, qtd: n });
+  }
+  avisoAcao('enviando', `Gravando a entrega de ${r0.numero || ''}…`);
+  const r = await trRpcSeguro('est_requisicao_separar', { p_id: id, p_separado: sep, p_quem: null });
+  if (!r.ok) return avisoAcao('erro', `✗ A entrega de ${r0.numero || ''} NÃO foi gravada: ${await trErroDe(r)}.`, () => reqEntregar(id));
+  const x = ((await r.json()) || [])[0] || {};
+  L.forEach((i) => delete REQS.separado[i.id]);
+  avisoAcao('ok', `✓ ${x.numero || r0.numero} entregue às ${avisoHora()}: ${x.itens} ${x.itens === 1 ? 'item' : 'itens'}${x.nao_atendidos ? `, ${x.nao_atendidos} sem sair` : ''}. A baixa no estoque já conta.`);
+  entrarReqSeparar();
+}

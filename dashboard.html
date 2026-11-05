@@ -218,6 +218,9 @@
       <button class="sidebar-btn" id="navBtnFechaturno" onclick="mostrarModulo('fechaturno')"><span class="mico">🔒</span>Fechar o turno</button>
       <button class="sidebar-btn" id="navBtnProdhist" onclick="mostrarModulo('prodhist')"><span class="mico">📚</span>Históricos da produção</button>
       <button class="sidebar-btn" id="navBtnConferencias" onclick="mostrarModulo('conferencias')"><span class="mico">☑️</span>Conferências</button>
+      <!-- Requisição de material (dono, 05/11/2026): a praça pede, quem separa entrega e dá a baixa -->
+      <button class="sidebar-btn" id="navBtnReqpedir" onclick="mostrarModulo('reqpedir')"><span class="mico">🧻</span>Pedir material</button>
+      <button class="sidebar-btn" id="navBtnReqseparar" onclick="mostrarModulo('reqseparar')"><span class="mico">📤</span>Separar requisições</button>
       <button class="sidebar-btn" id="navBtnControle" onclick="mostrarModulo('controle')"><span class="mico">📒</span>Controle de estoque</button>
       <button class="sidebar-btn" id="navBtnPosicao" onclick="mostrarModulo('posicao')"><span class="mico">💰</span>Posição de estoque</button>
       <button class="sidebar-btn" id="navBtnComprateto" onclick="mostrarModulo('comprateto')"><span class="mico">🛒</span>Teto de compra</button>
@@ -381,6 +384,8 @@
 
     <div id="modulo-fechaturno" class="modulo" style="display:none;"><div id="view-fechaturno"></div></div>
     <div id="modulo-comprateto" class="modulo" style="display:none;"><div id="view-comprateto"></div></div>
+    <div id="modulo-reqpedir" class="modulo" style="display:none;"><div id="view-reqpedir"></div></div>
+    <div id="modulo-reqseparar" class="modulo" style="display:none;"><div id="view-reqseparar"></div></div>
     <div id="modulo-prodhist" class="modulo" style="display:none;">
       <div id="view-prodhist"></div>
     </div>
@@ -514,7 +519,7 @@
 <script src="gestao/gestao.js?v=20261105a"></script>
 <script src="sistema/sistema.js?v=20261105a"></script>
 <script src="listas/listas.js?v=20261104h"></script>
-<script src="estoque/estoque.js?v=20261105g"></script>
+<script src="estoque/estoque.js?v=20261105h"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script src="caixa/caixa.js?v=20261103d"></script>
 <script src="pessoas/pessoas.js?v=20261103a"></script>
@@ -613,6 +618,8 @@ function mostrarModulo(nome) {
   if (nome === 'producao') entrarApontar();
   if (nome === 'fechaturno') entrarFechaTurno();
   if (nome === 'comprateto') entrarCompraTeto();
+  if (nome === 'reqpedir') entrarReqPedir();
+  if (nome === 'reqseparar') entrarReqSeparar();
   if (nome === 'prodhist') entrarProdHist();
   if (nome === 'conferencias') entrarConferencias();
   if (nome === 'controle') entrarControle();
@@ -661,7 +668,7 @@ function moduloAtivo() {
                               ['modulo-fichas','fichas'], ['modulo-engcard','engcard'],
                               ['modulo-plano','plano'],
                               ['modulo-reembolsos','reembolsos'], ['modulo-rh','rh'],
-                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-phoje','phoje'], ['modulo-fechaturno','fechaturno'], ['modulo-comprateto','comprateto'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
+                              ['modulo-forafolha','forafolha'], ['modulo-cargos','cargos'], ['modulo-phoje','phoje'], ['modulo-fechaturno','fechaturno'], ['modulo-comprateto','comprateto'], ['modulo-reqpedir','reqpedir'], ['modulo-reqseparar','reqseparar'], ['modulo-pcalc','pcalc'], ['modulo-pferias','pferias'], ['modulo-macertos','macertos'], ['modulo-presc','presc'], ['modulo-penvio','penvio'], ['modulo-pconf','pconf'], ['modulo-pcusto','pcusto'], ['modulo-orcamentos','orcamentos'], ['modulo-lojaempresas','lojaempresas'], ['modulo-pacertos','pacertos'], ['modulo-flash','flash'],
                               ['modulo-contaspagar','contaspagar'], ['modulo-contasreceber','contasreceber']]) {
     const el = document.getElementById(idm);
     if (el && el.style.display !== 'none') return nomem;
@@ -809,7 +816,7 @@ function aplicarAcesso() {
 
 // 24/10/2026 (bloco 1): telas que nao precisam da carga de vendas do iFood. Quem abre direto numa delas nao espera
 // a carga; ela acontece na primeira vez que a pessoa abre outra tela (garantirVendas, chamada pelo mostrarModulo).
-const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
+const MODULOS_LEVES = new Set(['orcamentos', 'listas', 'listasfin', 'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'reqpedir', 'reqseparar', 'prodhist', 'conferencias', 'controle', 'posicao', 'caixa', 'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'forafolha', 'rh', 'flash', 'reembolsos', 'fichas', 'engcard', 'rateio']);
 let VENDAS_CARREGADAS = false, VENDAS_PROMESSA = null;
 async function montarVendas() {
   await carregar();

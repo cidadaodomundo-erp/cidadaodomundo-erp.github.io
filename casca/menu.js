@@ -345,6 +345,16 @@ window.CASCA_MENU = [
     "icone": "☑️"
    },
    {
+    "chave": "reqpedir",
+    "rotulo": "Pedir material",
+    "icone": "🧻"
+   },
+   {
+    "chave": "reqseparar",
+    "rotulo": "Separar requisições",
+    "icone": "📤"
+   },
+   {
     "chave": "controle",
     "rotulo": "Controle de estoque",
     "icone": "📒"

@@ -8,7 +8,7 @@ window.CASCA_MODULOS = [
     lancar: [],
     acompanhar: ['hoje', 'estasemana', 'placar', 'indicadores', 'semana', 'fechamento'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
-    lancar: ['contagem', 'conferencias'],
+    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'],
     acompanhar: ['controle', 'posicao'] },
   { id: 'compras', nome: 'Compras', icone: '🛒',
     lancar: [], acompanhar: ['comprateto'] },
