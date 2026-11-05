@@ -683,7 +683,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['adt', 'Adiantamento · paga dia 20'], ['fora', 'Pagamento por fora · adiantamento dia 20 e saldo no 5º dia útil'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
+           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25'], ['fora', 'Parcelas e recibos por fora']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
@@ -2344,7 +2344,10 @@ function cgAbaAdt() {
   const proxVenc = new Date().getDate() <= 20 ? atual : prox;
   const mes = meses.includes(F.mesAdt) ? F.mesAdt : proxVenc;
   const linhas = CARGOS.adt.filter((a) => String(a.mes).slice(0, 10) === mes && (!F.unidade || a.unidade === F.unidade));
-  const tot = linhas.reduce((s, a) => s + cgN(a.valor), 0);
+  // 05/11/2026 (dono): quem é por fora entra NA MESMA lista, marcado "por fora", e soma no total que a Hellen paga
+  if (CARGOS.adtFora === undefined) cgAdtForaCarregar();
+  const fora = (CARGOS.adtFora || []).filter((x) => String(x.mes).slice(0, 10) === mes && cgN(x.adiantamento) > 0 && (!F.unidade || x.unidade === F.unidade));
+  const tot = linhas.reduce((s, a) => s + cgN(a.valor), 0) + fora.reduce((s, x) => s + cgN(x.adiantamento), 0);
   const enviado = linhas.find((a) => a.enviado_em);
   const dia = (linhas[0] && linhas[0].dia_pagamento) || (mes.slice(0, 8) + '20');
   const pago = cgHojeIso() > String(dia).slice(0, 10);
@@ -2357,18 +2360,31 @@ function cgAbaAdt() {
     </div>
     <div class="cards" style="max-width:520px;">
       <div class="card neutral"><div class="card-lbl">Total</div><div class="card-val">${cgR0(tot)}</div></div>
-      <div class="card neutral"><div class="card-lbl">Pessoas</div><div class="card-val">${linhas.length}</div></div>
+      <div class="card neutral"><div class="card-lbl">Pessoas</div><div class="card-val">${linhas.length + fora.length}</div>${fora.length ? `<div class="card-pct">${fora.length} por fora</div>` : ''}</div>
     </div>`;
-  if (!linhas.length) return h;
+  if (!linhas.length && !fora.length) return h;
   h += `<div id="tabelaCgAdt"><table>
     <thead><tr><th>Loja</th><th>Nome</th><th>Cargo</th><th style="text-align:right;">Salário</th><th style="text-align:right;">Dias</th><th style="text-align:right;">Adiantamento</th></tr></thead>
     <tbody>${linhas.map((a) => `<tr>
       <td>${cgEsc(a.unidade)}</td><td>${cgEsc(cgNome(a.nome))}${a.editado ? ` <div style="font-size:11px;color:var(--farol-perto);white-space:normal;">ajustado${a.motivo ? ': ' + cgEsc(a.motivo) : ''}</div>` : ''}</td>
       <td>${cgEsc(cgNome(a.cargo))}</td><td style="text-align:right;">${cgR(a.salario)}</td><td style="text-align:right;">${a.dias}/30</td>
-      <td style="text-align:right;font-weight:600;">${cgR(a.valor)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="sub"><td colspan="5">Total</td><td style="text-align:right;">${cgR(tot)}</td></tr></tfoot>
+      <td style="text-align:right;font-weight:600;">${cgR(a.valor)}</td></tr>`).join('')}
+    ${fora.map((x) => `<tr><td>${cgEsc(x.unidade || '')}</td><td>${cgEsc(cgNome(x.nome))} <span title="sem registro: sai da conta ${cgEsc(x.conta || '')}, não pela folha" style="font-size:11px;font-weight:700;border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;color:var(--tx-2);">por fora</span>
+        <div style="font-size:11px;color:var(--tx-4);">${x.adiantamento_pago_em ? 'pago em ' + cgData(x.adiantamento_pago_em) : 'vence ' + cgData(x.vence_adiantamento)} · <a href="javascript:void(0)" onclick="CARGOS_F.aba='fora';renderModuloCargos()">parcelas e recibo</a></div></td>
+      <td>–</td><td style="text-align:right;">${cgR(x.salario)}</td><td style="text-align:right;">${x.dias != null ? x.dias + '/30' : ''}</td>
+      <td style="text-align:right;font-weight:600;">${cgR(x.adiantamento)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="sub"><td colspan="5">Total${fora.length ? ' (com quem é por fora)' : ''}</td><td style="text-align:right;">${cgR(tot)}</td></tr></tfoot>
   </table></div>`;
   return h;
+}
+async function cgAdtForaCarregar() {
+  CARGOS.adtFora = null;
+  try {
+    const [m, p] = await Promise.all([consultarTudo('vw_rh_ff_meses?select=pessoa_id,mes,salario,dias,adiantamento,vence_adiantamento,adiantamento_pago_em&order=pessoa_id,mes'),
+      consultarTudo('rh_ff_pessoas?select=id,nome,unidade,conta&order=id')]);
+    CARGOS.adtFora = m.map((x) => { const q = p.find((y) => y.id === x.pessoa_id) || {}; return { ...x, nome: q.nome, unidade: q.unidade, conta: q.conta }; });
+  } catch (e) { CARGOS.adtFora = []; }
+  if (CARGOS_F.aba === 'adt') renderModuloCargos();
 }
 async function cgAdtGerar(mes) {
   avisoAcao('enviando', 'Gravando…');
