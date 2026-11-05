@@ -289,7 +289,10 @@ function barrasTopoTabelas() {
       if (!t.offsetParent || p.closest('table') || p.classList.contains('cel-cartao') || t.closest('#view-caixa') || CEL_FICA_TABELA.has(p.id)) return;
       if (t.offsetWidth <= p.clientWidth + 2 && t.getBoundingClientRect().right <= document.documentElement.clientWidth + 2) return;
       const cabs = [...t.rows].filter((r) => r.cells.length && [...r.cells].every((c) => c.tagName === 'TH'));
-      if (t.rows.length > 60 || cabs.length !== 1 || [...cabs[0].cells].some((c) => c.colSpan > 1)) return;
+      // 05/11/2026 (dono: "as telas todas responsivas"): o teto era 60 linhas e deixava rolando de lado Engenharia do
+      // cardápio (201), Contestações (102), Saipos dos acertos (140) e o Conferir da Contagem (322) — no celular, cartão
+      // comprido é melhor que tabela larga; quem precisa comparar colunas fica na CEL_FICA_TABELA
+      if (cabs.length !== 1 || [...cabs[0].cells].some((c) => c.colSpan > 1)) return;
       p.classList.add('cel-cartao');
     });
   }
