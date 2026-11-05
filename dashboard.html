@@ -5315,7 +5315,13 @@ async function concbFormEnsinar(d) {
     + lista('ensMet', 'Forma de pagamento', metodos)
     // ROBO LANCA (dono, 16/09/2026). NAO = a regra so faz a linha casar com o que ja
     // esta no Saipos (ex.: COPEL, conta a pagar com provisao) — o robo nunca a lanca.
-    + lista('ensRobo', 'Robô lança?', ['SIM', 'NÃO'], false)
+    // 3a OPCAO (dono, 04/11/2026 14:08: "já tem provisão, o robo só precisa baixar ao invés de lançar"): grava
+    // fin_licao.acao='CONCILIAR_PROVISAO'; o aplicar_licoes leva para a regra e o robô (Passo R2g) só dá a baixa.
+    + lista('ensRobo', 'Robô lança?', ['SIM', 'NÃO',
+        { v: 'PROVISAO', t: 'Já tem provisão no Saipos: o robô só dá a baixa' }], false)
+    + '<div id="ensDicaProv" style="display:none;font-size:11.5px;opacity:.85;margin:-4px 0 10px">'
+    +   'A regra casa pelo <b>Nome no banco</b>: deixe só o que se repete todo mês (ex.: TARIFA MENSAL). '
+    +   'Mês e data mudam e fariam a regra valer uma vez só.</div>'
     + '<div id="ensBlocoTransf" style="display:none">'
     +   lista('ensOri', 'Sai de qual conta', contasRegra)
     +   lista('ensDest', 'Entra em qual conta', contasRegra)
@@ -5347,6 +5353,19 @@ async function concbFormEnsinar(d) {
   };
   document.getElementById('ensTipo').addEventListener('change', arruma);
   document.getElementById('ensAgrupa').addEventListener('change', arruma);
+  // "só baixa a provisão" é conta que se repete (tarifa mensal): o nome do banco traz o mês ("...OUTUBRO") e a
+  // regra 500 nasceu valendo um mês só (consertada à mão em 04/11). Ao escolher a opção, a tela tira mês e data do
+  // nome e mostra a dica; quem ensina confere e pode mudar.
+  document.getElementById('ensRobo').addEventListener('change', () => {
+    const prov = document.getElementById('ensRobo').value === 'PROVISAO';
+    document.getElementById('ensDicaProv').style.display = prov ? '' : 'none';
+    if (!prov) return;
+    const n = document.getElementById('ensNome');
+    n.value = n.value.toUpperCase()
+      .replace(/\b(JANEIRO|FEVEREIRO|MAR[CÇ]O|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO|JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\b/g, ' ')
+      .replace(/\b\d{1,2}[\/.-]\d{1,2}([\/.-]\d{2,4})?\b|\b\d{4}\b/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  });
   arruma();
   document.getElementById('ensNome').value = d.nome || d.memo || '';
   document.getElementById('ensDoc').value = docLinha;
@@ -5401,7 +5420,7 @@ async function concbFormEnsinar(d) {
     // faz a linha casar sozinha da proxima vez. Os outros dois enriquecem.
     if (!desc) { alert('A descrição do Saipos é o que faz a linha casar. Preencha ela.'); return; }
     // Sem resposta nao se chuta: SIM lancaria em dobro uma conta que so devia casar.
-    if (!robo) { alert('Escolha se o robô lança (SIM) ou se a regra serve só para casar (NÃO).'); return; }
+    if (!robo) { alert('Escolha se o robô lança (SIM), se a regra serve só para casar (NÃO) ou se já tem provisão e o robô só dá a baixa.'); return; }
     const nomeBanco = document.getElementById('ensNome').value.trim().toUpperCase();
     // O documento vai para a regra ESCRITO COMO O BANCO ESCREVE (pontos, barra e
     // traco): o aplicar_licoes usa o texto como padrao, e so digitos nao casariam
@@ -5421,7 +5440,8 @@ async function concbFormEnsinar(d) {
       o_que_e: oQue || null, categoria: cat || null, documento: docFinal || null,
       tipo_lancamento: tipoLanc || null, metodo_pagamento: met || null,
       conta_origem: contas.origem || null, conta_destino: contas.destino || null,
-      agrupa: agrupa, palavra_chave: palavra || null, robo_lanca: robo === 'SIM' });
+      agrupa: agrupa, palavra_chave: palavra || null, robo_lanca: robo === 'SIM',
+      acao: robo === 'PROVISAO' ? 'CONCILIAR_PROVISAO' : null });
   });
 }
 
