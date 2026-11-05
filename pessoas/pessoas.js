@@ -683,7 +683,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25'], ['fora', 'Parcelas e recibos por fora']] },
+           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
@@ -697,6 +697,8 @@ function cgEntrarTela(t) {
   // pedido de outra tela (Contas a pagar → Pagamento por fora): vale uma vez
   try { const a = sessionStorage.getItem('pesAbaPedida'); if (a) { CG_ABA_PEDIDA = a; sessionStorage.removeItem('pesAbaPedida'); } } catch (e) {}
   const ok = CG_TELAS[t].abas.map(([k]) => k).concat(CG_TELAS[t].acomp ? CG_ACOMP.map(([k]) => k) : []);
+  // 05/11/2026 (dono): a aba do por fora saiu — a Rita está no Adiantamento e na Conferência, com o Recibo na linha
+  if (CG_ABA_PEDIDA === 'fora') CG_ABA_PEDIDA = 'adt';
   if (CG_ABA_PEDIDA && ok.includes(CG_ABA_PEDIDA)) CARGOS_F.aba = CG_ABA_PEDIDA;
   CG_ABA_PEDIDA = null;
   if (!ok.includes(CARGOS_F.aba)) CARGOS_F.aba = CG_TELAS[t].abas[0][0];
@@ -1403,6 +1405,7 @@ function cgAbaFolha() {
   const ok = (a, b) => Math.abs(cgN(a) - cgN(b)) < 0.01;
   let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).map((c) =>
       `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}${(CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : ''}</button>`).join('')}</div>
+    ${cgFolhaImportarHtml()}
     ${(CARGOS.folha.previa || new Set()).has(comp)
       ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números podem mudar quando a folha final chegar; o que está em "conferir" já vale para pedir à contabilidade.</div>`
       : `<div class="caption-label" style="text-align:left;">A folha fechada que a contabilidade devolveu, conferida contra as guias do mês e o cadastro. Só consulta.</div>`}
@@ -1481,6 +1484,56 @@ async function cgFolhaCorrEnviada(comp, emp) {
   const n = await r.json().catch(() => null);
   await cgFolhaCarregar();
   avisoAcao('ok', `✓ ${n != null ? `${n} ${Number(n) === 1 ? 'item marcado' : 'itens marcados'}` : 'Marcado'} como enviado à contabilidade — às ${avisoHora()}. Quando a folha corrigida voltar, a situação muda sozinha.`);
+}
+// IMPORTAR FOLHA (05/11/2026, proposta do RH 2026-11-05-rh-importar-folha-e-por-fora-sem-baixa-manual.md; dono: "igual temos no OFX")
+// O PDF vai em base64 para rh_folha_arquivo; o robô do RH (5 em 5 min) lê, grava e responde em vw_rh_folha_importacao.
+function cgFolhaImportarHtml() {
+  if (CARGOS.folhaImp === undefined) { CARGOS.folhaImp = null; cgFolhaImpCarregar(); }
+  const L = (CARGOS.folhaImp || []).slice(0, 4);
+  const linha = (x) => {
+    const q = String(x.quem || '').split('@')[0], em = x.enviado_em ? new Date(x.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') : '';
+    const st = x.situacao === 'LENDO' ? '<span style="color:var(--farol-perto);font-weight:700;">⏳ lendo (até 5 min)</span>'
+      : x.situacao === 'LIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ ${cgEsc(x.resultado || 'lida e gravada')}</span>`
+      : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgEsc(x.resultado || 'não lida')}</span> — confira se é o Extrato Mensal da Folha e envie de novo`;
+    return `<div style="font-size:12.5px;margin-top:4px;">${cgEsc(x.nome || '')} <span style="color:var(--tx-4);">· ${cgEsc(q)} ${em}</span> — ${st}</div>`;
+  };
+  return `<div class="contexto" style="text-align:left;margin-bottom:10px;">
+    <label class="preset-btn" style="cursor:pointer;display:inline-block;">📄 Importar folha da contabilidade (PDF)
+      <input type="file" accept=".pdf,application/pdf" multiple style="display:none;" onchange="cgFolhaImportar(this)"></label>
+    <span class="caption-label" style="margin-left:8px;">o robô lê em até 5 min e a conferência atualiza sozinha</span>
+    ${L.map(linha).join('')}</div>`;
+}
+async function cgFolhaImpCarregar() {
+  try { const r = await trFetch('vw_rh_folha_importacao?select=id,nome,quem,enviado_em,atendido_em,ok,resultado,situacao&order=enviado_em.desc,id.desc&limit=4');
+    CARGOS.folhaImp = r.ok ? await r.json() : []; }
+  catch (e) { CARGOS.folhaImp = []; }
+  const lendo = CARGOS.folhaImp.some((x) => x.situacao === 'LENDO');
+  if (CARGOS.folhaImpLendo && !lendo) { CARGOS.folhaImpLendo = false; await cgFolhaCarregar(); return; }
+  CARGOS.folhaImpLendo = lendo;
+  if (CARGOS_F.aba === 'folha') renderModuloCargos();
+  clearTimeout(CARGOS.folhaImpT);
+  if (lendo) CARGOS.folhaImpT = setTimeout(cgFolhaImpCarregar, 20000);
+}
+async function cgFolhaImportar(inp) {
+  const arqs = [...inp.files]; inp.value = '';
+  if (!arqs.length) return;
+  const b64 = (f) => new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => erro(new Error('não consegui ler ' + f.name)); r.readAsDataURL(f); });
+  try {
+    await rmbGarantirTokenValido();
+    for (let i = 0; i < arqs.length; i++) {
+      avisoAcao('enviando', `Enviando a folha ${arqs.length > 1 ? (i + 1) + ' de ' + arqs.length : ''} (${arqs[i].name})…`);
+      if (arqs[i].size > 15000000) throw new Error(arqs[i].name + ' é grande demais para ser a folha');
+      const conteudo = await b64(arqs[i]);
+      const envia = () => fetch(`${SUPABASE_URL}/rest/v1/rh_folha_arquivo`, { method: 'POST', headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify({ nome: arqs[i].name, conteudo }) });
+      let r = await envia();
+      if (r.status === 401) { await rmbRenovarSeExpirado(r); r = await envia(); }
+      if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    }
+    avisoAcao('ok', `✓ ${arqs.length === 1 ? 'Folha enviada' : arqs.length + ' folhas enviadas'} às ${avisoHora()} — o robô lê em até 5 min; o resultado aparece no quadro de importação.`);
+    CARGOS.folhaImpLendo = true;
+    await cgFolhaImpCarregar();
+  } catch (e) { avisoAcao('erro', '✗ Não consegui enviar a folha: ' + e.message + '. Tente de novo.'); }
 }
 function cgFolhaValidacaoHtml(comp) {
   const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
@@ -1596,7 +1649,14 @@ function cgFolhaQuadroFora(comp) {
         <td>${v0(x.saldo_fora)}</td>
         <td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
         <td>${v0(x.bonificacao)}</td>
-        <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}</td>
+        <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}${(() => {
+          if (x.liquido_folha != null) return '';
+          if (CARGOS.adtFora === undefined) cgAdtForaCarregar();
+          const nm = String(x.nome || '').trim().toUpperCase();
+          const f = (CARGOS.adtFora || []).find((y) => String(y.nome || '').trim().toUpperCase() === nm && String(y.mes).slice(0, 10) === comp);
+          if (!f) return '';
+          return `<div style="font-size:11px;font-weight:400;color:var(--tx-4);">${ffSituacaoTxt(f, 'SALDO')}</div>${f.saldo_pago_em ? `<button type="button" class="preset-btn" style="margin-top:4px;" onclick="ffReciboAbrir(${f.pessoa_id},'${comp}','SALDO')">🧾 Recibo</button>` : ''}`;
+        })()}</td>
         <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;" title="título de salário no Saipos: ${x.saipos_salario == null ? 'nenhum' : cgR(x.saipos_salario)}">${cgEsc(x.conferir_texto || '')}</td></tr>
 `;
     });
@@ -2370,9 +2430,9 @@ function cgAbaAdt() {
       <td>${cgEsc(cgNome(a.cargo))}</td><td style="text-align:right;">${cgR(a.salario)}</td><td style="text-align:right;">${a.dias}/30</td>
       <td style="text-align:right;font-weight:600;">${cgR(a.valor)}</td></tr>`).join('')}
     ${fora.map((x) => `<tr><td>${cgEsc(x.unidade || '')}</td><td>${cgEsc(cgNome(x.nome))} <span title="sem registro: sai da conta ${cgEsc(x.conta || '')}, não pela folha" style="font-size:11px;font-weight:700;border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;color:var(--tx-2);">por fora</span>
-        <div style="font-size:11px;color:var(--tx-4);">${x.adiantamento_pago_em ? 'pago em ' + cgData(x.adiantamento_pago_em) : 'vence ' + cgData(x.vence_adiantamento)} · <a href="javascript:void(0)" onclick="CARGOS_F.aba='fora';renderModuloCargos()">parcelas e recibo</a></div></td>
+        <div style="font-size:11px;color:var(--tx-4);">${ffSituacaoTxt(x, 'ADIANTAMENTO')}</div></td>
       <td>–</td><td style="text-align:right;">${cgR(x.salario)}</td><td style="text-align:right;">${x.dias != null ? x.dias + '/30' : ''}</td>
-      <td style="text-align:right;font-weight:600;">${cgR(x.adiantamento)}</td></tr>`).join('')}</tbody>
+      <td style="text-align:right;font-weight:600;">${cgR(x.adiantamento)}${x.adiantamento_pago_em ? ` <button type="button" class="preset-btn" style="margin-left:6px;" onclick="ffReciboAbrir(${x.pessoa_id},'${String(x.mes).slice(0, 10)}','ADIANTAMENTO')">🧾 Recibo</button>` : ''}</td></tr>`).join('')}</tbody>
     <tfoot><tr class="sub"><td colspan="5">Total${fora.length ? ' (com quem é por fora)' : ''}</td><td style="text-align:right;">${cgR(tot)}</td></tr></tfoot>
   </table></div>`;
   return h;
@@ -2380,11 +2440,32 @@ function cgAbaAdt() {
 async function cgAdtForaCarregar() {
   CARGOS.adtFora = null;
   try {
-    const [m, p] = await Promise.all([consultarTudo('vw_rh_ff_meses?select=pessoa_id,mes,salario,dias,adiantamento,vence_adiantamento,adiantamento_pago_em&order=pessoa_id,mes'),
+    const [m, p] = await Promise.all([consultarTudo('vw_rh_ff_meses?select=pessoa_id,mes,salario,dias,adiantamento,vence_adiantamento,adiantamento_pago_em,adiantamento_pago,saldo,vence_saldo,saldo_pago_em,saldo_pago&order=pessoa_id,mes'),
       consultarTudo('rh_ff_pessoas?select=id,nome,unidade,conta&order=id')]);
     CARGOS.adtFora = m.map((x) => { const q = p.find((y) => y.id === x.pessoa_id) || {}; return { ...x, nome: q.nome, unidade: q.unidade, conta: q.conta }; });
   } catch (e) { CARGOS.adtFora = []; }
-  if (CARGOS_F.aba === 'adt') renderModuloCargos();
+  if (CARGOS_F.aba === 'adt' || CARGOS_F.aba === 'folha') renderModuloCargos();
+}
+// situação da parcela por fora: a baixa é do robô (rh_ff_baixa_automatica, mesmo com diferença — dono 05/11)
+function ffSituacaoTxt(x, parcela) {
+  const ad = parcela === 'ADIANTAMENTO', em = ad ? x.adiantamento_pago_em : x.saldo_pago_em;
+  const valor = cgN(ad ? x.adiantamento : x.saldo), pago = ad ? x.adiantamento_pago : x.saldo_pago;
+  if (!em) return 'vence ' + cgData(ad ? x.vence_adiantamento : x.vence_saldo);
+  const dif = pago != null ? Math.round((cgN(pago) - valor) * 100) / 100 : 0;
+  return `<span style="color:var(--farol-ok);">✓ pago em ${cgData(em)} (Saipos)</span>${Math.abs(dif) >= 0.01 ? ` <span style="color:var(--farol-perto);">pago ${cgR(pago)}, diferença ${cgR(dif)}</span>` : ''}`;
+}
+// o Recibo abre das linhas onde a Hellen paga (Adiantamento e Conferência); usa o mesmo gerador (ffRecibo)
+async function ffReciboAbrir(pessoaId, mes, parcela) {
+  try {
+    if (!FF || !FF.meses.some((m) => m.pessoa_id === pessoaId && m.mes === mes)) {
+      avisoAcao('enviando', 'Montando o recibo…');
+      const [pp, mm] = await Promise.all([consultarTudo('rh_ff_pessoas?select=*&order=id'), consultarTudo('vw_rh_ff_meses?select=*&order=pessoa_id,mes')]);
+      FF = { pessoas: pp, meses: mm, saipos: [], lancado: null, editando: null };
+    }
+    if (!FF.meses.some((m) => m.pessoa_id === pessoaId && m.mes === mes)) throw new Error('não achei a parcela de ' + cgMesRot(mes));
+    ffRecibo(pessoaId, mes, parcela);
+    avisoAcao('ok', `✓ Recibo aberto às ${avisoHora()} — imprima ou salve em PDF.`);
+  } catch (e) { avisoAcao('erro', '✗ Não consegui abrir o recibo: ' + e.message, () => ffReciboAbrir(pessoaId, mes, parcela)); }
 }
 async function cgAdtGerar(mes) {
   avisoAcao('enviando', 'Gravando…');
