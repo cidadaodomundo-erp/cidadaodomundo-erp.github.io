@@ -1928,11 +1928,14 @@ function cgListaFlash(lista) {
   const porTipo = {};
   for (const i of lista) porTipo[i.tipo] = (porTipo[i.tipo] || 0) + 1;
   const lido = lista[0].flash_lido_em;
-  const nPortal = lista.filter(i => i.como === 'PORTAL').length;
   return `<div class="cards">
       <div class="card highlight"><div class="card-lbl">Correções na Flash</div><div class="card-val">${lista.length}</div><div class="card-pct">em ${Object.keys(pessoas).length} pessoas</div></div>
-      <div class="card neutral"><div class="card-lbl">Só pela tela da Flash</div><div class="card-val">${nPortal}</div><div class="card-pct">admissão, empresa, cadastro</div></div>
-      <div class="card neutral"><div class="card-lbl">O resto</div><div class="card-val" style="font-size:14px;line-height:1.5;">${Object.entries(porTipo).map(([t, n]) => `${CG_FLASH_TIPO[t] || t}: ${n}`).join('<br>')}</div></div>
+      ${[['Só pela tela da Flash', lista.filter((i) => i.como === 'PORTAL')], ['Pela API (com o sim do dono)', lista.filter((i) => i.como !== 'PORTAL')]].filter(([, L]) => L.length).map(([rot, L]) => {
+        // 05/11/2026: a legenda era fixa ("admissão, empresa, cadastro") e o "O resto" repetia todos os tipos; agora cada
+        // cartão conta só o que é dele, por tipo
+        const t = {}; for (const i of L) t[i.tipo] = (t[i.tipo] || 0) + 1;
+        return `<div class="card neutral"><div class="card-lbl">${rot}</div><div class="card-val">${L.length}</div><div class="card-pct">${Object.entries(t).map(([k, n]) => `${(CG_FLASH_TIPO[k] || k).toLowerCase()}: ${n}`).join(' · ')}</div></div>`;
+      }).join('')}
     </div>
     <div class="contexto">A folha do painel manda; a Flash tem de ficar igual. Corrigiu na Flash, o item some sozinho na leitura seguinte (Flash lida ${lido ? new Date(lido).toLocaleString('pt-BR') : '–'}).</div>
     <div id="tabelaCgFlash" style="overflow-x:auto;"><table>
