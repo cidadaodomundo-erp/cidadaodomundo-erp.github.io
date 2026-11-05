@@ -1457,23 +1457,36 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   if (!Qall) return '<div class="contexto">Não consegui ler o quadro da folha (vw_rh_folha_quadro).</div>';
   const conf = new Map(Pconf.map((x) => [`${x.empresa}|${x.matricula}`, cgLista(x.conferencia)]));
   const alertas = (x) => (conf.get(`${x.empresa}|${x.matricula}`) || []).concat(x.fecha === false ? ['as rubricas não somam o extrato'] : [],
-    cgLista(x.rubricas_sem_grupo).map((r) => 'rubrica nova: ' + r));
+    cgLista(x.rubricas_sem_grupo).map((r) => 'rubrica nova: ' + r), x.conferir_texto ? [x.conferir_texto] : []);
   const Q = Qall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
   const PV = CG_Q_PROV.filter(([k]) => Q.some((x) => cgN(x[k]))), DS = CG_Q_DESC.filter(([k]) => Q.some((x) => cgN(x[k])));
   const nConf = Q.filter((x) => alertas(x).length).length;
   const vis = Q.filter((x) => F.folhaCol !== 'conf' || alertas(x).length);
   const v0 = (v) => cgN(v) ? cgR(v) : '<span style="color:var(--tx-5);">–</span>';
   const soma = (arr, k) => arr.reduce((a, x) => a + cgN(x[k]), 0);
-  const ncol = PV.length + DS.length + 5;
+  // 05/11/2026 (dono, ajuste): "os por fora entrar na mesma tabela após o líquido CLT, a soma final que a Hellen deve pagar
+  // para cada um seria o CLT + os por fora" — combinado · empréstimo/vale · bonificação → A pagar (vw_rh_folha_quadro)
+  const comFora = Q.some((x) => 'valor_a_pagar' in x);
+  const ncol = PV.length + DS.length + 5 + (comFora ? 4 : 0);
+  const foraTot = (arr) => comFora ? `<td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td>` : '';
   const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td>${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
-    ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td><td></td></tr>`;
-  let h = `<div class="section-label" style="margin-top:14px;">Folha da contabilidade (por dentro) — até o líquido</div>
+    ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td>${foraTot(arr)}<td></td></tr>`;
+  const socio = (x) => x.vinculo && /diretor/i.test(x.vinculo), saiu = (x) => /demiti|rescis|deslig/i.test(String(x.situacao || ''));
+  const foraCel = (x) => {
+    if (!comFora) return '';
+    if (socio(x)) return '<td colspan="4" style="color:var(--tx-4);">sócio: pró-labore, sem por fora</td>';
+    if (x.valor_a_pagar == null && saiu(x)) return '<td colspan="4" style="color:var(--tx-4);">saiu: a rescisão paga</td>';
+    return `<td>${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;min-width:140px;">${x.combinado_tipo === 'TOTAL' ? 'total combinado' : 'acréscimo fixo'}${x.combinado_motivo ? ' — ' + cgEsc(x.combinado_motivo) : ''}</div>` : ''}</td>
+      <td>${cgN(x.desconto_emprestimo) ? '− ' + cgR(x.desconto_emprestimo) : v0(0)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
+      <td>${v0(x.bonificacao)}</td><td style="font-weight:700;">${x.valor_a_pagar == null ? '–' : cgR(x.valor_a_pagar)}</td>`;
+  };
+  let h = `<div class="section-label" style="margin-top:14px;">${comFora ? 'Folha da contabilidade e o que a Hellen paga a cada um' : 'Folha da contabilidade (por dentro) — até o líquido'}</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;align-items:center;">${nConf
       ? `<button type="button" class="preset-btn ${F.folhaCol === 'conf' ? 'active' : ''}" style="border-color:var(--farol-perto);" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='conf'?null:'conf';renderModuloCargos()">a conferir ${nConf}${F.folhaCol === 'conf' ? ' ✕' : ''}</button>`
       : '<span style="font-size:12px;color:var(--farol-ok);">✓ todas as rubricas entraram e cada pessoa fecha com o extrato</span>'}</div>
     <div id="tabelaCgFolha" style="overflow-x:auto;"><table><thead>
-      <tr><th rowspan="2">Nome</th><th colspan="${PV.length + 1}" style="text-align:center;">Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;">Descontos</th><th rowspan="2">Líquido</th><th rowspan="2">Conferir</th></tr>
-      <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+      <tr><th rowspan="2">Nome</th><th colspan="${PV.length + 1}" style="text-align:center;">Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;">Descontos</th><th rowspan="2">Líquido CLT</th>${comFora ? '<th colspan="4" style="text-align:center;">Depois do líquido</th>' : ''}<th rowspan="2">Conferir</th></tr>
+      <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${comFora ? '<th>Combinado</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th>' : ''}</tr></thead><tbody>`;
   const emps = [...new Set(vis.map((x) => x.empresa))];
   emps.forEach((e) => {
     const lin = vis.filter((x) => x.empresa === e).sort((a, b) => String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
@@ -1485,8 +1498,8 @@ function cgFolhaQuadroDentro(comp, Pconf) {
         <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
         ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
         ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
-        <td style="font-weight:700;">${cgR(x.liquido)}</td>
-        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;">${al.map(cgEsc).join('<br>')}</td></tr>
+        <td style="font-weight:700;">${cgR(x.liquido)}</td>${foraCel(x)}
+        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;"${x.saipos_salario != null ? ` title="título de salário no Saipos: ${cgR(x.saipos_salario)}"` : ''}>${al.map(cgEsc).join('<br>')}</td></tr>
         ${ab ? `<tr><td colspan="${ncol}">${cgFolhaRubHtml(x)}</td></tr>` : ''}`;
     });
     h += linhaTot(`Subtotal ${cgEsc(String(e).replace(/^\d+\s*-\s*/, ''))}`, lin, 'sub');
@@ -1497,14 +1510,18 @@ function cgFolhaQuadroDentro(comp, Pconf) {
 function cgFolhaQuadroFora(comp) {
   const F = CARGOS_F, Rall = CARGOS.folha.pag;
   if (!Rall) return '<div class="contexto">Não consegui ler o pagamento do mês (vw_rh_pagamento_mes).</div>';
-  const R = Rall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  // 05/11/2026 (dono): "no quadro abaixo somente o que for por fora" — quem tem folha já está na tabela de cima
+  const soFora = (CARGOS.folha.quadro || []).some((x) => 'valor_a_pagar' in x);
+  const R = Rall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade) && (!soFora || x.liquido_folha == null));
   if (!R.length) return '';
   const mp = R.find((x) => x.mes_pagamento) || {};
   const v0 = (v, neg) => cgN(v) ? (neg ? '− ' : '') + cgR(v) : '<span style="color:var(--tx-5);">–</span>';
   const soma = (arr, k) => arr.reduce((a, x) => a + cgN(x[k]), 0);
   const tot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td><td>${cgR(soma(arr, 'liquido_folha'))}</td><td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>${cgR(soma(arr, 'saldo_fora'))}</td>
     <td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td><td></td></tr>`;
-  let h = `<div class="section-label" style="margin-top:18px;">Depois do líquido (por fora)${mp.mes_pagamento ? ` — paga em ${cgEsc(cgMesRot(mp.mes_pagamento))}` : ''}</div>
+  const Q = (CARGOS.folha.quadro || []).filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  const totPagina = soFora ? Q.reduce((a, x) => a + cgN(x.valor_a_pagar), 0) + soma(R, 'valor_a_pagar') : null;
+  let h = `<div class="section-label" style="margin-top:18px;">${soFora ? 'Só por fora (sem registro)' : 'Depois do líquido (por fora)'}${mp.mes_pagamento ? ` — paga em ${cgEsc(cgMesRot(mp.mes_pagamento))}` : ''}</div>
     <div id="tabelaCgFora" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Líquido da folha</th><th>Acréscimo combinado</th><th>Saldo por fora</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th><th>Conferir</th></tr></thead><tbody>`;
   [...new Set(R.map((x) => x.empresa))].forEach((e) => {
     const lin = R.filter((x) => x.empresa === e);
@@ -1522,7 +1539,8 @@ function cgFolhaQuadroFora(comp) {
     });
     h += tot(`Subtotal ${cgEsc(e)}`, lin, 'sub');
   });
-  return h + `</tbody><tfoot>${tot(`Total · ${R.length} ${R.length === 1 ? 'pessoa' : 'pessoas'}`, R, 'liq')}</tfoot></table></div>`;
+  return h + `</tbody><tfoot>${tot(`Total · ${R.length} ${R.length === 1 ? 'pessoa' : 'pessoas'}`, R, 'liq')}</tfoot></table></div>
+    ${totPagina != null ? `<div class="contexto" style="text-align:left;margin-top:10px;"><b>Total a pagar no mês: ${cgR(totPagina)}</b> <span style="color:var(--tx-3);">(a tabela de cima + só por fora)</span></div>` : ''}`;
 }
 function cgFolhaCombForm(x) {
   const t = x.combinado_tipo || '';
