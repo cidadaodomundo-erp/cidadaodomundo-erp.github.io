@@ -1,6 +1,7 @@
-// GERADO por script/gerar_menu_casca.py a partir do menu lateral de docs/dashboard.html.
-// NÃO EDITE À MÃO: mude o menu do painel e rode o script (o gancho avisa se esquecer).
-// Tela que já saiu do painel para página própria vai em docs/casca/paginas.js.
+// O MENU DO PAINEL MORA AQUI desde 05/11/2026 (o painel antigo, docs/dashboard.html, virou só um redirecionamento).
+// Tela nova: uma linha aqui, a página dela em docs/casca/paginas.js e o módulo em docs/casca/modulos.js.
+// Conferir: python script/gerar_menu_casca.py (diz se alguma tela do menu ficou sem página).
+// Tirar, renomear ou mover tela do menu é item a item, com o sim do dono (13/09/2026).
 window.CASCA_MENU = [
  {
   "id": "gComecar",

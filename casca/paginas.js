@@ -73,6 +73,8 @@ window.CASCA_PAGINAS = {
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
+  // 05/11/2026: a última tela que ainda abria no painel antigo (Resumos semanais)
+  relatorios: 'canal/index.html#relatorios',
   // 05/11/2026 (bloco 7): Começar por aqui, Resultado e Financeiro
   estasemana: 'gestao/index.html#estasemana',
   hoje: 'gestao/index.html#hoje',
