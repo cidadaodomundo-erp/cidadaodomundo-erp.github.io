@@ -1395,7 +1395,8 @@ async function cgFolhaCarregar() {
     // 05/11/2026 (dono, chat RH): correções para a contabilidade (lista + mensagem pronta) e horas base de cada um
     const [corr, corrTxt, hbase] = await Promise.all([
       consultarTudo('vw_rh_folha_correcao?select=*&order=competencia.desc,empresa_cod,nome,chave').catch(() => null),
-      consultarTudo('vw_rh_folha_correcao_texto?select=*&order=competencia.desc,empresa_cod').catch(() => null),
+      // 05/11/2026 (dono): UMA mensagem só, separada por empresa, curta e dizendo o que fazer
+      consultarTudo('vw_rh_folha_correcao_mensagem?select=*&order=competencia.desc').catch(() => null),
       consultarTudo('vw_rh_folha_horas_base?select=competencia,empresa_cod,matricula,carga,horas_normais,horas_ferias_afastamento,mes_cheio&order=competencia.desc,empresa_cod,matricula').catch(() => null)]);
     CARGOS.folha = { emp, pes, rub: {}, previa, quadro, pag, valid, corr, corrTxt, hbase };
   } catch (e) { CARGOS.folha = { erro: e.message }; }
@@ -1464,11 +1465,11 @@ function cgFolhaCorrecoesHtml(comp) {
       <td style="white-space:normal;min-width:220px;">${cgEsc(x.texto || x.item || '')}</td><td>${cgEsc(x.esperado == null ? '–' : x.esperado)}</td><td>${cgEsc(x.na_folha == null ? '–' : x.na_folha)}</td>
       <td><span style="font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;border:1px solid ${CG_CORR_SIT[x.situacao] || 'var(--line)'};color:${CG_CORR_SIT[x.situacao] || 'var(--tx-3)'};white-space:nowrap;">${cgEsc(sitTxt(x))}</span></td></tr>`).join('')}
     </tbody></table></div>`;
-  if (T.length) h += `<div style="margin-top:10px;"><b style="font-size:12.5px;">Mensagem pronta para a contabilidade</b> (só o que falta corrigir)</div>
-    ${T.map((t, i) => `<div style="margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
-      <div style="font-size:12px;color:var(--tx-3);margin-bottom:4px;">${cgEsc(t.empresa)} · ${cgN(t.itens)} ${cgN(t.itens) === 1 ? 'item' : 'itens'}</div>
-      <pre id="cgCorrTxt${i}" style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;margin:0 0 8px;">${cgEsc(t.texto)}</pre>
-      ${cgBotaoPasso('Copiar mensagem', `cgFolhaCorrCopiar(${i})`, true)} ${cgBotaoPasso('Marquei como enviado', `cgFolhaCorrEnviada('${comp}','${cgEsc(t.empresa_cod)}')`, true)}</div>`).join('')}`;
+  const M = T[0];
+  if (M && M.texto) h += `<div style="margin-top:10px;"><b style="font-size:12.5px;">Mensagem para a contabilidade</b> (uma só, por empresa; só o que falta corrigir)</div>
+    <div style="margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
+      <pre id="cgCorrTxt0" style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;margin:0 0 8px;">${cgEsc(M.texto)}</pre>
+      ${cgBotaoPasso('Copiar mensagem', 'cgFolhaCorrCopiar(0)', true)} ${cgBotaoPasso('Marquei como enviado', `cgFolhaCorrEnviada('${comp}',null)`, true)}</div>`;
   return h + '</div>';
 }
 async function cgFolhaCorrCopiar(i) {
@@ -1478,7 +1479,7 @@ async function cgFolhaCorrCopiar(i) {
 }
 async function cgFolhaCorrEnviada(comp, emp) {
   avisoAcao('atencao', '… marcando como enviado');
-  const r = await trRpcSeguro('rh_folha_correcao_marcar_enviada', { p_competencia: comp, p_empresa_cod: emp });
+  const r = await trRpcSeguro('rh_folha_correcao_marcar_enviada', { p_competencia: comp, p_empresa_cod: emp || null });
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaCorrEnviada(comp, emp));
   const n = await r.json().catch(() => null);
   await cgFolhaCarregar();
