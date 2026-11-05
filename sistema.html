@@ -196,7 +196,7 @@
 </div>
 
 <script src="casca/menu.js?v=20261105b"></script>
-<script src="casca/paginas.js?v=20261105g"></script>
+<script src="casca/paginas.js?v=20261105h"></script>
 <script src="casca/modulos.js?v=20261105a"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -344,9 +344,12 @@ function trocarLoja(l) {
   atualizarFaixaLoja();
   if (ATUAL === null && MODULO_ATUAL === null && $('vista').querySelector('.home')) inicio();   // o cartão do Início
 }
+// 05/11/2026 (dono, 23/10: "tirar esse filtro da rede de cima" no Plano): tela que não tem loja não mostra o seletor
+const TELAS_SEM_LOJA = new Set(window.CASCA_TELAS_SEM_LOJA || []);
 function atualizarFaixaLoja() {
+  $('vendo').hidden = !!(ATUAL && TELAS_SEM_LOJA.has(ATUAL));
   const f = $('faixaLoja'), l = lojaAtual();
-  const mostra = !!(ATUAL && l && l !== LOJA_REDE && !lojaTravada() && !TELAS_POR_LOJA.has(ATUAL));
+  const mostra = !!(ATUAL && l && l !== LOJA_REDE && !lojaTravada() && !TELAS_POR_LOJA.has(ATUAL) && !TELAS_SEM_LOJA.has(ATUAL));
   f.hidden = !mostra;
   if (mostra) f.textContent = `Esta tela ainda não separa pela loja escolhida em cima: o que aparece aqui não é só de ${lojaNome(l)}.`;
 }

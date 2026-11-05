@@ -979,6 +979,8 @@ function renderModuloPlano() {
         </div>
         ${detGatilho}
         ${i.detalhe && detAberto ? '<div class="plano-det">' + planoDetalhe(i.detalhe, esc, aprsItem) + '</div>' : ''}
+        ${i.andamento && !estaFeito(i) ? '<div class="plano-dep" style="color:var(--tx-2);">andou' + (i.andamento_em ? ' em ' + new Date(i.andamento_em).toLocaleDateString('pt-BR') : '') + ': ' + esc(i.andamento) + '</div>' : ''}
+        ${i.evidencia && estaFeito(i) ? '<div class="plano-dep">' + (i.resolvido_em ? 'resolvido em ' + new Date(i.resolvido_em).toLocaleDateString('pt-BR') + ': ' : 'prova: ') + esc(i.evidencia) + '</div>' : ''}
         ${i.dependencia ? '<div class="plano-dep">depende de: ' + esc(i.dependencia) + '</div>' : ''}
         <div class="plano-acoes">${botoes}${quando}</div>
         ${blocoRecados(i, esc, sess)}
@@ -990,7 +992,21 @@ function renderModuloPlano() {
       </div>${linhas}`;
   }).join('');
 
-  const blocos = montarBlocos(porFase(emAberto));
+  // 05/11/2026 (dono, 23/10): "deixar mais claro os já resolvidos [...] e o que está em andamento, separar melhor isso" e
+  // "juntar tudo que já foi resolvido nessa tela" — em andamento e a fazer separados; o resolvido (desta fase e o arquivo
+  // da revisão de 22/10) vai para o fim, em blocos fechados.
+  const andando = emAberto.filter(i => i.estado === 'andando'), aFazer = emAberto.filter(i => i.estado !== 'andando');
+  const titBloco = (t, n) => `<div class="section-label" style="margin-top:14px;">${t} <span style="color:var(--tx-4);font-weight:400;">${n}</span></div>`;
+  const blocos = PLANO_VER_ARQ ? montarBlocos(porFase(emAberto))
+    : (andando.length ? titBloco('Em andamento', andando.length) + montarBlocos(porFase(andando)) : '')
+      + (aFazer.length ? titBloco('A fazer', aFazer.length) + montarBlocos(porFase(aFazer)) : '');
+  const arq = PLANO.filter(i => Number(i.fase_ordem) >= 90 && naVez(i));
+  const arqFeitos = arq.filter(i => i.estado === 'feito'), arqFora = arq.filter(i => i.estado !== 'feito');
+  const fechado = (rot, arr, aberto) => arr.length ? `<details class="plano-feitos" style="margin-top:8px;"${aberto ? ' open' : ''}><summary><b>${arr.length}</b> ${rot}</summary>
+      <div style="margin-top:10px;">${montarBlocos(porFase(arr))}</div></details>` : '';
+  const blocoResolvido = PLANO_VER_ARQ ? '' : titBloco('Já resolvido', jaFeitos.length + arqFeitos.length + arqFora.length)
+    + fechado('prontos nesta fase', jaFeitos, !!PLANO_ESTADO_F)
+    + (PLANO_DONO || PLANO_ESTADO_F ? '' : fechado('resolvidos antes de 22/10', arqFeitos) + fechado('saíram do plano na revisão de 22/10', arqFora));
   // Com filtro POR ESTADO ligado, o bloco recolhido perde o sentido: a pessoa pediu
   // justamente para ver aquele estado, entao ele ja abre.
   const blocoFeitos = jaFeitos.length ? `
@@ -1021,7 +1037,7 @@ function renderModuloPlano() {
       <button class="preset-btn" onclick="planoSair()">sair</button></div>
     ${avisoRecados(esc)}
     <div class="plano-barra">
-      <div class="plano-contagem"><b>${feitos}</b> de ${lista.length}${PLANO_DONO ? ' de ' + esc(PLANO_DONO) : ''} resolvidos</div>
+      <div class="plano-contagem">${PLANO_VER_ARQ ? `<b>${feitos}</b> de ${lista.length} resolvidos` : `<b>${andando.length}</b> em andamento · <b>${aFazer.length}</b> a fazer · <b>${feitos}</b> ${feitos === 1 ? 'pronto' : 'prontos'} nesta fase${PLANO_DONO ? ' (' + esc(PLANO_DONO) + ')' : ` · ${arqFeitos.length} resolvidos antes de 22/10`}`}</div>
       <div class="plano-trilho"><div class="plano-preenche" style="width:${pct.toFixed(1)}%;"></div></div>
     </div>
     ${PLANO_VER_ARQ ? `<div class="contexto" style="text-align:center;">Você está vendo o <b>arquivo</b>: ${nArq} itens fora do plano de saída (revisão de 22/10). <button class="preset-btn" onclick="PLANO_VER_ARQ=false; PLANO_DONO=null; PLANO_ESTADO_F=null; renderModuloPlano();">voltar ao plano</button></div>` : ''}
@@ -1032,9 +1048,10 @@ function renderModuloPlano() {
       <button class="preset-btn ${PLANO_ESTADO_F ? '' : 'active'}" onclick="planoFiltrarEstado(null)">qualquer estado</button>
       ${chipsEstado}
     </div>
-    ${blocoFeitos}
+    ${PLANO_VER_ARQ ? blocoFeitos : ''}
     ${blocos || (jaFeitos.length ? '<div class="contexto">Tudo o que está nesta lista já foi resolvido.</div>' : '<div class="contexto">Nada aqui.</div>')}
-    ${!PLANO_VER_ARQ && nArq ? `<div class="caption-label" style="text-align:center; margin-top:14px;"><a href="javascript:void(0)" style="color:var(--tx-4);" onclick="PLANO_VER_ARQ=true; PLANO_DONO=null; PLANO_ESTADO_F=null; renderModuloPlano();">${nArq} itens fora do plano (revisão de 22/10) — ver</a></div>` : ''}`;
+    ${blocoResolvido}
+    ${false && !PLANO_VER_ARQ && nArq ? `<div class="caption-label" style="text-align:center; margin-top:14px;"><a href="javascript:void(0)" style="color:var(--tx-4);" onclick="PLANO_VER_ARQ=true; PLANO_DONO=null; PLANO_ESTADO_F=null; renderModuloPlano();">${nArq} itens fora do plano (revisão de 22/10) — ver</a></div>` : ''}`;
 }
 
 // O PEDAÇO DO mostrarModulo QUE É DO SISTEMA (05/11/2026).

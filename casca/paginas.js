@@ -99,6 +99,9 @@ window.CASCA_PAGINAS = {
   telas: 'sistema/index.html#telas',
 };
 
+// 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas'];
+
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
 window.CASCA_TELAS_POR_LOJA = ['caixa',
