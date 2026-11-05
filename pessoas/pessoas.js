@@ -1657,7 +1657,7 @@ function cgFfCelulas(ff, V, extraAPagar) {
     if (ff && k === 'salario' && Number(ff.dias) < 30) s = `${ff.dias}/30 dias`;
     if (ff && k === 'adiantamento' && v) s = ff.adiantamento_pago_em ? `pago ${cgDiaMes(String(ff.adiantamento_pago_em))}` : ff.vence_adiantamento ? `vence ${cgDiaMes(String(ff.vence_adiantamento))}` : '';
     if (ff && k === 'desconto_divida' && v) s = pd ? `${cgEsc(cgNome(pd.credor))} ${pd.parcela}/${pd.parcelas_no_plano}` : '';
-    if (k === 'apagar' && ff && ff.vence_saldo) s = `vence ${cgDiaMes(String(ff.vence_saldo))}`;
+    if (k === 'apagar' && ff && ff.vence_saldo && !extraAPagar) s = `vence ${cgDiaMes(String(ff.vence_saldo))}`;
     const tit = ff && k === 'ajuste' && ff.ajuste_motivo ? ` title="${cgEsc(ff.ajuste_motivo)}"` : ff && k === 'desconto_divida' && ff.desconto_divida_motivo ? ` title="${cgEsc(ff.desconto_divida_motivo)}"` : '';
     return `<td${tit}${sg === 0 ? ' style="font-weight:700;"' : ''}>${num}${sub(s)}${k === 'apagar' ? extraAPagar || '' : ''}</td>`;
   }).join('');
