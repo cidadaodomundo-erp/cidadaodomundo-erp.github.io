@@ -2058,8 +2058,93 @@ async function cgAdtGerar(mes) {
 // Dono, 19/10: "sempre atualizadas com a lista da última folha ... 600 (200 de cada mês) ... lançar pelo valor cheio
 // de cada mês trabalhado"; 22/08: proporcional no mês em que a pessoa entra. A conta é toda do banco
 // (script/sql/rh_bonificacao.sql); a tela só soma. As horas de falta da Flash aparecem para conferir — ainda não descontam.
-function cargosCiclo(c) { CARGOS_F.ciclo = c; renderModuloCargos(); }
+function cargosCiclo(c) { CARGOS_F.ciclo = c; CARGOS_F.bonifCel = null; renderModuloCargos(); }
+
+// ---------- BONIFICAÇÃO MÊS A MÊS (05/11/2026, proposta do RH 2026-11-05-rh-bonificacao-mes-a-mes.md) ----------
+// O modelo é a aba "Bonificacoes" da planilha de pagamento do dono: por empresa, uma linha por pessoa, os 3 meses (26 a 25)
+// e o total; cada célula pintada pelo motivo. Fonte vw_rh_bonificacao_mes; ajuste por rh_bonificacao_ajustar.
+// Enquanto a view não existir no banco, a aba segue com a tela do ciclo (cgAbaBonifCiclo).
+const CG_BON_COR = {
+  FORA_REGISTRO: ['var(--bonif-fora)', 'Fora do período de registro (admitido no mês: proporcional)'],
+  FALTA_ATESTADO: ['var(--bonif-falta)', 'Perda por falta ou atestado'],
+  FERIAS: ['var(--bonif-ferias)', 'Férias'],
+  ADVERTENCIA: ['var(--bonif-adv)', 'Advertência ou suspensão'],
+  AJUSTE: ['var(--bonif-ajuste)', 'Ajuste feito aqui'],
+};
+async function cgBonifMesCarregar() {
+  CARGOS.bonifMes = null;
+  try { CARGOS.bonifMes = { lin: await consultarTudo('vw_rh_bonificacao_mes?select=*&order=pagamento,empresa,nome,n') }; }
+  catch (e) { CARGOS.bonifMes = { erro: e.message }; }
+  if (CARGOS_F.aba === 'bonif') renderModuloCargos();
+}
 function cgAbaBonif() {
+  if (CARGOS.bonifMes === undefined) { cgBonifMesCarregar(); return '<div class="contexto">Lendo a bonificação…</div>'; }
+  if (CARGOS.bonifMes === null) return '<div class="contexto">Lendo a bonificação…</div>';
+  if (CARGOS.bonifMes.erro || !CARGOS.bonifMes.lin.length) return cgAbaBonifCiclo();
+  const F = CARGOS_F, L = CARGOS.bonifMes.lin, hoje = trHoje(), d10 = (v) => String(v || '').slice(0, 10);
+  const pags = [...new Set(L.map((x) => d10(x.pagamento)))].sort();
+  const pag = pags.includes(F.bonifPag) ? F.bonifPag : (pags.find((p) => p >= hoje) || pags[pags.length - 1]);
+  const doPag = L.filter((x) => d10(x.pagamento) === pag && (!F.unidade || !x.unidade || x.unidade === F.unidade));
+  const meses = [1, 2, 3].map((n) => doPag.find((x) => Number(x.n) === n)).filter(Boolean);
+  const mesRot = (x) => new Date(d10(x.mes) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase();
+  const pk = (x) => String(x.pessoa_id != null ? x.pessoa_id : x.nome);
+  const emps = [...new Set(doPag.map((x) => x.empresa))];
+  const soma = (arr) => arr.reduce((a, x) => a + cgN(x.valor), 0);
+  const corDe = (x) => x.ajuste === 'ZERAR' ? 'AJUSTE' : x.cor;
+  const cel = (x) => {
+    if (!x) return '<td style="color:var(--tx-5);">–</td>';
+    const c = CG_BON_COR[corDe(x)], k = pk(x) + '|' + x.n, sel = F.bonifCel === k;
+    const est = c ? `background:${c[0]};color:${corDe(x) === 'AJUSTE' ? 'var(--tx-1)' : 'var(--bg)'};` : '';
+    return `<td title="${cgEsc(x.motivo || '')}" style="cursor:pointer;${est}${sel ? 'outline:2px solid var(--brand);outline-offset:-2px;' : ''}" onclick="CARGOS_F.bonifCel=CARGOS_F.bonifCel==='${cgEsc(k)}'?null:'${cgEsc(k)}';renderModuloCargos()">${cgR(x.valor)}${x.ajuste === 'MANTER' ? ' <span style="font-size:10.5px;font-weight:700;">mantido</span>' : ''}</td>`;
+  };
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${pags.map((p) =>
+      `<button type="button" class="preset-btn ${p === pag ? 'active' : ''}" onclick="CARGOS_F.bonifPag='${p}';CARGOS_F.bonifCel=null;renderModuloCargos()">paga ${cgData(p)}</button>`).join('')}</div>
+    <div class="cards">${emps.map((e) => { const l = doPag.filter((x) => x.empresa === e); const np = new Set(l.map(pk)).size;
+      return `<div class="card neutral"><div class="card-lbl">${cgEsc(cgEmpresaCurta(e))}</div><div class="card-val">${cgR0(soma(l))}</div><div class="card-pct">${np} ${np === 1 ? 'pessoa' : 'pessoas'}</div></div>`; }).join('')}
+      <div class="card blue"><div class="card-lbl">Total geral</div><div class="card-val">${cgR0(soma(doPag))}</div><div class="card-pct">paga ${cgData(pag)}</div></div></div>
+    ${cgFiltroUnidade(CARGOS.pessoas)}
+    <div id="tabelaCgBonifMes" style="overflow-x:auto;"><table><thead><tr><th>Nome</th>
+      ${meses.map((m) => `<th>${mesRot(m)} <span style="font-weight:400;color:var(--tx-4);">${cgDiaMes(d10(m.periodo_ini))}–${cgDiaMes(d10(m.periodo_fim))}</span></th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  emps.forEach((e) => {
+    const l = doPag.filter((x) => x.empresa === e), ps = [...new Set(l.map(pk))];
+    h += `<tr class="sub"><td colspan="${meses.length + 2}"><b>${cgEsc(cgEmpresaCurta(e))}</b></td></tr>`;
+    ps.forEach((p) => {
+      const lp = l.filter((x) => pk(x) === p);
+      h += `<tr><td>${cgEsc(cgNome(lp[0].nome))}</td>${meses.map((m) => cel(lp.find((x) => Number(x.n) === Number(m.n)))).join('')}<td style="font-weight:700;">${cgR(soma(lp))}</td></tr>`;
+      const aberta = lp.find((x) => F.bonifCel === pk(x) + '|' + x.n);
+      if (aberta) h += `<tr><td colspan="${meses.length + 2}">${cgBonifDetalhe(aberta)}</td></tr>`;
+    });
+    h += `<tr class="sub"><td>Subtotal ${cgEsc(cgEmpresaCurta(e))}</td>${meses.map((m) => `<td>${cgR(soma(l.filter((x) => Number(x.n) === Number(m.n))))}</td>`).join('')}<td>${cgR(soma(l))}</td></tr>`;
+  });
+  h += `</tbody><tfoot><tr class="liq"><td>Total geral</td>${meses.map((m) => `<td>${cgR(soma(doPag.filter((x) => Number(x.n) === Number(m.n))))}</td>`).join('')}<td>${cgR(soma(doPag))}</td></tr></tfoot></table></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--tx-3);">${Object.entries(CG_BON_COR).map(([k, [c, r]]) =>
+      `<span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c};border:1px solid var(--line);vertical-align:-2px;margin-right:4px;"></span>${r}</span>`).join('')}</div>`;
+  return h;
+}
+function cgBonifDetalhe(x) {
+  const d10 = (v) => String(v || '').slice(0, 10), id = `cgBonMot_${String(x.pessoa_id)}_${x.n}`;
+  const pessoa = x.pessoa_id != null ? x.pessoa_id : 'null', mes = d10(x.mes);
+  return `<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;max-width:760px;">
+    <b>${cgEsc(cgNome(x.nome))}</b> · período ${cgData(x.periodo_ini)} a ${cgData(x.periodo_fim)} · <b>${cgR(x.valor)}</b>${cgN(x.perdido) ? ` <span style="color:var(--farol-perto);">(perdeu ${cgR(x.perdido)})</span>` : ''}
+    <div style="margin-top:4px;color:var(--tx-2);">${x.motivo ? cgEsc(x.motivo) : 'Mês cheio, sem motivo de desconto.'}</div>
+    ${x.ajuste ? `<div style="margin-top:4px;color:var(--tx-3);">${x.ajuste === 'ZERAR' ? 'Zerado' : 'Mantido'} por ${cgEsc(String(x.ajuste_por || '').split('@')[0])}${x.ajuste_em ? ' em ' + cgData(x.ajuste_em) : ''}: ${cgEsc(x.ajuste_motivo || '')}</div>` : ''}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
+      ${x.ajuste ? cgBotaoPasso('Desfazer ajuste', `cgBonifAjustar(${pessoa},'${mes}',null)`, true)
+        : `<input id="${id}" type="text" placeholder="motivo (obrigatório)" style="flex:1 1 220px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+           ${cgBotaoPasso('Zerar o mês', `cgBonifAjustar(${pessoa},'${mes}','ZERAR','${id}')`, true)}
+           ${x.motivo ? cgBotaoPasso('Manter o mês', `cgBonifAjustar(${pessoa},'${mes}','MANTER','${id}')`, true) : ''}`}</div></div>`;
+}
+async function cgBonifAjustar(pessoa, mes, acao, idMotivo) {
+  const el = idMotivo && document.getElementById(idMotivo), motivo = el ? el.value.trim() : null;
+  if (acao && !motivo) return avisoAcao('atencao', '! Escreva o motivo antes de zerar ou manter o mês.');
+  avisoAcao('atencao', '… gravando o ajuste da bonificação');
+  const r = await trRpcSeguro('rh_bonificacao_ajustar', { p_pessoa: pessoa, p_mes: mes, p_tipo: acao, p_motivo: motivo });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgBonifAjustar(pessoa, mes, acao, idMotivo));
+  CARGOS.bonif = await consultarTudo('vw_rh_bonificacao_ciclo?select=*&order=unidade,nome').catch(() => CARGOS.bonif);
+  await cgBonifMesCarregar();
+  avisoAcao('ok', `✓ ${acao === 'ZERAR' ? 'Mês zerado' : acao === 'MANTER' ? 'Mês mantido (paga cheio)' : 'Ajuste desfeito'}: o total já mudou — às ${avisoHora()}.`);
+}
+function cgAbaBonifCiclo() {
   const F = CARGOS_F;
   const todos = CARGOS.bonif || [];
   if (!todos.length) return '<div class="contexto">A bonificação ainda não tem ciclo calculado.</div>';
