@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Gestão · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PÁGINA PRÓPRIA DA GESTÃO (05/11/2026, bloco 7 do painel em módulos): Começar por aqui, Resultado e Financeiro.
+     A casca abre gestao/index.html#<tela> (docs/casca/paginas.js). Carrega o núcleo, canal.js e gestao.js, o mesmo código
+     do painel antigo. Diferente das outras páginas, TROCA DE TELA POR DENTRO entre as telas dela (e Resumo, Cancelamentos
+     e Promoções): é assim que o clique num número do Placar leva o recorte (mês e loja) para a tela que ele abre.
+     Quem mexe: o chat "Telas do painel". -->
+<script>
+  // aqui a casca abre a página sem ?casca=1: dentro de moldura da mesma origem é casca
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  // TROCA_DENTRO: a página trocou de tela sozinha (atalho do Placar). Aí ela não pede à casca para abrir a tela,
+  // porque a casca abriria outra moldura, sem o recorte.
+  let TROCA_DENTRO = false;
+  function avisarCasca(msg) {
+    if (!NA_CASCA) return;
+    if (TROCA_DENTRO && msg && msg.tipo === 'casca-modulo') return;
+    try { parent.postMessage(msg, location.origin); } catch (e) {}
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261105b">
+<style>
+  .na-casca body::before { display:none !important; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="loadingMsg">Carregando dados do banco...</div>
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="painel" style="display:none;">
+      <div id="barraVendas"></div>
+      <div id="modulo-estasemana" class="modulo" style="display:none;"><div id="view-estasemana"></div></div>
+      <div id="modulo-hoje" class="modulo" style="display:none;"><div id="view-hoje"></div></div>
+      <div id="modulo-placar" class="modulo" style="display:none;"><div id="view-placar"></div></div>
+      <div id="modulo-indicadores" class="modulo" style="display:none;"><div id="view-indicadores"></div></div>
+      <div id="modulo-semana" class="modulo" style="display:none;"><div id="view-semana"></div></div>
+      <div id="modulo-fechamento" class="modulo" style="display:none;"><div id="view-fechamento"></div></div>
+      <div id="modulo-evolucao" class="modulo" style="display:none;"><div id="view-evolucao"></div></div>
+      <div id="modulo-dre" class="modulo" style="display:none;"><div id="view-dre"></div></div>
+      <div id="modulo-fluxo" class="modulo" style="display:none;"><div id="view-fluxo"></div></div>
+      <div id="modulo-despesas" class="modulo" style="display:none;"><div id="view-despesas"></div></div>
+      <div id="modulo-lucrouni" class="modulo" style="display:none;"><div id="view-lucrouni"></div></div>
+      <div id="modulo-concbanco" class="modulo" style="display:none;"><div id="view-concbanco"></div></div>
+      <div id="modulo-conciliacao" class="modulo" style="display:none;"><div id="view-conciliacao"></div></div>
+      <div id="modulo-contaspagar" class="modulo" style="display:none;"><div id="view-contaspagar"></div></div>
+      <div id="modulo-contasreceber" class="modulo" style="display:none;"><div id="view-contasreceber"></div></div>
+      <div id="modulo-projecao" class="modulo" style="display:none;"><div id="view-projecao"></div></div>
+      <div id="modulo-rede" class="modulo" style="display:none;"><div id="view-rede"></div></div>
+      <!-- telas do Canal que o Placar abre com o recorte -->
+      <div id="modulo-resumo" class="modulo" style="display:none;"><div id="view-content"></div></div>
+      <div id="modulo-cancelamentos" class="modulo" style="display:none;"><div id="view-cancelamentos"></div></div>
+      <div id="modulo-promocoes" class="modulo" style="display:none;"><div id="view-promocoes"></div></div>
+      <div id="rodapeVendas"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/graficos.js?v=20261105a"></script>
+<script src="../nucleo/vendas.js?v=20261105c"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../canal/canal.js?v=20261105a"></script>
+<script src="gestao.js?v=20261105a"></script>
+<script>
+// O que é desta página: qual tela abrir, a carga de vendas antes dela e a troca de tela por dentro.
+const TELAS_GESTAO = ['estasemana', 'hoje', 'placar', 'indicadores', 'semana', 'fechamento', 'evolucao', 'dre', 'fluxo',
+  'despesas', 'lucrouni', 'concbanco', 'conciliacao', 'contaspagar', 'contasreceber', 'projecao', 'rede'];
+const TELAS_DAQUI = new Set([...TELAS_GESTAO, 'resumo', 'cancelamentos', 'promocoes']);
+const TELA = TELAS_GESTAO.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'estasemana';
+// as mesmas listas do painel antigo
+const MODULOS_COM_RODAPE = new Set(['estasemana', 'resumo', 'cancelamentos',
+  'promocoes', 'negociacoes', 'avaliacoes', 'relatorios', 'contestacoes']);
+const MODULOS_COM_FILTRO_TOPO = new Set(['estasemana', 'resumo', 'cancelamentos',
+  'promocoes', 'qualidade', 'site', 'evolucao']);
+let VENDAS_CARREGADAS = false;
+function abrirGrupoDoModulo() {}   // o menu é o da casca
+function moduloAtivo() { return MODULO_ATUAL; }
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;   // aberta solta (botão "abrir"): a porta é a da casca
+}
+
+function renderAll() {
+  limparFiltrosVer(MODULO_ATUAL);
+  const m = computeMetrics();
+  const ant = periodoAnterior();
+  const a = ant ? computeMetrics(ant.ini, ant.fim) : null;
+  renderPresets();
+  const ativo = moduloAtivo();
+  renderAllCanal(m, a, ant, linhaContexto(ant), ativo);
+  renderAllGestao(ativo);
+}
+
+// Tela daqui: troca por dentro (o recorte do Placar vai junto). Outra tela: a casca abre.
+function mostrarModulo(nome) {
+  if (!TELAS_DAQUI.has(nome)) {
+    if (NA_CASCA) { TROCA_DENTRO = false; avisarCasca({ tipo: 'casca-modulo', nome }); return; }
+    location.href = '../sistema.html#' + nome; return;
+  }
+  TROCA_DENTRO = MODULO_ATUAL !== null && nome !== TELA;
+  if (!prepararTela(nome)) return;
+  entrarTelaCanal(nome);
+  entrarTelaGestao(nome);
+  window.scrollTo(0, 0);
+}
+
+async function abrirTela() {
+  try {
+    MODULO_ATUAL = null;
+    await rmbGarantirTokenValido();
+    await carregar();
+    montarFiltrosBase();
+    renderPerimetro();
+    renderTopNav();
+    rebuildLojaOptions();
+    VENDAS_CARREGADAS = true;
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('painel').style.display = 'block';
+    mostrarModulo(TELA);
+    avisarCasca({ tipo: 'casca-pronto', modulo: TELA });
+  } catch (e) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    const el = document.getElementById('erroMsg');
+    el.style.display = 'block'; el.textContent = 'Erro ao carregar dados do Supabase: ' + e.message;
+  }
+}
+// a casca reabre a tela: volta para a tela desta moldura e recarrega os dados dela
+window.reentrarTela = () => { try { TROCA_DENTRO = false; mostrarModulo(TELA); } catch (e) {} };
+window.addEventListener('hashchange', () => location.reload());
+abrirTela();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

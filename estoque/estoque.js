@@ -2519,9 +2519,7 @@ async function plpImprimir() {
 
 let PRD = null;   // { papel, unidade, data, receitas, lancamentos, busca, aberta, ingredientes }
 
-function prdHoje() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-}
+// prdHoje mora no núcleo desde 05/11/2026 (o Fluxo projetado também usa)
 function prdDiasAtras(n) {
   const d = new Date(prdHoje() + 'T12:00:00');
   d.setDate(d.getDate() - n);

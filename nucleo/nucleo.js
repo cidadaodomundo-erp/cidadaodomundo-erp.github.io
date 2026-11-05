@@ -253,6 +253,10 @@ function registrarUso(tela) {
 // 24/10/2026 (bloco 2): auxiliares que as telas de Listas e de Estoque usam e o painel também. Saíram do listas.js
 // (trHoje, trFetch, trRpc, trErroDe, trEscH) e do dashboard.html (fxSomaDias), com os mesmos nomes.
 // ------------------------------------------------------------------
+// o dia de hoje em Curitiba (AAAA-MM-DD). Saiu do estoque.js em 05/11/2026: o Fluxo projetado também usa.
+function prdHoje() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
 function trHoje() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
 async function trFetch(url, opts = {}) {
   const faz = () => fetch(`${SUPABASE_URL}/rest/v1/${url}`, { ...opts, headers: rmbHeaders(opts.headers || {}) });
