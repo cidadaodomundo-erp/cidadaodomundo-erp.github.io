@@ -1492,7 +1492,7 @@ function cgFolhaImportarHtml() {
   const L = (CARGOS.folhaImp || []).slice(0, 4);
   const linha = (x) => {
     const q = String(x.quem || '').split('@')[0], em = x.enviado_em ? new Date(x.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') : '';
-    const st = x.situacao === 'LENDO' ? '<span style="color:var(--farol-perto);font-weight:700;">⏳ lendo (até 5 min)</span>'
+    const st = x.situacao === 'LENDO' ? `<span style="color:var(--farol-perto);font-weight:700;">⏳ ${x.resultado ? cgEsc(x.resultado) : 'lendo (até 5 min)'}</span>`
       : x.situacao === 'LIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ ${cgEsc(x.resultado || 'lida e gravada')}</span>`
       : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgEsc(x.resultado || 'não lida')}</span> — confira se é o Extrato Mensal da Folha e envie de novo`;
     return `<div style="font-size:12.5px;margin-top:4px;">${cgEsc(x.nome || '')} <span style="color:var(--tx-4);">· ${cgEsc(q)} ${em}</span> — ${st}</div>`;
