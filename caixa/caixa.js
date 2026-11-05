@@ -138,17 +138,35 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
 
   const saipos = trs.filter(t => t.origem === 'SAIPOS').map(t => ({ ...t, par: null }));
   const rede = trs.filter(t => t.origem === 'REDE').map(t => ({ ...t, usado: false }));
-  saipos.forEach(s => {
-    let melhor = null, dist = Infinity;
-    rede.forEach(r => {
-      if (r.usado || Math.abs(+r.valor - +s.valor) > 0.005) return;
-      const dt = Math.abs(r.t - s.t);
-      if (dt > 180) return;                              // tolerância: 3 h
-      // mesmo valor em dois caixas: prefere a maquininha do caixa da venda (SD = salao — dono, 10/09/2026)
-      const d = dt + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0);
-      if (d < dist) { dist = d; melhor = r; }
-    });
-    if (melhor) { melhor.usado = true; melhor.parDe = s; s.par = melhor; s.dist = dist; }
+  // 05/11/2026 (Financeiro, auditoria da AV: 19 trocas falsas): o par era guloso, venda a venda, e cruzava duas vendas do
+  // mesmo valor e do mesmo horário. Agora monta todos os pares possíveis e casa do melhor para o pior: menor tempo, com o
+  // MESMO cartão (bandeira + crédito/débito/vale) como desempate — forma diferente pesa como 15 min a mais. No delivery,
+  // a cobrança tem de ser depois de o pedido existir (pago_em = criação do pagamento no pedido): a cobrança das 20:00
+  // não é do pedido criado às 22:08 (21/10, 38,38: a troca é real). No salão a maquininha cobra antes de a comanda
+  // fechar, então ali não há essa trava.
+  const minDe = (ts) => { if (!ts) return null; const d = String(ts).slice(0, 10), h = String(ts).slice(11, 16); if (!h) return null;
+    return min(h) + Math.round((new Date(d + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; };
+  saipos.forEach(s => { s.tPago = minDe(s.pago_em); s.entrega = /hora da entrega/.test(s.detalhe || ''); });
+  const pares = [];
+  saipos.forEach(s => rede.forEach(r => {
+    if (Math.abs(+r.valor - +s.valor) > 0.005) return;
+    const dt = Math.abs(r.t - s.t);
+    if (dt > 180) return;                              // tolerância: 3 h
+    if (s.entrega && s.tPago !== null && s.tPago <= s.t && r.t < s.tPago - 5) return;   // cobrou antes de o pedido existir
+    const mesma = formaPadrao(r.detalhe) === formaPadrao(s.detalhe);
+    // mesmo valor em dois caixas: prefere a maquininha do caixa da venda (SD = salao — dono, 10/09/2026)
+    pares.push({ s, r, d: dt + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0), ordem: dt + (mesma ? 0 : 15) + (r.caixa && s.caixa && r.caixa !== s.caixa ? 60 : 0) });
+  }));
+  pares.sort((a, b) => a.ordem - b.ordem);
+  pares.forEach(({ s, r, d }) => { if (s.par || r.usado) return; r.usado = true; r.parDe = s; s.par = r; s.dist = d; });
+  // pagamento lançado no Saipos depois da cobrança (pago_em em outro dia, ex. 19,79 cobrado 31/10 e lançado 03/11) ou
+  // cobrado na entrega bem depois (pedido 7901): segunda rodada, só MESMO valor e MESMA forma, até 2 dias de distância
+  saipos.filter(s => !s.par).forEach(s => {
+    const fs = formaPadrao(s.detalhe);
+    const c = rede.filter(r => !r.usado && Math.abs(+r.valor - +s.valor) < 0.005 && formaPadrao(r.detalhe) === fs
+      && (Math.abs(r.t - s.t) <= 2880 || (s.tPago !== null && Math.abs(r.t - s.tPago) <= 2880)))
+      .sort((a, b) => Math.min(Math.abs(a.t - s.t), s.tPago !== null ? Math.abs(a.t - s.tPago) : 1e9) - Math.min(Math.abs(b.t - s.t), s.tPago !== null ? Math.abs(b.t - s.tPago) : 1e9))[0];
+    if (c) { c.usado = true; c.parDe = s; s.par = c; s.dist = Math.abs(c.t - s.t); }
   });
   let semParS = saipos.filter(s => !s.par);
   let semParR = rede.filter(r => !r.usado);
@@ -477,7 +495,11 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   arredond.forEach(q => addTroca(q.s, q.r, q.s.valor, rotVenda(q.s)));
   compostos.forEach(c => { if (c.alvo.origem === 'REDE') c.itens.forEach(it => addTroca(it, c.alvo, it.valor, rotVenda(it))); else c.itens.forEach(it => addTroca(c.alvo, it, it.valor, rotVenda(c.alvo))); });
   const trocasRefs = new Set(trocas.map(t => t.ref));
-  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || roboT(f)) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
+  // 05/11/2026 (Financeiro, regra 3): cobrança já casada não serve de novo — venda que o próprio cruzamento já casou
+  // (par, conta dividida ou quase-par) não entra pela varredura (a varredura reaproveitava a NSU de outra venda)
+  const pareadosRefs = new Set([...casados.map(x => String(x.referencia)), ...compostos.flatMap(c => [c.alvo, ...c.itens]).filter(x => x.origem === 'SAIPOS').map(x => String(x.referencia)),
+    ...conferir.map(q => String(q.s.referencia))]);
+  (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || pareadosRefs.has(String(f.id_sale)) || roboT(f)) return; const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
     trocas.push({ hora: hhmm(String(f.hora || '').slice(11)), venda: f.numero ? 'venda ' + f.numero : f.mesa ? 'mesa ' + f.mesa : 'salão', valor: +f.valor, de, para, pd: ehPendenteTxt(f.registrado), caixa: f.caixa || null, ref: String(f.id_sale) }); });
   if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas, turnos };
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
