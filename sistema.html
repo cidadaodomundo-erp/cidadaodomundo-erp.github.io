@@ -479,9 +479,11 @@ window.addEventListener('message', (e) => {
   const f = MOLDURAS.painel;
   // página própria (Listas, Estoque, 24/10/2026): atalho para outra tela e aviso de sessão vencida
   if (!f || e.source !== f.contentWindow) {
-    const daPagina = Object.values(MOLDURAS).some((m) => m.contentWindow === e.source);
+    const daPagina = Object.values(MOLDURAS).find((m) => m.contentWindow === e.source);
     if (!daPagina) return;
-    if (e.data.tipo === 'casca-modulo' && ITENS[e.data.nome] && e.data.nome !== ATUAL) abrir(e.data.nome);
+    // 05/11/2026: moldura ESCONDIDA não troca a tela. Com uma moldura por tela (Gestão, Canal), trocar a loja redesenha
+    // também as escondidas, e a "Esta semana" de fundo puxava a casca para ela no meio do Contas a pagar.
+    if (e.data.tipo === 'casca-modulo' && ITENS[e.data.nome] && e.data.nome !== ATUAL) { if (!daPagina.hidden) abrir(e.data.nome); }
     else if (e.data.tipo === 'casca-login') mostrarPorta(e.data.recado || 'Sua sessão acabou. Entre de novo.');
     else if (e.data.tipo === 'casca-loja-pedir') trocarLoja(e.data.loja);   // a tela pediu uma loja (ex.: Estoque na Rede)
     return;
