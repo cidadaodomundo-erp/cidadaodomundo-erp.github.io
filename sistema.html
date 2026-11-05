@@ -347,7 +347,7 @@ function trocarLoja(l) {
 // 05/11/2026 (dono, 23/10: "tirar esse filtro da rede de cima" no Plano): tela que não tem loja não mostra o seletor
 const TELAS_SEM_LOJA = new Set(window.CASCA_TELAS_SEM_LOJA || []);
 function atualizarFaixaLoja() {
-  $('vendo').hidden = !!(ATUAL && TELAS_SEM_LOJA.has(ATUAL));
+  $('vendo').style.display = ATUAL && TELAS_SEM_LOJA.has(ATUAL) ? 'none' : '';   // .vendo tem display:flex, que vence o hidden
   const f = $('faixaLoja'), l = lojaAtual();
   const mostra = !!(ATUAL && l && l !== LOJA_REDE && !lojaTravada() && !TELAS_POR_LOJA.has(ATUAL) && !TELAS_SEM_LOJA.has(ATUAL));
   f.hidden = !mostra;
