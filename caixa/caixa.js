@@ -1030,7 +1030,8 @@ async function entrarCaixa() {
       // filtro por CAIXA no modulo inteiro (dono, 10/09/2026 noite): as mesmas reguas de
       // cartao e PIX, quebradas por caixa (Saipos pelo cashier, Rede pela maquininha SD)
       consultarTudo('vw_cartao_conciliacao_caixa_dia?select=*&dia=gte.2026-08-01&order=dia'),
-      consultarTudo('vw_pix_conciliacao_caixa_dia?select=*&dia=gte.2026-08-01&order=dia'),
+      // 05/11/2026: esta view estourou os 8 s depois da vw_pix_conciliacao um-para-um; sem ela a tela abre sem o PIX por caixa
+      consultarTudo('vw_pix_conciliacao_caixa_dia?select=*&dia=gte.2026-08-01&order=dia').catch((e) => { console.warn('pix por caixa:', e.message); return []; }),
       // recados da equipe para o dono (15/09/2026): o botao "Avisar o Neto"
       consultarTudo('painel_aviso?select=*&order=criado_em.desc&limit=40'),
     ]);
