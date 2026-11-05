@@ -745,6 +745,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       ${podeExplicar ? `<button onclick="caixaAtualizarDia(this)" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" style="font:inherit; font-size:12px; padding:3px 10px; cursor:pointer; margin-left:auto;">↻ Já corrigi no Saipos — atualizar este dia</button>` : ''}
     </div>
     <div style="font-size:12px; color:#a5a49a;">Mesma leitura do fechamento do Saipos, preenchida sozinha: <b style="color:#e8e6dc;">registrado</b> é o que o turno lançou; <b style="color:#e8e6dc;">passou de verdade</b> é a maquininha, o banco e a contagem. Primeiro o <span style="color:#f5a623;">1º</span> (corrigir no Saipos e clicar atualizar), depois o <span style="color:#ff6b6b;">2º</span>. ${bateram} pagamento(s) bateram sozinhos${viradaSaipos || viradaRede ? ` · na virada do dia: ${viradaSaipos ? reaisCc(viradaSaipos) + ' do Saipos veio da véspera' : ''}${viradaSaipos && viradaRede ? ', ' : ''}${viradaRede ? reaisCc(viradaRede) + ' da maquininha caiu na madrugada seguinte' : ''}` : ''}.</div>
+    ${dia > CAIXA_DINHEIRO_ATE ? cofreLinhaDia(unidade, dia) : ''}
     ${blocosCaixa || '<div style="margin-top:10px; color:#9aa4af;">Nenhum caixa neste dia.</div>'}
     ${blocoResto ? caixa('Já tratado', '#9aa4af', blocoResto) : ''}
   </div>`;
@@ -1245,10 +1246,52 @@ function cofreHtml() {
     ${pendentes.length ? `<div id="tabelaCofreSbPend"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${pendentes.map(linha).join('')}</tbody></table></div>` : ''}
     <details><summary style="cursor:pointer;">ver os ${entrou.length} que já entraram</summary>
       <div id="tabelaCofreSbOk"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${entrou.map(linha).join('')}</tbody></table></div></details>` : '';
-  return `<div class="section-label">O cofre de cada loja</div>
-    <div class="cards cards-3">${cards}</div>
-    <div class="caption-label" style="text-align:left;">Saldo = o da tela do Saipos (cofre + gaveta), a partir do corte travado de cada loja. A diferença só aparece quando a contagem for do cofre + gaveta.</div>
-    ${blocoSB}`;
+  // 05/11/2026 (dono: "podemos eliminar esse quadro, a contagem já é feita na linha de cada caixa"): a contagem foi para a
+  // linha "Dinheiro da loja" de cada dia (cofreLinhaDia); aqui fica só o envio do SB para a AV
+  void cards;
+  return blocoSB;
+}
+// DINHEIRO DA LOJA NO DIA (05/11/2026, proposta do Financeiro): UM campo às cegas por loja e por dia, "gaveta + cofre contado".
+// Antes de gravar não se mostra o saldo do Saipos; depois, contado × saldo e "bateu" ou a diferença.
+function cofreLinhaDia(unidade, dia) {
+  const r = (COFRE_DIA || []).find((x) => x.unidade === unidade && String(x.dia).slice(0, 10) === dia);
+  const dm = (d) => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+  const k = (unidade + dia).replace(/[^A-Z0-9]/g, '');
+  const email = String((rmbSessao() || {}).email || '').toLowerCase();
+  const pode = (typeof souODono === 'function' && souODono()) || (CAIXA_RESP || []).some((x) => String(x.email).toLowerCase() === email && x.unidade === unidade);
+  const cab = `<div style="margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;"><b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">gaveta + cofre, contados juntos no fim do dia ${dm(dia)}</span>`;
+  if (!r) return cab + `<div style="font-size:12.5px; color:var(--tx-4); margin-top:4px;">sem saldo do cofre para este dia no sistema</div></div>`;
+  if (r.contagem_cobre_cofre === true && r.contado != null) {
+    const dif = Number(r.diferenca);
+    return cab + `<div style="margin-top:4px;">contado R$ ${fmt(Number(r.contado))} × Saipos R$ ${fmt(Number(r.saldo_fim_dia))} —
+      ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))}</b>`}</div></div>`;
+  }
+  if (!pode) return cab + `<div style="margin-top:4px; color:var(--farol-perto);">ainda não contado</div></div>`;
+  return cab + `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
+      <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      <button class="preset-btn" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a contagem</button>
+      <span class="caption-label">O saldo do Saipos aparece depois de gravar.</span></div></div>`;
+}
+async function cofreGravarTotal(unidade, dia, k) {
+  const el = document.getElementById('cfT_' + k), v = el ? el.value : '';
+  if (v === '') { avisoAcao('atencao', '! Digite o dinheiro contado (gaveta + cofre). Se não tinha nada, digite 0.'); return; }
+  const s = rmbSessao();
+  avisoAcao('enviando', 'Gravando a contagem do dinheiro…');
+  try {
+    // chave da loja no dia; a contagem por caixa está desligada desde 22/10 (CAIXA_DINHEIRO_ATE), então não há mistura
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem?on_conflict=unidade,data,caixa`, { method: 'POST',
+      headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ unidade, data: dia, caixa: 'SALÃO', contado: 0, troco: null, cofre: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    await cofreCarregar();
+    const x = (COFRE_DIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia);
+    const dif = x && x.diferenca != null ? Number(x.diferenca) : null;
+    avisoAcao(dif != null && Math.abs(dif) >= 0.005 ? 'atencao' : 'ok', dif == null ? `✓ Contagem de ${dia.split('-').reverse().join('/')} gravada — às ${avisoHora()}.`
+      : Math.abs(dif) < 0.005 ? `✓ Contagem gravada às ${avisoHora()}: bateu com o Saipos.` : `! Contagem gravada às ${avisoHora()}: ${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))} em relação ao Saipos.`);
+    CAIXA_HELLEN_CALC = null;
+    if (CAIXA_DRILL_DADOS && CAIXA_DRILL_DADOS.unidade === unidade && CAIXA_DRILL_DADOS.dia === dia) { const d = CAIXA_DRILL_DADOS; renderDiaConcartao(d.unidade, d.dia, d.trs, d.pix, d.cobr, d.forma, d.descs, d.onl); }
+    renderModuloCaixa();
+  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarTotal(unidade, dia, k)); }
 }
 async function cofreGravarContagem(unidade, dia, k) {
   const g = document.getElementById('cfG_' + k).value, c = document.getElementById('cfC_' + k).value;
@@ -1360,11 +1403,11 @@ function caixaHellenItens() {
     // cofre: contado diferente do Saipos, e hoje sem contagem
     const cof = (COFRE_DIA || []).filter(r => r.unidade === u && r.dia >= corte);
     cof.filter(r => r.contagem_cobre_cofre === true && r.diferenca != null && Math.abs(+r.diferenca) >= 0.01).forEach(r => add({ u, dia: r.dia, ordem: 3, valor: +r.diferenca,
-      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'cofre', botao: 'ver o cofre' }));
+      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'abrir', botao: 'abrir o dia' }));
     const ult = cof[cof.length - 1];
     if (ult && ult.contado == null) {
       const ultC = [...cof].reverse().find(r => r.contado != null);
-      add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'cofre', botao: 'contar' });
+      add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'contar', botao: 'contar' });
     }
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
@@ -1394,6 +1437,7 @@ function caixaHellenHtml() {
   const btn = x => x.acao === 'explicar' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenExplicar(${x.i})">Explicar</button>`
     : x.acao === 'naochegou' ? (marca ? `<button class="preset-btn" onclick="event.stopPropagation(); cofreNaoChegou(${x.id})">Não chegou</button>` : '')
     : x.acao === 'cofre' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenCofre()">${x.botao}</button>`
+    : x.acao === 'contar' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenAbrir(${x.i})">contar</button>`
     : `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenAbrir(${x.i})">${x.botao || 'abrir o dia'}</button>`;
   const linhas = itens.map(x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="abre o dia com as vendas lado a lado">
       <td style="white-space:nowrap;">${nomeLoja(x.u)}</td><td style="white-space:nowrap;">${dm(x.dia)}</td><td>${rotCx(x.caixa)}</td>
@@ -1414,6 +1458,7 @@ async function caixaHellenAbrir(i) {
   if (!x) return;
   if (x.acao === 'cofre' || x.acao === 'naochegou') { caixaHellenCofre(); return; }
   await abrirDiaConcartao(x.u, x.dia);
+  if (x.acao === 'contar') { const el = document.querySelector('#concartao-dia input[id^="cfT_"]'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } return; }
   if (x.caixa) caixaDrillFiltro(x.caixa);
   // 05/11/2026 (Financeiro, regra 8): a troca é feita no Saipos; depois, o "atualizar este dia" confere de novo
   if (/no Saipos/.test(x.botao || '')) {
