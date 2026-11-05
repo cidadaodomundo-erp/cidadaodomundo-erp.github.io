@@ -484,6 +484,15 @@ window.addEventListener('message', (e) => {
     // 05/11/2026: moldura ESCONDIDA não troca a tela. Com uma moldura por tela (Gestão, Canal), trocar a loja redesenha
     // também as escondidas, e a "Esta semana" de fundo puxava a casca para ela no meio do Contas a pagar.
     if (e.data.tipo === 'casca-modulo' && ITENS[e.data.nome] && e.data.nome !== ATUAL) { if (!daPagina.hidden) abrir(e.data.nome); }
+    else if (e.data.tipo === 'casca-titulo' && ITENS[e.data.nome] && !daPagina.hidden) {
+      // 05/11/2026: a página trocou de tela por dentro (Placar → DRE na Gestão): a casca acompanha o título e o menu, e a
+      // moldura fica a mesma
+      const it = ITENS[e.data.nome];
+      ATUAL = e.data.nome;
+      $('titulo').textContent = it.icone + ' ' + it.rotulo;
+      history.replaceState(null, '', '#' + e.data.nome);
+      desenharMenu();
+    }
     else if (e.data.tipo === 'casca-login') mostrarPorta(e.data.recado || 'Sua sessão acabou. Entre de novo.');
     else if (e.data.tipo === 'casca-loja-pedir') trocarLoja(e.data.loja);   // a tela pediu uma loja (ex.: Estoque na Rede)
     return;

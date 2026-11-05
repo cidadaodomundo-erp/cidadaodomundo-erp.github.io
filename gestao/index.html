@@ -24,7 +24,8 @@
   let TROCA_DENTRO = false;
   function avisarCasca(msg) {
     if (!NA_CASCA) return;
-    if (TROCA_DENTRO && msg && msg.tipo === 'casca-modulo') return;
+    // troca por dentro: a casca só acompanha o título; abrir a tela trocaria a moldura e perderia o recorte
+    if (TROCA_DENTRO && msg && msg.tipo === 'casca-modulo') msg = { tipo: 'casca-titulo', nome: msg.nome };
     try { parent.postMessage(msg, location.origin); } catch (e) {}
   }
 </script>
