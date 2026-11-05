@@ -37,6 +37,7 @@ function formaPadrao(t) {
   let m;
   if ((m = low.match(/^(credito|debito)\s+([a-z]+)/))) { const b = band(m[2]); return !b ? s0 : b === 'Amex' ? 'Amex' : b + (m[1] === 'credito' ? ' Crédito' : ' Débito'); }
   if ((m = low.match(/^vale\s+([a-z]+)/))) return band(m[1]) || s0;
+  if (/^ben visa vale/.test(low)) return 'Visa';   // 05/11/2026 (Financeiro): "Ben Visa Vale" no Saipos = "vale Visa" na Rede
   if (/^pix qr no banco/.test(low)) return 'Pix QRCode Rede';
   if ((m = low.match(/^(master|visa|elo)\s+(credito|debito)/))) return band(m[1]) + (m[2] === 'credito' ? ' Crédito' : ' Débito');
   if (/^amex/.test(low)) return 'Amex';
@@ -118,7 +119,7 @@ async function abrirDiaConcartao(unidade, dia) {
     consultarTudo('vw_caixa_online_dia?select=*&dia=eq.' + dia + '&unidade=eq.' + encodeURIComponent(unidade) + '&order=hora'),
     // troca de bandeira provada que o robô faz no Saipos (dono, 03/11/2026: "que vá pra diferença do caixa apenas diferenças de valores")
     consultarTudo('vw_caixa_troca_bandeira_robo?select=id_sale,valor,caixa,hora_venda,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em&dia=eq.' + dia +
-      '&unidade=eq.' + encodeURIComponent(unidade) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA)').catch(() => []),
+      '&unidade=eq.' + encodeURIComponent(unidade) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),   // 05/11: DIVERGENTE = o robô já trocou
   ]);
   CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
@@ -269,7 +270,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const semForma = t => /pendente|n[aã]o cadastrado/i.test(t.detalhe || '');
   // Rede ainda nao entregou a madrugada deste turno? (a linha do dia sabe: rede_completa)
   const redeIncompleta = (CAIXA_CARTAO || []).some(r => r.unidade === unidade && r.dia === dia && r.rede_completa === false);
-  const madrugadaSemRede = s => redeIncompleta && min(s.hora) < CORTE_TURNO;
+  // 05/11/2026 (Financeiro): a Rede incompleta segura o dia inteiro, não só a madrugada (04/11 SB 51,24 + 43,18; AV 31,98 vale)
+  const madrugadaSemRede = s => redeIncompleta;
   // Mesma forma, mesmo caixa, poucos minutos de distancia, valores DIFERENTES: e a mesma
   // venda com valor diferente (dono, 10/09/2026 noite: "tratar a diferenca por bandeira na
   // linha da venda"). Vira UMA linha com a diferenca, em vez de duas soltas que nao se explicam.
@@ -289,8 +291,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   });
   semParS.filter(s => !s._explicado).forEach(s => pend.push({ forma: formaPadrao(s.detalhe), caixa: s.caixa || null, chave: 'pdv:' + s.referencia + ':' + (+s.valor).toFixed(2), bloco: semForma(s) ? 'dinheiro' : 'maquininha', efeito: semForma(s) ? 0 : +s.valor,
     p: madrugadaSemRede(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) ? '#9aa4af' : eVale(s) ? '#f5a623' : '#ff6b6b', hora: hhmm(s.hora),
-    saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou a madrugada' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
-    leitura: madrugadaSemRede(s) ? 'pagamento depois da meia-noite: a maquininha só entrega amanhã' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'registrado no Saipos, mas não passou na maquininha',
+    saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou este dia inteiro' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
+    leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'registrado no Saipos, mas não passou na maquininha',
     acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou' : 'confirmar no caixa se cobrou, ou se passou em outra forma' }));
   restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || null, chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
     p: 2, cor: '#f5a623', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
@@ -605,7 +607,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
               else status = '<span style="color:#7bc47f;">✔ bateu</span>';
             }
             const rb = roboT(x);
-            if (rb) { contrib = 0; cor = '#8a897e'; bg = ''; status = `<span style="color:#9aa4af;">🤖 o robô ${rb.acao === 'FEITO_AGUARDA_CARGA' ? 'trocou' : 'troca'} no Saipos: ${formaPadrao(rb.forma_no_saipos)} → ${formaPadrao(rb.forma_nova)} · não entra na diferença</span>`; }
+            if (rb) { contrib = 0; cor = '#8a897e'; bg = ''; status = `<span style="color:#9aa4af;">🤖 o robô ${rb.acao === 'TROCAR' ? 'troca' : 'trocou'} no Saipos: ${formaPadrao(rb.forma_no_saipos)} → ${formaPadrao(rb.forma_nova)} · não entra na diferença</span>`; }
           }
           det.push({ ord: min(x.hora), hora: hhmm(x.hora), venda: rotVenda(x) + (moto[x.referencia] ? ' · 🛵 ' + moto[x.referencia] : ''), reg: `${limpa(x.detalhe)} ${reaisCc(x.valor)}`, passou, contrib, status, cor, bg });
         });
@@ -641,7 +643,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     };
     const somaS = lista.reduce((a, l) => a + l.saipos, 0), somaR = lista.reduce((a, l) => a + (l.semReal ? 0 : l.real), 0);
     const roboCx = ((CAIXA_DRILL_DADOS || {}).robo || []).filter(x => saipos.some(s => doDia(s) && noCxItem(s, cx) && roboT(s) === x));
-    const roboHtml = !roboCx.length ? '' : `<div style="margin-top:4px; font-size:12px; color:#9aa4af;">🤖 o robô troca no Saipos (não entra na diferença): ${roboCx.map(x => `${x.numero ? 'nº ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'} ${reaisCc(x.valor)} ${formaPadrao(x.forma_no_saipos)} → ${formaPadrao(x.forma_nova)}${x.acao === 'FEITO_AGUARDA_CARGA' ? ' (feito)' : ''}`).join(' · ')}</div>`;
+    const roboHtml = !roboCx.length ? '' : `<div style="margin-top:4px; font-size:12px; color:#9aa4af;">🤖 o robô troca no Saipos (não entra na diferença): ${roboCx.map(x => `${x.numero ? 'nº ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'} ${reaisCc(x.valor)} ${formaPadrao(x.forma_no_saipos)} → ${formaPadrao(x.forma_nova)}${x.acao !== 'TROCAR' ? ' (feito)' : ''}`).join(' · ')}</div>`;
     const descsCx = (descs || []).filter(x => !x.caixa || x.caixa === cx);
     const semMotivo = descsCx.filter(x => !x.motivo && !x.cupom).length;
     const descHtml = !descsCx.length ? '' : `<details style="margin-top:4px; font-size:12px;"><summary style="cursor:pointer; color:#a5a49a;">Descontos manuais: ${descsCx.length}, ${reaisCc(descsCx.reduce((a, x) => a + +x.desconto, 0))}${semMotivo ? ` · <span style="color:#f5a623;">${semMotivo} sem motivo</span>` : ''} <span style="color:#6f6e64;">(informação; não entra na conferência)</span></summary>
@@ -1250,7 +1252,7 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
       consultarTudo('vw_cartao_bandeira_divergente?select=dia,unidade,hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale' + faixa(des, ate) + '&order=hora'),
       consultarTudo('vw_caixa_online_dia?select=*&canal_ok=not.is.true' + faixa(des, ate) + '&order=hora'),
-      consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA)').catch(() => []),
+      consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
     ]);
     CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras };
@@ -1280,7 +1282,7 @@ function caixaHellenItens() {
       r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
         oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa' }));
       r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
-        botao: t.pd ? 'fechar a venda com ' + t.para : 'trocar para ' + t.para }));
+        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para }));
       // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
       r.abertas.filter(x => !String(x.chave).startsWith('dinheiro:')).forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
         oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x }));
@@ -1329,7 +1331,7 @@ function caixaHellenHtml() {
   const linhas = itens.map(x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="abre o dia com as vendas lado a lado">
       <td style="white-space:nowrap;">${nomeLoja(x.u)}</td><td style="white-space:nowrap;">${dm(x.dia)}</td><td>${rotCx(x.caixa)}</td>
       <td style="text-align:left;">${trEscH(x.oque)}</td><td style="text-align:right; white-space:nowrap;">${x.valor == null ? '—' : 'R$ ' + fmt(Math.abs(x.valor))}</td><td style="white-space:nowrap;">${btn(x)}</td></tr>`).join('');
-  const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao === 'FEITO_AGUARDA_CARGA');
+  const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
   const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
   const rodape = rb.length ? `<div class="caption-label" style="text-align:left; margin-top:6px;">🤖 ${vai.length ? `o robô vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''} — não precisa fazer nada.</div>` : '';
   return `<div class="section-label">Para você resolver (${itens.length})</div>
@@ -1346,6 +1348,12 @@ async function caixaHellenAbrir(i) {
   if (x.acao === 'cofre' || x.acao === 'naochegou') { caixaHellenCofre(); return; }
   await abrirDiaConcartao(x.u, x.dia);
   if (x.caixa) caixaDrillFiltro(x.caixa);
+  // 05/11/2026 (Financeiro, regra 8): a troca é feita no Saipos; depois, o "atualizar este dia" confere de novo
+  if (/no Saipos/.test(x.botao || '')) {
+    const bt = document.querySelector('#concartao-dia button[onclick^="caixaAtualizarDia"]');
+    if (bt) { bt.scrollIntoView({ behavior: 'smooth', block: 'center' }); bt.style.outline = '2px solid var(--marca-amarelo)';
+      avisoAcao('atencao', `! Troque a forma no Saipos (caixa do dia → Ver → a venda → mudar a forma → salvar ajustes) e depois clique em "Já corrigi no Saipos — atualizar este dia".`); }
+  }
 }
 function caixaHellenCofre() {
   const el = document.querySelector('#view-caixa .cards') || document.getElementById('tabelaCofreSbPend');
