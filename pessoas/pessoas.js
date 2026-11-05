@@ -1837,7 +1837,7 @@ function cgEnvioPessoas(M) {
 }
 function cgEnvVal(k, v, pct) {
   if (!v) return '<span style="color:var(--tx-5);">–</span>';
-  if (k === 'vt' && pct) return `desconta ${String(v).replace('.', ',')}%`;
+  if (k === 'vt' && pct) return `${String(v).replace('.', ',')}%`;
   if (k === 'dsr') return `${cgN(v)} ${cgN(v) === 1 ? 'dia' : 'dias'}`;
   return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
 }
@@ -2043,7 +2043,7 @@ function cgEnvioXlsx() {
       const E = L.filter((x) => x.empresa_codigo === e).sort((a, b) => String(a.nome).localeCompare(String(b.nome)) || String(a.rubrica).localeCompare(String(b.rubrica)));
       const linhas = [[`Empresa ${e} · ${cgMesRot(comp)}`], [], ['Matrícula', 'Nome', 'Rubrica', 'Descrição', 'Valor', 'Observação']];
       E.forEach((x) => linhas.push([String(x.matricula), cgNome(x.nome), String(x.rubrica), x.descricao || '', Math.round(cgN(x.valor) * 100) / 100,
-        x.rubrica === 'DSR' ? `${cgN(x.valor)} dia(s) — ${String(x.origem || '').replace(/^.*?:\s*/, '')}` : x.medida === '%' ? '% (desconta em folha)' : 'R$']));
+        x.rubrica === 'DSR' ? `${cgN(x.valor)} dia(s) — ${String(x.origem || '').replace(/^.*?:\s*/, '')}` : x.medida === '%' ? '%' : 'R$']));
       linhas.push([], ['Total por rubrica']);
       [...new Set(E.map((x) => x.rubrica))].forEach((r) => { const R = E.filter((x) => x.rubrica === r);
         if (R[0].medida === '%') { linhas.push(['', '', String(r), R[0].descricao || '', R.length, 'pessoas']); return; }
