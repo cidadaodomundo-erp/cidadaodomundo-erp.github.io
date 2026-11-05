@@ -2563,14 +2563,14 @@ function cargosCiclo(c) { CARGOS_F.ciclo = c; CARGOS_F.bonifCel = null; renderMo
 
 // ---------- BONIFICAÇÃO MÊS A MÊS (05/11/2026, proposta do RH 2026-11-05-rh-bonificacao-mes-a-mes.md) ----------
 // O modelo é a aba "Bonificacoes" da planilha de pagamento do dono: por empresa, uma linha por pessoa, os 3 meses (26 a 25)
-// e o total; cada célula pintada pelo motivo. Fonte vw_rh_bonificacao_mes; ajuste por rh_bonificacao_ajustar.
+// e o total; cada célula pintada pelo motivo. Desde 05/11 (dono) conta por MÊS FECHADO (1º ao último dia). Fonte vw_rh_bonificacao_mes; ajuste por rh_bonificacao_ajustar.
 // Enquanto a view não existir no banco, a aba segue com a tela do ciclo (cgAbaBonifCiclo).
 const CG_BON_COR = {
   FORA_REGISTRO: ['var(--bonif-fora)', 'Fora do período de registro (admitido no mês: proporcional)'],
   FALTA_ATESTADO: ['var(--bonif-falta)', 'Perda por falta ou atestado'],
   FERIAS: ['var(--bonif-ferias)', 'Férias'],
   ADVERTENCIA: ['var(--bonif-adv)', 'Advertência ou suspensão'],
-  AJUSTE: ['var(--bonif-ajuste)', 'Ajuste feito aqui'],
+  AJUSTE: ['var(--bonif-ajuste)', 'Zerado pelo gestor (azul claro)'],
 };
 async function cgBonifMesCarregar() {
   CARGOS.bonifMes = null;
@@ -2597,8 +2597,9 @@ function cgAbaBonif() {
   const cel = (x) => {
     if (!x) return '<td style="color:var(--tx-5);">–</td>';
     const c = CG_BON_COR[corDe(x)], k = pk(x) + '|' + x.n, sel = F.bonifCel === k;
-    const est = c ? `background:${c[0]};color:${corDe(x) === 'AJUSTE' ? 'var(--tx-1)' : 'var(--bg)'};` : '';
-    return `<td title="${cgEsc(x.motivo || '')}" style="cursor:pointer;${est}${sel ? 'outline:2px solid var(--brand);outline-offset:-2px;' : ''}" onclick="CARGOS_F.bonifCel=CARGOS_F.bonifCel==='${cgEsc(k)}'?null:'${cgEsc(k)}';renderModuloCargos()">${cgR(x.valor)}${x.ajuste === 'MANTER' ? ' <span style="font-size:10.5px;font-weight:700;">mantido</span>' : ''}</td>`;
+    const est = c ? `background:${c[0]};color:var(--bg);` : '';
+    const tit = x.ajuste === 'ZERAR' ? `zerado por ${String(x.ajuste_por || '').split('@')[0] || 'gestor'}${x.ajuste_motivo ? ': ' + x.ajuste_motivo : ''}${x.motivo ? ' · ' + x.motivo : ''}` : (x.motivo || '');
+    return `<td title="${cgEsc(tit)}" style="cursor:pointer;${est}${sel ? 'outline:2px solid var(--brand);outline-offset:-2px;' : ''}" onclick="CARGOS_F.bonifCel=CARGOS_F.bonifCel==='${cgEsc(k)}'?null:'${cgEsc(k)}';renderModuloCargos()">${cgR(x.valor)}${x.ajuste === 'MANTER' ? ' <span style="font-size:10.5px;font-weight:700;">mantido</span>' : ''}</td>`;
   };
   let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${pags.map((p) =>
       `<button type="button" class="preset-btn ${p === pag ? 'active' : ''}" onclick="CARGOS_F.bonifPag='${p}';CARGOS_F.bonifCel=null;renderModuloCargos()">paga ${cgData(p)}</button>`).join('')}</div>

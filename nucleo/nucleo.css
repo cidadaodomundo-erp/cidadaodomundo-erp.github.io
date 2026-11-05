@@ -701,8 +701,8 @@
        e no escuro sobra so a faixa azul-roxo-rosa (verde-agua ja fica a 13 do verde do farol). */
     --serie-1:#1e69d2; --serie-2:#25a1ad; --serie-3:#813be3; --serie-4:#b6689c;
     /* Bonificação mês a mês (05/11/2026): as cores da aba "Bonificacoes" da planilha de pagamento do dono, uma por motivo.
-       Só nas células dessa grade; o texto em cima delas é o --bg (escuro), menos no ajuste (preto, texto claro). */
-    --bonif-fora:#f2d64b; --bonif-falta:#7cc68a; --bonif-ferias:#f7c59f; --bonif-adv:#e0605a; --bonif-ajuste:#000000;
+       Só nas células dessa grade; o texto em cima delas é o --bg (escuro). Ajuste = zerado pelo gestor, azul claro (dono, 05/11 19:15). */
+    --bonif-fora:#f2d64b; --bonif-falta:#7cc68a; --bonif-ferias:#f7c59f; --bonif-adv:#e0605a; --bonif-ajuste:#9fd3f5;
   }
   .papel { --farol-ok:#1f6d3f; --farol-perto:#b26a00; --farol-fora:#b3261e; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c;
     --p-bg:#f6f5f1; --p-paper:#fff; --p-ink:#1e2226; --p-line:#dcdad3; --p-line2:#ebe9e3; --p-head:#efede6; --p-zebra:#f1f0eb;
