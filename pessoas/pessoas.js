@@ -1456,7 +1456,10 @@ async function cgEnvioCarregar() {
     const [lin, prev] = await Promise.all([consultarTudo('vw_rh_fechamento_folha?select=*&order=competencia.desc,empresa_codigo,matricula,rubrica,medida'),
       // 05/11/2026 (RH): o adiantamento do painel confere com o que a contabilidade descontou na folha (prévia ou fechada)
       consultarTudo('vw_rh_folha_conferencia_pessoa?select=competencia,empresa,matricula,nome,adiantamento&order=competencia,empresa,matricula').catch(() => [])]);
-    CARGOS.envio = { lin, prev };
+    // 05/11/2026 (RH): "Hellen conferiu" (um por competência) e o dia de cada falta (uma linha por dia)
+    const [conf, fdias] = await Promise.all([consultarTudo('rh_fechamento_conferido?select=*&order=competencia').catch(() => []),
+      consultarTudo('rh_falta_data?select=competencia,pessoa_id,data&order=competencia,pessoa_id,data').catch(() => [])]);
+    CARGOS.envio = { lin, prev, conf, fdias };
   }
   catch (e) { CARGOS.envio = { erro: e.message }; }
   if (CARGOS_F.aba === 'envio') renderModuloCargos();
@@ -1474,7 +1477,7 @@ function cgEnvioPessoas(M) {
   const P = new Map();
   M.forEach((x) => {
     const k = x.empresa_codigo + '|' + x.matricula;
-    if (!P.has(k)) P.set(k, { k, empresa: x.empresa_codigo, matricula: x.matricula, nome: x.nome, unidade: x.unidade, fora: !x.pessoa_id, lin: [] });
+    if (!P.has(k)) P.set(k, { k, pid: x.pessoa_id, empresa: x.empresa_codigo, matricula: x.matricula, nome: x.nome, unidade: x.unidade, fora: !x.pessoa_id, lin: [] });
     const p = P.get(k); p.lin.push(x);
     const c = CG_ENV_COLS.find(([, , f]) => f(x));
     if (c) p[c[0]] = (p[c[0]] || 0) + (x.medida === 'horas' ? cgEnvMin(x.valor) : cgN(x.valor));
@@ -1500,11 +1503,17 @@ function cgAbaEnvio() {
   const ini = new Date(comp + 'T12:00:00'); const de = new Date(ini.getFullYear(), ini.getMonth() - 1, 26), ate = new Date(ini.getFullYear(), ini.getMonth(), 25);
   const tem = (f) => M.some(f);
   const empsFlash = new Set(M.filter((x) => x.medida === 'horas').map((x) => x.empresa_codigo));
+  const conf = (CARGOS.envio.conf || []).find((x) => String(x.competencia).slice(0, 10) === comp);
+  const PT = cgEnvioPessoas(M), fComF = PT.filter((p) => p.falta && p.pid).length, fPend = PT.filter((p) => p.falta && p.pid && !cgEnvDias(comp, p.pid).length).length;
   let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;">${comps.slice(0, 6).map((c) =>
       `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.envioComp='${c}';CARGOS_F.envioEmp=null;CARGOS_F.envioAberta=null;renderModuloCargos()">${cgMesRot(c)}</button>`).join('')}</div>
     <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
     ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
-                ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')]])}`;
+                ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')],
+                [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, fComF > 0 && !fPend], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;">${conf
+      ? `<span style="font-size:12.5px;color:var(--farol-ok);">✓ Conferido — pode enviar à contabilidade.</span> ${cgBotaoPasso('Desfazer a conferência', `cgEnvioConferir('${comp}',false)`, true)}`
+      : cgBotaoPasso('Marcar como conferido', `cgEnvioConferir('${comp}',true)`)}</div>`;
   // um cartão por empresa: clicar filtra a tabela
   h += `<div class="cards">${emps.map((e) => {
       const L = M.filter((x) => x.empresa_codigo === e), P = cgEnvioPessoas(L), ativo = F.envioEmp === e;
@@ -1543,8 +1552,8 @@ function cgAbaEnvio() {
       return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(p.k))}?null:${cgEsc(JSON.stringify(p.k))};renderModuloCargos()'>
         <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
-        ${CG_ENV_COLS.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"' : ''}>${cgEnvVal(k, p[k])}</td>`).join('')}</tr>
-        ${ab ? `<tr><td colspan="${CG_ENV_COLS.length + 2}">${cgEnvioLinhasHtml(p)}</td></tr>` : ''}`; }).join('')}
+        ${CG_ENV_COLS.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"' : ''}>${cgEnvVal(k, p[k])}${k === 'falta' && p.falta && p.pid ? cgEnvDiasRot(comp, p.pid) : ''}</td>`).join('')}</tr>
+        ${ab ? `<tr><td colspan="${CG_ENV_COLS.length + 2}">${p.falta && p.pid ? cgEnvDiasHtml(comp, p) : ''}${cgEnvioLinhasHtml(p)}</td></tr>` : ''}`; }).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="2">${P.length} ${P.length === 1 ? 'pessoa' : 'pessoas'}</td>
       ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, P.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
   return h;
@@ -1555,6 +1564,51 @@ function cgEnvioLinhasHtml(p) {
       <td>${x.medida === 'horas' ? cgEnvHM(cgEnvMin(x.valor)) : cgR(x.valor)}</td>
       <td style="color:var(--tx-4);">${x.medida === 'horas' ? cgEsc(cgN(x.valor).toFixed(2)) : ''}</td>
       <td style="color:var(--tx-4);">${cgEsc(x.origem)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+// ---- dia de cada falta (rh_falta_data) e "conferido" (rh_fechamento_conferido), do RH em 05/11/2026 ----
+function cgEnvDias(comp, pid) { return (CARGOS.envio.fdias || []).filter((x) => String(x.competencia).slice(0, 10) === comp && x.pessoa_id === pid).map((x) => String(x.data).slice(0, 10)).sort(); }
+function cgEnvQuem(e) { return cgNome(String(e || '').split('@')[0]) || '–'; }
+function cgEnvQuando(t) { if (!t) return ''; const d = new Date(t); return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }); }
+function cgEnvDiasRot(comp, pid) {
+  const n = cgEnvDias(comp, pid).length;
+  return n ? `<div style="font-size:11px;color:var(--tx-4);">${n} ${n === 1 ? 'dia' : 'dias'}</div>` : '<div style="font-size:11px;color:var(--farol-perto);">falta o dia</div>';
+}
+function cgEnvDiasHtml(comp, p) {
+  const ds = cgEnvDias(comp, p.pid), ini = new Date(comp + 'T12:00:00');
+  const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const de = iso(new Date(ini.getFullYear(), ini.getMonth() - 1, 26)), ate = iso(new Date(ini.getFullYear(), ini.getMonth(), 25));
+  return `<div onclick="event.stopPropagation()" style="margin:4px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;max-width:760px;">
+    <b style="font-size:12.5px;">Dias das faltas</b> <span style="font-size:12px;color:var(--tx-4);">— ${cgEnvHM(p.falta)} de falta na Flash</span>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">
+      ${ds.map((d) => `<span class="preset-btn" style="cursor:default;">${cgData(d)} <a href="javascript:void(0)" title="tirar este dia" onclick="cgEnvDiasSalvar('${comp}',${p.pid},${cgEsc(JSON.stringify(ds.filter((x) => x !== d)))})" style="color:var(--tx-4);margin-left:4px;">✕</a></span>`).join('') || '<span style="font-size:12px;color:var(--farol-perto);">nenhum dia informado</span>'}
+      <input type="date" id="cgEnvDia_${p.pid}" min="${de}" max="${ate}" style="padding:5px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      ${cgBotaoPasso('Acrescentar o dia', `cgEnvDiaMais('${comp}',${p.pid})`, true)}</div></div>`;
+}
+function cgEnvDiaMais(comp, pid) {
+  const el = document.getElementById('cgEnvDia_' + pid), d = el && el.value;
+  if (!d) return avisoAcao('atencao', '! Escolha o dia da falta no calendário e clique em "Acrescentar o dia".');
+  const ds = cgEnvDias(comp, pid);
+  if (ds.includes(d)) return avisoAcao('atencao', `! O dia ${cgData(d)} já está na lista.`);
+  cgEnvDiasSalvar(comp, pid, ds.concat(d).sort());
+}
+async function cgEnvDiasSalvar(comp, pid, dias) {
+  avisoAcao('atencao', '… gravando os dias da falta');
+  const r = await trRpcSeguro('rh_falta_datas_salvar', { p_competencia: comp, p_pessoa_id: pid, p_datas: dias });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgEnvDiasSalvar(comp, pid, dias));
+  CARGOS.envio.fdias = (CARGOS.envio.fdias || []).filter((x) => !(String(x.competencia).slice(0, 10) === comp && x.pessoa_id === pid))
+    .concat(dias.map((d) => ({ competencia: comp, pessoa_id: pid, data: d })));
+  renderModuloCargos();
+  avisoAcao('ok', `✓ ${dias.length ? `${dias.length} ${dias.length === 1 ? 'dia de falta gravado' : 'dias de falta gravados'}` : 'Dias de falta apagados'} às ${avisoHora()}.`);
+}
+async function cgEnvioConferir(comp, sim) {
+  avisoAcao('atencao', sim ? '… marcando como conferido' : '… desfazendo a conferência');
+  const r = await trRpcSeguro('rh_fechamento_conferir', { p_competencia: comp, p_conferido: sim });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgEnvioConferir(comp, sim));
+  const quando = sim ? await r.json().catch(() => null) : null;
+  CARGOS.envio.conf = (CARGOS.envio.conf || []).filter((x) => String(x.competencia).slice(0, 10) !== comp)
+    .concat(sim ? [{ competencia: comp, conferido_por: ((typeof rmbSessao === 'function' && rmbSessao()) || {}).email || '', conferido_em: quando || new Date().toISOString() }] : []);
+  renderModuloCargos();
+  avisoAcao('ok', sim ? `✓ ${cgMesRot(comp)} marcado como conferido às ${avisoHora()}.` : `✓ Conferência de ${cgMesRot(comp)} desfeita às ${avisoHora()}.`);
 }
 function cgEnvioBaixar(nome, texto, tipo) {
   const url = URL.createObjectURL(new Blob([texto], { type: tipo }));
