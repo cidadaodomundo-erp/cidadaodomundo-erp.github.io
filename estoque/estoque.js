@@ -133,7 +133,11 @@ async function ctgCarregar() {
     // sem lugar): entra também a linha LIDA e não gravada. Quem decide se já está contado é ctgHtmlBrancos (pela contagem).
     CTG.brancos = await consultarTudo(`vw_est_contagem_grade?select=linha,grupo,ordem_grupo,nome,nome_saipos_conta,un,situacao,qtd_lida,id_foto` +
       `&id_inventario=eq.${CTG.folha.id}&situacao=in.(%22EM%20BRANCO%20NA%20FOTO%22,%22EM%20BRANCO%20NO%20FIM%20DA%20PAGINA%22,%22ESPERANDO%20CONFERENCIA%22)&order=ordem_grupo,linha`).catch(() => []);   // 22/10: o Estoque criou as linhas vazias (ESPERANDO CONFERENCIA, sem quantidade)
-  } else CTG.brancos = [];
+    // 05/11/2026 (proposta 2026-10-21-grade-da-contagem-folha-inteira.md): página fotografada pela metade e item que saiu
+    // da folha depois de impressa. A página sem foto nenhuma já está no quadro de páginas.
+    CTG.gradeAviso = await consultarTudo(`vw_est_contagem_grade?select=linha,grupo,ordem_grupo,nome,situacao` +
+      `&id_inventario=eq.${CTG.folha.id}&situacao=in.(%22FALTA%20A%20FOTO%20DO%20COMECO%20DA%20PAGINA%22,%22NAO%20CONTA%20MAIS%22)&order=ordem_grupo,linha`).catch(() => []);
+  } else { CTG.brancos = []; CTG.gradeAviso = []; }
   // 28/10/2026: notas com data até a contagem, lançadas no Saipos depois dela — a mercadoria já estava na prateleira?
   CTG.nfDepois = await consultarTudo(`vw_est_nf_apos_contagem?select=*&unidade=eq.${u}&order=data_da_nota,nf`).catch(() => null);
   CTG.nfTodasAgora = false;
@@ -1059,14 +1063,39 @@ async function ctgConferirOk() {
 }
 
 // o que ficou em branco no papel e ainda não foi preenchido aqui (some da lista assim que grava)
-function ctgHtmlBrancos() {
+// as linhas em branco que ainda esperam resposta (0 ou o valor contado)
+function ctgBrancosPendentes() {
   // 04/11/2026: grava e compara pelo NOME DA BASE (b.nome da vw_est_contagem_grade), nunca pelo nome_saipos_conta.
   // Linha antiga gravada com o nome do Saipos também conta como preenchida (não reaparece para digitar de novo).
   const ja = new Set(CTG.itens.map((i) => i.nome_saipos));
   // linha de foto ainda esperando "Gravar estes itens" já tem campo na conferência da foto: não repete aqui
   const fotoPendente = new Set((CTG.fotos || []).filter((f) => f.status === 'TRANSCRITA').map((f) => f.id));
-  const L = (CTG.brancos || []).filter((b) => !ja.has(b.nome) && !ja.has(b.nome_saipos_conta)
+  return (CTG.brancos || []).filter((b) => !ja.has(b.nome) && !ja.has(b.nome_saipos_conta)
     && !(b.qtd_lida != null && fotoPendente.has(b.id_foto)));
+}
+// 05/11/2026: página com o começo fora da foto (vermelho, com o botão da câmera) e item que saiu da folha (cinza).
+function ctgHtmlGradeAviso() {
+  const A = CTG.gradeAviso || [];
+  const ja = new Set(CTG.itens.map((i) => i.nome_saipos));
+  const falta = A.filter((x) => x.situacao === 'FALTA A FOTO DO COMECO DA PAGINA' && !ja.has(x.nome));
+  const fora = A.filter((x) => x.situacao === 'NAO CONTA MAIS');
+  let h = '';
+  if (falta.length) {
+    const lendo = (CTG.fotos || []).some((f) => f.status === 'AGUARDANDO');
+    const grupos = [...new Set(falta.map((x) => x.grupo))];
+    h += `<div class="contexto" style="text-align:left; border-color:${lendo ? 'var(--info)' : 'var(--farol-fora)'}; margin-bottom:10px;">
+      <b style="color:${lendo ? 'var(--tx-1)' : 'var(--farol-fora)'};">A foto não pegou o começo de ${grupos.length === 1 ? 'uma página' : grupos.length + ' páginas'}: ${falta.length} ${falta.length === 1 ? 'item ficou' : 'itens ficaram'} sem leitura</b>
+      ${grupos.map((g) => { const l = falta.filter((x) => x.grupo === g), n = l.map((x) => x.linha).filter((v) => v != null);
+        return `<div style="font-size:12.5px; margin-top:4px;"><b>${trEscH(g || 'sem página')}</b>${n.length ? ` — linhas ${Math.min(...n)} a ${Math.max(...n)}` : ''} (${l.length} ${l.length === 1 ? 'item' : 'itens'})</div>`; }).join('')}
+      <div style="font-size:12.5px; margin-top:6px;">${lendo ? `Chegou foto que ainda está sendo lida (resultado ${ctgProximaLeitura()}). Se ela for desta parte, <b>não precisa mandar de novo</b>.`
+        : 'Fotografe o começo da página (a parte de cima, com os números das linhas) e mande.'}</div>
+      ${lendo ? '' : `<div style="margin-top:8px;"><button class="preset-btn" style="border-color:var(--farol-fora); color:var(--tx-1); font-size:14px; padding:9px 14px;" onclick="ctgAbrirCamera()">📷 Mandar a foto que falta</button></div>`}</div>`;
+  }
+  if (fora.length) h += `<div class="caption-label" style="text-align:left; margin-bottom:10px;">Saíram da folha depois de impressa e não contam mais: <s>${fora.map((x) => trEscH(x.nome)).join(', ')}</s>.</div>`;
+  return h;
+}
+function ctgHtmlBrancos() {
+  const L = ctgBrancosPendentes();
   if (!L.length) return '';
   const nLidas = L.filter((b) => b.qtd_lida != null).length;
   let h = `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); margin-bottom:10px;">
@@ -1092,7 +1121,7 @@ function ctgHtmlBrancos() {
 
 function ctgHtmlConferir() {
   const feitos = CTG.itens.slice().sort((a, b) => (b.contado_em || '').localeCompare(a.contado_em || ''));
-  const brancos = ctgHtmlBrancos();
+  const brancos = ctgHtmlGradeAviso() + ctgHtmlBrancos();
   if (!feitos.length) {
     return brancos || `<div class="caption-label">Nada ainda — o que vier da foto aparece aqui para conferir e corrigir.</div>`;
   }
@@ -1144,6 +1173,9 @@ function ctgHtmlConferir() {
 // Depois do fechamento a própria contagem vira o ponto de partida do saldo: se o esperado não
 // fosse gravado aqui, ele seria irrecuperável e toda diferença daria zero.
 async function ctgFechar() {
+  // 05/11/2026 (proposta da grade, 22/10): linha em branco sem resposta não deixa fechar — 0 é resposta, vazio não
+  const vazios = ctgBrancosPendentes().length;
+  if (vazios) return avisoAcao('atencao', `! A folha não fechou: ${vazios} ${vazios === 1 ? 'item ficou' : 'itens ficaram'} em branco no papel. Digite 0 se não tinha, ou o valor contado, no quadro "ainda sem contagem", e feche de novo.`);
   const esperados = ctgListaDoPapel(CTG.folha).length;
   const n = CTG.itens.length;
   if (n < esperados && !confirm(`Faltam ${esperados - n} itens sem contar. Fechar assim mesmo?`)) return;
