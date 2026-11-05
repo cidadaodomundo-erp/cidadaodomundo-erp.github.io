@@ -1310,7 +1310,7 @@ function cgAbaVtVa() {
   const totFlash = soma(pelaFlash), totFora = soma(fora), nFlash = pelaFlash.filter((v) => cgN(v.vt_valor) + cgN(v.va_valor) > 0).length;
   const dt = (k) => linhas.map((v) => v[k]).filter(Boolean).sort().pop();
   const ca = dt('calculado_em'), fe = dt('fechado_em'), en = dt('enviado_em');
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mes='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).reverse().map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mes='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
     <h3 style="margin:8px 0 0;">VT e VA de ${cgMesRot(mes)} · fecha no último dia útil de ${cgMesRot(cgMesIso(0)).split(' ')[0]}</h3>
     ${cgPassos([['calculado', !!ca, cgDiaMes(ca)], ['fechado', !!fe, cgDiaMes(fe)], ['enviado', !!en, cgDiaMes(en)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
@@ -1403,7 +1403,7 @@ function cgAbaFolha() {
   const E = emp.filter((x) => String(x.competencia).slice(0, 10) === comp);
   const P = pes.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
   const ok = (a, b) => Math.abs(cgN(a) - cgN(b)) < 0.01;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).map((c) =>
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).reverse().map((c) =>
       `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}${(CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : ''}</button>`).join('')}</div>
     ${cgFolhaImportarHtml()}
     ${(CARGOS.folha.previa || new Set()).has(comp)
@@ -1737,7 +1737,7 @@ function cgAbaDez() {
   const R = res.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
   const P = pes.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
   const parcial = R.length && R.every((x) => !x.periodo_fechado);
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${comps.slice(0, 6).map((c) => { const fx = res.some((x) => d10(x.competencia) === c && x.periodo_fechado);
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${comps.slice(0, 6).reverse().map((c) => { const fx = res.some((x) => d10(x.competencia) === c && x.periodo_fechado);
       return `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.dezComp='${c}';renderModuloCargos()">${cgMesRot(c)}${fx ? '' : ' (parcial)'}</button>`; }).join('')}</div>
     ${R[0] ? `<div class="caption-label" style="text-align:left;">Período ${cgData(R[0].periodo_inicio)} a ${cgData(R[0].periodo_fim)}${parcial ? ' — <b>parcial até hoje</b>: a conta muda até o dia 25' : ''}.</div>` : ''}`;
   if (!R.length) return h + '<div class="contexto">Nenhuma unidade com gratificação nesta competência.</div>';
@@ -1789,7 +1789,11 @@ const CG_ENV_COLS = [
   ['grat', 'Gratif. salão', (x) => x.medida === 'R$' && (x.rubrica === '0203' || x.rubrica === '0205')],
   ['vt', 'VT do mês', (x) => x.rubrica === '0048'],
   ['adt', 'Adiantamento', (x) => x.rubrica === '0981'],
+  // 05/11/2026 (dono): dias de falta sem atestado do ciclo, para o desconto do DSR (datas em `origem`)
+  ['dsr', 'Dias de falta p/ DSR', (x) => x.rubrica === 'DSR'],
 ];
+// 05/11/2026 (dono): "os campos que vem da Flash, baixamos de lá, o restante [...] em outro arquivo" — dois blocos
+const CG_ENV_FLASH = ['he100', 'he70', 'not', 'falta', 'atraso'], CG_ENV_PAINEL = ['grat', 'vt', 'adt', 'dsr'];
 // 05/11/2026 ~16h (RH, CORRIGIDO): as horas da Flash são DECIMAIS — minutos = valor × 60 (7,85 = 7:51; 18,80 = 18:48). A API da
 // Flash dá, para o mesmo lançamento, 10.27 e 10:16. A leitura "hora + minutos" (48.99 = 49:39) estava errada.
 function cgEnvMin(v) { return Math.round(cgN(v) * 60); }
@@ -1825,11 +1829,13 @@ function cgEnvioPessoas(M) {
     const p = P.get(k); p.lin.push(x);
     const c = CG_ENV_COLS.find(([, , f]) => f(x));
     if (c) p[c[0]] = (p[c[0]] || 0) + (x.medida === 'horas' ? cgEnvMin(x.valor) : cgN(x.valor));
+    if (c && c[0] === 'dsr') p.dsrOrigem = x.origem;
   });
   return [...P.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
 }
 function cgEnvVal(k, v) {
   if (!v) return '<span style="color:var(--tx-5);">–</span>';
+  if (k === 'dsr') return `${cgN(v)} ${cgN(v) === 1 ? 'dia' : 'dias'}`;
   return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
 }
 function cgAbaEnvio() {
@@ -1848,13 +1854,14 @@ function cgAbaEnvio() {
   const tem = (f) => M.some(f);
   const empsFlash = new Set(M.filter((x) => x.medida === 'horas').map((x) => x.empresa_codigo));
   const conf = (CARGOS.envio.conf || []).find((x) => String(x.competencia).slice(0, 10) === comp);
-  const PT = cgEnvioPessoas(M), fComF = PT.filter((p) => p.falta && p.pid).length, fPend = PT.filter((p) => p.falta && p.pid && !cgEnvDias(comp, p.pid).length).length;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;">${comps.slice(0, 6).map((c) =>
+  // Dias das faltas ✓ quando toda pessoa com falta (0040) no arquivo da Flash tem a linha DSR (RH 05/11)
+  const PT = cgEnvioPessoas(M), fComF = PT.filter((p) => p.falta).length, fPend = PT.filter((p) => p.falta && !p.dsr).length;
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;">${comps.slice(0, 6).reverse().map((c) =>
       `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.envioComp='${c}';CARGOS_F.envioEmp=null;CARGOS_F.envioAberta=null;renderModuloCargos()">${cgMesRot(c)}</button>`).join('')}</div>
     <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
     ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
                 ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')],
-                [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, fComF > 0 && !fPend], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}
+                [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, !fPend && (fComF > 0 || empsFlash.size > 0)], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;">${conf
       ? `<span style="font-size:12.5px;color:var(--farol-ok);">✓ Conferido — pode enviar à contabilidade.</span> ${cgBotaoPasso('Desfazer a conferência', `cgEnvioConferir('${comp}',false)`, true)}`
       : cgBotaoPasso('Marcar como conferido', `cgEnvioConferir('${comp}',true)`)}</div>`;
@@ -1885,21 +1892,33 @@ function cgAbaEnvio() {
     });
   }
   const adtDifK = new Set(adtDif.map((d) => d.k));
-  h += `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
-      ${(F.envioEmp ? [F.envioEmp] : emps).map((e) => cgBotaoPasso(`Baixar arquivo de TESTE · empresa ${cgEsc(e)}`, `cgEnvioArquivo('${cgEsc(e)}')`)).join('')}
-      ${cgBotaoPasso('Baixar planilha de conferência', 'cgEnvioPlanilha()', true)}</div>
-    ${fora ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">${fora} ${fora === 1 ? 'matrícula da Flash não está' : 'matrículas da Flash não estão'} no cadastro: conferir antes de enviar.</div>` : ''}
+  const avisos = `${fora ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">${fora} ${fora === 1 ? 'matrícula da Flash não está' : 'matrículas da Flash não estão'} no cadastro: conferir antes de enviar.</div>` : ''}
     ${adtDif.length ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Adiantamento: o painel e a folha da contabilidade não batem em ${adtDif.length} ${adtDif.length === 1 ? 'pessoa' : 'pessoas'}.</b>
-      <div style="margin-top:4px;">${adtDif.map((d) => `${cgEsc(cgNome(d.nome))}: painel ${d.a ? cgR(d.a) : 'sem adiantamento'} × contabilidade ${d.b ? cgR(d.b) : 'sem desconto'}`).join('<br>')}</div></div>` : ''}
-    <div id="tabelaCgEnvio" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Empresa · matr.</th>${CG_ENV_COLS.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
-    ${P.map((p) => { const ab = F.envioAberta === p.k;
-      return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(p.k))}?null:${cgEsc(JSON.stringify(p.k))};renderModuloCargos()'>
+      <div style="margin-top:4px;">${adtDif.map((d) => `${cgEsc(cgNome(d.nome))}: painel ${d.a ? cgR(d.a) : 'sem adiantamento'} × contabilidade ${d.b ? cgR(d.b) : 'sem desconto'}`).join('<br>')}</div></div>` : ''}`;
+  const tabela = (id, ks) => {
+    const C = CG_ENV_COLS.filter(([k]) => ks.includes(k)), Q = P.filter((p) => ks.some((k) => p[k]));
+    if (!Q.length) return '<div class="contexto">Nada neste mês.</div>';
+    return `<div id="${id}" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Empresa · matr.</th>${C.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
+    ${Q.map((p) => { const ab = F.envioAberta === id + p.k;
+      return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(id + p.k))}?null:${cgEsc(JSON.stringify(id + p.k))};renderModuloCargos()'>
         <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
-        ${CG_ENV_COLS.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"' : ''}>${cgEnvVal(k, p[k])}${k === 'falta' && p.falta && p.pid ? cgEnvDiasRot(comp, p.pid) : ''}</td>`).join('')}</tr>
-        ${ab ? `<tr><td colspan="${CG_ENV_COLS.length + 2}">${p.falta && p.pid ? cgEnvDiasHtml(comp, p) : ''}${cgEnvioLinhasHtml(p)}</td></tr>` : ''}`; }).join('')}
-    </tbody><tfoot><tr class="sub"><td colspan="2">${P.length} ${P.length === 1 ? 'pessoa' : 'pessoas'}</td>
-      ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, P.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
+        ${C.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"'
+          : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k])}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}</tr>
+        ${ab ? `<tr><td colspan="${C.length + 2}">${cgEnvioLinhasHtml({ ...p, lin: p.lin.filter((x) => { const c = CG_ENV_COLS.find(([, , f]) => f(x)); return c && ks.includes(c[0]); }) })}</td></tr>` : ''}`; }).join('')}
+    </tbody><tfoot><tr class="sub"><td colspan="2">${Q.length} ${Q.length === 1 ? 'pessoa' : 'pessoas'}</td>
+      ${C.map(([k]) => `<td>${cgEnvVal(k, Q.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
+  };
+  h += avisos + `<div class="section-label" style="margin-top:14px;">1 · Arquivo da Flash — baixar na Flash</div>
+    <div class="caption-label" style="text-align:left;line-height:1.7;">Flash › Controle de jornada › Integrações › Domínio › <b>Exportar arquivo</b> › código da empresa (945 / 944 / 413) › Período fechado (mês/ano) ›
+      conjunto "Exportação para contabilidade" › Selecionar pessoas: <b>só os registrados da empresa que batem ponto</b>${comp >= '2026-11-01' ? ' › "Exportar apenas funcionários com espelho de ponto FECHADO" = <b>Sim</b>' : ''}.
+      Cidadão AV (350) não tem arquivo. O txt baixado é o que vale: a Conferência da folha compara com ele.</div>
+    ${tabela('tabelaCgEnvioFlash', CG_ENV_FLASH)}
+    <div class="section-label" style="margin-top:18px;">2 · Arquivo do painel — enviar à contabilidade</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
+      ${cgBotaoPasso('Gerar arquivo para a contabilidade (.xlsx)', 'cgEnvioXlsx()')}
+      <span class="caption-label" style="margin:0;">uma aba por empresa: matrícula, nome, rubrica, descrição e valor, com o total por rubrica</span></div>
+    ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}`;
   return h;
 }
 function cgEnvioLinhasHtml(p) {
@@ -1974,6 +1993,63 @@ function cgEnvioArquivo(emp) {
     cgEnvioBaixar(`contabilidade-${emp}-${am}-TESTE.txt`, txt, 'text/plain');
     avisoAcao('ok', `✓ Arquivo de TESTE da empresa ${emp} gerado (${L.length} linhas) às ${avisoHora()}. Está na pasta de downloads.`);
   } catch (e) { avisoAcao('erro', `✗ Não gerou o arquivo: ${e.message}.`, () => cgEnvioArquivo(emp)); }
+}
+// ---- .xlsx montado no navegador (zip sem compressão + SpreadsheetML), sem biblioteca (05/11/2026) ----
+function cgCrc32(b) {
+  let t = cgCrc32.t; if (!t) { t = cgCrc32.t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } }
+  let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = t[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function cgZip(arquivos) {   // [{nome, texto}] → Blob (método 0 = guardado)
+  const enc = new TextEncoder(), partes = [], central = []; let pos = 0;
+  const u16 = (v) => [v & 255, (v >>> 8) & 255], u32 = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+  arquivos.forEach((a) => {
+    const nome = enc.encode(a.nome), dado = enc.encode(a.texto), crc = cgCrc32(dado);
+    const loc = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(dado.length), ...u32(dado.length), ...u16(nome.length), ...u16(0)]);
+    central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(dado.length), ...u32(dado.length),
+      ...u16(nome.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(pos)]), nome);
+    partes.push(loc, nome, dado); pos += loc.length + nome.length + dado.length;
+  });
+  const tamC = central.reduce((a, x) => a + x.length, 0);
+  const fim = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(arquivos.length), ...u16(arquivos.length), ...u32(tamC), ...u32(pos), ...u16(0)]);
+  return new Blob([...partes, ...central, fim], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function cgXlsx(abas) {   // [{nome, linhas: [[valor]]}]; número vira célula numérica, o resto texto
+  const x = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const col = (i) => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const folha = (L) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${L.map((r, i) =>
+    `<row r="${i + 1}">${r.map((v, j) => typeof v === 'number' ? `<c r="${col(j)}${i + 1}"><v>${v}</v></c>` : `<c r="${col(j)}${i + 1}" t="inlineStr"><is><t xml:space="preserve">${x(v)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const nomes = abas.map((a) => x(String(a.nome).replace(/[\\/?*[\]:]/g, ' ').slice(0, 31)));
+  return cgZip([
+    { nome: '[Content_Types].xml', texto: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${abas.map((a, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>` },
+    { nome: '_rels/.rels', texto: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { nome: 'xl/workbook.xml', texto: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${nomes.map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>` },
+    { nome: 'xl/_rels/workbook.xml.rels', texto: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${abas.map((a, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>` },
+    ...abas.map((a, i) => ({ nome: `xl/worksheets/sheet${i + 1}.xml`, texto: folha(a.linhas) })),
+  ]);
+}
+// "Arquivo do painel" para a contabilidade: uma aba por empresa, só as rubricas do painel (gratificação, VT, adiantamento, DSR)
+function cgEnvioXlsx() {
+  try {
+    const { comp, M } = cgEnvioDoMes();
+    const ehPainel = (x) => { const c = CG_ENV_COLS.find(([, , f]) => f(x)); return c && CG_ENV_PAINEL.includes(c[0]); };
+    const L = M.filter((x) => ehPainel(x) && cgN(x.valor));
+    if (!L.length) return avisoAcao('atencao', '! Nada do painel a enviar neste mês (gratificação, VT, adiantamento ou dias de falta).');
+    const emps = [...new Set(L.map((x) => x.empresa_codigo))].sort();
+    const abas = emps.map((e) => {
+      const E = L.filter((x) => x.empresa_codigo === e).sort((a, b) => String(a.nome).localeCompare(String(b.nome)) || String(a.rubrica).localeCompare(String(b.rubrica)));
+      const linhas = [[`Empresa ${e} · ${cgMesRot(comp)}`], [], ['Matrícula', 'Nome', 'Rubrica', 'Descrição', 'Valor', 'Observação']];
+      E.forEach((x) => linhas.push([String(x.matricula), cgNome(x.nome), String(x.rubrica), x.descricao || '', Math.round(cgN(x.valor) * 100) / 100,
+        x.rubrica === 'DSR' ? `${cgN(x.valor)} dia(s) — ${String(x.origem || '').replace(/^.*?:\s*/, '')}` : 'R$']));
+      linhas.push([], ['Total por rubrica']);
+      [...new Set(E.map((x) => x.rubrica))].forEach((r) => { const R = E.filter((x) => x.rubrica === r);
+        linhas.push(['', '', String(r), R[0].descricao || '', Math.round(R.reduce((a, x) => a + cgN(x.valor), 0) * 100) / 100, r === 'DSR' ? 'dias' : 'R$']); });
+      return { nome: 'Empresa ' + e, linhas };
+    });
+    const blob = cgXlsx(abas), url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `contabilidade-painel-${comp.slice(0, 7)}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    avisoAcao('ok', `✓ Arquivo gerado às ${avisoHora()} (${emps.length} ${emps.length === 1 ? 'empresa' : 'empresas'}, ${L.length} linhas). Está na pasta de downloads.`);
+  } catch (e) { avisoAcao('erro', `✗ Não gerou o arquivo: ${e.message}.`, cgEnvioXlsx); }
 }
 function cgEnvioPlanilha() {
   try {
@@ -2412,7 +2488,7 @@ function cgAbaAdt() {
   const dia = (linhas[0] && linhas[0].dia_pagamento) || (mes.slice(0, 8) + '20');
   const pago = cgHojeIso() > String(dia).slice(0, 10);
   const travado = !!enviado || pago;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mesAdt='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).reverse().map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mesAdt='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
     <h3 style="margin:8px 0 0;">Adiantamento de ${cgMesRot(mes)} · paga ${cgData(dia)}</h3>
     ${cgPassos([['calculado', linhas.length > 0], ['enviado ao RH', !!enviado, enviado ? cgDiaMes(enviado.enviado_em) : ''], ['pago', pago, cgDiaMes(dia)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
