@@ -1990,7 +1990,9 @@ async function entrarRh() {
       consultarTudo('vw_rh_credor_detalhe?select=*&order=data_concessao.asc'),
       consultarTudo('vw_rh_divergencias?select=*&order=diferenca.desc'),
     ]);
-    RH = { colab, aberto, credor, credorDet, diverg };
+    // 05/11/2026 (RH): a planilha ficou sem ser lida de agosto a novembro e ninguém via; a data da leitura fica no alto
+    const lida = await consultarTudo('rh_descontos?select=atualizado_em&order=atualizado_em.desc.nullslast&limit=1').catch(() => []);
+    RH = { colab, aberto, credor, credorDet, diverg, lidaEm: (lida[0] || {}).atualizado_em || null };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${e.message}</div>`;
     return;
@@ -2146,6 +2148,12 @@ function renderModuloRh() {
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Descontos em folha</div>
     <div class="caption-label" style="text-align:center;">
       Vales e empréstimos que a empresa adiantou e recupera no contracheque. É saldo, não fluxo — sem janela de período.
+      ${(() => {
+        if (!RH.lidaEm) return '<br><b style="color:var(--farol-perto);">Não sei quando a planilha foi lida.</b>';
+        const d = new Date(RH.lidaEm), dias = Math.floor((Date.now() - d.getTime()) / 86400000);
+        const quando = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+        return `<br>Planilha lida em <b${dias > 7 ? ' style="color:var(--farol-perto);"' : ''}>${quando}</b>${dias > 7 ? ` — há ${dias} dias: o que mudou depois não está aqui` : ''}.`;
+      })()}
     </div>
     ${P ? `<div class="contexto" style="border-color:var(--brand);">
       <b>Filtrando:</b>
