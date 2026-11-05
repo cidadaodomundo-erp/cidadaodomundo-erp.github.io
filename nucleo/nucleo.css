@@ -866,6 +866,17 @@
   .tr-ilha div[id^="tabela"] th:first-child { background:#f3eee3; }
   .tr-tag { color:#f5a623; font-size:11px; }
   .tr-ilha .tr-tag { color:#a05c00; }
+  /* ---- Conferências na mesma ILHA CLARA das Listas · Pedidos (dono, 05/11/2026: "conferências usa as mesmas
+     cores que usamos nas telas da lista pedidos"). O código da tela pinta com tokens (var(--tx-1), --surface-2,
+     --line, --farol-*), então aqui os tokens viram a paleta da ilha — só dentro de #view-conferencias. */
+  #view-conferencias { --bg:#faf6ef; --surface:#fdfbf7; --surface-2:#f3eee3; --zebra:#f6f1e7; --line:#e5ddd0; --line-2:#d5cbbb;
+    --tx-1:#2b2620; --tx-2:#2b2620; --tx-3:#6f675c; --tx-4:#6f675c; --tx-5:#6f675c; --tx-6:#6f675c; --tx-creme:#2b2620;
+    --farol-ok:#2e7d4f; --farol-perto:#a05c00; --farol-fora:#b3261e; --info:#345a86; --marca-amarelo:var(--brand);
+    background:#faf6ef; color:#2b2620; border-radius:14px; padding:16px 16px 20px; margin-top:8px; }
+  #view-conferencias .contexto, #view-conferencias .preset-btn { background:#fff; border-color:#e5ddd0; color:#2b2620; }
+  #view-conferencias .preset-btn:hover { border-color:var(--brand); color:var(--brand); }
+  #view-conferencias .preset-btn.active { background:var(--brand); border-color:var(--brand); color:#fdfbf7; }
+  #view-conferencias div[id^="tabela"] th { color:#6f675c; }
   /* Tabela de precos das listas (dono, 01/10/2026): cabe na largura da area, sem rolar
      de lado. "Como vem" e "Custo" sao colunas no computador; em area estreita descem
      para baixo do nome do item. A medida e a largura da AREA (container), nao a da
