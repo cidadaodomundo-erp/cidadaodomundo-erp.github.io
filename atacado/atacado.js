@@ -41,7 +41,7 @@ function orcEstilo() {
       body.orc-imprimindo::before { display:none !important; }
       body.orc-imprimindo #orcImpressao { display:block; color:#000; font-size:13px; }
       #orcImpressao table { width:100%; border-collapse:collapse; }
-      #orcImpressao th, #orcImpressao td { color:#000 !important; background:#fff !important; border:1px solid #888; padding:5px 8px; text-align:left; }
+      #orcImpressao th, #orcImpressao td { color:#000 !important; background:#fff !important; border:1px solid var(--tx-5); padding:5px 8px; text-align:left; }
       #orcImpressao h3 { color:#000; margin:0 0 10px; }
       #orcImpressao .orc-nao-imprime { display:none; }
     }`;
