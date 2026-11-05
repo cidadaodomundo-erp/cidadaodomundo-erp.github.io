@@ -282,6 +282,50 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       leitura: 'mesmo valor dos dois lados, horários mais de 3 h distantes — provavelmente a mesma venda',
       acao: 'nada a fazer se a hora explicar (madrugada, comanda fechada depois)' });
   });
+  // CONTA DIVIDIDA COM DIFERENÇA (05/11/2026, regra 5 do Financeiro): depois de todo o pareamento, o que sobrou do mesmo
+  // caixa e do mesmo turno, encadeado por tempo (15 min; mesma mesa no salão: até 60 min, a comanda fecha depois da
+  // cobrança), com pelo menos uma linha de cada lado, no máximo 6 linhas e |Saipos − maquininha| ≤ R$ 2,00, vira UM item
+  // (ou nenhum, se bateu na soma e por forma). Grupo acima de R$ 2,00 fica solto: aí é erro de verdade.
+  const divididas = [];
+  {
+    const semFormaD = t => /pendente|n[aã]o cadastrado/i.test(t.detalhe || '');
+    const sobra = [...semParS.filter(x => !x._explicado && !semFormaD(x)).map(x => ({ x, lado: 'S' })), ...restoR.map(x => ({ x, lado: 'R' }))]
+      .sort((a, b) => a.x.t - b.x.t);
+    const pai = sobra.map((_, i) => i), raiz = i => (pai[i] === i ? i : (pai[i] = raiz(pai[i])));
+    const mesaDe = o => (o.lado === 'S' && o.x.mesa ? String(o.x.mesa) : null);
+    for (let i = 0; i < sobra.length; i++) for (let j = i + 1; j < sobra.length; j++) {
+      const a = sobra[i], b = sobra[j], dt = Math.abs(a.x.t - b.x.t);
+      if (dt > 60) break;
+      if ((a.x.caixa || '') !== (b.x.caixa || '')) continue;
+      const ma = mesaDe(a), mb = mesaDe(b);
+      const liga = dt <= 15 || (dt <= 60 && ((ma && mb && ma === mb) || (ma && b.lado === 'R') || (mb && a.lado === 'R')));
+      if (liga) pai[raiz(j)] = raiz(i);
+    }
+    const grupos = {};
+    sobra.forEach((o, i) => { (grupos[raiz(i)] = grupos[raiz(i)] || []).push(o); });
+    Object.values(grupos).forEach(g => {
+      const S = g.filter(o => o.lado === 'S').map(o => o.x), R = g.filter(o => o.lado === 'R').map(o => o.x);
+      if (!S.length || !R.length || g.length > 6 || g.length < 3) return;   // 1 × 1 é par, quase-par ou diferença: segue como hoje
+      const somaS = S.reduce((a, t) => a + +t.valor, 0), somaR = R.reduce((a, t) => a + +t.valor, 0), dif = Math.round((somaS - somaR) * 100) / 100;
+      if (Math.abs(dif) > 2.0001) return;
+      const porForma = (L) => { const m = {}; L.forEach(t => { const f = formaPadrao(t.detalhe); m[f] = Math.round(((m[f] || 0) + +t.valor) * 100) / 100; }); return m; };
+      const fS = porForma(S), fR = porForma(R), formas = [...new Set([...Object.keys(fS), ...Object.keys(fR)])];
+      const mesmaForma = formas.every(f => Math.abs((fS[f] || 0) - (fR[f] || 0)) < 0.005);
+      S.forEach(t => { t._explicado = true; });
+      R.forEach(t => { const k = restoR.indexOf(t); if (k >= 0) restoR.splice(k, 1); });
+      const ref = S.map(t => t.referencia).concat(R.map(t => t.referencia)).join('+');
+      const txtS = S.map(t => `${limpa(t.detalhe)} ${reaisCc(t.valor)}`).join(' + ') + ' · ' + [...new Set(S.map(rotVenda))].join(', ');
+      const txtR = R.map(t => `${limpa(t.detalhe)} ${reaisCc(t.valor)} às ${hhmm(t.hora)}`).join(' + ');
+      if (Math.abs(dif) < 0.005 && mesmaForma) { divididas.push({ hora: hhmm(S[0].hora), texto: `${txtS} = ${txtR}` }); return; }
+      const fPrinc = formaPadrao(S.slice().sort((a, b) => +b.valor - +a.valor)[0].detalhe);
+      const trocaTxt = formas.filter(f => (fS[f] || 0) > (fR[f] || 0) + 0.005).join(', ') + ' → ' + formas.filter(f => (fR[f] || 0) > (fS[f] || 0) + 0.005).join(', ');
+      pend.push({ forma: fPrinc, caixa: S[0].caixa || R[0].caixa || null, chave: 'divid:' + ref, bloco: 'maquininha', efeito: dif, p: Math.abs(dif) < 0.005 ? 2 : 1,
+        cor: Math.abs(dif) < 0.005 ? '#f5a623' : '#ff6b6b', hora: hhmm(S[0].hora), valor: dif,
+        saipos: `${txtS} (${S.length} ${S.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaS)})`, real: `${txtR} (${R.length} ${R.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaR)})`,
+        leitura: Math.abs(dif) < 0.005 ? `conta dividida, forma trocada no Saipos: ${trocaTxt}` : `conta dividida: Saipos ${reaisCc(somaS)} × maquininha ${reaisCc(somaR)} = ${dif > 0 ? '+' : '−'}${reaisCc(Math.abs(dif))}`,
+        acao: Math.abs(dif) < 0.005 ? 'trocar a forma no Saipos para a que passou na maquininha' : (dif > 0 ? 'faltou ' : 'passou ') + reaisCc(Math.abs(dif)) + ' na conta dividida: conferir o valor digitado em cada cartão' });
+    });
+  }
   // "Pendente" / "Pagamento nao cadastrado": o Saipos nao disse a forma (dono, 09/09/2026:
   // eram 22 com mais de 14 dias fora de tudo). Quando a maquininha tem, a base ja
   // reclassifica; o que sobra aqui e venda sem forma E sem transacao.
@@ -361,6 +405,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const podeExplicar = (CAIXA_RESP || []).some(r => r.unidade === unidade && String(r.email).toLowerCase() === eu)
     || (typeof souODono === 'function' && souODono());
   const resolvidos = [
+    ...divididas.map(d => ({ hora: d.hora, tipo: 'conta dividida', texto: d.texto })),
     ...compostos.map(c => ({ hora: hhmm(c.alvo.hora), tipo: 'conta dividida', texto: `${c.rotulo}: ${reaisCc(c.alvo.valor)} (${limpa(c.alvo.detalhe)}) = ${c.itens.map(t => reaisCc(t.valor) + ' às ' + hhmm(t.hora)).join(' + ')}` })),
     ...arredond.map(q => ({ hora: hhmm(q.s.hora), tipo: 'centavos', texto: `${limpa(q.s.detalhe)} ${reaisCc(q.s.valor)} × maquininha ${reaisCc(q.r.valor)}` })),
     // forma diferente da registrada: o Saipos diz X, passou Y — a base ja usa o Y
