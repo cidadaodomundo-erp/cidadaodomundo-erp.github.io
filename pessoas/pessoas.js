@@ -1503,12 +1503,12 @@ function cgFolhaQuadroFora(comp) {
   const v0 = (v, neg) => cgN(v) ? (neg ? '− ' : '') + cgR(v) : '<span style="color:var(--tx-5);">–</span>';
   const soma = (arr, k) => arr.reduce((a, x) => a + cgN(x[k]), 0);
   const tot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td><td>${cgR(soma(arr, 'liquido_folha'))}</td><td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>${cgR(soma(arr, 'saldo_fora'))}</td>
-    <td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td></tr>`;
+    <td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td><td></td></tr>`;
   let h = `<div class="section-label" style="margin-top:18px;">Depois do líquido (por fora)${mp.mes_pagamento ? ` — paga em ${cgEsc(cgMesRot(mp.mes_pagamento))}` : ''}</div>
-    <div id="tabelaCgFora" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Líquido da folha</th><th>Acréscimo combinado</th><th>Saldo por fora</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th></tr></thead><tbody>`;
+    <div id="tabelaCgFora" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Líquido da folha</th><th>Acréscimo combinado</th><th>Saldo por fora</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th><th>Conferir</th></tr></thead><tbody>`;
   [...new Set(R.map((x) => x.empresa))].forEach((e) => {
     const lin = R.filter((x) => x.empresa === e);
-    h += `<tr class="sub"><td colspan="7"><b>${cgEsc(e)}</b></td></tr>`;
+    h += `<tr class="sub"><td colspan="8"><b>${cgEsc(e)}</b></td></tr>`;
     lin.forEach((x) => {
       h += `<tr><td>${cgEsc(cgNome(x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
         <td>${v0(x.liquido_folha)}</td>
@@ -1516,7 +1516,8 @@ function cgFolhaQuadroFora(comp) {
         <td>${v0(x.saldo_fora)}</td>
         <td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
         <td>${v0(x.bonificacao)}</td>
-        <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}</td></tr>
+        <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}</td>
+        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;" title="título de salário no Saipos: ${x.saipos_salario == null ? 'nenhum' : cgR(x.saipos_salario)}">${cgEsc(x.conferir_texto || '')}</td></tr>
 `;
     });
     h += tot(`Subtotal ${cgEsc(e)}`, lin, 'sub');
