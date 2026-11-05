@@ -8194,7 +8194,7 @@ function cpTitulos(linhas, saiu, aguarda) {
     let t = mapa.get(k);
     if (!t) {
       t = { vencimento: r.vencimento, situacao: r.situacao, dias_vencida: r.dias_vencida, origem: r.origem,
-            unidade: r.unidade, conta_exibida: r.conta_exibida || '', descricao: r.titulo || r.descricao || '',
+            unidade: r.unidade, conta_exibida: r.conta_exibida || '', descricao: String(r.titulo || r.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),
             fornecedor: r.fornecedor || '', liquido: 0, partes: [], saiuTodas: true, saiuBanco: undefined, aguardaTodas: true };
       mapa.set(k, t);
     }
@@ -9912,7 +9912,7 @@ function fxlMontar(par, tit, det) {
     if (!dataPartida || p.data_partida > dataPartida) dataPartida = p.data_partida;
   });
   const lin = (r, dia) => ({ unidade: r.unidade, conta: r.conta, lado: (r.sentido === 'PAGAR' || Number(r.efeito) < 0) ? 'PAGAR' : 'RECEBER',
-    origem: r.origem, entre_lojas: r.entre_lojas === true || (r.entre_lojas == null && (r.origem === 'LISTAS' || projEntreLojas(r))), situacao: r.situacao || 'PREVISTO', descricao: r.descricao_tela || r.descricao || r.subtipo || '',
+    origem: r.origem, entre_lojas: r.entre_lojas === true || (r.entre_lojas == null && (r.origem === 'LISTAS' || projEntreLojas(r))), situacao: r.situacao || 'PREVISTO', descricao: String(r.descricao_tela || r.descricao || r.subtipo || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),   // dono 05/11: "(parc. …)" é da nossa carga, não está no Saipos
     subtipo: r.subtipo, tem_titulo: r.tem_titulo == null ? !!r.situacao && r.situacao !== 'PREVISTO' : r.tem_titulo,
     valor: Math.abs(Number(r.valor || r.efeito || 0)), efeito: Number(r.efeito || 0), vencimento: r.vencimento || dia });
   const porDia = {};
