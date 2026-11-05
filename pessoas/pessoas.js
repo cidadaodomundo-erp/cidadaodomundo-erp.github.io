@@ -1453,15 +1453,25 @@ function cgFolhaGrupoTroca(b) {
 // erro deles, enviamos a correção, eles devolvem corrigida e vc confere"). A situação muda sozinha quando a folha é relida.
 const CG_CORR_SIT = { 'A ENVIAR': 'var(--farol-perto)', 'ENVIADO': 'var(--tx-3)', 'CORRIGIDO': 'var(--farol-ok)', 'NÃO CORRIGIDO': 'var(--farol-fora)', 'NAO CORRIGIDO': 'var(--farol-fora)' };
 function cgFolhaCorrecoesHtml(comp) {
-  const C = (CARGOS.folha.corr || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
+  const C0 = (CARGOS.folha.corr || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
   if (CARGOS.folha.corr === null) return '<div class="contexto">Não consegui ler as correções para a contabilidade (vw_rh_folha_correcao).</div>';
-  if (!C.length) return '';
+  if (!C0.length) return '';
+  // 05/11/2026 (dono, chat RH): à contabilidade só vai ERRO PROVADO deles; o que depende de conferir na nossa ponta (Flash) é da Hellen
+  const H = C0.filter((x) => x.para === 'HELLEN'), C = C0.filter((x) => x.para !== 'HELLEN');
   const T = (CARGOS.folha.corrTxt || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
   const aEnviar = C.filter((x) => x.situacao === 'A ENVIAR').length;
   const sitTxt = (x) => x.situacao === 'ENVIADO' && x.enviado_em ? `ENVIADO em ${cgData(x.enviado_em)}` : /N[ÃA]O CORRIGIDO/.test(x.situacao) && x.folha_lida_em ? `NÃO CORRIGIDO (folha relida em ${cgData(x.folha_lida_em)})` : x.situacao;
-  let h = `<div class="contexto" style="text-align:left;border-color:${aEnviar ? 'var(--farol-perto)' : 'var(--line)'};"><b>Correções para a contabilidade</b> — ${C.length} ${C.length === 1 ? 'item' : 'itens'}${aEnviar ? `, ${aEnviar} a enviar` : ''}. Quando a folha corrigida volta, a situação muda sozinha.
+  const quem = (x) => `${x.nome ? cgEsc(cgNome(x.nome)) : 'todos'}<div style="font-size:11px;color:var(--tx-4);">${cgEsc(String(x.empresa || '').replace(/^\d+\s*-\s*/, ''))}</div>`;
+  let h = '';
+  if (H.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Para a Hellen conferir antes de mandar</b> — ${H.length} ${H.length === 1 ? 'item' : 'itens'}. Não vai à contabilidade: o erro pode ser nosso.
+    <div id="tabelaCgCorrHellen" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Quem</th><th>O que aconteceu</th><th>O que fazer</th></tr></thead><tbody>
+    ${H.map((x) => `<tr><td>${quem(x)}</td><td style="white-space:normal;min-width:200px;">${cgEsc(x.texto || x.item || '')}</td>
+      <td style="white-space:normal;min-width:220px;font-weight:600;">${cgEsc(x.para_hellen || '')}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  if (!C.length) return h;
+  h += `<div class="contexto" style="text-align:left;border-color:${aEnviar ? 'var(--farol-perto)' : 'var(--line)'};"><b>Erros da contabilidade</b> — ${C.length} ${C.length === 1 ? 'item' : 'itens'}${aEnviar ? `, ${aEnviar} a enviar` : ''}. Quando a folha corrigida volta, a situação muda sozinha.
     <div id="tabelaCgCorr" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Quem</th><th>O quê</th><th>Esperado</th><th>Na folha</th><th>Situação</th></tr></thead><tbody>
-    ${C.map((x) => `<tr><td>${x.nome ? cgEsc(cgNome(x.nome)) : 'todos'}<div style="font-size:11px;color:var(--tx-4);">${cgEsc(String(x.empresa || '').replace(/^\d+\s*-\s*/, ''))}</div></td>
+    ${C.map((x) => `<tr><td>${quem(x)}</td>
       <td style="white-space:normal;min-width:220px;">${cgEsc(x.texto || x.item || '')}</td><td>${cgEsc(x.esperado == null ? '–' : x.esperado)}</td><td>${cgEsc(x.na_folha == null ? '–' : x.na_folha)}</td>
       <td><span style="font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;border:1px solid ${CG_CORR_SIT[x.situacao] || 'var(--line)'};color:${CG_CORR_SIT[x.situacao] || 'var(--tx-3)'};white-space:nowrap;">${cgEsc(sitTxt(x))}</span></td></tr>`).join('')}
     </tbody></table></div>`;
@@ -2069,18 +2079,20 @@ function cgAbaHoje() {
   if (CARGOS.hoje.erro) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as pendências: ${cgEsc(CARGOS.hoje.erro)} <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>`;
   const H = CARGOS.hoje;
   const { lido_em: lido, atrasada } = H.leitura;
-  const rodape = `<div class="caption-label" style="text-align:left;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">${lido ? `Flash lida em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}` : ''}
-    ${cgFlashPedidoHtml()}</div>`;
+  // 05/11/2026 (dono, chat RH): "Atualizar na Flash" no TOPO, em destaque, com o "lida em" junto (não mais no rodapé)
+  const topoFlash = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px;">${cgFlashPedidoHtml()}
+    <span class="caption-label" style="margin:0;">${lido ? `Flash lida em ${new Date(lido).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às')}` : 'Flash ainda não lida'}</span></div>`;
+  const rodape = '';
   // com a leitura atrasada ou uma fonte fora, "nada pendente" não pode ser afirmado
   const falhou = [[H.L, 'a Flash'], [H.calc, 'os cálculos da folha'], [H.fer, 'as férias']].filter(([v]) => v && v.erro).map(([, r]) => r);
   const atraso = (atrasada ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Leitura da Flash atrasada: pode faltar pendência nesta lista.</b></div>' : '')
     + (falhou.length ? `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);"><b style="color:var(--farol-fora);">✗ Não consegui ler ${falhou.join(', ')}: pode faltar pendência.</b> <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>` : '');
   const T = cgHojeItens();
-  if (!T.length) return `${atraso}${atrasada || falhou.length ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente em Pessoas.</b></div>'}${rodape}`;
+  if (!T.length) return `${topoFlash}${atraso}${atrasada || falhou.length ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente em Pessoas.</b></div>'}${rodape}`;
   const de = (g) => T.filter((x) => x.grupo === g);
   const card = (g) => { const n = de(g), pe = g === 'Pagar' ? cgR(n.reduce((a, x) => a + cgN(x.valor), 0)) : ''; return n.length ? `<div class="card neutral" style="cursor:pointer;${F.fcGrupo === g ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.fcGrupo=CARGOS_F.fcGrupo==='${g}'?null:'${g}';renderModuloCargos()"><div class="card-lbl">${g}</div><div class="card-val">${n.length}</div>${pe ? `<div class="card-pct">${pe}</div>` : ''}</div>` : ''; };
   const vis = F.fcGrupo && de(F.fcGrupo).length ? de(F.fcGrupo) : T;
-  return `${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Admissão', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
+  return `${topoFlash}${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Admissão', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
     <div id="tabelaCgHoje" style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Quem</th><th>Detalhe</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>
     ${vis.map((x) => `<tr><td>${cgEsc(x.o_que || '')}</td>
       <td>${x.nome ? cgEsc(cgNome(x.nome)) : '–'}${x.sub ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.sub)}</div>` : ''}</td>
@@ -2095,7 +2107,7 @@ function cgFlashPedidoHtml() {
   const P = CG_FLASH_PED;
   if (P && P.estado === 'pedido') return `<span style="color:var(--info);">pedido às ${cgHM(P.em)} — o robô lê em até 5 min</span>`;
   if (P && P.estado === 'falhou') return `<span style="color:var(--farol-fora);">✗ não consegui ler a Flash</span> ${cgBotaoPasso('Tentar de novo', 'cgFlashLerAgora()', true)}`;
-  return `${P && P.estado === 'ok' ? `<span style="color:var(--farol-ok);">✓ Flash lida às ${cgHM(P.em)}</span>` : ''} ${cgBotaoPasso('Ler a Flash agora', 'cgFlashLerAgora()', true)}`;
+  return `${cgBotaoPasso('↻ Atualizar na Flash', 'cgFlashLerAgora()')}${P && P.estado === 'ok' ? ` <span style="color:var(--farol-ok);">✓ Flash lida às ${cgHM(P.em)}</span>` : ''}`;
 }
 async function cgFlashLerAgora() {
   const r = await trRpcSeguro('rh_flash_ler_agora', {});
