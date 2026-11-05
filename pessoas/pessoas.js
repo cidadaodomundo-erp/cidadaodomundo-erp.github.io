@@ -1887,21 +1887,32 @@ function cgAbaBonif() {
 
 // ---------- ACERTOS NO SAIPOS (a parte da folha da fila do robô, vw_rh_saipos_acertos) ----------
 const CG_SAIPOS_ACAO = { ALTERAR: 'Trocar o valor', ABRIR: 'Abrir a provisão', JA_CERTO: 'Já certo', PARE: 'Parado' };
-const CG_SAIPOS_MOTIVO = { SEM_PROVISAO: 'falta a provisão no Saipos', PROVISAO_SOBRANDO: 'provisão para quem não recebe',
-  NAO_FECHADO: 'esperando fechar o VT/VA no painel' };
+// 05/11/2026 (Financeiro, com o "Pode" do dono): SEM_PROVISAO com vencimento por vir é ABRIR e o robô abre; excluir título
+// é a única coisa que fica com a Hellen (apaga sem volta) e o robô avisa. Regra do dono (05/11): o número do título não
+// aparece no Saipos — para achar, conta · data · descrição · valor.
+const CG_SAIPOS_MOTIVO = { SEM_PROVISAO: 'o robô abre a provisão', PROVISAO_SOBRANDO: 'provisão para quem não recebe: a Hellen exclui',
+  DESLIGADO_SOBRANDO: 'provisão de quem saiu: a Hellen exclui', NAO_FECHADO: 'esperando fechar o VT/VA no painel',
+  PAGO_DIFERENTE: 'já pago com outro valor: o robô não mexe em título pago', SEM_TITULO_VENCIDO: 'venceu sem provisão: o robô não abre (pagaria em dobro)' };
+const cgSaiposExcluir = (s) => s.acao === 'PARE' && /SOBRANDO$/.test(s.motivo_codigo || '');
+const cgSaiposAchar = (s) => [s.conta, cgData(s.vencimento), String(s.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''), cgR(s.valor_saipos)].filter(Boolean).join(' · ');
 function cgAbaSaipos() {
   const F = CARGOS_F;
-  const linhas = (CARGOS.saipos || []).filter(s => !F.unidade || s.unidade_pagadora === F.unidade);
-  if (!linhas.length) return '<div class="contexto">Nada da folha esperando acerto no Saipos.</div>';
+  const todas = (CARGOS.saipos || []).filter(s => !F.unidade || s.unidade_pagadora === F.unidade);
+  const nCerto = todas.filter(s => s.acao === 'JA_CERTO').length;
+  const linhas = todas.filter(s => s.acao !== 'JA_CERTO');   // "já certo" não pede nada: só a contagem embaixo
+  if (!linhas.length) return `<div class="contexto">Nada da folha esperando acerto no Saipos${nCerto ? ` (${nCerto} lançamentos já certos)` : ''}.</div>`;
   const n = (a, m) => linhas.filter(s => s.acao === a && (!m || s.motivo_codigo === m)).length;
+  const nExcl = linhas.filter(cgSaiposExcluir).length, nAbrir = linhas.filter(s => s.acao === 'ABRIR').length;
+  const nParado = linhas.filter(s => s.acao === 'PARE' && !cgSaiposExcluir(s) && s.motivo_codigo !== 'NAO_FECHADO').length;
   const rot = { FOLHA_ADIANTAMENTO: 'Adiantamento', FOLHA_VT: 'Vale-transporte', FOLHA_VA: 'Vale-alimentação', FOLHA_BONIFICACAO: 'Bonificação', FORA_DA_FOLHA: 'Salário por fora' };
-  const ordem = (s) => s.acao === 'ALTERAR' ? 0 : s.motivo_codigo === 'SEM_PROVISAO' ? 1 : s.motivo_codigo === 'PROVISAO_SOBRANDO' ? 2 : 3;
+  const ordem = (s) => cgSaiposExcluir(s) ? 0 : s.acao === 'PARE' && s.motivo_codigo !== 'NAO_FECHADO' ? 1 : s.acao === 'ALTERAR' ? 2 : s.acao === 'ABRIR' ? 3 : 4;
   const ord = [...linhas].sort((a, b) => ordem(a) - ordem(b) || String(a.vencimento).localeCompare(String(b.vencimento)));
   return cgFiltroUnidade(linhas.map(s => ({ unidade: s.unidade_pagadora }))) + `
     <div class="cards">
       <div class="card ${n('ALTERAR') ? 'highlight' : 'neutral'}"><div class="card-lbl">Trocar o valor</div><div class="card-val">${n('ALTERAR')}</div><div class="card-pct">provisão com valor velho; o robô faz</div></div>
-      <div class="card ${n('PARE', 'SEM_PROVISAO') ? 'highlight' : 'neutral'}"><div class="card-lbl">Falta a provisão</div><div class="card-val">${n('PARE', 'SEM_PROVISAO')}</div><div class="card-pct">abrir no Saipos (Hellen)</div></div>
-      <div class="card ${n('PARE', 'PROVISAO_SOBRANDO') ? 'highlight' : 'neutral'}"><div class="card-lbl">Provisão sobrando</div><div class="card-val">${n('PARE', 'PROVISAO_SOBRANDO')}</div><div class="card-pct">tirar do Saipos (Hellen)</div></div>
+      <div class="card neutral"><div class="card-lbl">Abrir a provisão</div><div class="card-val">${nAbrir}</div><div class="card-pct">o robô abre</div></div>
+      <div class="card ${nExcl ? 'highlight' : 'neutral'}"><div class="card-lbl">Excluir no Saipos</div><div class="card-val">${nExcl}</div><div class="card-pct">a Hellen exclui — o robô avisa</div></div>
+      ${nParado ? `<div class="card highlight"><div class="card-lbl">Parado</div><div class="card-val">${nParado}</div><div class="card-pct">o robô não mexe: conferir</div></div>` : ''}
       <div class="card neutral"><div class="card-lbl">Esperando fechar</div><div class="card-val">${n('PARE', 'NAO_FECHADO')}</div><div class="card-pct">VT e VA do mês seguinte</div></div>
     </div>
     <div id="tabelaCgSaipos" style="overflow-x:auto;"><table>
@@ -1909,9 +1920,9 @@ function cgAbaSaipos() {
       <tbody>${ord.map(s => `<tr>
         <td>${cgData(s.vencimento)}</td><td>${cgEsc(rot[s.tipo] || s.tipo)}</td><td>${cgEsc(s.unidade_pagadora)}</td><td>${cgEsc(cgNome(s.quem))}</td>
         <td style="text-align:right;">${cgR(s.valor_painel)}</td><td style="text-align:right;color:var(--tx-4);">${s.valor_saipos != null ? cgR(s.valor_saipos) : '–'}</td>
-        <td style="font-size:12px;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}</td></tr>`).join('')}</tbody>
+        <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? `<div style="margin-top:3px;color:var(--tx-2);" title="título ${cgEsc(s.id_titulo || '')}">No Saipos: <b>${cgEsc(cgSaiposAchar(s))}</b></div>` : ''}</td></tr>`).join('')}</tbody>
     </table></div>
-    <div class="contexto" style="margin-top:8px;">É a fila que o robô do contas a pagar lê: ele troca os valores; abrir e tirar provisão de salário fica com a Hellen. O Saipos mostra a troca na hora, a carga do painel só umas 2 horas depois.</div>`;
+    <div class="contexto" style="margin-top:8px;">É a fila que o robô do contas a pagar lê: ele troca valores e abre provisão; excluir é só da Hellen, e o robô avisa no aviso do dia.${nCerto ? ` ${nCerto} lançamentos já estão certos.` : ''} O Saipos mostra a troca na hora, a carga do painel só umas 2 horas depois.</div>`;
 }
 
 // ---------- CORREÇÕES NA FLASH (também a tela 'flash', da Arissa) ----------
