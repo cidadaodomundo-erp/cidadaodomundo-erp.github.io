@@ -1364,7 +1364,12 @@ async function cgFolhaCarregar() {
                                           consultarTudo('rh_folha_mensal?select=competencia,arquivo&arquivo=ilike.PREVIA*').catch(() => [])]);
     // 05/11/2026 (RH): outubro entrou como PRÉVIA da contabilidade; a folha final regrava o mês. A prévia é marcada pelo arquivo.
     const previa = new Set(arq.map((x) => String(x.competencia).slice(0, 10)));
-    CARGOS.folha = { emp, pes, rub: {}, previa };
+    // 05/11/2026 (RH): os dois quadros (por dentro até o líquido; por fora depois dele) e a validação da conferência
+    const [quadro, pag, valid] = await Promise.all([
+      consultarTudo('vw_rh_folha_quadro?select=*&order=competencia.desc,empresa,matricula').catch(() => null),
+      consultarTudo('vw_rh_pagamento_mes?select=*&order=competencia.desc,empresa,nome,pessoa_id').catch(() => null),
+      consultarTudo('rh_folha_validada?select=*&order=competencia').catch(() => [])]);
+    CARGOS.folha = { emp, pes, rub: {}, previa, quadro, pag, valid };
   } catch (e) { CARGOS.folha = { erro: e.message }; }
   if (CARGOS_F.aba === 'folha') renderModuloCargos();
 }
@@ -1393,26 +1398,132 @@ function cgAbaFolha() {
         consignado ${cgR(x.consignado_folha)} × ${x.consignado_guia == null ? '—' : cgR(x.consignado_guia)} ${x.consignado_guia != null && ok(x.consignado_folha, x.consignado_guia) ? '<span style="color:var(--farol-ok);">✓</span>' : ''}<br>
         INSS da guia ${x.inss_guia == null ? '—' : cgR(x.inss_guia)}${x.guia_vencimento ? ` · vence ${cgData(x.guia_vencimento)}` : ''}</div>
       ${cgLista(x.conferencia).length ? `<div style="font-size:11.5px;color:var(--farol-perto);margin-top:4px;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</div>` : ''}</div>`).join('')}</div>
-    ${cgFiltroUnidade(CARGOS.pessoas)}
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;align-items:center;"><b style="font-size:12.5px;">O que pesou:</b>
-      ${CG_PESOU.map(([k, r]) => { const s = P.reduce((a, x) => a + cgN(x[k]), 0); if (!s) return '';
-        return `<button type="button" class="preset-btn ${F.folhaCol === k ? 'active' : ''}" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='${k}'?null:'${k}';renderModuloCargos()">${r} ${cgR0(s)}${F.folhaCol === k ? ' ✕' : ''}</button>`; }).join('')}
-      ${(() => { const n = P.filter((x) => cgLista(x.conferencia).length).length; return n ? `<button type="button" class="preset-btn ${F.folhaCol === 'conf' ? 'active' : ''}" style="border-color:var(--farol-perto);" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='conf'?null:'conf';renderModuloCargos()">a conferir ${n}${F.folhaCol === 'conf' ? ' ✕' : ''}</button>` : '<span style="font-size:12px;color:var(--farol-ok);">✓ ninguém a conferir</span>'; })()}</div>`;
-  const vis = P.filter((x) => !F.folhaCol || (F.folhaCol === 'conf' ? cgLista(x.conferencia).length : cgN(x[F.folhaCol])));
-  const sit = (x) => x.tem_rescisao ? 'saiu' : x.tem_ferias ? 'férias' : x.afastado ? 'afastado' : (x.situacao || '').toLowerCase();
-  const v0 = (v) => cgN(v) ? cgR(v) : '<span style="color:var(--tx-5);">–</span>';
-  h += `<div id="tabelaCgFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Situação</th><th style="text-align:right;">Salário</th><th style="text-align:right;">Horas extras</th>
-      <th style="text-align:right;">Ad. noturno</th><th style="text-align:right;">Gratif. salão</th><th style="text-align:right;">Faltas</th><th style="text-align:right;">Adiantamento</th><th style="text-align:right;">Líquido</th><th>Conferir</th></tr></thead><tbody>
-    ${vis.map((x) => { const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k;
-      return `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
-        <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
-        <td>${cgEsc(sit(x))}</td><td style="text-align:right;">${v0(x.salario_folha)}</td><td style="text-align:right;">${v0(x.horas_extras)}</td>
-        <td style="text-align:right;">${v0(x.adicional_noturno)}</td><td style="text-align:right;">${v0(x.dez_por_cento)}</td><td style="text-align:right;">${v0(x.faltas_valor)}</td>
-        <td style="text-align:right;">${v0(x.adiantamento)}</td><td style="text-align:right;font-weight:700;">${cgR(x.liquido)}</td>
-        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</td></tr>
-        ${ab ? `<tr><td colspan="10">${cgFolhaRubHtml(x)}</td></tr>` : ''}`; }).join('')}
-    </tbody><tfoot><tr class="sub"><td colspan="8">${vis.length} ${vis.length === 1 ? 'pessoa' : 'pessoas'}</td><td style="text-align:right;">${cgR(vis.reduce((a, x) => a + cgN(x.liquido), 0))}</td><td></td></tr></tfoot></table></div>`;
+    ${cgFolhaValidacaoHtml(comp)}
+    ${cgFiltroUnidade(CARGOS.pessoas)}`;
+  // 05/11/2026 (dono, chat RH): "o que entra por dentro da folha até o líquido [...] e um quadro novo abaixo com o por fora"
+  h += cgFolhaQuadroDentro(comp, P) + cgFolhaQuadroFora(comp);
   return h;
+}
+// ---- Conferência da folha em dois quadros + validação (RH 05/11/2026: 2026-11-05-rh-conferencia-dois-quadros.md e
+// 2026-11-05-rh-validar-conferencia.md). Só depois de validar o robô atualiza o Saipos e a lista de pagamento (dono, 12:47).
+const CG_Q_PROV = [['salario', 'Salário'], ['horas_extras', 'Horas extras'], ['noturno', 'Noturno'], ['gratif_salao', 'Gratif. salão'], ['gratif_confianca', 'Gratif. confiança'],
+  ['ferias', 'Férias'], ['afastamento', 'Afastamento'], ['rescisao_proventos', 'Rescisão'], ['outros_proventos', 'Outros']];
+const CG_Q_DESC = [['inss', 'INSS'], ['irrf', 'IRRF'], ['vt', 'VT'], ['adiantamento', 'Adiantamento'], ['adiant_ferias', 'Adiant. férias'], ['faltas', 'Faltas'],
+  ['consignado', 'Consignado'], ['sindical', 'Sindical'], ['rescisao_descontos', 'Rescisão'], ['outros_descontos', 'Outros']];
+function cgFolhaValidacaoHtml(comp) {
+  const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
+  if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
+    ${v.obs ? `<span style="color:var(--tx-3);">${cgEsc(v.obs)}</span>` : ''} O robô já pode atualizar o Saipos e a lista de pagamento.
+    <a href="javascript:void(0)" onclick="cgFolhaValidar('${comp}',false)" style="color:var(--tx-4);margin-left:6px;">desfazer</a></div>`;
+  return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Conferência de ${cgEsc(cgMesRot(comp))} ainda não validada.</b>
+    Depois de validar, o robô atualiza o Saipos (salários e bonificação) e a lista de pagamento.
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
+      <input id="cgFolhaObs" type="text" placeholder="observação (opcional)" style="flex:1 1 220px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      ${cgBotaoPasso('Validar conferência', `cgFolhaValidar('${comp}',true)`)}</div></div>`;
+}
+async function cgFolhaValidar(comp, sim) {
+  const el = document.getElementById('cgFolhaObs'), obs = sim && el ? el.value.trim() || null : null;
+  avisoAcao('atencao', sim ? '… validando a conferência' : '… desfazendo a validação');
+  const r = await trRpcSeguro('rh_folha_validar', { p_competencia: comp, p_validar: sim, p_obs: obs });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaValidar(comp, sim));
+  await cgFolhaCarregar();
+  avisoAcao('ok', sim ? `✓ Conferência de ${cgMesRot(comp)} validada às ${avisoHora()}: o robô já pode atualizar o Saipos e a lista de pagamento.` : `✓ Validação de ${cgMesRot(comp)} desfeita às ${avisoHora()}.`);
+}
+function cgFolhaQuadroDentro(comp, Pconf) {
+  const F = CARGOS_F, Qall = CARGOS.folha.quadro;
+  if (!Qall) return '<div class="contexto">Não consegui ler o quadro da folha (vw_rh_folha_quadro).</div>';
+  const conf = new Map(Pconf.map((x) => [`${x.empresa}|${x.matricula}`, cgLista(x.conferencia)]));
+  const alertas = (x) => (conf.get(`${x.empresa}|${x.matricula}`) || []).concat(x.fecha === false ? ['as rubricas não somam o extrato'] : [],
+    cgLista(x.rubricas_sem_grupo).map((r) => 'rubrica nova: ' + r));
+  const Q = Qall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  const PV = CG_Q_PROV.filter(([k]) => Q.some((x) => cgN(x[k]))), DS = CG_Q_DESC.filter(([k]) => Q.some((x) => cgN(x[k])));
+  const nConf = Q.filter((x) => alertas(x).length).length;
+  const vis = Q.filter((x) => F.folhaCol !== 'conf' || alertas(x).length);
+  const v0 = (v) => cgN(v) ? cgR(v) : '<span style="color:var(--tx-5);">–</span>';
+  const soma = (arr, k) => arr.reduce((a, x) => a + cgN(x[k]), 0);
+  const ncol = PV.length + DS.length + 5;
+  const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td>${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
+    ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td><td></td></tr>`;
+  let h = `<div class="section-label" style="margin-top:14px;">Folha da contabilidade (por dentro) — até o líquido</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;align-items:center;">${nConf
+      ? `<button type="button" class="preset-btn ${F.folhaCol === 'conf' ? 'active' : ''}" style="border-color:var(--farol-perto);" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='conf'?null:'conf';renderModuloCargos()">a conferir ${nConf}${F.folhaCol === 'conf' ? ' ✕' : ''}</button>`
+      : '<span style="font-size:12px;color:var(--farol-ok);">✓ todas as rubricas entraram e cada pessoa fecha com o extrato</span>'}</div>
+    <div id="tabelaCgFolha" style="overflow-x:auto;"><table><thead>
+      <tr><th rowspan="2">Nome</th><th colspan="${PV.length + 1}" style="text-align:center;">Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;">Descontos</th><th rowspan="2">Líquido</th><th rowspan="2">Conferir</th></tr>
+      <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  const emps = [...new Set(vis.map((x) => x.empresa))];
+  emps.forEach((e) => {
+    const lin = vis.filter((x) => x.empresa === e).sort((a, b) => String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
+    h += `<tr class="sub"><td colspan="${ncol}"><b>${cgEsc(String(e).replace(/^\d+\s*-\s*/, ''))}</b></td></tr>`;
+    lin.forEach((x) => {
+      const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k, al = alertas(x);
+      const sit = String(x.situacao || '').toLowerCase();
+      h += `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
+        <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
+        ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
+        ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
+        <td style="font-weight:700;">${cgR(x.liquido)}</td>
+        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;">${al.map(cgEsc).join('<br>')}</td></tr>
+        ${ab ? `<tr><td colspan="${ncol}">${cgFolhaRubHtml(x)}</td></tr>` : ''}`;
+    });
+    h += linhaTot(`Subtotal ${cgEsc(String(e).replace(/^\d+\s*-\s*/, ''))}`, lin, 'sub');
+  });
+  h += `</tbody><tfoot>${linhaTot(`Total · ${vis.length} ${vis.length === 1 ? 'pessoa' : 'pessoas'}`, vis, 'liq')}</tfoot></table></div>`;
+  return h;
+}
+function cgFolhaQuadroFora(comp) {
+  const F = CARGOS_F, Rall = CARGOS.folha.pag;
+  if (!Rall) return '<div class="contexto">Não consegui ler o pagamento do mês (vw_rh_pagamento_mes).</div>';
+  const R = Rall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  if (!R.length) return '';
+  const mp = R.find((x) => x.mes_pagamento) || {};
+  const v0 = (v, neg) => cgN(v) ? (neg ? '− ' : '') + cgR(v) : '<span style="color:var(--tx-5);">–</span>';
+  const soma = (arr, k) => arr.reduce((a, x) => a + cgN(x[k]), 0);
+  const tot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td><td>${cgR(soma(arr, 'liquido_folha'))}</td><td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>${cgR(soma(arr, 'saldo_fora'))}</td>
+    <td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td></tr>`;
+  let h = `<div class="section-label" style="margin-top:18px;">Depois do líquido (por fora)${mp.mes_pagamento ? ` — paga em ${cgEsc(cgMesRot(mp.mes_pagamento))}` : ''}</div>
+    <div id="tabelaCgFora" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Líquido da folha</th><th>Acréscimo combinado</th><th>Saldo por fora</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th></tr></thead><tbody>`;
+  [...new Set(R.map((x) => x.empresa))].forEach((e) => {
+    const lin = R.filter((x) => x.empresa === e);
+    h += `<tr class="sub"><td colspan="7"><b>${cgEsc(e)}</b></td></tr>`;
+    lin.forEach((x) => {
+      const ed = F.folhaComb === x.pessoa_id;
+      h += `<tr><td>${cgEsc(cgNome(x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
+        <td>${v0(x.liquido_folha)}</td>
+        <td style="cursor:pointer;" title="${cgEsc(x.combinado_motivo || 'clique para combinar um valor')}" onclick="CARGOS_F.folhaComb=CARGOS_F.folhaComb===${x.pessoa_id}?null:${x.pessoa_id};renderModuloCargos()">${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);">${x.combinado_tipo === 'TOTAL' ? 'total combinado ' + cgR(x.combinado_valor) : 'acréscimo fixo'}</div>` : '<div style="font-size:11px;color:var(--tx-5);">combinar</div>'}</td>
+        <td>${v0(x.saldo_fora)}</td>
+        <td title="${cgEsc(x.desconto_detalhe || '')}">${v0(x.desconto_emprestimo, true)}${x.desconto_detalhe ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.desconto_detalhe)}</div>` : ''}</td>
+        <td>${v0(x.bonificacao)}</td>
+        <td style="font-weight:700;">${x.saiu ? '<span style="font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</span>' : cgR(x.valor_a_pagar)}</td></tr>
+        ${ed ? `<tr><td colspan="7">${cgFolhaCombForm(x)}</td></tr>` : ''}`;
+    });
+    h += tot(`Subtotal ${cgEsc(e)}`, lin, 'sub');
+  });
+  return h + `</tbody><tfoot>${tot(`Total · ${R.length} ${R.length === 1 ? 'pessoa' : 'pessoas'}`, R, 'liq')}</tfoot></table></div>`;
+}
+function cgFolhaCombForm(x) {
+  const t = x.combinado_tipo || '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;max-width:820px;">
+    <b>${cgEsc(cgNome(x.nome))}</b>
+    <select id="cgCombTipo" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      <option value="TOTAL"${t === 'TOTAL' ? ' selected' : ''}>valor total combinado (paga a diferença do líquido)</option>
+      <option value="ACRESCIMO"${t === 'ACRESCIMO' ? ' selected' : ''}>acréscimo fixo</option></select>
+    <input id="cgCombValor" type="number" step="0.01" min="0" value="${x.combinado_valor != null ? cgN(x.combinado_valor) : ''}" placeholder="valor" style="width:120px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+    <input id="cgCombMotivo" type="text" value="${cgEsc(x.combinado_motivo || '')}" placeholder="motivo" style="flex:1 1 200px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+    ${cgBotaoPasso('Gravar', `cgFolhaCombSalvar(${x.pessoa_id},false)`)}
+    ${t ? cgBotaoPasso('Tirar o combinado', `cgFolhaCombSalvar(${x.pessoa_id},true)`, true) : ''}</div>`;
+}
+async function cgFolhaCombSalvar(pessoa, tirar) {
+  const tipo = tirar ? null : document.getElementById('cgCombTipo').value;
+  const vEl = document.getElementById('cgCombValor'), valor = tirar ? null : (vEl && vEl.value !== '' ? Number(vEl.value) : null);
+  const motivo = tirar ? null : (document.getElementById('cgCombMotivo').value || '').trim() || null;
+  if (!tirar && valor == null) return avisoAcao('atencao', '! Escreva o valor combinado antes de gravar.');
+  avisoAcao('atencao', '… gravando o combinado');
+  const r = await trRpcSeguro('rh_folha_combinado_salvar', { p_pessoa: pessoa, p_tipo: tipo, p_valor: valor, p_motivo: motivo });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaCombSalvar(pessoa, tirar));
+  CARGOS_F.folhaComb = null;
+  await cgFolhaCarregar();
+  avisoAcao('ok', `✓ ${tirar ? 'Combinado tirado' : 'Combinado gravado'}: o valor a pagar já mudou — às ${avisoHora()}.`);
 }
 async function cgFolhaAbrir(k) {
   CARGOS_F.folhaAberta = CARGOS_F.folhaAberta === k ? null : k; renderModuloCargos();
