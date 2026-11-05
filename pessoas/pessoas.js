@@ -843,7 +843,7 @@ function renderModuloCargos() {
   else if (F.aba === 'saipos') h += cgAbaSaipos();
   else if (F.aba === 'flash') h += cgListaFlash(CARGOS.flash);
   // 29/10/2026 18:19 (dono): o nome é "Gratificações salão" em todo lugar
-  else if (F.aba === 'dez') h += cgEmMontagem('Gratificações salão', 'A taxa de serviço do salão menos os 30% e o fixo da casa, dividida igual entre todos os ativos, proporcional aos dias trabalhados.');
+  else if (F.aba === 'dez') h += cgAbaDez();
   else if (F.aba === 'resc') h += cgAbaResc();
   else if (F.aba === 'envio') h += cgAbaEnvio();
   alvo.innerHTML = h;
@@ -1651,6 +1651,72 @@ function cgFolhaRubHtml(x) {
     ${R.map((r) => `<tr><td>${cgEsc(r.codigo)} · ${cgEsc(r.rubrica)}</td><td style="text-align:right;color:var(--tx-4);">${cgEsc(r.referencia || '')}</td>
       <td style="text-align:right;color:var(--farol-ok);">${r.tipo === 'P' ? cgR(r.valor) : ''}</td><td style="text-align:right;color:var(--tx-3);">${r.tipo === 'D' ? cgR(r.valor) : ''}</td></tr>`).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="4">Proventos ${cgR(x.proventos)} · descontos ${cgR(x.descontos)} · <b>líquido ${cgR(x.liquido)}</b></td></tr></tfoot></table></div>`;
+}
+
+// ---------- GRATIFICAÇÕES SALÃO (05/11/2026, proposta do RH 2026-11-05-rh-gratificacoes-salao.md; regra do dono 29/10) ----------
+// Taxa de serviço do salão (26 a 25) − 30% da casa − fixo = parte dos funcionários, dividida igual entre os ativos,
+// proporcional aos dias. Só consulta: a conta é do banco e o arquivo da contabilidade sai pelo Envio à contabilidade.
+async function cgDezCarregar() {
+  CARGOS.dez = null;
+  try {
+    const [res, pes] = await Promise.all([consultarTudo('vw_rh_dez_por_cento_resumo?select=*&order=competencia.desc,unidade'),
+      consultarTudo('vw_rh_dez_por_cento?select=*&order=competencia.desc,unidade,nome,pessoa_id')]);
+    CARGOS.dez = { res, pes };
+  } catch (e) { CARGOS.dez = { erro: e.message }; }
+  if (CARGOS_F.aba === 'dez') renderModuloCargos();
+}
+function cgAbaDez() {
+  const F = CARGOS_F;
+  if (CARGOS.dez === undefined) { cgDezCarregar(); return '<div class="contexto">Lendo as gratificações do salão…</div>'; }
+  if (CARGOS.dez === null) return '<div class="contexto">Lendo as gratificações do salão…</div>';
+  if (CARGOS.dez.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler as gratificações: ${cgEsc(CARGOS.dez.erro)}
+    <button type="button" class="preset-btn" onclick="CARGOS.dez=undefined;renderModuloCargos()">Tentar de novo</button></div>`;
+  const { res, pes } = CARGOS.dez, d10 = (v) => String(v || '').slice(0, 10);
+  const comps = [...new Set(res.map((x) => d10(x.competencia)))].sort().reverse();
+  if (!comps.length) return '<div class="contexto">Nenhuma competência calculada ainda.</div>';
+  const fechadas = comps.filter((c) => res.some((x) => d10(x.competencia) === c && x.periodo_fechado));
+  const comp = comps.includes(F.dezComp) ? F.dezComp : (fechadas[0] || comps[0]);
+  const R = res.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
+  const P = pes.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
+  const parcial = R.length && R.every((x) => !x.periodo_fechado);
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${comps.slice(0, 6).map((c) => { const fx = res.some((x) => d10(x.competencia) === c && x.periodo_fechado);
+      return `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.dezComp='${c}';renderModuloCargos()">${cgMesRot(c)}${fx ? '' : ' (parcial)'}</button>`; }).join('')}</div>
+    ${R[0] ? `<div class="caption-label" style="text-align:left;">Período ${cgData(R[0].periodo_inicio)} a ${cgData(R[0].periodo_fim)}${parcial ? ' — <b>parcial até hoje</b>: a conta muda até o dia 25' : ''}.</div>` : ''}`;
+  if (!R.length) return h + '<div class="contexto">Nenhuma unidade com gratificação nesta competência.</div>';
+  const linhaEsc = (rot, v, forte, neg) => `<div style="display:flex;justify-content:space-between;gap:12px;${forte ? 'font-weight:700;border-top:1px solid var(--line);padding-top:3px;margin-top:3px;' : ''}"><span>${rot}</span><span>${neg ? '− ' : ''}${cgR(v)}</span></div>`;
+  h += `<div class="cards">${R.map((r) => {
+    const doGrupo = P.filter((x) => x.unidade === r.unidade), cotas = doGrupo.length ? cgN(doGrupo[0].cotas_do_grupo) : 0;
+    const cota = cotas ? cgN(r.parte_funcionarios) / cotas : null;
+    return `<div class="card neutral" style="text-align:left;${parcial ? 'opacity:.75;' : ''}">
+      <div class="card-lbl">${cgEsc(r.unidade)}${parcial ? ' · parcial' : ''}</div>
+      <div style="font-size:12.5px;line-height:1.7;margin-top:4px;">
+        ${linhaEsc(`taxa de serviço do salão <span style="color:var(--tx-4);">(${cgN(r.vendas_salao)} vendas, ${cgR0(r.venda_bruta_salao)})</span>`, r.taxa_servico)}
+        ${linhaEsc('casa 30%', r.parte_casa, false, true)}
+        ${linhaEsc('fixo da casa', r.desconto_fixo, false, true)}
+        ${cgN(r.quebra_salao) ? linhaEsc('quebra do salão', r.quebra_salao, false, true) : ''}
+        ${linhaEsc('= parte dos funcionários', r.parte_funcionarios, true)}
+        ${cota != null ? `<div style="display:flex;justify-content:space-between;gap:12px;"><span>÷ ${cotas.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} cotas = <b>cota cheia</b></span><b>${cgR(cota)}</b></div>` : ''}
+      </div></div>`; }).join('')}</div>`;
+  if (!P.length) return h + (parcial ? '<div class="contexto">A lista por pessoa sai quando o período fechar (dia 25).</div>' : '');
+  h += cgFiltroUnidade(CARGOS.pessoas);
+  const unids = [...new Set(P.map((x) => x.unidade))];
+  h += `<div id="tabelaCgDez" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Dias</th><th>Valor</th><th>Pago na folha</th><th>Observação</th></tr></thead><tbody>`;
+  unids.forEach((u) => {
+    const L = P.filter((x) => x.unidade === u).sort((a, b) => (cgN(b.valor) > 0) - (cgN(a.valor) > 0) || String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
+    h += `<tr class="sub"><td colspan="5"><b>${cgEsc(u)}</b></td></tr>`;
+    L.forEach((x) => {
+      const zero = !cgN(x.valor), frac = cgN(x.fracao) < 1 && cgN(x.dias_periodo);
+      const pago = x.pago_na_folha == null ? '<span style="color:var(--tx-5);">–</span>'
+        : Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)) < 0.01 ? `<span style="color:var(--farol-ok);">✓ ${cgR(x.pago_na_folha)}</span>`
+        : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgR(x.pago_na_folha)} (${cgN(x.pago_na_folha) > cgN(x.valor) ? '+' : '−'}${cgR(Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)))})</span>`;
+      h += `<tr style="${zero ? 'color:var(--tx-4);' : ''}"><td>${cgEsc(cgNome(x.apelido || x.nome))}</td>
+        <td>${frac ? `${cgN(x.dias_trabalhados)}/${cgN(x.dias_periodo)}` : ''}</td>
+        <td style="${zero ? '' : 'font-weight:700;'}">${cgR(x.valor)}</td><td>${pago}</td>
+        <td style="white-space:normal;font-size:12px;color:var(--tx-3);">${cgEsc(x.observacao || '')}</td></tr>`;
+    });
+    h += `<tr class="sub"><td colspan="2">Subtotal ${cgEsc(u)}</td><td>${cgR(L.reduce((a, x) => a + cgN(x.valor), 0))}</td><td>${cgR(L.reduce((a, x) => a + cgN(x.pago_na_folha), 0))}</td><td></td></tr>`;
+  });
+  return h + `</tbody></table></div>`;
 }
 
 // ---------- ENVIO À CONTABILIDADE (05/11/2026, proposta do RH de 29/10: contexto/propostas-telas/2026-10-29-rh-fechamento-folha.md) ----------
