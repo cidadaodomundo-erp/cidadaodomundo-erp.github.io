@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Sistema · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PÁGINA PRÓPRIA DO SISTEMA (05/11/2026, último bloco do painel em módulos), no molde de cardapio/index.html.
+     A casca abre sistema/index.html#plano, #rotinas ou #telas (docs/casca/paginas.js); a página carrega só o núcleo comum
+     e docs/sistema/sistema.js — o mesmo código que o painel antigo usa. Quem mexe: o chat "Telas do painel". -->
+<script>
+  // aqui a casca abre a página sem ?casca=1: dentro de moldura da mesma origem é casca
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-plano" class="modulo" style="display:none;"><div id="view-plano"></div></div>
+    <div id="modulo-rotinas" class="modulo" style="display:none;"><div id="view-rotinas"></div></div>
+    <div id="modulo-telas" class="modulo" style="display:none;"><div id="view-telas"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105a"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="sistema.js?v=20261105a"></script>
+<script>
+// O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
+const TELAS_PAGINA = { plano: entrarPlano, rotinas: entrarRotinas, telas: entrarTelas };
+const TELA = TELAS_PAGINA[location.hash.slice(1)] ? location.hash.slice(1) : 'plano';
+// o "sair" do Plano: no painel antigo ele também redesenha os Reembolsos, que não moram aqui
+function rmbSair() { localStorage.removeItem('rmbSessao'); }
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;   // aberta solta (botão "abrir"): a porta é a da casca
+}
+// atalho de uma tela para outra (ex.: gerar ordem → Apontar): na casca, ela abre a outra tela; solta, troca o endereço
+function mostrarModulo(nome) {
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-modulo', nome }); return; }
+  location.hash = nome;
+}
+function abrirTela() {
+  document.getElementById('modulo-' + TELA).style.display = '';
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  try { TELAS_PAGINA[TELA](); }
+  catch (e) {
+    const el = document.getElementById('erroMsg');
+    el.style.display = 'block'; el.textContent = 'Erro ao abrir a tela: ' + e.message;
+  }
+}
+// a casca reabre a tela já carregada: recarrega os dados, como o painel antigo faz no mostrarModulo
+window.reentrarTela = () => { try { TELAS_PAGINA[TELA](); } catch (e) {} };
+window.addEventListener('hashchange', () => location.reload());
+abrirTela();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
