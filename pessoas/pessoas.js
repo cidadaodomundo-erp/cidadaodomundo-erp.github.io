@@ -841,7 +841,7 @@ function renderModuloCargos() {
   // 29/10/2026 18:19 (dono): o nome é "Gratificações salão" em todo lugar
   else if (F.aba === 'dez') h += cgEmMontagem('Gratificações salão', 'A taxa de serviço do salão menos os 30% e o fixo da casa, dividida igual entre todos os ativos, proporcional aos dias trabalhados.');
   else if (F.aba === 'resc') h += cgAbaResc();
-  else if (F.aba === 'envio') h += cgEmMontagem('Envio à contabilidade', 'Junta, por pessoa, as horas da Flash, as gratificações salão, cada falta injustificada com a data, o desconto do VT de quem pega e o adiantamento. Gera o arquivo da contabilidade (primeiro um de teste) e a planilha de conferência. A Hellen confere aqui antes de enviar.');
+  else if (F.aba === 'envio') h += cgAbaEnvio();
   alvo.innerHTML = h;
 }
 
@@ -1433,6 +1433,141 @@ function cgFolhaRubHtml(x) {
     ${R.map((r) => `<tr><td>${cgEsc(r.codigo)} · ${cgEsc(r.rubrica)}</td><td style="text-align:right;color:var(--tx-4);">${cgEsc(r.referencia || '')}</td>
       <td style="text-align:right;color:var(--farol-ok);">${r.tipo === 'P' ? cgR(r.valor) : ''}</td><td style="text-align:right;color:var(--tx-3);">${r.tipo === 'D' ? cgR(r.valor) : ''}</td></tr>`).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="4">Proventos ${cgR(x.proventos)} · descontos ${cgR(x.descontos)} · <b>líquido ${cgR(x.liquido)}</b></td></tr></tfoot></table></div>`;
+}
+
+// ---------- ENVIO À CONTABILIDADE (05/11/2026, proposta do RH de 29/10: contexto/propostas-telas/2026-10-29-rh-fechamento-folha.md) ----------
+// Lê vw_rh_fechamento_folha (uma linha por lançamento). Horas da Flash: a parte inteira é hora e os 2 decimais são MINUTOS, que
+// passam de 60 ("48.99" = 48 h + 99 min = 49:39). Na tela vira HH:MM e a soma é em minutos; o arquivo leva o número cru (× 1000).
+const CG_ENV_COLS = [
+  ['he100', 'HE 100%', (x) => x.rubrica === '0200'],
+  ['he70', 'HE 70%', (x) => x.medida === 'horas' && (x.rubrica === '0205' || x.rubrica === '0209')],
+  ['not', 'Ad. noturno', (x) => x.rubrica === '0025'],
+  ['falta', 'Faltas', (x) => x.rubrica === '0040'],
+  ['atraso', 'Atrasos', (x) => x.rubrica === '8069'],
+  ['grat', 'Gratif. salão', (x) => x.medida === 'R$' && (x.rubrica === '0203' || x.rubrica === '0205')],
+  ['vt', 'VT do mês', (x) => x.rubrica === '0048'],
+  ['adt', 'Adiantamento', (x) => x.rubrica === '0981'],
+];
+function cgEnvMin(v) { const n = cgN(v), h = Math.trunc(n); return h * 60 + Math.round((n - h) * 100); }   // "48.99" → 2979 min
+function cgEnvHM(min) { if (!min) return ''; return Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0'); }
+async function cgEnvioCarregar() {
+  CARGOS.envio = null;
+  try { CARGOS.envio = { lin: await consultarTudo('vw_rh_fechamento_folha?select=*&order=competencia.desc,empresa_codigo,matricula,rubrica,medida') }; }
+  catch (e) { CARGOS.envio = { erro: e.message }; }
+  if (CARGOS_F.aba === 'envio') renderModuloCargos();
+}
+function cgEnvioDoMes() {
+  const F = CARGOS_F, L = CARGOS.envio.lin;
+  const comps = [...new Set(L.map((x) => String(x.competencia).slice(0, 10)))].sort().reverse();
+  // abre no mês mais recente que já tem o txt da Flash (é ele que define o fechamento)
+  const comFlash = comps.filter((c) => L.some((x) => String(x.competencia).slice(0, 10) === c && x.medida === 'horas'));
+  const comp = comps.includes(F.envioComp) ? F.envioComp : (comFlash[0] || comps[0]);
+  const M = L.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  return { comps, comp, M };
+}
+function cgEnvioPessoas(M) {
+  const P = new Map();
+  M.forEach((x) => {
+    const k = x.empresa_codigo + '|' + x.matricula;
+    if (!P.has(k)) P.set(k, { k, empresa: x.empresa_codigo, matricula: x.matricula, nome: x.nome, unidade: x.unidade, fora: !x.pessoa_id, lin: [] });
+    const p = P.get(k); p.lin.push(x);
+    const c = CG_ENV_COLS.find(([, , f]) => f(x));
+    if (c) p[c[0]] = (p[c[0]] || 0) + (x.medida === 'horas' ? cgEnvMin(x.valor) : cgN(x.valor));
+  });
+  return [...P.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
+}
+function cgEnvVal(k, v) {
+  if (!v) return '<span style="color:var(--tx-5);">–</span>';
+  return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
+}
+function cgAbaEnvio() {
+  const F = CARGOS_F;
+  if (CARGOS.envio === undefined) { cgEnvioCarregar(); return '<div class="contexto">Lendo o fechamento da folha…</div>'; }
+  if (CARGOS.envio === null) return '<div class="contexto">Lendo o fechamento da folha…</div>';
+  // 05/11/2026: a prévia ainda não abre para o login do painel (o RH está liberando a leitura do adiantamento)
+  if (CARGOS.envio.erro && /permission denied/i.test(CARGOS.envio.erro)) return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Envio à contabilidade — o RH está liberando os números deste mês.</b>
+    <div style="margin-top:6px;">Assim que liberar, aparecem aqui as horas da Flash, as gratificações, o VT e o adiantamento de cada pessoa, com o arquivo e a planilha para baixar.</div></div>`;
+  if (CARGOS.envio.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler o fechamento da folha: ${cgEsc(CARGOS.envio.erro)}
+    <div style="margin-top:6px;"><button type="button" class="preset-btn" onclick="CARGOS.envio=undefined;renderModuloCargos()">Tentar de novo</button></div></div>`;
+  const { comps, comp, M } = cgEnvioDoMes();
+  if (!comps.length) return '<div class="contexto">Nenhum fechamento no banco ainda: falta carregar o txt da Flash do mês.</div>';
+  const emps = [...new Set(M.map((x) => x.empresa_codigo))].sort();
+  const ini = new Date(comp + 'T12:00:00'); const de = new Date(ini.getFullYear(), ini.getMonth() - 1, 26), ate = new Date(ini.getFullYear(), ini.getMonth(), 25);
+  const tem = (f) => M.some(f);
+  const empsFlash = new Set(M.filter((x) => x.medida === 'horas').map((x) => x.empresa_codigo));
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;">${comps.slice(0, 6).map((c) =>
+      `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.envioComp='${c}';CARGOS_F.envioEmp=null;CARGOS_F.envioAberta=null;renderModuloCargos()">${cgMesRot(c)}</button>`).join('')}</div>
+    <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
+    ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
+                ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')]])}`;
+  // um cartão por empresa: clicar filtra a tabela
+  h += `<div class="cards">${emps.map((e) => {
+      const L = M.filter((x) => x.empresa_codigo === e), P = cgEnvioPessoas(L), ativo = F.envioEmp === e;
+      const us = [...new Set(L.map((x) => x.unidade).filter(Boolean))].join(' · ');
+      const soma = (k) => P.reduce((a, p) => a + (p[k] || 0), 0);
+      return `<div class="card ${ativo ? 'highlight' : 'neutral'}" style="text-align:left;cursor:pointer;" onclick="CARGOS_F.envioEmp=CARGOS_F.envioEmp==='${cgEsc(e)}'?null:'${cgEsc(e)}';CARGOS_F.envioAberta=null;renderModuloCargos()">
+        <div class="card-lbl">Empresa ${cgEsc(e)}${us ? ' · ' + cgEsc(us) : ''}${ativo ? ' ✕' : ''}</div>
+        <div class="card-val" style="font-size:18px;">${P.length} <span style="font-size:12px;color:var(--tx-4);font-weight:600;">${P.length === 1 ? 'pessoa' : 'pessoas'} · ${L.length} lançamentos</span></div>
+        <div class="card-pct" style="line-height:1.6;">horas extras ${cgEnvHM(soma('he100') + soma('he70')) || '–'} · faltas ${cgEnvHM(soma('falta') + soma('atraso')) || '–'}<br>
+          gratificações ${cgR0(soma('grat'))} · VT ${cgR0(soma('vt'))} · adiantamento ${cgR0(soma('adt'))}</div></div>`; }).join('')}</div>`;
+  h += cgFiltroUnidade(CARGOS.pessoas);
+  const P = cgEnvioPessoas(M.filter((x) => !F.envioEmp || x.empresa_codigo === F.envioEmp));
+  const fora = P.filter((p) => p.fora).length;
+  h += `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
+      ${(F.envioEmp ? [F.envioEmp] : emps).map((e) => cgBotaoPasso(`Baixar arquivo de TESTE · empresa ${cgEsc(e)}`, `cgEnvioArquivo('${cgEsc(e)}')`)).join('')}
+      ${cgBotaoPasso('Baixar planilha de conferência', 'cgEnvioPlanilha()', true)}</div>
+    ${fora ? `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">${fora} ${fora === 1 ? 'matrícula da Flash não está' : 'matrículas da Flash não estão'} no cadastro: conferir antes de enviar.</div>` : ''}
+    <div id="tabelaCgEnvio" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Empresa · matr.</th>${CG_ENV_COLS.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
+    ${P.map((p) => { const ab = F.envioAberta === p.k;
+      return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(p.k))}?null:${cgEsc(JSON.stringify(p.k))};renderModuloCargos()'>
+        <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
+        <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
+        ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, p[k])}</td>`).join('')}</tr>
+        ${ab ? `<tr><td colspan="${CG_ENV_COLS.length + 2}">${cgEnvioLinhasHtml(p)}</td></tr>` : ''}`; }).join('')}
+    </tbody><tfoot><tr class="sub"><td colspan="2">${P.length} ${P.length === 1 ? 'pessoa' : 'pessoas'}</td>
+      ${CG_ENV_COLS.map(([k]) => `<td>${cgEnvVal(k, P.reduce((a, p) => a + (p[k] || 0), 0))}</td>`).join('')}</tr></tfoot></table></div>`;
+  return h;
+}
+function cgEnvioLinhasHtml(p) {
+  return `<div id="tabelaCgEnvioLin" style="overflow-x:auto;max-width:760px;"><table><thead><tr><th>Rubrica</th><th>Valor</th><th>Na Flash</th><th>De onde vem</th></tr></thead><tbody>
+    ${p.lin.map((x) => `<tr><td>${cgEsc(x.rubrica)} · ${cgEsc(x.descricao)}</td>
+      <td>${x.medida === 'horas' ? cgEnvHM(cgEnvMin(x.valor)) : cgR(x.valor)}</td>
+      <td style="color:var(--tx-4);">${x.medida === 'horas' ? cgEsc(cgN(x.valor).toFixed(2)) : ''}</td>
+      <td style="color:var(--tx-4);">${cgEsc(x.origem)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function cgEnvioBaixar(nome, texto, tipo) {
+  const url = URL.createObjectURL(new Blob([texto], { type: tipo }));
+  const a = document.createElement('a'); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+// Layout do txt da Flash (43 caracteres): "10" · matrícula (10) · AAAAMM · rubrica (4) · "11" · valor (10) · empresa (9).
+// Horas: o número cru da Flash × 1000. R$: × 100 — é TESTE (dono 29/10 12:59): a contabilidade diz se o Domínio aceita R$ no mesmo arquivo.
+function cgEnvioArquivo(emp) {
+  try {
+    const { comp, M } = cgEnvioDoMes();
+    const L = M.filter((x) => x.empresa_codigo === emp && cgN(x.valor));
+    if (!L.length) return avisoAcao('atencao', `! A empresa ${emp} não tem lançamento neste mês: nada a gerar.`);
+    const am = comp.slice(0, 4) + comp.slice(5, 7), z = (v, n) => String(v).padStart(n, '0');
+    const ruins = L.filter((x) => !/^\d+$/.test(String(x.matricula)) || !/^\d{4}$/.test(String(x.rubrica)));
+    if (ruins.length) return avisoAcao('erro', `✗ Não gerou: ${ruins.length} lançamento(s) sem matrícula ou rubrica válida (ex.: ${ruins[0].nome}). Corrija o cadastro e tente de novo.`, () => cgEnvioArquivo(emp));
+    const txt = L.map((x) => '10' + z(x.matricula, 10) + am + x.rubrica + '11'
+      + z(Math.round(cgN(x.valor) * (x.medida === 'horas' ? 1000 : 100)), 10) + z(emp, 9)).join('\r\n') + '\r\n';
+    cgEnvioBaixar(`contabilidade-${emp}-${am}-TESTE.txt`, txt, 'text/plain');
+    avisoAcao('ok', `✓ Arquivo de TESTE da empresa ${emp} gerado (${L.length} linhas) às ${avisoHora()}. Está na pasta de downloads.`);
+  } catch (e) { avisoAcao('erro', `✗ Não gerou o arquivo: ${e.message}.`, () => cgEnvioArquivo(emp)); }
+}
+function cgEnvioPlanilha() {
+  try {
+    const F = CARGOS_F, { comp, M } = cgEnvioDoMes();
+    const L = M.filter((x) => !F.envioEmp || x.empresa_codigo === F.envioEmp);
+    if (!L.length) return avisoAcao('atencao', '! Nada a pôr na planilha neste mês.');
+    const q = (s) => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"', br = (v) => cgN(v).toFixed(2).replace('.', ',');
+    const cab = ['Competência', 'Empresa', 'Matrícula', 'Nome', 'Unidade', 'Rubrica', 'Descrição', 'Medida', 'Valor (horas em HH:MM)', 'Valor da Flash', 'De onde vem'];
+    const lin = L.map((x) => [cgMesRot(comp), x.empresa_codigo, x.matricula, x.nome, x.unidade, x.rubrica, x.descricao, x.medida,
+      x.medida === 'horas' ? cgEnvHM(cgEnvMin(x.valor)) : br(x.valor), x.medida === 'horas' ? br(x.valor) : '', x.origem].map(q).join(';'));
+    cgEnvioBaixar(`conferencia-folha-${comp.slice(0, 7)}${F.envioEmp ? '-' + F.envioEmp : ''}.csv`, '﻿' + [cab.map(q).join(';')].concat(lin).join('\r\n'), 'text/csv;charset=utf-8');
+    avisoAcao('ok', `✓ Planilha de conferência gerada (${L.length} linhas) às ${avisoHora()}. Está na pasta de downloads.`);
+  } catch (e) { avisoAcao('erro', `✗ Não gerou a planilha: ${e.message}.`, cgEnvioPlanilha); }
 }
 
 // ---------- FÉRIAS (29/10/2026, chat RH) ----------
