@@ -3015,10 +3015,7 @@ function renderModuloRh() {
           <td>${cgData(x.data_concessao)}</td><td>${R(x.valor_total)}</td><td>${R(x.descontado)}</td><td>${n(x.a_descontar) ? R(x.a_descontar) : 'quitado'}</td><td>${x.ultimo_pago ? cgData(x.ultimo_pago) : '—'}</td></tr>`).join('')}</tbody></table></td></tr>`;
     });
     h += `</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td></tr></tfoot></table></div>`;
-    const dv = RH.diverg.filter((d) => d.situacao_base === 'HISTORICO');
-    if (dv.length) h += `<details style="margin-top:14px;"><summary class="caption-label" style="cursor:pointer;text-align:left;">Empréstimos de quem saiu que não fecham na planilha (${dv.length})</summary>
-      <div id="tabelaRhDivHist" style="overflow-x:auto;"><table><thead><tr><th>Funcionário</th><th>Descrição</th><th>Data</th><th>Concedido</th><th>Soma das parcelas</th><th>Diferença</th><th>Tipo</th></tr></thead><tbody>
-      ${dv.map((d) => `<tr><td>${cgEsc(cgNome(d.colaborador))}</td><td>${cgEsc(d.descricao || '')}</td><td>${cgData(d.data_concessao)}</td><td>${R(d.valor_total)}</td><td>${R(d.soma_parcelas)}</td><td>${R(d.diferenca)}</td><td>${cgEsc(d.tipo || '')}</td></tr>`).join('')}</tbody></table></div></details>`;
+    // 06/11/2026 (dono): "pode tirar esses avisos de falta parcela" — o histórico é só consulta, sem conferência de parcelas
     alvo.innerHTML = h;
     return;
   }
