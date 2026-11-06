@@ -1596,7 +1596,8 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   const conf = new Map(Pconf.map((x) => [`${x.empresa}|${x.matricula}`, cgLista(x.conferencia)]));
   const alertas = (x) => (conf.get(`${x.empresa}|${x.matricula}`) || []).concat(x.fecha === false ? ['as rubricas não somam o extrato'] : [],
     cgLista(x.rubricas_sem_grupo).map((r) => 'rubrica nova: ' + r), x.conferir_texto ? [x.conferir_texto] : []);
-  const Q = Qall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  // 06/11/2026 (dono 14:19): sócios (Fabio e Jane, vínculo diretor) recebem tudo no pró-labore — fora do quadro e dos totais
+  const Q = Qall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade) && !(x.vinculo && /diretor/i.test(x.vinculo)));
   // 05/11/2026 (dono): "um agrupar igual do excel" — fechado (padrão) mostra só o total do bloco; a escolha fica guardada
   const G = cgFolhaGrupo();
   const PV = G.prov ? CG_Q_PROV.filter(([k]) => Q.some((x) => cgN(x[k]))) : [], DS = G.desc ? CG_Q_DESC.filter(([k]) => Q.some((x) => cgN(x[k]))) : [];

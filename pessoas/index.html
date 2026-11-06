@@ -20,9 +20,12 @@
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
-<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261105b">
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261106a">
 <style>
   .na-casca body::before { display:none !important; }
+  /* 06/11/2026 (dono): cabeçalho claro, letra escura — não se confunde com as linhas */
+  div[id^="tabela"] th { background:var(--th-claro) !important; color:var(--th-claro-tx) !important; border-color:var(--line-2); }
+  div[id^="tabela"] th a, div[id^="tabela"] th span { color:var(--th-claro-tx) !important; }
 </style>
 </head>
 <body>
@@ -48,7 +51,7 @@
 
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="pessoas.js?v=20261106l"></script>
+<script src="pessoas.js?v=20261106m"></script>
 <script>
 // O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
 // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o endereço antigo cai nela
