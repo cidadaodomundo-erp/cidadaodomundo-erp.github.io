@@ -3886,7 +3886,7 @@ function cfRender(id) {
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
   h += `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
-      ${[['falta', 'falta conferir'], ['feitas', 'conferidas'], ['todas', 'todas']].map(([k, r]) => `<button class="preset-btn${CF.filtro === k ? ' active' : ''}" onclick="CF.filtro='${k}'; cfRender('${id}');">${r}</button>`).join('')}
+      ${[['falta', 'falta conferir', L.length - feitas], ['feitas', 'conferidas', feitas], ['todas', 'todas', L.length]].map(([k, r, n]) => `<button class="preset-btn${CF.filtro === k ? ' active' : ''}" onclick="CF.filtro='${k}'; cfRender('${id}');">${r} · ${n}</button>`).join('')}
       <input id="cfBusca" placeholder="buscar pelo nome" value="${trEscH(CF.busca)}" oninput="cfBuscar('${id}', this.value)" style="flex:1 1 200px; ${campo}"></div>
     <datalist id="cfNomes">${(CF.nomes || []).map((n) => `<option value="${trEscH(n)}">`).join('')}</datalist>`;
   if (!lista.length) h += `<div class="contexto" style="border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">${CF.filtro === 'falta' && !b ? '✓ Nada falta conferir aqui.' : 'Nada com esse filtro.'}</b></div>`;
