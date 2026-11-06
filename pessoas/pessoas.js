@@ -3075,20 +3075,21 @@ function renderModuloRh() {
   // o depósito da Rita não é parcela de folha; e só o empréstimo com parcela aberta (dono 06/11 12:54: o passado é só consulta)
   const chavesAbertas = new Set(RH.aberto.map((r) => r.chave));
   const dvA = RH.diverg.filter((d) => d.situacao_base === 'ATIVO' && d.forma !== 'DEPOSITO' && chavesAbertas.has(d.chave));
+  // 06/11/2026 (RH, dono): a coluna Situação saiu — a diferença da planilha era de parcelas já pagas (Alyson), o futuro está certo
   const sit = (c) => { const D = dvA.filter((d) => d.colaborador === c.colaborador); if (!D.length) return '<span style="color:var(--farol-ok);">em dia</span>';
     const fp = D.filter((d) => d.tipo === 'FALTA PARCELA').reduce((a, d) => a + n(d.diferenca), 0), pm = D.filter((d) => d.tipo !== 'FALTA PARCELA').reduce((a, d) => a + Math.abs(n(d.diferenca)), 0);
     return [fp ? `<span style="color:var(--farol-perto);" title="sobrou valor sem parcela lançada: ninguém está cobrando">falta parcela ${R(fp)}</span>` : '', pm ? `<span style="color:var(--farol-perto);" title="quase sempre vale replanejado com a parcela antiga ainda na planilha">parcela a mais ${R(pm)}</span>` : ''].filter(Boolean).join('<br>'); };
   const quem = ativos.filter((c) => n(c.a_descontar) > 0);
-  h += `<div class="section-label">Quem deve</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Falta</th><th>Parcelas que faltam</th><th>Próxima</th><th>Última</th><th>Situação</th></tr></thead><tbody>
+  h += `<div class="section-label">Quem deve</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Falta</th><th>Parcelas que faltam</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
     ${quem.map((c) => { const ab = P === c.colaborador;
       let t = `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})' title="${ab ? 'clique para soltar' : 'clique para a tela falar só desta pessoa'}">
-        <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${R(c.a_descontar)}</td><td>${n(c.parcelas_abertas)}</td><td>${cgData(c.proximo_desconto)}</td><td>${mesTxt(c.quitacao_prevista)}</td><td>${sit(c)}</td></tr>`;
+        <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${R(c.a_descontar)}</td><td>${n(c.parcelas_abertas)}</td><td>${cgData(c.proximo_desconto)}</td><td>${mesTxt(c.quitacao_prevista)}</td></tr>`;
       if (ab) { const E = [...new Set(RH.aberto.filter((r) => r.colaborador === c.colaborador).map((r) => r.chave))].map((k) => RH.aberto.filter((r) => r.chave === k && r.colaborador === c.colaborador));
-        t += `<tr><td colspan="6"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
+        t += `<tr><td colspan="5"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
           ${E.map((L) => `<tr><td>${cgEsc(L[0].descricao || '')}${L[0].credor && L[0].credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(L[0].credor))}</span>` : ''}</td>
             <td>${L.length}${L[0].parcelas_total ? ` (de ${L[0].parcelas_total})` : ''}</td><td>${R(L.reduce((a, r) => a + n(r.valor), 0))}</td><td>${cgData(L[0].data_desconto)}</td><td>${cgData(L[L.length - 1].data_desconto)}</td></tr>`).join('')}</tbody></table></td></tr>`; }
       return t; }).join('')}
-    </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td><td></td></tr></tfoot></table></div>`;
+    </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td></tr></tfoot></table></div>`;
 
   // Bloco 4: depósitos da Rita (Vales Cidadão) — ela deposita na conta, não sai da folha
   if (depAll.length) h += `<div class="section-label">Depósitos da Rita (Vales Cidadão)</div><div id="tabelaRhDeposito" style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Nome completo</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
