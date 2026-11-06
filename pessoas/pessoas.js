@@ -1030,7 +1030,21 @@ function cgColunasConferir(c, p) {
 // ---------- ADMISSÃO (dono, 02/11/2026; proposta 2026-11-02-rh-admissao.md): o Novo registro cadastra na Flash e vai à contabilidade. O robô envia. ----------
 let CG_ADM = null;   // { id da pessoa, docs já gravados, novos a subir }
 const CG_ADM_MAX = 15 * 1048576, CG_ADM_MAX_EMAIL = 22 * 1048576;
-const CG_ADM_DOCS = ['CTPS', 'RG', 'CPF', 'Título de eleitor', 'CNH', 'Comprovante de endereço (até 90 dias)', 'PIS', 'Certidão de nascimento ou casamento', 'Certidão e CPF dos dependentes', 'Exame admissional', 'Termo de opção sindical', 'Dados bancários', 'Foto 3x4'];
+// 06/11/2026 (dono 16:45: "a lista de docs ali está bem extensa"): 3 grupos; CPF avulso e foto 3x4 saíram
+const CG_ADM_DOCS_G = [
+  ['Obrigatórios', ['RG ou CNH (com foto)', 'CTPS digital', 'Comprovante de endereço (até 90 dias)', 'Exame admissional (ASO)']],
+  ['Essenciais', ['Dados bancários', 'Certidão de nascimento ou casamento', 'Título de eleitor', 'PIS (se não está na CTPS)']],
+  ['Só quando se aplica', ['Certidão e CPF dos dependentes', 'Termo de opção sindical']]];
+const CG_ADM_DOCS = CG_ADM_DOCS_G.flatMap(([, L]) => L);
+// os 4 obrigatórios, reconhecendo também os nomes antigos do anexo (RG, CNH, CTPS, Exame admissional)
+const CG_ADM_OBRIG = [['RG ou CNH', /\b(RG|CNH|CIN)\b/i], ['CTPS digital', /CTPS/i], ['comprovante de endereço', /endere/i], ['exame admissional', /exame|ASO/i]];
+// campos que a leitura dos documentos preenche (rotina rh-admissao-leitura, 06/11/2026); os outros a pessoa informa
+const CG_ADM_LEIT = { nome_mae: 'RG/CNH/certidão/título', nome_pai: 'RG/CNH/certidão/título', nascimento: 'RG/CNH/certidão/título', municipio_nascimento: 'RG/certidão', sexo: 'RG/certidão',
+  estado_civil: 'certidão', rg: 'RG/CNH', rg_orgao: 'RG/CNH', rg_data: 'RG', cnh: 'CNH', cnh_categoria: 'CNH', titulo: 'título', titulo_zona: 'título', titulo_secao: 'título', pis: 'PIS/CTPS',
+  ctps: 'CTPS', ctps_serie: 'CTPS', ctps_uf: 'CTPS', ctps_data: 'CTPS', cep: 'comprovante de endereço', rua: 'comprovante de endereço', numero: 'comprovante de endereço',
+  complemento: 'comprovante de endereço', bairro: 'comprovante de endereço', cidade: 'comprovante de endereço', banco: 'dados bancários', agencia: 'dados bancários', conta: 'dados bancários' };
+function cgAdmTiposAnexados() { return CG_ADM ? [...CG_ADM.docs.map((d) => d.tipo), ...CG_ADM.novos.map((n) => n.tipo)] : []; }
+function cgAdmTemIdentidade() { return cgAdmTiposAnexados().some((t) => /\b(RG|CNH|CIN)\b|certid|t[ií]tulo/i.test(t)); }
 // 06/11/2026 (dono 16:23: "quais são os campos obrigatórios ... e ve quais pode aplicar lista suspensa"; proposta 2026-11-06-rh-admissao-campos-e-listas)
 const CG_UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 const CG_ADM_BLOCOS = [
@@ -1082,15 +1096,20 @@ function cgFormAdmissao(a, id) {
     return `<input id="cgA_${c}" type="${t || 'text'}" ${on} value="${cgEsc(t === 'date' ? atual.slice(0, 10) : atual)}" style="width:100%">`;
   };
   const titulo = (t) => `<div style="font-size:13px;font-weight:800;color:var(--tx-1);margin:14px 0 6px;">${t}</div>`;
+  const lido = a.lido_doc || {};
+  const selo = (c) => lido[c] && lido[c].doc ? `<span style="font-size:10.5px;color:var(--farol-ok);font-weight:700;">✓ lido do ${cgEsc(lido[c].doc)} — conferir</span>`
+    : CG_ADM_LEIT[c] ? `<span style="font-size:10.5px;color:var(--tx-5);">vem do documento (${CG_ADM_LEIT[c]})</span>` : '';
   setTimeout(() => { (a.dependentes || []).forEach(cgAdmDepAdd); cgAdmDocsPintar(); });
   return `<div id="cgAdmAlerta"></div>
-    ${CG_ADM_BLOCOS.map(([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1], ctl(c))).join('')}</div>`).join('')}
-    <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
-    ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
     ${titulo('Documentos anexos')}
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><select id="cgAdmDocTipo" style="max-width:100%;">${CG_ADM_DOCS.map((d) => `<option>${cgEsc(d)}</option>`).join('')}</select>
+    <div class="caption-label" style="text-align:left;margin:0 0 6px;">Suba os documentos primeiro: o robô lê e preenche os campos marcados "vem do documento" (até 40 min). CPF, telefone, raça/cor e escolaridade a pessoa informa.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><select id="cgAdmDocTipo" style="max-width:100%;">${CG_ADM_DOCS_G.map(([g, L]) => `<optgroup label="${cgEsc(g)}">${L.map((d) => `<option>${cgEsc(d)}</option>`).join('')}</optgroup>`).join('')}</select>
       <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="max-width:100%;" onchange="cgAdmDocEscolher(this)"></div>
     <div id="cgAdmDocs" style="margin-top:6px;font-size:12.5px;"></div>
+    ${CG_ADM_BLOCOS.map(([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1].replace(/^(Nascimento|Nome da mãe) \*$/, '$1 * (ou anexe RG/CNH)'), ctl(c) + selo(c[0]))).join('')}</div>`).join('')}
+    <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
+    ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
+
     ${campo('<span style="margin-top:12px;">Observação para a contabilidade</span>', `<input id="cgA_obs" value="${cgEsc(a.obs || '')}" style="width:100%">`)}`;
 }
 function cgAdmData(v) {
@@ -1125,7 +1144,9 @@ function cgAdmDocsPintar() {
   if (!el || !CG_ADM) return;
   const linha = (t, n, i, novo) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px;">✓ <b>${cgEsc(t)}</b> <span style="color:var(--tx-3);overflow-wrap:anywhere;">${cgEsc(n)}</span> <a href="javascript:void(0)" style="color:var(--tx-3);" onclick="cgAdmDocTirar(${i},${novo})">tirar</a></div>`;
   const soma = CG_ADM.novos.reduce((s, n) => s + n.arquivo.size, 0);
-  el.innerHTML = CG_ADM.docs.map((d, i) => linha(d.tipo, d.nome, i, false)).join('') + CG_ADM.novos.map((n, i) => linha(n.tipo, n.arquivo.name, i, true)).join('')
+  const tipos = cgAdmTiposAnexados(), falta = CG_ADM_OBRIG.filter(([, re]) => !tipos.some((t) => re.test(t))).map(([r]) => r);
+  el.innerHTML = `<div style="margin-bottom:4px;font-weight:700;color:${falta.length ? 'var(--farol-perto)' : 'var(--farol-ok)'};">Obrigatórios: ${4 - falta.length} de 4${falta.length ? ` · ! falta subir: ${falta.join(', ')} (dá para salvar e subir depois)` : ' ✓'}</div>`
+    + CG_ADM.docs.map((d, i) => linha(d.tipo, d.nome, i, false)).join('') + CG_ADM.novos.map((n, i) => linha(n.tipo, n.arquivo.name, i, true)).join('')
     + (soma > CG_ADM_MAX_EMAIL ? '<div style="color:var(--farol-perto);font-weight:700;">Mais de 22 MB: pode não caber num e-mail só.</div>' : '');
 }
 // sobe uma vez só: Tentar de novo reaproveita o que já subiu. O nome do anexo no e-mail é o tipo com a extensão.
@@ -1161,13 +1182,22 @@ function cgAdmEtapa(rot, sit, em, motivo, a, etapa) {
   if (sit === 'NAO_SE_APLICA') return `<span style="color:var(--tx-4);">${rot}: não vai</span>`;
   return `<span style="color:var(--tx-3);">${rot}: enviando…</span>`;
 }
+function cgAdmLeitura(a) {
+  const s = a.leitura_situacao;
+  if (s === 'ESPERANDO') return '<span style="color:var(--farol-perto);font-weight:700;">⏳ lendo documentos (até 40 min)</span>';
+  if (s === 'LIDA') return `<span style="color:var(--farol-ok);font-weight:700;">✓ documentos lidos${a.leitura_em ? ' ' + cgEnvQuando(a.leitura_em) : ''}</span>`;
+  if (s === 'DUVIDA') return `<span style="color:var(--farol-perto);font-weight:700;">! conferir: ${cgEsc(a.leitura_obs || 'a leitura deixou dúvida')}</span>`;
+  if (s === 'SEM_ANEXO') return '<span style="color:var(--tx-4);">sem documentos</span>';
+  return '';
+}
 function cgAdmEtapas(a) {
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;white-space:normal;">${cgAdmEtapa('Flash', a.flash_situacao, a.flash_em, a.flash_motivo, a, 'FLASH')}${cgAdmEtapa('Contabilidade', a.contab_situacao, a.contab_em, a.contab_motivo, a, 'CONTABILIDADE')}</div>
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;white-space:normal;">${cgAdmLeitura(a)}${cgAdmEtapa('Flash', a.flash_situacao, a.flash_em, a.flash_motivo, a, 'FLASH')}${cgAdmEtapa('Contabilidade', a.contab_situacao, a.contab_em, a.contab_motivo, a, 'CONTABILIDADE')}</div>
     ${a.flash_aviso ? `<div style="color:var(--farol-perto);font-weight:700;white-space:normal;margin-top:4px;">${cgEsc(a.flash_aviso)}</div>` : ''}`;
 }
 // fica à vista enquanto faltar alguma etapa; nada some sozinho antes do ✓
 function cgAdmAndamento() {
-  const L = (CARGOS.adm || []).filter((a) => a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || a.flash_aviso);
+  const L = (CARGOS.adm || []).filter((a) => a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || a.flash_aviso
+    || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA');
   if (!L.length) return '';
   const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
   return `<div class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><b>${cgEsc(cgNome(nome(a)))}</b><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
@@ -1286,8 +1316,10 @@ async function cgSalvar(id) {
     if (!cargo) falta.push('cargo (fora do plano: escreva o nome do cargo com setor)');
     if (!(Number(corpo.salario) > 0)) falta.push('salário maior que zero');
     if (!corpo.admissao) falta.push('data de admissão');
-    if (!A.nascimento) falta.push('nascimento');
-    if (!A.nome_mae) falta.push('nome da mãe');
+    if (!cgAdmTemIdentidade()) {   // com RG/CNH/certidão/título anexado, a leitura preenche (banco, 06/11)
+      if (!A.nascimento) falta.push('nascimento (ou anexe o RG/CNH)');
+      if (!A.nome_mae) falta.push('nome da mãe (ou anexe o RG/CNH)');
+    }
     const pn = corpo.nome.trim().toUpperCase().split(/\s+/)[0];
     if (!nomes.length && pn && CARGOS.pessoas.some((x) => x.ativo && x.empresa === corpo.empresa && String(x.nome || '').trim().toUpperCase().split(/\s+/)[0] === pn))
       falta.push(`"como aparece no contas a pagar" (já existe ${cgNome(pn)} na ${corpo.empresa})`);
