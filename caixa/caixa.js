@@ -103,6 +103,36 @@ function caixaDiaDaVez(u) {
   return { dia: dias[0] || null, fila: dias.slice(1) };
 }
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null;
+const cgNum = v => Number(v) || 0;
+function caixaFrenteNome(u, cx) {   // 'Caixa 14808' → 'CaixaSalao' (caixa_frente_nome); desconhecido fica "caixa <id>"
+  const id = String(cx || '').replace(/\D/g, '');
+  const f = (CAIXA_FRENTE || []).find(x => x.unidade === u && String(x.caixa_usuario) === id);
+  return f ? f.nome : (id ? 'caixa ' + id : String(cx || 'caixa'));
+}
+// faixa "Frentes do dia" no alto do detalhe: nome · Saipos aberta/fechada · diferença do Saipos · painel
+function caixaFrentesFaixa(unidade, dia) {
+  const cont = document.getElementById('concartao-dia');
+  if (!cont) return;
+  const old = document.getElementById('cxFrentes'); if (old) old.remove();
+  const T = (CAIXA_TURNOS || []).filter(t => t.unidade === unidade && t.dia === dia);
+  if (!T.length) return;
+  const hm = ts => ts ? String(ts).slice(8, 10) + '/' + String(ts).slice(5, 7) + ' ' + String(ts).slice(11, 16) : '';
+  const D = (CAIXA_DIFSAI || []).filter(l => l.unidade === unidade && l.data === dia);
+  const itens = CAIXA_HELLEN && !CAIXA_HELLEN.erro && CAIXA_HELLEN.trs ? caixaHellenItens().filter(x => x.u === unidade && x.dia === dia && !['aguardando', 'quebra'].includes(x.bloco)) : null;
+  const tipos = { aberto: 'fechar no Saipos', difsaipos: 'explicar a diferença', contagem: 'contar', cofre: 'dinheiro', troca: 'trocar bandeira', semcobr: 'maquininha', pix: 'PIX', online: 'online' };
+  const linhas = T.map(t => {
+    const nome = caixaFrenteNome(unidade, t.caixa), d = D.find(l => String(l.descricao || '').replace(/^.*?-\s*/, '').toLowerCase() === nome.toLowerCase());
+    const v = d ? Math.round((cgNum(d.credito) - cgNum(d.debito)) * 100) / 100 : null;
+    const sai = t.fechado === false ? `<b style="color:var(--farol-fora);">aberta desde ${hm(t.aberto_em)}</b>` : `<span style="color:var(--farol-ok);">fechada${t.fechado_em ? ' às ' + hm(t.fechado_em) : ''}</span>`;
+    const dif = t.fechado === false ? '—' : v == null || Math.abs(v) < 0.005 ? 'sem diferença' : Math.abs(v) <= 1.0001 ? `<span style="color:var(--tx-4);">R$ ${fmt(v)} (absorvido)</span>` : `<b style="color:var(--farol-perto);">R$ ${fmt(v)}</b>`;
+    return `<tr><td><b>${trEscH(nome)}</b></td><td>${sai}</td><td>${dif}</td></tr>`;
+  }).join('');
+  const pain = itens == null ? '' : itens.length ? `<b style="color:var(--farol-perto);">falta: ${[...new Set(itens.map(x => tipos[x.bloco] || 'conferir'))].join(', ')}</b>` : '<b style="color:var(--farol-ok);">✓ painel fechou</b>';
+  cont.insertAdjacentHTML('afterbegin', `<div id="cxFrentes" class="contexto" style="text-align:left;margin-bottom:8px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;"><b>Frentes do dia</b><span style="font-size:12px;">${pain}</span></div>
+    <div style="overflow-x:auto;"><table style="font-size:12.5px;margin-top:4px;"><thead><tr><th>Frente</th><th>Saipos</th><th>Diferença no fechamento</th></tr></thead><tbody>${linhas}</tbody></table></div></div>`);
+}
 function caixaTravarDia(unidade, dia) {
   const cont = document.getElementById('concartao-dia');
   if (!cont) return;
@@ -145,6 +175,7 @@ async function abrirDiaConcartao(unidade, dia) {
   ]);
   CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
+  caixaFrentesFaixa(unidade, dia);
   caixaTravarDia(unidade, dia);
 }
 // calc = { robo } (03/11/2026, lista da Hellen): faz o mesmo cruzamento sem desenhar e devolve as pendências do dia
@@ -1398,6 +1429,12 @@ async function caixaHellenCarregar() {
   const un = 'unidade=in.(' + lojas.map(u => '"' + encodeURIComponent(u) + '"').join(',') + ')';
   const faixa = (a, b) => '&dia=gte.' + a + '&dia=lte.' + b + '&' + un;
   try {
+    // 06/11/2026 (dono: "caixa aberto no Saipos e caixa com diferença são coisas diferentes"): nomes das frentes e a diferença
+    // que o turno deixou no fechamento do Saipos (lançamento "Diferença de Frente de Caixa - <nome>", subtipo DIFERENÇA DE CAIXA)
+    const [frentes, difsai] = await Promise.all([
+      consultarTudo('caixa_frente_nome?select=unidade,caixa_usuario,nome&order=unidade,caixa_usuario').catch(() => []),
+      consultarTudo('fin_lancamentos?select=id,data,unidade,descricao,credito,debito&subtipo=eq.' + encodeURIComponent('DIFERENÇA DE CAIXA') + '&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
+    CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
       consultarTudo('vw_pix_conciliacao?select=dia,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
@@ -1432,8 +1469,8 @@ function caixaHellenItens() {
       if (!r) continue;
       // caixa esquecido aberto aparece em todo turno seguinte: uma linha só, no dia em que abriu
       r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
-        oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa',
-        bloco: 'aberto', venda: 'aberto desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16) }));
+        oque: 'falta fechar no Saipos: ' + caixaFrenteNome(u, t.caixa) + ', aberta desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar no Saipos',
+        bloco: 'aberto', venda: caixaFrenteNome(u, t.caixa) + ' · aberta desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16) }));
       r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
         botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para, bloco: 'troca', hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para }));
       // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
@@ -1453,6 +1490,18 @@ function caixaHellenItens() {
       const ultC = [...cof].reverse().find(r => r.contado != null);
       add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'contar', botao: 'contar', bloco: 'contagem', venda: ultC ? 'última contagem ' + dm(ultC.dia) : 'nenhuma contagem desde ' + dm(corte), forma: 'Dinheiro' });
     }
+    // diferença no fechamento do Saipos (até R$ 1 é absorvida; acima vira item que a Hellen explica como quebra ou sobra)
+    const valDS = {}; (CAIXA_VALID || []).filter(v => v.unidade === u).forEach(v => { valDS[v.dia + '|' + v.chave] = v; });
+    (CAIXA_DIFSAI || []).filter(l => l.unidade === u && l.data >= corte).forEach(l => {
+      const v = Math.round((cgNum(l.credito) - cgNum(l.debito)) * 100) / 100, nome = String(l.descricao || '').replace(/^.*?-\s*/, '');
+      if (Math.abs(v) <= 1.0001) return;
+      const chave = 'difsai:' + l.id;
+      if (valDS[l.data + '|' + chave]) return;
+      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro',
+        saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
+        leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
+      add({ u, dia: l.data, ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro' });
+    });
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
       oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir', bloco: 'quebra', quem: q.responsavel || 'sem responsável' }));
@@ -1478,8 +1527,9 @@ function caixaHellenCampos(x) {
   return { bloco: espera ? 'aguardando' : pix ? 'pix' : 'semcobr', hora: x.hora, venda, quem: quem ? quem.trim() : '', forma: x.forma || '' };
 }
 const CAIXA_BLOCOS = [
-  ['aberto', 'Caixa aberto no Saipos', 'o caixa ficou aberto: fechar no Saipos para o dia entrar na conferência'],
+  ['aberto', 'Falta fechar no Saipos', 'a frente de caixa não foi fechada: quem fecha aquele caixa fecha no Saipos (AV: salão · SB: Diego · Ahú: Edgar)'],
   ['contagem', 'Dinheiro sem contagem', 'gaveta + cofre ainda não contados hoje'],
+  ['difsaipos', 'Diferença no fechamento do Saipos', 'o caixa foi fechado, mas a gaveta não bateu: explicar como quebra ou sobra (até R$ 1 é absorvido)'],
   ['cofre', 'Dinheiro do cofre e envios', 'contagem diferente do Saipos, ou envio do São Braz sem confirmação'],
   ['troca', 'Bandeira trocada no Saipos', 'registrada numa forma, passou em outra: trocar no Saipos'],
   ['pix', 'PIX que não entrou no banco', 'registrado como PIX e nenhum crédito desse valor no banco em até 5 dias'],
@@ -1688,7 +1738,7 @@ function renderModuloCaixa() {
       // "Para você resolver" montada, o status do dia sai dos MESMOS itens dela (a diferença total não decide mais)
       const HI = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && iso >= caixaHellenCorte(unidade) ? caixaHellenItens() : null;
       const itDia = HI ? HI.filter(x => x.u === unidade && x.dia === iso && x.bloco !== 'quebra' && (!F.caixa || !x.caixa || x.caixa === F.caixa)) : null;
-      const tipoIt = { aberto: 'caixa aberto', contagem: 'dinheiro (falta contar)', cofre: 'dinheiro', troca: 'maquininha', semcobr: 'maquininha', pix: 'PIX', online: 'online', erro: 'o dia' };
+      const tipoIt = { aberto: 'falta fechar no Saipos', difsaipos: 'diferença no fechamento do Saipos', contagem: 'dinheiro (falta contar)', cofre: 'dinheiro', troca: 'maquininha', semcobr: 'maquininha', pix: 'PIX', online: 'online', erro: 'o dia' };
       if (aberto) situacao = '<span style="color:#9aa4af;">dia em aberto</span>';
       else if (itDia) {
         const ac = itDia.filter(x => x.bloco !== 'aguardando');
