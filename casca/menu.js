@@ -234,24 +234,14 @@ window.CASCA_MENU = [
     "icone": "📌"
    },
    {
-    "chave": "cargos",
-    "rotulo": "Cargos e salários",
-    "icone": "🪪"
-   },
-   {
     "chave": "pcalc",
     "rotulo": "Cálculos da folha",
     "icone": "🧮"
    },
    {
-    "chave": "pferias",
-    "rotulo": "Férias",
-    "icone": "🏖️"
-   },
-   {
-    "chave": "presc",
-    "rotulo": "Rescisões",
-    "icone": "📄"
+    "chave": "rh",
+    "rotulo": "Descontos em folha",
+    "icone": "💳"
    },
    {
     "chave": "penvio",
@@ -264,14 +254,19 @@ window.CASCA_MENU = [
     "icone": "✅"
    },
    {
-    "chave": "rh",
-    "rotulo": "Descontos em folha",
-    "icone": "💳"
+    "chave": "pferias",
+    "rotulo": "Férias",
+    "icone": "🏖️"
    },
    {
-    "chave": "reembolsos",
-    "rotulo": "Reembolsos",
-    "icone": "💸"
+    "chave": "presc",
+    "rotulo": "Rescisões",
+    "icone": "📄"
+   },
+   {
+    "chave": "cargos",
+    "rotulo": "Cargos e salários",
+    "icone": "🪪"
    },
    {
     "chave": "pcusto",
