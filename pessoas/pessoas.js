@@ -683,7 +683,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · a partir do dia 25'], ['ffcalc', 'Cálculos por fora']] },
+           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · mês fechado'], ['ffcalc', 'Cálculos por fora']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
@@ -787,6 +787,13 @@ function cargosMes(m) { CARGOS_F.mes = m; renderModuloCargos(); }
 
 function cgChip(rot, ativo, onclick) {
   return `<button type="button" class="preset-btn ${ativo ? 'active' : ''}" onclick="${onclick}" style="padding:3px 10px;">${cgEsc(rot)}${ativo ? ' ✕' : ''}</button>`;
+}
+// 06/11/2026 (dono): o período dos Cálculos se escolhe numa lista suspensa, do mais antigo ao mais novo. ops = [[valor, rótulo]];
+// ao escolher roda `fn(valor)` (nome de função global ou trecho que recebe v)
+function cgSelPeriodo(rot, ops, atual, fn) {
+  return `<label style="display:inline-flex;align-items:center;gap:8px;margin:4px 0 8px;font-size:13px;color:var(--tx-3);">${rot}
+    <select onchange="(${fn})(this.value)" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;font-size:13px;">
+    ${ops.map(([v, r]) => `<option value="${cgEsc(v)}" ${v === atual ? 'selected' : ''}>${cgEsc(r)}</option>`).join('')}</select></label>`;
 }
 function cgFiltroUnidade(lista) {
   const F = CARGOS_F;
@@ -1311,7 +1318,7 @@ function cgAbaVtVa() {
   const totFlash = soma(pelaFlash), totFora = soma(fora), nFlash = pelaFlash.filter((v) => cgN(v.vt_valor) + cgN(v.va_valor) > 0).length;
   const dt = (k) => linhas.map((v) => v[k]).filter(Boolean).sort().pop();
   const ca = dt('calculado_em'), fe = dt('fechado_em'), en = dt('enviado_em');
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).reverse().map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mes='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
+  let h = `${cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m)]), mes, "(v) => { CARGOS_F.mes = v; renderModuloCargos(); }")}
     <h3 style="margin:8px 0 0;">VT e VA de ${cgMesRot(mes)} · fecha no último dia útil de ${cgMesRot(cgMesIso(0)).split(' ')[0]}</h3>
     ${cgPassos([['calculado', !!ca, cgDiaMes(ca)], ['fechado', !!fe, cgDiaMes(fe)], ['enviado', !!en, cgDiaMes(en)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
@@ -1837,8 +1844,7 @@ function cgAbaDez() {
   const R = res.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
   const P = pes.filter((x) => d10(x.competencia) === comp && (!F.unidade || x.unidade === F.unidade));
   const parcial = R.length && R.every((x) => !x.periodo_fechado);
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${comps.slice(0, 6).reverse().map((c) => { const fx = res.some((x) => d10(x.competencia) === c && x.periodo_fechado);
-      return `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.dezComp='${c}';renderModuloCargos()">${cgMesRot(c)}${fx ? '' : ' (parcial)'}</button>`; }).join('')}</div>
+  let h = `${cgSelPeriodo('Mês', [...comps].sort().map((c) => [c, cgMesRot(c) + (res.some((x) => d10(x.competencia) === c && x.periodo_fechado) ? '' : ' (parcial)')]), comp, "(v) => { CARGOS_F.dezComp = v; renderModuloCargos(); }")}
     ${R[0] ? `<div class="caption-label" style="text-align:left;">Período ${cgData(R[0].periodo_inicio)} a ${cgData(R[0].periodo_fim)}${parcial ? ' — <b>parcial até hoje</b>: a conta muda até o dia 25' : ''}.</div>` : ''}`;
   if (!R.length) return h + '<div class="contexto">Nenhuma unidade com gratificação nesta competência.</div>';
   const linhaEsc = (rot, v, forte, neg) => `<div style="display:flex;justify-content:space-between;gap:12px;${forte ? 'font-weight:700;border-top:1px solid var(--line);padding-top:3px;margin-top:3px;' : ''}"><span>${rot}</span><span>${neg ? '− ' : ''}${cgR(v)}</span></div>`;
@@ -2593,7 +2599,7 @@ function cgAbaAdt() {
   const dia = (linhas[0] && linhas[0].dia_pagamento) || (mes.slice(0, 8) + '20');
   const pago = cgHojeIso() > String(dia).slice(0, 10);
   const travado = !!enviado || pago;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0;">${meses.slice(0, 3).reverse().map((m) => `<button type="button" class="preset-btn ${m === mes ? 'active' : ''}" onclick="CARGOS_F.mesAdt='${m}';renderModuloCargos()">${cgMesRot(m)}</button>`).join('')}</div>
+  let h = `${cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m)]), mes, "(v) => { CARGOS_F.mesAdt = v; renderModuloCargos(); }")}
     <h3 style="margin:8px 0 0;">Adiantamento de ${cgMesRot(mes)} · paga ${cgData(dia)}</h3>
     ${cgPassos([['calculado', linhas.length > 0], ['enviado ao RH', !!enviado, enviado ? cgDiaMes(enviado.enviado_em) : ''], ['pago', pago, cgDiaMes(dia)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
@@ -2705,8 +2711,9 @@ function cgAbaBonif() {
     const tit = x.ajuste === 'ZERAR' ? `zerado por ${String(x.ajuste_por || '').split('@')[0] || 'gestor'}${x.ajuste_motivo ? ': ' + x.ajuste_motivo : ''}${x.motivo ? ' · ' + x.motivo : ''}` : (x.motivo || '');
     return `<td title="${cgEsc(tit)}" style="cursor:pointer;${est}${sel ? 'outline:2px solid var(--brand);outline-offset:-2px;' : ''}" onclick="CARGOS_F.bonifCel=CARGOS_F.bonifCel==='${cgEsc(k)}'?null:'${cgEsc(k)}';renderModuloCargos()">${cgR(x.valor)}${x.ajuste === 'MANTER' ? ' <span style="font-size:10.5px;font-weight:700;">mantido</span>' : ''}</td>`;
   };
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;">${pags.map((p) =>
-      `<button type="button" class="preset-btn ${p === pag ? 'active' : ''}" onclick="CARGOS_F.bonifPag='${p}';CARGOS_F.bonifCel=null;renderModuloCargos()">paga ${cgData(p)}</button>`).join('')}</div>
+  const triRot = (p) => { const M = [1, 2, 3].map((n) => L.find((x) => d10(x.pagamento) === p && Number(x.n) === n)).filter(Boolean);
+    return `paga ${cgData(p)}${M.length ? ` · ${M.map((m) => mesRot(m)).join(', ')}` : ''}`; };
+  let h = `${cgSelPeriodo('Trimestre', pags.map((p) => [p, triRot(p)]), pag, "(v) => { CARGOS_F.bonifPag = v; CARGOS_F.bonifCel = null; renderModuloCargos(); }")}
     <div class="cards">${emps.map((e) => { const l = doPag.filter((x) => x.empresa === e); const np = new Set(l.map(pk)).size;
       return `<div class="card neutral"><div class="card-lbl">${cgEsc(cgEmpresaCurta(e))}</div><div class="card-val">${cgR0(soma(l))}</div><div class="card-pct">${np} ${np === 1 ? 'pessoa' : 'pessoas'}</div></div>`; }).join('')}
       <div class="card blue"><div class="card-lbl">Total geral</div><div class="card-val">${cgR0(soma(doPag))}</div><div class="card-pct">paga ${cgData(pag)}</div></div></div>
