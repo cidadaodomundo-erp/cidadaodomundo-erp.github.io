@@ -1470,9 +1470,9 @@ function caixaHellenItens() {
       // caixa esquecido aberto aparece em todo turno seguinte: uma linha só, no dia em que abriu
       r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
         oque: 'falta fechar no Saipos: ' + caixaFrenteNome(u, t.caixa) + ', aberta desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar no Saipos',
-        bloco: 'aberto', venda: caixaFrenteNome(u, t.caixa) + ' · aberta desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16) }));
+        bloco: 'aberto', venda: caixaFrenteNome(u, t.caixa) + ' · aberta desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16), frente: caixaFrenteNome(u, t.caixa), desde: dm(t.aberto_em) }));
       r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
-        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para, bloco: 'troca', hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para }));
+        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para, bloco: 'troca', hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para, de: t.de, para: t.para }));
       // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
       r.abertas.filter(x => !String(x.chave).startsWith('dinheiro:')).forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
         oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x, ...caixaHellenCampos(x) }));
@@ -1500,7 +1500,7 @@ function caixaHellenItens() {
       const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro',
         saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
         leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
-      add({ u, dia: l.data, ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro' });
+      add({ u, dia: l.data, ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro', frente: nome });
     });
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
@@ -1539,68 +1539,58 @@ const CAIXA_BLOCOS = [
   ['erro', 'Dia que não consegui conferir', 'abrir o dia para ver o que aconteceu'],
   ['aguardando', 'Aguardando — não precisa fazer nada', 'vale leva até 7 dias para aparecer na Rede; a maquininha ainda não mandou o dia'],
 ];
+// 5º pedido (dono 06/11/2026, via Financeiro: "muito poluída ... tem que estar de forma clara pra ele o que tem que fazer, o que está
+// pendente e como resolver"): um cartão por loja com o dia da vez e uma tarefa por linha (frase com verbo + um botão); o resto recolhido.
+const CAIXA_QUEM_FECHA = { 'AGUA VERDE': 'a equipe do salão', AHU: 'o Edgar', 'SÃO BRAZ': 'o Diego' };
+function caixaTarefa(x) {   // { txt, btn } da pendência, em frase
+  const R = v => 'R$ ' + fmt(Math.abs(+v || 0)), dd = caixaDdm(x.dia), q = [x.hora, x.forma].filter(Boolean).join(', ');
+  const B = (rot, f) => `<button class="preset-btn" style="min-width:120px;" onclick="event.stopPropagation(); ${f}">${rot}</button>`;
+  switch (x.bloco) {
+    case 'aberto': return { txt: `Pedir para ${CAIXA_QUEM_FECHA[x.u] || 'quem fecha o caixa'} fechar no Saipos a frente <b>${trEscH(x.frente || '')}</b> (aberta desde ${x.desde || dd})`, btn: B('Feito, atualizar', 'caixaHellenDeNovo()') };
+    case 'contagem': return { txt: `Contar o dinheiro de hoje (gaveta + cofre)`, btn: B('Contar', `caixaHellenAbrir(${x.i})`) };
+    case 'difsaipos': return { txt: `Explicar a ${+x.valor < 0 ? 'falta' : 'sobra'} de <b>${R(x.valor)}</b> no dinheiro do ${trEscH(x.frente || '')} (${dd})`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
+    case 'pix': return { txt: `Achar o pagamento da ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>): o PIX não entrou no banco`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
+    case 'semcobr': return { txt: `Conferir a ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>)${x.quem ? ' com o motoboy ' + trEscH(x.quem) : ''}: ${trEscH((x.pend && x.pend.leitura) || 'não bate com a maquininha')}`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
+    case 'troca': return { txt: `Trocar no Saipos a ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, <b>${R(x.valor)}</b>) de ${trEscH(x.de || '')} para <b>${trEscH(x.para || '')}</b>`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'online': return { txt: `Trocar a forma da ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.forma || '')})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'cofre': return x.acao === 'naochegou' || x.acao === 'cofre' ? { txt: trEscH(x.oque), btn: '' } : { txt: `Explicar o dinheiro contado ${trEscH(x.venda || '')} (${dd}, <b>${R(x.valor)}</b>)`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'quebra': return { txt: `Descontar ou repor a quebra de <b>${R(x.valor)}</b> (${trEscH(x.quem || '')}, ${dd})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'aguardando': return { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(q)}, ${R(x.valor)}): esperando a Rede`, btn: '' };
+    default: return { txt: trEscH(x.oque || ''), btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+  }
+}
 function caixaHellenHtml() {
   const H = CAIXA_HELLEN;
-  if (H === null) return caixaHellenLojas().length ? '<div class="section-label">Para você resolver</div><div class="contexto">Montando a sua lista…</div>' : '';
+  if (H === null) return caixaHellenLojas().length ? '<div class="contexto">Montando o que fazer…</div>' : '';
   if (!H.lojas.length) return '';
-  if (H.erro) return `<div class="section-label">Para você resolver</div><div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar a lista: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
+  if (H.erro) return `<div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar o que fazer: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
   const todos = caixaHellenItens();
-  const DV = {}; [...new Set(todos.map(x => x.u))].forEach(u => { DV[u] = caixaDiaDaVez(u); });
   const naoTrava = x => ['aguardando', 'quebra'].includes(x.bloco) || x.acao === 'naochegou' || x.acao === 'cofre';
-  const itens = todos.filter(x => naoTrava(x) || !DV[x.u] || x.dia === DV[x.u].dia);
-  const lojaC = u => ({ 'AGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB' }[u] || u);
-  const vez = Object.entries(DV).filter(([, d]) => d && d.dia).map(([u, d]) => `<b>${lojaC(u)}</b> ${caixaDdm(d.dia)}${d.fila.length ? ` <span style="color:var(--tx-4);">· na fila: ${d.fila.length} ${d.fila.length === 1 ? 'dia' : 'dias'}</span>` : ''}`);
-  const dm = d => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
-  const rotCx = cx => cx === 'SALÃO' ? 'Salão' : cx === 'DELIVERY' ? 'Delivery' : '—';
-  const lojaCurta = u => ({ 'AGUA VERDE': 'AV', 'ÁGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB', 'SAO BRAZ': 'SB' }[String(u).toUpperCase()] || u);
-  const marca = ['hellen@cidadaodomundo.com.br', 'neto@cidadaodomundo.com.br'].includes(String((rmbSessao() || {}).email || '').toLowerCase());
-  const B = (rot, f) => `<button class="preset-btn cx-res-btn" onclick="event.stopPropagation(); ${f}">${rot}</button>`;
-  const btn = x => x.bloco === 'aguardando' ? ''
-    : x.acao === 'explicar' ? B('Explicar', `caixaHellenExplicar(${x.i})`)
-    : x.acao === 'naochegou' ? (marca ? B('Não chegou', `cofreNaoChegou(${x.id})`) : '')
-    : x.acao === 'cofre' ? B(x.botao, 'caixaHellenCofre()')
-    : x.acao === 'contar' ? B('Contar', `caixaHellenAbrir(${x.i})`)
-    : B(x.botao ? x.botao.charAt(0).toUpperCase() + x.botao.slice(1) : 'Abrir o dia', `caixaHellenAbrir(${x.i})`);
-  const v = (t) => t ? trEscH(t) : '<span style="color:var(--tx-5);">—</span>';
-  const linha = x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="${trEscH(x.oque)}">
-      <td data-r="Loja"><b>${lojaCurta(x.u)}</b></td><td data-r="Dia">${dm(x.dia)}</td><td data-r="Hora">${v(x.hora)}</td><td data-r="Caixa">${rotCx(x.caixa)}</td>
-      <td data-r="Venda" class="cx-res-txt">${v(x.venda)}</td><td data-r="Forma" class="cx-res-txt">${v(x.forma)}</td><td data-r="Quem" class="cx-res-txt">${v(x.quem)}</td>
-      <td data-r="Valor" style="text-align:right;">${x.valor == null ? v('') : 'R$ ' + fmt(Math.abs(x.valor))}</td><td class="cx-res-acao">${btn(x)}</td></tr>`;
-  const cab = '<thead><tr><th>Loja</th><th>Dia</th><th>Hora</th><th>Caixa</th><th>Venda</th><th>Forma</th><th>Quem</th><th style="text-align:right;">Valor</th><th>Ação</th></tr></thead>';
-  const acao = itens.filter(x => x.bloco !== 'aguardando'), esp = itens.filter(x => x.bloco === 'aguardando');
-  const blocos = CAIXA_BLOCOS.map(([k, tit, leg]) => {
-    const L = itens.filter(x => (x.bloco || 'semcobr') === k);
-    if (!L.length) return '';
-    const tab = `<div id="tabelaCxRes_${k}" class="cx-res" style="overflow-x:auto;"><table>${cab}<tbody>${L.map(linha).join('')}</tbody></table></div>`;
-    const t = `<b>${tit}</b> <span style="color:var(--tx-3);">(${L.length})</span> <span style="font-size:12px;color:var(--tx-4);">— ${leg}</span>`;
-    return k === 'aguardando'
-      ? `<details style="margin-top:12px;color:var(--tx-4);"><summary style="cursor:pointer;">${t}</summary>${tab}</details>`
-      : `<div style="margin-top:12px;">${t}${tab}</div>`;
+  const linha = (x) => { const t = caixaTarefa(x);
+    return `<div onclick="caixaHellenAbrir(${x.i})" title="clique para abrir o dia" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);cursor:pointer;">
+      <span style="flex:1 1 auto;">${t.txt}</span>${t.btn}</div>`; };
+  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
+  const cartoes = H.lojas.map((u) => {
+    const dv = caixaDiaDaVez(u);
+    const faz = todos.filter(x => x.u === u && ((dv && dv.dia && x.dia === dv.dia && !naoTrava(x)) || (x.bloco === 'quebra')));
+    if (!dv || !dv.dia) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${faz.length ? faz.map(linha).join('') : ''}</div>`;
+    const n = faz.length;
+    return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">
+      <div><b>${nomeLoja(u)}</b> · dia da vez <b>${caixaDdm(dv.dia)}</b> · ${n} ${n === 1 ? 'coisa para fazer' : 'coisas para fazer'}${dv.fila.length ? ` · <span style="color:var(--tx-4);">${dv.fila.length} ${dv.fila.length === 1 ? 'dia' : 'dias'} na fila</span>` : ''}</div>
+      ${faz.map(linha).join('')}</div>`;
   }).join('');
+  // recolhidos: uma linha cinza cada
+  const cinza = (rot, corpo) => corpo ? `<details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">${rot}</summary><div style="margin:4px 0 0 14px;">${corpo}</div></details>` : '';
+  const fila = H.lojas.map(u => { const dv = caixaDiaDaVez(u); return dv && dv.fila.length ? `${nomeLoja(u)}: ${dv.fila.map(caixaDdm).join(', ')}` : ''; }).filter(Boolean);
+  const nFila = H.lojas.reduce((a, u) => { const dv = caixaDiaDaVez(u); return a + (dv ? dv.fila.length : 0); }, 0);
+  const esp = todos.filter(x => x.bloco === 'aguardando');
   const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
   const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
-  const rodape = rb.length ? `<div class="caption-label" style="text-align:left; margin-top:6px;">🤖 ${vai.length ? `o robô vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''} — não precisa fazer nada.</div>` : '';
-  return `<style>
-      .cx-res table { table-layout:fixed; width:100%; min-width:860px; }
-      .cx-res td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .cx-res th:nth-child(1), .cx-res td:nth-child(1) { width:58px; } .cx-res th:nth-child(2), .cx-res td:nth-child(2) { width:72px; }
-      .cx-res th:nth-child(3), .cx-res td:nth-child(3) { width:70px; } .cx-res th:nth-child(4), .cx-res td:nth-child(4) { width:90px; }
-      .cx-res th:nth-child(8), .cx-res td:nth-child(8) { width:100px; } .cx-res th:nth-child(9), .cx-res td:nth-child(9) { width:200px; }
-      .cx-res-btn { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      @media (max-width:700px) {
-        .cx-res table, .cx-res tbody, .cx-res tr, .cx-res td { display:block; width:auto !important; min-width:0; }
-        .cx-res thead { display:none; }
-        .cx-res tr { border:1px solid var(--line); border-radius:8px; padding:8px; margin:6px 0; display:grid; grid-template-columns:repeat(3, auto); gap:2px 10px; }
-        .cx-res td { border:0 !important; padding:0 !important; white-space:normal; }
-        .cx-res td.cx-res-acao { grid-column:1 / -1; margin-top:6px; }
-      }
-    </style>
-    <div class="section-label">Para você resolver (${acao.length})${esp.length ? ` <span style="font-weight:400;color:var(--tx-4);">+ ${esp.length} aguardando</span>` : ''}</div>
-    <div class="contexto" style="text-align:left; border-color:${acao.length ? '#f5a623' : 'var(--farol-ok)'};">
-      ${vez.length ? `<div style="font-size:13px;margin-bottom:4px;" title="um dia por vez em cada loja: o seguinte abre quando este ficar ✔ fechou">Dia da vez: ${vez.join(' &nbsp;·&nbsp; ')}</div>` : ''}
-      ${itens.length ? blocos : `<b style="color:var(--farol-ok);">✓ Nada para você resolver</b> — desde o recomeço de cada loja até ontem, tudo bateu ou já foi explicado.`}
-      ${rodape}
-    </div>`;
+  const robo = rb.length ? `${vai.length ? `vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''}` : '';
+  return `${cartoes}
+    ${cinza(`na fila: ${nFila} ${nFila === 1 ? 'dia' : 'dias'}`, nFila ? fila.join('<br>') + '<div style="font-size:11.5px;">cada dia abre quando o anterior ficar ✓</div>' : '')}
+    ${cinza(`aguardando: ${esp.length} (não precisa fazer nada)`, esp.length ? esp.map(x => `${nomeLoja(x.u)} · ${caixaTarefa(x).txt}`).join('<br>') : '')}
+    ${cinza(`o robô vai fazer: ${vai.length + feito.length} troca(s) de bandeira`, robo)}`;
 }
 function caixaHellenDeNovo() { CAIXA_HELLEN = null; renderModuloCaixa(); caixaHellenCarregar(); }
 async function caixaHellenAbrir(i) {
@@ -1803,14 +1793,10 @@ function renderModuloCaixa() {
   alvo.innerHTML = `
     <div class="section-label">Fechamento de Caixas${visao ? ' · ' + (typeof lojaNome === 'function' ? lojaNome(visao) : visao) : ''}</div>
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>' : ''}
-    ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar a lista "Para você resolver": ' + trEscH(e.message) + '</div>'; } })()}
-    ${cofreHtml()}
-    <details style="margin-top:14px;"><summary style="cursor:pointer;"><b>Conferência do dia a dia</b> — PDV × maquininha × banco${pendTotal ? ` · ${pendTotal} dia(s) para conferir` : ' · nada pendente'}</summary>
+    ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
+    <details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
+    <details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">conferência do dia a dia (histórico)${pendTotal ? ` · ${pendTotal} dia(s) com pendência` : ''}</summary>
     <div class="contexto" style="text-align:left;">
-      O que o PDV registrou × o que de fato chegou, dia a dia. Cada turno fecha o caixa no Saipos sem digitar
-      bandeira; a conferência é aqui. ${pendTotal
-        ? `<b class="negativo">${pendTotal} dia(s) para conferir</b>${semFechTotal ? `, ${semFechTotal} com turno sem fechamento` : ''}.`
-        : '<b style="color:#3f9c5a;">Nenhuma pendência na janela.</b>'}
       <details style="margin-top:6px; font-size:12px; color:#9aa4af;"><summary style="cursor:pointer;">como ler</summary>
         <b>Turno não fechou</b> = o caixa que fez as vendas ainda está aberto no Saipos (o clique no dia diz qual). <b>Dinheiro</b>: venda em dinheiro no PDV × o que a contagem da gaveta registrou como enviado, caixa a caixa
         (Arissa: Água Verde e Ahú · Diego: São Braz); dia sem contagem aparece como "falta contar" — a contagem se registra dentro do dia, na linha <b>Dinheiro</b>. <b>Maquininha</b>: cartão e vale × transações
@@ -1823,6 +1809,7 @@ function renderModuloCaixa() {
       ${filtros}
     </div>
     ${blocos}
-    </details>`;
+    </details>
+    <div class="caption-label" style="text-align:left;margin-top:10px;">Resolva o dia da vez de cada loja; o próximo abre sozinho.</div>`;
 }
 
