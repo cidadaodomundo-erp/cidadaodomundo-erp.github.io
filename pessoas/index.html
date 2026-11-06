@@ -26,6 +26,9 @@
   /* 06/11/2026 (dono): cabeçalho claro, letra escura — não se confunde com as linhas */
   div[id^="tabela"] th { background:var(--th-claro) !important; color:var(--th-claro-tx) !important; border-color:var(--line-2); }
   div[id^="tabela"] th a, div[id^="tabela"] th span { color:var(--th-claro-tx) !important; }
+  /* cabeçalho de duas linhas: gruda o thead inteiro, não cada th (cada th com top:0 fazia a 2ª linha deslizar sobre a 1ª) */
+  div[id^="tabela"] thead { position:sticky; top:0; z-index:4; }
+  div[id^="tabela"] thead th { position:static !important; }
 </style>
 </head>
 <body>
@@ -51,7 +54,7 @@
 
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="pessoas.js?v=20261106n"></script>
+<script src="pessoas.js?v=20261106o"></script>
 <script>
 // O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
 // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o endereço antigo cai nela
