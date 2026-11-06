@@ -2308,12 +2308,12 @@ function cgHojeItens() {
       acao: prog ? `${x.valor_estimado != null ? `<b>cerca de ${cgR(x.valor_estimado)}</b><div style="font-size:11px;color:var(--tx-4);">o valor certo é o do recibo</div>` : ''}${irPara('pferias', 'Abrir férias')}` : irPara('pferias', 'Abrir férias') });
   }
   // 06/11/2026 (dono: "ordenar por ordem de prioridade"): 0 vence hoje ou venceu · 1 parado há 3+ dias ou vence em até 3 ·
-  // 2 férias/pagamento em até 15 dias · 3 o resto; dentro da faixa, o prazo mais perto e depois o mais parado
+  // 2 qualquer parado, férias/pagamento em até 15 dias · 3 o resto (prazo longe, sem prazo); dentro da faixa, o prazo mais perto e depois o mais parado
   const fd = (x) => (x.faltam_dias === null || x.faltam_dias === undefined ? null : Number(x.faltam_dias));
   const faixa = (x) => { const f = fd(x), p = cgN(x.parado_dias);
     if (f !== null && f <= 0) return 0;
     if (p >= 3 || (f !== null && f <= 3)) return 1;
-    if (f !== null && f <= 15 && (x.grupo === 'Pagar' || /FERIAS/.test(x.tipo || ''))) return 2;
+    if (p > 0 || (f !== null && f <= 15 && (x.grupo === 'Pagar' || /FERIAS/.test(x.tipo || '')))) return 2;   // parado é ação de agora
     return 3; };
   return itens.sort((a, b) => faixa(a) - faixa(b) || (fd(a) ?? 999) - (fd(b) ?? 999) || cgN(b.parado_dias) - cgN(a.parado_dias));
 }
