@@ -1505,8 +1505,8 @@ function caixaHellenHtml() {
   return `<style>
       .cx-res table { table-layout:fixed; width:100%; min-width:860px; }
       .cx-res td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .cx-res th:nth-child(1), .cx-res td:nth-child(1) { width:48px; } .cx-res th:nth-child(2), .cx-res td:nth-child(2) { width:56px; }
-      .cx-res th:nth-child(3), .cx-res td:nth-child(3) { width:56px; } .cx-res th:nth-child(4), .cx-res td:nth-child(4) { width:74px; }
+      .cx-res th:nth-child(1), .cx-res td:nth-child(1) { width:58px; } .cx-res th:nth-child(2), .cx-res td:nth-child(2) { width:72px; }
+      .cx-res th:nth-child(3), .cx-res td:nth-child(3) { width:70px; } .cx-res th:nth-child(4), .cx-res td:nth-child(4) { width:90px; }
       .cx-res th:nth-child(8), .cx-res td:nth-child(8) { width:100px; } .cx-res th:nth-child(9), .cx-res td:nth-child(9) { width:200px; }
       .cx-res-btn { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       @media (max-width:700px) {
