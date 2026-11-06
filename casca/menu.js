@@ -234,11 +234,6 @@ window.CASCA_MENU = [
     "icone": "📌"
    },
    {
-    "chave": "padm",
-    "rotulo": "Admissões",
-    "icone": "🆕"
-   },
-   {
     "chave": "pcalc",
     "rotulo": "Cálculos da folha",
     "icone": "🧮"
@@ -257,6 +252,11 @@ window.CASCA_MENU = [
     "chave": "pconf",
     "rotulo": "Conferência da folha",
     "icone": "✅"
+   },
+   {
+    "chave": "padm",
+    "rotulo": "Admissões",
+    "icone": "🆕"
    },
    {
     "chave": "pferias",
