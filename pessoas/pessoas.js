@@ -675,8 +675,9 @@ const CG_PASSOS = [
 const CG_ACOMP = [['custo', 'Custo por pessoa'], ['setor', 'Por setor'], ['saipos', 'Acertos no Saipos'], ['flash', 'Correções na Flash']];
 // 29/10/2026 13:51 (dono): cada passo é uma tela do menu Pessoas. Cada tela mostra só as suas abas (o código é o mesmo).
 const CG_TELAS = {
-  cargos: { titulo: 'Cargos e salários', leg: 'A Flash é a base oficial da folha: aqui aparecem as diferenças entre ela, o nosso cadastro e a folha da contabilidade.',
-            abas: [['pessoas', 'Cargos e salários'], ['tabela', 'Tabela de cargos']] },
+  // 06/11/2026 (dono: "Cargos e salários e custos da folha ... juntar em uma só"; desenho do RH): o custo de verdade ao lado do cadastro
+  cargos: { titulo: 'Cargos, salários e custo', leg: 'A Flash é a base oficial da folha: aqui aparecem as diferenças entre ela, o nosso cadastro e a folha da contabilidade.',
+            abas: [['pessoas', 'Pessoas'], ['custo', 'Custo do mês'], ['setor', 'Por setor'], ['tabela', 'Tabela de cargos']] },
   // 02/11/2026 (dono): as Pendências da Flash ganham tela própria, junto com o resto do que está pendente no módulo
   phoje: { titulo: 'O que fazer hoje', abas: [['hoje', 'O que fazer hoje']] },
   // 29/10/2026 14:24 (dono): o que era "Acompanhar" virou tela própria (custo) ou foi para o Financeiro (acertos)
@@ -692,6 +693,7 @@ const CG_TELAS = {
 function cgAlvo() { return document.getElementById('view-' + (CARGOS_F.tela || 'cargos')) || document.getElementById('view-cargos'); }
 let CG_ABA_PEDIDA = new URLSearchParams(location.search).get('aba');   // link direto na aba (sistema.html#cargos/fcaixa): vale uma vez
 function cgEntrarTela(t) {
+  if (t === 'pcusto') { if (!CG_ABA_PEDIDA) CG_ABA_PEDIDA = 'custo'; t = 'cargos'; }   // 06/11/2026: Custo da folha entrou em Cargos, salários e custo
   if (t === 'cargos' && CG_ABA_PEDIDA === 'fcaixa') { CG_ABA_PEDIDA = null; mostrarModulo('phoje'); return; }   // link antigo, já enviado à Hellen
   CARGOS_F.tela = t;
   // pedido de outra tela (Contas a pagar → Pagamento por fora): vale uma vez
@@ -880,7 +882,7 @@ function cgAbaPessoas() {
     ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Novo registro</div>${cgFormPessoa(null)}` : ''}
     ${cgAdmAndamento()}`;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
-    <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th>Alerta</th></tr></thead>
+    <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th style="text-align:right;" title="o que a pessoa custou de verdade em ${cgMesRot(cgMesCustoFechado())} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta</th></tr></thead>
     <tbody>${vis.map((p) => { const A = alertas(p), ab = F.editando === p.id;
       return `<tr style="cursor:pointer;" onclick="cgEditar(${p.id})">
         <td class="cg-seta" style="color:var(--tx-3);font-size:12px;font-weight:600;white-space:nowrap;">${ab ? '▾ Fechar detalhes' : '▸ Ver detalhes'}</td>
@@ -890,8 +892,9 @@ function cgAbaPessoas() {
         <td>${p.setor_rateio ? cgEsc(p.setor_rateio) : '–'}</td><td>${cgEsc(p.turno || '–')}</td>
         <td style="text-align:right;">${p.horas ? p.horas + 'h' : '–'}</td>
         <td class="cg-sal" style="text-align:right;">${cgR(p.salario)}</td>
+        <td style="text-align:right;">${(() => { const c = cgCustoDaPessoa(p.id).find((x) => String(x.mes).slice(0, 10) === cgMesCustoFechado()); return c ? cgR(c.total) : '<span style="color:var(--tx-5);">–</span>'; })()}</td>
         <td class="cg-al" style="white-space:normal;min-width:160px;">${A.map((a) => `<span title="${cgEsc(a.todo)}" style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--farol-perto);border:1px solid var(--farol-perto);border-radius:999px;padding:1px 8px;margin:1px 3px 1px 0;">${cgEsc(a.t)}</span>`).join('')}${nota(p)}</td></tr>
-        ${ab ? `<tr><td colspan="${comLoja ? 9 : 8}">${cgDetalhePessoa(p)}</td></tr>` : ''}`; }).join('')}</tbody></table></div>`;
+        ${ab ? `<tr><td colspan="${comLoja ? 10 : 9}">${cgDetalhePessoa(p)}</td></tr>` : ''}`; }).join('')}</tbody></table></div>`;
   if (F.soConferir && cgFlashDaLoja(CARGOS.flash).length) h += `<div class="section-label" style="text-align:left;">Corrigir na Flash</div>` + cgListaFlash(CARGOS.flash);
   return h;
 }
@@ -905,7 +908,25 @@ function cgDetalhePessoa(p) {
       <span><b>Adiantamento</b> ${p.pega_adiantamento && p.contrato === 'CLT' ? 'sim' : 'não'}</span>${p.desligamento ? `<span><b>Saiu</b> ${cgData(p.desligamento)}</span>` : ''}
       <button type="button" class="preset-btn" onclick="cgFormAbrir(${p.id})">Editar</button></div>
     ${cgCombinadoFicha(p)}
+    ${cgCustoPessoaHtml(p)}
     ${cgMovHtml(p)}`;
+}
+function cgCustoPessoaHtml(p) {
+  const L = cgCustoDaPessoa(p.id).slice(-6);
+  if (!L.length) return '';
+  const col = [['salario', 'Salário e adiant.'], ['vt', 'VT'], ['va', 'VA'], ['rescisao_ferias_13', 'Rescisão, férias, 13º'], ['bonificacao', 'Bonificação'], ['encargos_rateados', 'Encargos'], ['outros', 'Outros'], ['total', 'Total']];
+  const v = (c, k) => k === 'outros' ? cgN(c.outros_rateados) + cgN(c.outros_diretos) : cgN(c[k]);
+  return `<div style="font-size:12.5px;margin:4px 0 8px;"><b>Custo mês a mês</b>
+    <div style="overflow-x:auto;"><table style="font-size:12.5px;"><thead><tr><th>Mês</th>${col.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
+    ${L.map((c) => { const m = String(c.mes).slice(0, 10), prev = CARGOS.conf.some((x) => String(x.mes).slice(0, 10) === m && x.tem_previsto);
+      return `<tr><td>${cgMesRot(m)}${prev ? ' <span style="font-size:11px;color:var(--tx-4);">previsto</span>' : ''}</td>${col.map(([k]) => `<td${k === 'total' ? ' style="font-weight:700;"' : ''}>${cgR(v(c, k))}</td>`).join('')}</tr>`; }).join('')}</tbody></table></div></div>`;
+}
+// Custo do mês → a pessoa na aba Pessoas
+function cgAbrirPessoa(id) {
+  const p = CARGOS.pessoas.find((x) => x.id === id);
+  CARGOS_F.aba = 'pessoas'; CARGOS_F.desligados = p ? !p.ativo : false; CARGOS_F.soConferir = false; CARGOS_F.editando = null;
+  cgEditar(id);
+  setTimeout(() => { const el = cgAlvo() && cgAlvo().querySelector('.cg-seta'); const r = [...(cgAlvo() || document).querySelectorAll('#tabelaCgPessoas tr')].find((t) => /Fechar detalhes/.test(t.textContent)); if (r) r.scrollIntoView({ block: 'center' }); }, 50);
 }
 // "Combinado além da folha" (dono 05/11/2026, chat RH): valor total combinado (paga a diferença do líquido) ou acréscimo
 // fixo. Quem muda é esta ficha; a Conferência da folha só mostra (rh_folha_combinado / rh_folha_combinado_salvar).
@@ -1222,7 +1243,7 @@ function cgAbaTabela() {
     const u = p.unidade === 'SÃO BRAZ' ? 'SÃO BRAZ' : 'AGUA VERDE';
     const k = `${u}|${p.familia}|${p.nivel}|${p.horas}`; ocup[k] = (ocup[k] || 0) + 1;
   }
-  let h = `<div class="contexto">Salário base bruto depois do dissídio de 6,11% (vigência ${cgMesRot(CARGOS.tabela[0] && CARGOS.tabela[0].vigencia)}). O Ahú usa a tabela da Água Verde. O setor (Atendimento, Cozinha, Produção, Operacional, Limpeza) entra só no nome do cargo — o salário é o do cargo.</div>
+  let h = `<div class="caption-label" style="text-align:left;margin:0 0 8px;" title="Salário base bruto depois do dissídio de 6,11%. O setor (Atendimento, Cozinha, Produção, Operacional, Limpeza) entra só no nome do cargo — o salário é o do cargo.">Tabela de cargos · vigência ${cgMesRot(CARGOS.tabela[0] && CARGOS.tabela[0].vigencia)} · Ahú usa a da Água Verde</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;">`;
   for (const u of unid) {
     const linhas = {};
@@ -1238,17 +1259,25 @@ function cgAbaTabela() {
 
 // ---------- CUSTO REALIZADO POR PESSOA ----------
 function cgMesesCusto() { return [...new Set(CARGOS.conf.map(c => String(c.mes).slice(0, 10)))].sort().reverse(); }
+function cgSelMesCusto(meses, mes) {
+  return cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m) + (CARGOS.conf.some((c) => String(c.mes).slice(0, 10) === m && c.tem_previsto) ? ' (previsto)' : '')]), mes,
+    "(v) => { CARGOS_F.mes = v; renderModuloCargos(); }");
+}
+// custo de cada pessoa por mês (vw_rh_custo_pessoa_mes.pessoa_id)
+function cgCustoDaPessoa(id) { return (CARGOS.custo || []).filter((c) => c.pessoa_id === id).sort((a, b) => String(a.mes).localeCompare(String(b.mes))); }
+function cgMesCustoFechado() { const m = cgMesesCusto(); return m[1] || m[0]; }
 function cgAbaCusto() {
   const F = CARGOS_F;
   const meses = cgMesesCusto();
   const mes = meses.includes(F.mes) ? F.mes : (meses[1] || meses[0]);   // padrão: o último mês fechado
-  const linhas = CARGOS.custo.filter(c => String(c.mes).slice(0, 10) === mes && (!F.unidade || c.unidade === F.unidade))
+  const linhas = CARGOS.custo.filter(c => String(c.mes).slice(0, 10) === mes && (!F.unidade || c.unidade === F.unidade) && (!F.semSetor || !c.setor_rateio || c.setor_rateio === 'SEM SETOR'))
                              .sort((a, b) => cgN(b.total) - cgN(a.total));
   const conf = CARGOS.conf.filter(c => String(c.mes).slice(0, 10) === mes && (!F.unidade || c.unidade === F.unidade));
   const soma = (k) => linhas.reduce((s, c) => s + cgN(c[k]), 0);
   const total = soma('total'), prev = conf.some(c => c.tem_previsto);
   const ex = linhas.filter(c => c.fora_do_cadastro);
-  let h = cgSeletorMes(meses.slice(0, 6), mes) + cgFiltroUnidade(CARGOS.conf) + `
+  let h = cgSelMesCusto(meses, mes) + cgFiltroUnidade(CARGOS.conf) + `
+    ${F.semSetor ? `<div style="margin:0 0 8px;"><button type="button" class="preset-btn active" onclick="CARGOS_F.semSetor=false;renderModuloCargos()">só quem está sem setor ✕</button></div>` : ''}
     <div class="cards">
       <div class="card blue"><div class="card-lbl">Custo da folha no mês</div><div class="card-val">${cgR0(total)}</div><div class="card-pct">${prev ? 'ainda com provisões do Saipos' : 'tudo pago'}</div></div>
       <div class="card neutral"><div class="card-lbl">Pessoas com lançamento</div><div class="card-val">${linhas.length}</div><div class="card-pct">${ex.length ? `${ex.length} fora do cadastro (ex-funcionários)` : 'todas no cadastro'}</div></div>
@@ -1256,17 +1285,16 @@ function cgAbaCusto() {
       <div class="card neutral"><div class="card-lbl">Empréstimos e vales fora</div><div class="card-val">${cgR0(conf.reduce((s, c) => s + cgN(c.emprestimos_fora), 0))}</div><div class="card-pct">voltam pelo desconto em folha</div></div>
     </div>
     <div id="tabelaCgCusto" style="overflow-x:auto;"><table>
-      <thead><tr><th>Loja</th><th>Nome</th><th>Setor</th><th style="text-align:right;">Salário e adiant.</th><th style="text-align:right;">VT</th><th style="text-align:right;">VA</th><th style="text-align:right;">Rescisão, férias, 13º</th><th style="text-align:right;">Bonificação</th><th style="text-align:right;">Encargos (rateio)</th><th style="text-align:right;">Outros (rateio)</th><th style="text-align:right;">Total</th></tr></thead>
+      <thead><tr><th>Loja</th><th>Nome</th><th>Setor</th><th style="text-align:right;">Salário e adiant.</th><th style="text-align:right;">VT</th><th style="text-align:right;">VA</th><th style="text-align:right;">Rescisão, férias, 13º</th><th style="text-align:right;">Bonificação</th><th style="text-align:right;" title="INSS, FGTS, medicina… repartidos pela parte do salário de cada um no mês">Encargos (rateio)</th><th style="text-align:right;" title="gasto coletivo (uniforme etc.) repartido pela parte do salário; do contas a pagar, os 18 subtipos de folha da DRE, menos empréstimos e vales">Outros (rateio)</th><th style="text-align:right;">Total</th></tr></thead>
       <tbody>${linhas.map(c => `<tr>
-        <td>${cgEsc(c.unidade)}</td><td>${cgEsc(cgNome(c.nome))}${c.fora_do_cadastro ? ' <span style="font-size:10px;color:var(--tx-4);">ex-funcionário</span>' : ''}</td>
+        <td>${cgEsc(c.unidade)}</td><td>${c.pessoa_id ? `<a href="javascript:void(0)" onclick="cgAbrirPessoa(${c.pessoa_id})" title="abrir o cadastro">${cgEsc(cgNome(c.nome))}</a>` : cgEsc(cgNome(c.nome))}${c.fora_do_cadastro ? ' <span style="font-size:10px;color:var(--tx-4);">ex-funcionário</span>' : ''}</td>
         <td>${cgEsc(c.setor_rateio || '–')}</td>
         <td style="text-align:right;">${cgR(c.salario)}</td><td style="text-align:right;">${cgR(c.vt)}</td><td style="text-align:right;">${cgR(c.va)}</td>
         <td style="text-align:right;">${cgR(c.rescisao_ferias_13)}</td><td style="text-align:right;">${cgR(c.bonificacao)}</td>
         <td style="text-align:right;color:var(--tx-4);">${cgR(c.encargos_rateados)}</td><td style="text-align:right;color:var(--tx-4);">${cgR(cgN(c.outros_rateados) + cgN(c.outros_diretos))}</td>
         <td style="text-align:right;font-weight:600;">${cgR(c.total)}</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sub"><td colspan="3">Total</td><td style="text-align:right;">${cgR(soma('salario'))}</td><td style="text-align:right;">${cgR(soma('vt'))}</td><td style="text-align:right;">${cgR(soma('va'))}</td><td style="text-align:right;">${cgR(soma('rescisao_ferias_13'))}</td><td style="text-align:right;">${cgR(soma('bonificacao'))}</td><td style="text-align:right;">${cgR(soma('encargos_rateados'))}</td><td style="text-align:right;">${cgR(soma('outros_rateados') + soma('outros_diretos'))}</td><td style="text-align:right;">${cgR(total)}</td></tr></tfoot>
-    </table></div>
-    <div class="contexto" style="margin-top:8px;">Do contas a pagar, os 18 subtipos de folha da DRE (menos empréstimos e vales). Guia e gasto coletivo entram pela parte do salário de cada um no mês.</div>`;
+    </table></div>`;
   return h;
 }
 
@@ -1279,17 +1307,16 @@ function cgAbaSetor() {
   const tot = linhas.reduce((s, x) => s + cgN(x.total), 0);
   const sem = linhas.filter(s => s.setor === 'SEM SETOR').reduce((s, x) => s + cgN(x.total), 0);
   const soma = (k) => cgR(linhas.reduce((s, x) => s + cgN(x[k]), 0));
-  return cgSeletorMes(meses.slice(0, 6), mes) + cgFiltroUnidade(CARGOS.conf) + `
-    ${sem > 0.5 ? `<div class="contexto" style="border-color:var(--farol-perto);">${cgR0(sem)} sem setor neste mês: gente que não está no cadastro. Cadastre (ou dê o setor) na aba Pessoas.</div>` : ''}
+  return cgSelMesCusto(meses, mes) + cgFiltroUnidade(CARGOS.conf) + `
+    ${sem > 0.5 ? `<div class="contexto" style="border-color:var(--farol-perto);cursor:pointer;" onclick="CARGOS_F.semSetor=true;CARGOS_F.aba='custo';renderModuloCargos()">${cgR0(sem)} sem setor neste mês — <u>ver quem</u></div>` : ''}
     <div id="tabelaCgSetor" style="overflow-x:auto;"><table>
-      <thead><tr><th>Loja</th><th>Setor</th><th style="text-align:right;">Pessoas</th><th style="text-align:right;">Salário</th><th style="text-align:right;">VT e VA</th><th style="text-align:right;">Outros diretos</th><th style="text-align:right;">Rateados</th><th style="text-align:right;">Total</th><th style="text-align:right;">% da loja</th></tr></thead>
-      <tbody>${linhas.map(s => `<tr><td>${cgEsc(s.unidade)}</td><td>${cgEsc(s.setor)}</td><td style="text-align:right;">${cgN(s.pessoas)}</td>
+      <thead><tr><th>Loja</th><th title="é o setor de cada pessoa no cadastro que reparte a folha entre os canais em Resultado por canal">Setor</th><th style="text-align:right;">Pessoas</th><th style="text-align:right;">Salário</th><th style="text-align:right;">VT e VA</th><th style="text-align:right;">Outros diretos</th><th style="text-align:right;">Rateados</th><th style="text-align:right;">Total</th><th style="text-align:right;">% da loja</th></tr></thead>
+      <tbody>${linhas.map(s => `<tr${s.setor === 'SEM SETOR' ? ` style="cursor:pointer;color:var(--farol-perto);${F.realceSemSetor ? 'outline:2px solid var(--farol-perto);' : ''}" onclick="CARGOS_F.semSetor=true;CARGOS_F.aba='custo';renderModuloCargos()" title="ver quem está sem setor"` : ''}><td>${cgEsc(s.unidade)}</td><td>${cgEsc(s.setor)}</td><td style="text-align:right;">${cgN(s.pessoas)}</td>
         <td style="text-align:right;">${cgR(s.salario)}</td><td style="text-align:right;">${cgR(s.beneficios)}</td><td style="text-align:right;">${cgR(s.outros_diretos)}</td>
         <td style="text-align:right;color:var(--tx-4);">${cgR(s.rateados)}</td><td style="text-align:right;font-weight:600;">${cgR(s.total)}</td>
         <td style="text-align:right;">${(100 * cgN(s.share)).toFixed(0)}%</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sub"><td colspan="3">Total</td><td style="text-align:right;">${soma('salario')}</td><td style="text-align:right;">${soma('beneficios')}</td><td style="text-align:right;">${soma('outros_diretos')}</td><td style="text-align:right;">${soma('rateados')}</td><td style="text-align:right;">${cgR(tot)}</td><td></td></tr></tfoot>
-    </table></div>
-    <div class="contexto" style="margin-top:8px;">É o setor de cada pessoa no cadastro que reparte a folha entre os canais em Resultado por canal. Trocou o setor de alguém, o rateio acompanha.</div>`;
+    </table></div>`;
 }
 
 // ---------- VT E VA DO MÊS ----------

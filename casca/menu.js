@@ -265,13 +265,8 @@ window.CASCA_MENU = [
    },
    {
     "chave": "cargos",
-    "rotulo": "Cargos e salários",
+    "rotulo": "Cargos, salários e custo",
     "icone": "🪪"
-   },
-   {
-    "chave": "pcusto",
-    "rotulo": "Custo da folha",
-    "icone": "📊"
    }
   ]
  },
