@@ -747,9 +747,8 @@ async function entrarCargos() {
     const [pessoas, tabela, custo, setor, conf, vtva, adt, flash, saipos, bonif, cs, faltasFF, foraCadastro, adm, comb] = await Promise.all([
       consultarTudo('vw_rh_pessoas?select=*&order=unidade,nome'),
       consultarTudo('vw_rh_cargos_tabela?select=*&order=unidade,familia,nivel,horas'),
-      consultarTudo(`vw_rh_custo_pessoa_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,nome`),
-      consultarTudo(`vw_rh_custo_setor_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,setor`),
-      consultarTudo(`vw_rh_custo_mes_conferencia?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}`),
+      // 06/11/2026 (RH): o custo (a consulta mais pesada) não carrega mais com toda tela de Pessoas — só quando a aba usa (cgCustoCarregar)
+      undefined, undefined, undefined,
       consultarTudo(`vw_rh_vt_va_mes?select=*&mes=gte.${cgMesIso(-1)}&order=unidade,nome`),
       consultarTudo(`vw_rh_adiantamento_mes?select=*&mes=gte.${cgMesIso(-1)}&order=unidade,nome`),
       consultarTudo('vw_rh_flash_pendencias?select=*&order=unidade,nome,ordem'),
@@ -866,6 +865,7 @@ function cgAbaPessoas() {
   // 05/11/2026 (RH): a observação do RH é anotação, não alerta — "MUDOU PARA NIVEL 3 EM AGOSTO" contava como pendência.
   // Fica na mesma coluna, em cinza, e não entra no "Com alerta".
   const alertas = (p) => cgAlertasCadastro(p);
+  if (CARGOS.custo === undefined && !CARGOS.custoErro) cgCustoCarregar();   // a coluna "Custo no mês" chega depois, sem segurar a tela
   const nota = (p) => p.obs_rh ? `<span title="${cgEsc(p.obs_rh)}" style="display:inline-block;font-size:11.5px;color:var(--tx-3);margin:1px 0;">${cgEsc(curto(p.obs_rh))}</span>` : '';
   const base = CARGOS.pessoas.filter((p) => (F.desligados ? !p.ativo : p.ativo) && (!F.unidade || p.unidade === F.unidade));
   const nAl = base.filter((p) => alertas(p).length).length;
@@ -882,7 +882,7 @@ function cgAbaPessoas() {
     ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Novo registro</div>${cgFormPessoa(null)}` : ''}
     ${cgAdmAndamento()}`;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
-    <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th style="text-align:right;" title="o que a pessoa custou de verdade em ${cgMesRot(cgMesCustoFechado())} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta</th></tr></thead>
+    <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th style="text-align:right;" title="o que a pessoa custou de verdade em ${cgMesCustoFechado() ? cgMesRot(cgMesCustoFechado()) : 'o último mês fechado'} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta</th></tr></thead>
     <tbody>${vis.map((p) => { const A = alertas(p), ab = F.editando === p.id;
       return `<tr style="cursor:pointer;" onclick="cgEditar(${p.id})">
         <td class="cg-seta" style="color:var(--tx-3);font-size:12px;font-weight:600;white-space:nowrap;">${ab ? '▾ Fechar detalhes' : '▸ Ver detalhes'}</td>
@@ -918,7 +918,7 @@ function cgCustoPessoaHtml(p) {
   const v = (c, k) => k === 'outros' ? cgN(c.outros_rateados) + cgN(c.outros_diretos) : cgN(c[k]);
   return `<div style="font-size:12.5px;margin:4px 0 8px;"><b>Custo mês a mês</b>
     <div style="overflow-x:auto;"><table style="font-size:12.5px;"><thead><tr><th>Mês</th>${col.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
-    ${L.map((c) => { const m = String(c.mes).slice(0, 10), prev = CARGOS.conf.some((x) => String(x.mes).slice(0, 10) === m && x.tem_previsto);
+    ${L.map((c) => { const m = String(c.mes).slice(0, 10), prev = (CARGOS.conf || []).some((x) => String(x.mes).slice(0, 10) === m && x.tem_previsto);
       return `<tr><td>${cgMesRot(m)}${prev ? ' <span style="font-size:11px;color:var(--tx-4);">previsto</span>' : ''}</td>${col.map(([k]) => `<td${k === 'total' ? ' style="font-weight:700;"' : ''}>${cgR(v(c, k))}</td>`).join('')}</tr>`; }).join('')}</tbody></table></div></div>`;
 }
 // Custo do mês → a pessoa na aba Pessoas
@@ -1258,15 +1258,36 @@ function cgAbaTabela() {
 }
 
 // ---------- CUSTO REALIZADO POR PESSOA ----------
-function cgMesesCusto() { return [...new Set(CARGOS.conf.map(c => String(c.mes).slice(0, 10)))].sort().reverse(); }
+function cgMesesCusto() { return [...new Set((CARGOS.conf || []).map(c => String(c.mes).slice(0, 10)))].sort().reverse(); }
+// custo, setor e conferência do custo: lidos só quando a aba precisa; se engasgar, só a aba de custo avisa (as outras telas seguem)
+async function cgCustoCarregar() {
+  if (CARGOS.custoLendo) return;
+  CARGOS.custoLendo = true; CARGOS.custoErro = null;
+  const desde = cgMesIso(-5);
+  try {
+    const [custo, setor, conf] = await Promise.all([
+      consultarTudo(`vw_rh_custo_pessoa_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,nome,pessoa_id,mes`),
+      consultarTudo(`vw_rh_custo_setor_mes?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}&order=unidade,setor,mes`),
+      consultarTudo(`vw_rh_custo_mes_conferencia?select=*&mes=gte.${desde}&mes=lte.${cgMesIso(0)}`)]);
+    Object.assign(CARGOS, { custo, setor, conf });
+  } catch (e) { CARGOS.custoErro = e.message; }
+  CARGOS.custoLendo = false;
+  renderModuloCargos();
+}
+function cgCustoPronto() {   // devolve '' se o custo está lido; senão o aviso (e pede a leitura)
+  if (CARGOS.custoErro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);"><b style="color:var(--farol-fora);">✗ O custo não carregou</b> (${cgEsc(CARGOS.custoErro).slice(0, 120)}). ${cgBotaoPasso('Tentar de novo', 'CARGOS.custoErro=null;cgCustoCarregar()', true)}</div>`;
+  if (!CARGOS.custo || !CARGOS.conf || !CARGOS.setor) { cgCustoCarregar(); return '<div class="contexto">Lendo o custo da folha…</div>'; }
+  return '';
+}
 function cgSelMesCusto(meses, mes) {
-  return cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m) + (CARGOS.conf.some((c) => String(c.mes).slice(0, 10) === m && c.tem_previsto) ? ' (previsto)' : '')]), mes,
+  return cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m) + ((CARGOS.conf || []).some((c) => String(c.mes).slice(0, 10) === m && c.tem_previsto) ? ' (previsto)' : '')]), mes,
     "(v) => { CARGOS_F.mes = v; renderModuloCargos(); }");
 }
 // custo de cada pessoa por mês (vw_rh_custo_pessoa_mes.pessoa_id)
 function cgCustoDaPessoa(id) { return (CARGOS.custo || []).filter((c) => c.pessoa_id === id).sort((a, b) => String(a.mes).localeCompare(String(b.mes))); }
 function cgMesCustoFechado() { const m = cgMesesCusto(); return m[1] || m[0]; }
 function cgAbaCusto() {
+  { const av = cgCustoPronto(); if (av) return av; }
   const F = CARGOS_F;
   const meses = cgMesesCusto();
   const mes = meses.includes(F.mes) ? F.mes : (meses[1] || meses[0]);   // padrão: o último mês fechado
@@ -1301,6 +1322,7 @@ function cgAbaCusto() {
 
 // ---------- POR SETOR (o rateio dos canais) ----------
 function cgAbaSetor() {
+  { const av = cgCustoPronto(); if (av) return av; }
   const F = CARGOS_F;
   const meses = cgMesesCusto();
   const mes = meses.includes(F.mes) ? F.mes : (meses[1] || meses[0]);
