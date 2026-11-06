@@ -1651,10 +1651,22 @@ function renderModuloCaixa() {
       const maqResto = Math.abs(maqDif) < 0.01 ? 0 : maqDif - efeito('maquininha');
       const chaveResto = chaveSem <= 0 ? 0 : Math.max(0, chaveSem - efeito('pix_chave'));
       const dinExplicado = vals.some(v => v.bloco === 'dinheiro');
+      const aguardHtml0 = '<span style="color:#9aa4af;" title="vale esperando a Rede (até 7 dias): não precisa fazer nada">aguardando</span>';
       const badge = vals.length ? ` <span style="color:#9aa4af; font-weight:normal;" title="pendências explicadas por quem conferiu">· ${vals.length} explicada(s)</span>` : '';
       const expl = v => '<span style="color:#9aa4af; text-decoration:line-through;" title="explicada">R$ ' + fmt(v) + '</span>';
       let situacao, cor = '', alerta = false;
+      // 06/11/2026 (dono, via Financeiro: "veja se essa tela está trazendo as pendencias atualizadas"): com a lista
+      // "Para você resolver" montada, o status do dia sai dos MESMOS itens dela (a diferença total não decide mais)
+      const HI = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && iso >= caixaHellenCorte(unidade) ? caixaHellenItens() : null;
+      const itDia = HI ? HI.filter(x => x.u === unidade && x.dia === iso && x.bloco !== 'quebra' && (!F.caixa || !x.caixa || x.caixa === F.caixa)) : null;
+      const tipoIt = { aberto: 'caixa aberto', contagem: 'dinheiro (falta contar)', cofre: 'dinheiro', troca: 'maquininha', semcobr: 'maquininha', pix: 'PIX', online: 'online', erro: 'o dia' };
       if (aberto) situacao = '<span style="color:#9aa4af;">dia em aberto</span>';
+      else if (itDia) {
+        const ac = itDia.filter(x => x.bloco !== 'aguardando');
+        if (ac.length) { situacao = `<b style="color:${ac.some(x => x.bloco === 'aberto') ? '#ff6b6b' : '#f5a623'};">conferir ${[...new Set(ac.map(x => tipoIt[x.bloco] || 'maquininha'))].join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; if (ac.some(x => x.bloco === 'aberto')) semFech++; }
+        else if (itDia.length) situacao = aguardHtml0;
+        else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
+      }
       else if (!temDinheiro && maqPdv === 0 && maqReal === 0 && chavePdv === 0) situacao = '<span style="color:#9aa4af;">sem movimento</span>';
       else if (semFechDia && !dinExplicado) { situacao = '<b style="color:#ff6b6b;">turno não fechou</b>' + badge; cor = 'background:rgba(255,107,107,.07);'; alerta = true; semFech++; }
       else {
