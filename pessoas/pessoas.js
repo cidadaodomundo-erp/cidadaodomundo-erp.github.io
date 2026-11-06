@@ -3072,7 +3072,9 @@ function renderModuloRh() {
       <span style="width:96px;">${R(v)}</span></div>`).join('')}</div>`;
 
   // Bloco 3: quem deve (o seletor da tela)
-  const dvA = RH.diverg.filter((d) => d.situacao_base === 'ATIVO' && d.forma !== 'DEPOSITO');   // o depósito da Rita não é parcela de folha
+  // o depósito da Rita não é parcela de folha; e só o empréstimo com parcela aberta (dono 06/11 12:54: o passado é só consulta)
+  const chavesAbertas = new Set(RH.aberto.map((r) => r.chave));
+  const dvA = RH.diverg.filter((d) => d.situacao_base === 'ATIVO' && d.forma !== 'DEPOSITO' && chavesAbertas.has(d.chave));
   const sit = (c) => { const D = dvA.filter((d) => d.colaborador === c.colaborador); if (!D.length) return '<span style="color:var(--farol-ok);">em dia</span>';
     const fp = D.filter((d) => d.tipo === 'FALTA PARCELA').reduce((a, d) => a + n(d.diferenca), 0), pm = D.filter((d) => d.tipo !== 'FALTA PARCELA').reduce((a, d) => a + Math.abs(n(d.diferenca)), 0);
     return [fp ? `<span style="color:var(--farol-perto);" title="sobrou valor sem parcela lançada: ninguém está cobrando">falta parcela ${R(fp)}</span>` : '', pm ? `<span style="color:var(--farol-perto);" title="quase sempre vale replanejado com a parcela antiga ainda na planilha">parcela a mais ${R(pm)}</span>` : ''].filter(Boolean).join('<br>'); };
