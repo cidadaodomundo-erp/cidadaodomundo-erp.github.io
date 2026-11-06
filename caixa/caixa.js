@@ -264,6 +264,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const moto = {};
   (cobr || []).forEach(c => { if (c.entregador) moto[String(c.id_sale)] = c.entregador; });
   const quem = t => moto[t.referencia] ? ' · motoboy ' + moto[t.referencia] : '';
+  // 06/11/2026 (dono, via Financeiro: "diferença de até R$ 1 deixa de virar pendência"): o quase-par de até R$ 1 vai para
+  // "Absorvido"; a exceção é delivery cobrado a menos com motoboy, que segue quebra do motoboy (regra de 11/09)
+  [...conferir].forEach(q => { if (Math.abs(q.dv) <= 1.0001 && !(q.dv < 0 && moto[q.s.referencia])) { conferir.splice(conferir.indexOf(q), 1); arredond.push(q); } });
   const eVale = t => /^vr\b|ticket|alelo|pluxee|sodexo|^vale/i.test(t.detalhe || '');
   const turnos = (CAIXA_TURNOS || []).filter(t => t.unidade === unidade && t.dia === dia).sort((a, b) => +b.total - +a.total);
   const hhmmTs = ts => ts ? String(ts).slice(11, 16) + (String(ts).slice(0, 10) !== dia ? ' (' + String(ts).slice(8, 10) + '/' + String(ts).slice(5, 7) + ')' : '') : '';
@@ -317,6 +320,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const txtS = S.map(t => `${limpa(t.detalhe)} ${reaisCc(t.valor)}`).join(' + ') + ' · ' + [...new Set(S.map(rotVenda))].join(', ');
       const txtR = R.map(t => `${limpa(t.detalhe)} ${reaisCc(t.valor)} às ${hhmm(t.hora)}`).join(' + ');
       if (Math.abs(dif) < 0.005 && mesmaForma) { divididas.push({ hora: hhmm(S[0].hora), texto: `${txtS} = ${txtR}` }); return; }
+      if (Math.abs(dif) >= 0.005 && Math.abs(dif) <= 1.0001 && !(dif > 0 && S.some(t => moto[t.referencia]))) { divididas.push({ hora: hhmm(S[0].hora), texto: `${txtS} = ${txtR} (diferença de ${reaisCc(Math.abs(dif))}, até R$ 1)` }); return; }
       const fPrinc = formaPadrao(S.slice().sort((a, b) => +b.valor - +a.valor)[0].detalhe);
       const trocaTxt = formas.filter(f => (fS[f] || 0) > (fR[f] || 0) + 0.005).join(', ') + ' → ' + formas.filter(f => (fR[f] || 0) > (fS[f] || 0) + 0.005).join(', ');
       pend.push({ forma: fPrinc, caixa: S[0].caixa || R[0].caixa || null, chave: 'divid:' + ref, bloco: 'maquininha', efeito: dif, p: Math.abs(dif) < 0.005 ? 2 : 1,
@@ -545,11 +549,11 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // 05/11/2026 (Financeiro, regra 3): cobrança já casada não serve de novo — venda que o próprio cruzamento já casou
   // (par, conta dividida ou quase-par) não entra pela varredura (a varredura reaproveitava a NSU de outra venda)
   const pareadosRefs = new Set([...casados.map(x => String(x.referencia)), ...compostos.flatMap(c => [c.alvo, ...c.itens]).filter(x => x.origem === 'SAIPOS').map(x => String(x.referencia)),
-    ...conferir.map(q => String(q.s.referencia))]);
+    ...conferir.map(q => String(q.s.referencia)), ...arredond.map(q => String(q.s.referencia))]);
   // 05/11/2026 (Financeiro): a varredura diz qual cobrança usou (referencia = 'NSU …' da Rede; no PIX QR do banco, 'extrato <data>'
   // + passou + valor). Uma cobrança, uma venda: a que o cruzamento já casou não serve, e a segunda venda que a reaproveita sai.
   const redeUsada = new Set([...rede.filter(r => r.usado).map(r => String(r.referencia)), ...compostos.flatMap(c => [c.alvo, ...c.itens]).filter(x => x.origem === 'REDE').map(x => String(x.referencia)),
-    ...conferir.map(q => String(q.r.referencia))]);
+    ...conferir.map(q => String(q.r.referencia)), ...arredond.map(q => String(q.r.referencia))]);
   const varrUsada = new Set();
   const chaveVarr = f => !f.referencia ? null : /^NSU/i.test(String(f.referencia)) ? String(f.referencia) : String(f.referencia) + '|' + String(f.passou) + '|' + (+f.valor).toFixed(2);
   (forma || []).forEach(f => { if (trocasRefs.has(String(f.id_sale)) || pareadosRefs.has(String(f.id_sale)) || roboT(f)) return;
@@ -557,7 +561,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     if (kv && (redeUsada.has(String(f.referencia)) || varrUsada.has(kv))) return;
     if (kv) varrUsada.add(kv); const de = formaPadrao(f.registrado), para = formaPadrao(f.passou);
     trocas.push({ hora: hhmm(String(f.hora || '').slice(11)), venda: f.numero ? 'venda ' + f.numero : f.mesa ? 'mesa ' + f.mesa : 'salão', valor: +f.valor, de, para, pd: ehPendenteTxt(f.registrado), caixa: f.caixa || null, ref: String(f.id_sale) }); });
-  if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas, turnos };
+  // 06/11/2026 (dono, via Financeiro: "bandeira trocada que já passou fica como registro"): troca com baixa em
+  // caixa_pendencia_validada (chave 'troca:<id_sale>') não é mais pendência — fica só o registro na forma
+  const trocaBaixa = t => !!valDe['troca:' + t.ref];
+  if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas: trocas.filter(t => !trocaBaixa(t)), turnos };
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
   const viradas = [];
   casados.forEach(sRow => { if (sRow.par && !doDia(sRow.par)) viradas.push({ forma: formaPadrao(sRow.detalhe), caixa: sRow.caixa || null, contrib: +sRow.valor, texto: `${rotVenda(sRow)} ${reaisCc(sRow.valor)}: a maquininha registrou em ${String(sRow.par.dia).split('-').reverse().slice(0, 2).join('/')} às ${hhmm(sRow.par.hora)} (virada do dia)` }); });
@@ -610,7 +617,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
         acao: x.canal_ok === false ? 'canal do pedido não bate com a forma: trocar a forma no Saipos' : 'forma online sem regra cadastrada: conferir' }); });
     // 1º AJUSTAR NO SAIPOS: registrado numa forma, passou em outra (do cruzamento + varredura)
     trocas.filter(x => noCxItem(x, cx)).forEach(x => {
-      L(x.de).ajustar.push({ contrib: x.valor, hora: x.hora, venda: x.venda, valor: x.valor, texto: x.pd ? `fechar a venda com a forma <b>${x.para}</b>` : `trocar de ${x.de} para <b>${x.para}</b>`, porque: 'foi assim que passou na maquininha' });
+      L(x.de).ajustar.push({ contrib: x.valor, hora: x.hora, venda: x.venda, valor: x.valor, texto: trocaBaixa(x) ? `✓ bandeira trocada (${x.de} → ${x.para}) — baixa dada, fica só o registro` : x.pd ? `fechar a venda com a forma <b>${x.para}</b>` : `trocar de ${x.de} para <b>${x.para}</b>`, porque: 'foi assim que passou na maquininha' });
       if (!x.pd) L(x.para).notas.push({ texto: `inclui ${reaisCc(x.valor)} de ${x.venda}, registrada no Saipos como ${x.de} (some quando corrigir lá)`, contrib: -x.valor }); });
     viradas.filter(x => noCxItem(x, cx)).forEach(x => L(x.forma).notas.push({ texto: x.texto, contrib: x.contrib }));
     // 2º CONFERIR / AGUARDANDO: pendencias abertas deste caixa, por forma
