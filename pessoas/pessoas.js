@@ -2273,7 +2273,9 @@ function cgFcPrazo(x) {
 }
 function cgHojeItens() {
   const F = CARGOS_F, H = CARGOS.hoje, itens = [];
-  const irPara = (tela, r) => `<button type="button" class="preset-btn" onclick="mostrarModulo('${tela}')">${r}</button>`;
+  // 06/11/2026 (dono): cada linha leva à aba certa — a aba vai por pesAbaPedida (cgEntrarTela lê uma vez)
+  const irPara = (tela, r, aba) => `<button type="button" class="preset-btn" onclick="${aba ? `try{sessionStorage.setItem('pesAbaPedida','${aba}')}catch(e){};` : ''}mostrarModulo('${tela}')">${r}</button>`;
+  const CALC_ABA = { ADIANTAMENTO: 'adt', DEZ_POR_CENTO: 'dez', VT_VA: 'vtva', BONIFICACAO: 'bonif' };
   const daLoja = (u) => !F.unidade || !u || u === F.unidade;
   const acaoFlash = (x) => {
     const emp = `<div style="font-size:11px;color:var(--tx-4);">${cgEsc(x.empresa || '')}</div>`;
@@ -2281,7 +2283,7 @@ function cgHojeItens() {
     return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${x.link_flash ? `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(x.link_flash)}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
   };
   if (Array.isArray(H.L)) for (const x of H.L) if (daLoja(x.empresa)) itens.push({ ...x, sub: [x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).join(' · '), acao: acaoFlash(x) });
-  for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: '<span style="font-size:12px;color:var(--tx-3);">Na tela da Flash</span>' });
+  for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="https://hros.flashapp.com.br/employees" target="_blank" rel="noopener">Abrir na Flash</a>` });
   for (const p of CARGOS.pessoas) if (p.ativo && daLoja(p.unidade)) for (const a of cgAlertasCadastro(p)) itens.push({ grupo: 'Cadastro', o_que: 'Cadastro', nome: p.nome, sub: p.unidade, detalhe: a.todo, acao: irPara('cargos', 'Abrir cadastro') });
   for (const a of CARGOS.adm || []) {
     const p = CARGOS.pessoas.find((x) => x.id === a.pessoa_id) || {};
@@ -2293,7 +2295,7 @@ function cgHojeItens() {
   if (Array.isArray(H.calc)) for (const c of H.calc) {
     const f = cgFaltamDias(c.data_limite);
     if (c.fechado_em || c.enviado_em || f === null || f > 30 || (c.calculo === 'ADIANTAMENTO' && f < 0)) continue;
-    itens.push({ grupo: 'Folha', o_que: c.nome, detalhe: c.calculado_em ? `calculado: ${cgN(c.pessoas)} pessoas, ${cgR(c.total)}` : 'ainda não calculado', faltam_dias: f, acao: irPara('pcalc', 'Abrir cálculos') });
+    itens.push({ grupo: 'Folha', o_que: c.nome, detalhe: c.calculado_em ? `calculado: ${cgN(c.pessoas)} pessoas, ${cgR(c.total)}` : 'ainda não calculado', faltam_dias: f, acao: irPara('pcalc', 'Abrir cálculos', CALC_ABA[c.calculo]) });
   }
   // 05/11/2026: férias já programadas vencem no PAGAMENTO (2 dias antes do início, a mesma data que a mensagem diz),
   // não no primeiro dia — "pagamento até 08/11 vence em 5 dias" contava até 10/11. E "30.00 dias" vira "30 dias".
@@ -2305,8 +2307,15 @@ function cgHojeItens() {
       detalhe: String(x.mensagem || '').replace(/(\d+)\.00\b/g, '$1'), faltam_dias: cgFaltamDias(ref),
       acao: prog ? `${x.valor_estimado != null ? `<b>cerca de ${cgR(x.valor_estimado)}</b><div style="font-size:11px;color:var(--tx-4);">o valor certo é o do recibo</div>` : ''}${irPara('pferias', 'Abrir férias')}` : irPara('pferias', 'Abrir férias') });
   }
-  const urg = (x) => (x.faltam_dias !== null && x.faltam_dias !== undefined ? Number(x.faltam_dias) : cgN(x.parado_dias) ? -cgN(x.parado_dias) : 999);
-  return itens.sort((a, b) => urg(a) - urg(b));
+  // 06/11/2026 (dono: "ordenar por ordem de prioridade"): 0 vence hoje ou venceu · 1 parado há 3+ dias ou vence em até 3 ·
+  // 2 férias/pagamento em até 15 dias · 3 o resto; dentro da faixa, o prazo mais perto e depois o mais parado
+  const fd = (x) => (x.faltam_dias === null || x.faltam_dias === undefined ? null : Number(x.faltam_dias));
+  const faixa = (x) => { const f = fd(x), p = cgN(x.parado_dias);
+    if (f !== null && f <= 0) return 0;
+    if (p >= 3 || (f !== null && f <= 3)) return 1;
+    if (f !== null && f <= 15 && (x.grupo === 'Pagar' || /FERIAS/.test(x.tipo || ''))) return 2;
+    return 3; };
+  return itens.sort((a, b) => faixa(a) - faixa(b) || (fd(a) ?? 999) - (fd(b) ?? 999) || cgN(b.parado_dias) - cgN(a.parado_dias));
 }
 function cgAbaHoje() {
   const F = CARGOS_F;
