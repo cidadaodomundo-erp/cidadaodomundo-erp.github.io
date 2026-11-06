@@ -562,7 +562,7 @@ function ffRecibo(pessoaId, mes, parcela) {
     </table>` : '';
   const w = window.open('', '_blank');
   if (!w) { alert('O navegador bloqueou a janela do recibo — libere pop-ups para este site.'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recibo — ${p.nome.split(' ')[0]} — ${mesLong}</title><style>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recibo — ${p.nome} — ${mesLong}</title><style>
     body { font-family:Arial, sans-serif; color:#000; margin:36px 48px; max-width:720px; font-size:14px; line-height:1.5; }
     h1 { font-size:18px; letter-spacing:1px; text-align:center; margin:0 0 4px; }
     .valor { text-align:right; font-size:16px; margin-bottom:18px; }
@@ -1328,7 +1328,7 @@ function cgAbaVtVa() {
     <div class="cards" style="max-width:900px;">
       <div class="card neutral"><div class="card-lbl">VT + VA</div><div class="card-val">${cgR(totVt + totVa)}</div><div class="card-pct">VT ${cgR(totVt)} · VA ${cgR(totVa)}</div></div>
       <div class="card neutral"><div class="card-lbl">Pela Flash</div><div class="card-val">${cgR(totFlash)}</div><div class="card-pct">${nFlash} ${nFlash === 1 ? 'pessoa' : 'pessoas'}</div></div>
-      <div class="card neutral"><div class="card-lbl">Por fora da Flash</div><div class="card-val">${cgR(totFora)}</div><div class="card-pct">${fora.map((v) => cgEsc(cgNome(v.apelido || v.nome).replace(/\s*\(.*$/, ''))).join(', ') || 'ninguém'}</div></div>
+      <div class="card neutral"><div class="card-lbl">Por fora da Flash</div><div class="card-val">${cgR(totFora)}</div><div class="card-pct">${fora.map((v) => cgEsc(cgNome(v.nome || v.apelido).replace(/\s*\(.*$/, ''))).join(', ') || 'ninguém'}</div></div>
       <div class="card neutral"><div class="card-lbl">Pessoas</div><div class="card-val">${linhas.length}</div></div>
     </div>`;
   if (!linhas.length) return h + cgFaltasFFHtml(mes, fechado, linhas);
@@ -1351,7 +1351,7 @@ function cgFaltasFFHtml(mes, fechado, linhas) {
   if (!(CARGOS.faltasFF || []).length) return '';
   return `<details ${L.length ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">Faltas: Flash × folha ${L.length ? `<span style="color:var(--farol-perto);">(${L.length} para olhar)</span>` : '<span style="color:var(--farol-ok);">— batem</span>'}</summary>
     ${L.length ? `<div id="tabelaCgFaltasFF" style="overflow-x:auto;"><table><thead><tr><th>Mês</th><th>Nome</th><th style="text-align:right;">Flash</th><th style="text-align:right;">Folha</th><th>O que não bate</th></tr></thead><tbody>
-      ${L.map((x) => `<tr><td>${cgMesRot(x.mes)}</td><td>${cgEsc(cgNome(x.apelido || x.nome))}</td>
+      ${L.map((x) => `<tr><td>${cgMesRot(x.mes)}</td><td>${cgEsc(cgNome(x.nome || x.apelido))}</td>
           <td style="text-align:right;">${cgN(x.dias_flash)} ${cgN(x.dias_flash) === 1 ? 'dia' : 'dias'}</td>
           <td style="text-align:right;">${cgN(x.dias_folha)} ${cgN(x.dias_folha) === 1 ? 'dia' : 'dias'}${cgN(x.valor_descontado_folha) ? ` <span style="color:var(--tx-4);">(${cgR(x.valor_descontado_folha)})</span>` : ''}</td>
           <td style="font-size:12px;color:var(--farol-perto);white-space:normal;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</td></tr>`).join('')}
@@ -1613,13 +1613,13 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.prov ? 'Total' : 'Proventos'}</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.desc ? 'Total' : 'Descontos'}</th>${comFora ? '<th>Combinado</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th>' : ''}</tr></thead><tbody>`;
   const emps = [...new Set(vis.map((x) => x.empresa))];
   emps.forEach((e) => {
-    const lin = vis.filter((x) => x.empresa === e).sort((a, b) => String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
+    const lin = vis.filter((x) => x.empresa === e).sort((a, b) => String(a.nome || a.apelido).localeCompare(String(b.nome || b.apelido)));
     h += `<tr class="sub"><td colspan="${ncol}"><b>${cgEsc(String(e).replace(/^\d+\s*-\s*/, ''))}</b></td></tr>`;
     lin.forEach((x) => {
       const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k, al = alertas(x);
       const sit = String(x.situacao || '').toLowerCase();
       h += `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
-        <td>${cgEsc(cgNome(x.apelido || x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>${hbCel(x)}
+        <td>${cgEsc(cgNome(x.nome || x.apelido))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>${hbCel(x)}
         ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
         ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
         <td style="font-weight:700;">${cgR(x.liquido)}</td>${foraCel(x)}
@@ -1866,14 +1866,14 @@ function cgAbaDez() {
   const unids = [...new Set(P.map((x) => x.unidade))];
   h += `<div id="tabelaCgDez" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Dias</th><th>Valor</th><th>Pago na folha</th><th>Observação</th></tr></thead><tbody>`;
   unids.forEach((u) => {
-    const L = P.filter((x) => x.unidade === u).sort((a, b) => (cgN(b.valor) > 0) - (cgN(a.valor) > 0) || String(a.apelido || a.nome).localeCompare(String(b.apelido || b.nome)));
+    const L = P.filter((x) => x.unidade === u).sort((a, b) => (cgN(b.valor) > 0) - (cgN(a.valor) > 0) || String(a.nome || a.apelido).localeCompare(String(b.nome || b.apelido)));
     h += `<tr class="sub"><td colspan="5"><b>${cgEsc(u)}</b></td></tr>`;
     L.forEach((x) => {
       const zero = !cgN(x.valor), frac = cgN(x.fracao) < 1 && cgN(x.dias_periodo);
       const pago = x.pago_na_folha == null ? '<span style="color:var(--tx-5);">–</span>'
         : Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)) < 0.01 ? `<span style="color:var(--farol-ok);">✓ ${cgR(x.pago_na_folha)}</span>`
         : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgR(x.pago_na_folha)} (${cgN(x.pago_na_folha) > cgN(x.valor) ? '+' : '−'}${cgR(Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)))})</span>`;
-      h += `<tr style="${zero ? 'color:var(--tx-4);' : ''}"><td>${cgEsc(cgNome(x.apelido || x.nome))}</td>
+      h += `<tr style="${zero ? 'color:var(--tx-4);' : ''}"><td>${cgEsc(cgNome(x.nome || x.apelido))}</td>
         <td>${frac ? `${cgN(x.dias_trabalhados)}/${cgN(x.dias_periodo)}` : ''}</td>
         <td style="${zero ? '' : 'font-weight:700;'}">${cgR(x.valor)}</td><td>${pago}</td>
         <td style="white-space:normal;font-size:12px;color:var(--tx-3);">${cgEsc(x.observacao || '')}</td></tr>`;
@@ -2212,7 +2212,7 @@ function cgAbaFerias() {
   const dataBase = per.map((x) => x.data_base).filter(Boolean).sort().pop();
   let h = dataBase ? `<h3 style="margin:8px 0;">Programação da contabilidade de ${cgData(dataBase)}</h3>` : '';
   if (A.length) h += `<div class="contexto" style="text-align:left;border-color:${A.some(alerta) ? 'var(--farol-fora)' : 'var(--farol-perto)'};">${A.map((x) =>
-      `<div style="color:${alerta(x) ? cor(sit(x)) : 'var(--farol-perto)'};font-weight:700;">${cgEsc(cgNome(x.apelido || x.nome))} — ${cgN(x.dias_a_gozar)} dias — começar até ${cgData(x.limite_gozo)} — ${alerta(x) ? cgEsc(sit(x)) : 'perto do limite'}</div>`).join('')}</div>`;
+      `<div style="color:${alerta(x) ? cor(sit(x)) : 'var(--farol-perto)'};font-weight:700;">${cgEsc(cgNome(x.nome || x.apelido))} — ${cgN(x.dias_a_gozar)} dias — começar até ${cgData(x.limite_gozo)} — ${alerta(x) ? cgEsc(sit(x)) : 'perto do limite'}</div>`).join('')}</div>`;
   else h += `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nenhuma férias em dobro, obrigatória ou perto do limite agora.</b></div>`;
   const card = (id, rot, L, pe) => `<div class="card neutral" style="cursor:pointer;${F.ferCard === id ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.ferCard=CARGOS_F.ferCard==='${id}'?null:'${id}';renderModuloCargos()"><div class="card-lbl">${rot}</div><div class="card-val">${L.length}</div><div class="card-pct">${pe}</div></div>`;
   const totalDe = (L) => cgR0(L.reduce((a, x) => a + cgN(x.valor_estimado), 0));
@@ -2233,13 +2233,13 @@ function cgAbaFerias() {
       <th style="text-align:right;">Dias a gozar</th><th>Marcado na Flash</th><th style="text-align:right;">Valor estimado</th><th>Situação</th></tr></thead><tbody>
     ${vis.map((x) => { const k = `${x.pessoa_id}|${x.aquisitivo_inicio}`, ab = F.ferAberta === k, G = goz(x.pessoa_id);
       return `<tr style="cursor:pointer;" onclick="CARGOS_F.ferAberta=CARGOS_F.ferAberta==='${k}'?null:'${k}';renderModuloCargos()">
-        <td>${cgEsc(cgNome(x.apelido || x.nome))}</td><td>${cgEsc(x.unidade || '')}</td>
+        <td>${cgEsc(cgNome(x.nome || x.apelido))}</td><td>${cgEsc(x.unidade || '')}</td>
         <td>${cgData(x.aquisitivo_inicio)} a ${cgData(x.aquisitivo_fim)}</td><td>${cgData(x.limite_gozo)}</td>
         <td style="text-align:right;">${cgN(x.dias_a_gozar)}${cgN(x.dias_gozados) || cgN(x.faltas) ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgN(x.dias_direito)}</span>` : ''}</td>
         <td style="font-size:12px;">${cgN(x.dias_programados) ? cgEsc(cgFerMarcado(x)) : '<span style="color:var(--tx-5);">nada</span>'}</td>
         <td style="text-align:right;">${marcada(x) ? cgR(x.valor_programado) : cgN(x.valor_estimado) ? cgR(x.valor_estimado) : '–'}</td>
         <td style="color:${cor(sit(x))};font-weight:700;white-space:normal;">${cgEsc(sit(x))}</td></tr>
-        ${ab ? `<tr><td colspan="8"><b>Férias conhecidas de ${cgEsc(cgNome(x.apelido || x.nome))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
+        ${ab ? `<tr><td colspan="8"><b>Férias conhecidas de ${cgEsc(cgNome(x.nome || x.apelido))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
     </tbody></table></div>`;
   return h;
 }
@@ -2805,7 +2805,7 @@ function cgAbaBonifCiclo() {
         <td style="font-weight:600;">${cgR(b.total)}</td></tr>`).join('')}</tbody>
       <tfoot><tr class="sub"><td colspan="3">Total</td><td>${cgR(linhas.reduce((s, b) => s + cgN(b.mes1), 0))}</td><td>${cgR(linhas.reduce((s, b) => s + cgN(b.mes2), 0))}</td><td>${cgR(linhas.reduce((s, b) => s + cgN(b.mes3), 0))}</td>${temDesc ? `<td>${cgR(-linhas.reduce((s, b) => s + cgN(b.desconto), 0))}</td>` : ''}<td>${cgR(soma(linhas))}</td></tr></tfoot>
     </table></div>
-    ${naoRecebem.length ? `<div class="contexto" style="margin-top:8px;">Não recebem neste ciclo: ${naoRecebem.map(p => cgEsc(cgNome(p.nome).split(' ')[0])).join(', ')}. Para mudar, marque "recebe bonificação" na aba Pessoas.</div>` : ''}`;
+    ${naoRecebem.length ? `<div class="contexto" style="margin-top:8px;">Não recebem neste ciclo: ${naoRecebem.map(p => cgEsc(cgNome(p.nome))).join(', ')}. Para mudar, marque "recebe bonificação" na aba Pessoas.</div>` : ''}`;
   return h;
 }
 
@@ -2907,232 +2907,162 @@ async function entrarRh() {
   if (RH) { renderModuloRh(); return; }
   alvo.innerHTML = '<div class="contexto">Carregando os descontos em folha...</div>';
   try {
-    const [colab, aberto, credor, credorDet, diverg] = await Promise.all([
-      consultarTudo('vw_rh_colaboradores?select=*&order=a_descontar.desc'),
-      consultarTudo('vw_rh_a_descontar?select=*&order=data_desconto.asc'),
-      consultarTudo('vw_rh_credor?select=*&order=devolver_agora.desc'),
-      consultarTudo('vw_rh_credor_detalhe?select=*&order=data_concessao.asc'),
-      consultarTudo('vw_rh_divergencias?select=*&order=diferenca.desc'),
+    // 06/11/2026 (dono 11:44, proposta 2026-11-06-rh-descontos-ativos-historico-nome-completo): base ativa × histórico de quem saiu,
+    // depósito da Rita à parte, conferência "sai na folha" e nome completo (o vale de um Alexandre caiu no outro pelo primeiro nome)
+    const [colab, aberto, credor, credorDet, diverg, conf, hist, dep] = await Promise.all([
+      consultarTudo('vw_rh_colaboradores?select=*&order=a_descontar.desc,colaborador'),
+      consultarTudo('vw_rh_a_descontar?select=*&order=data_desconto.asc,colaborador,chave,parcela_n'),
+      consultarTudo('vw_rh_credor?select=*&order=devolver_agora.desc,credor'),
+      consultarTudo('vw_rh_credor_detalhe?select=*&order=data_concessao.asc,chave'),
+      consultarTudo('vw_rh_divergencias?select=*&order=diferenca.desc,chave'),
+      consultarTudo('vw_rh_desconto_conferencia?select=*&order=mes_pagamento,nome_completo,pessoa_id').catch(() => []),
+      consultarTudo('vw_rh_desconto_historico?select=*&order=nome_completo,data_concessao,chave').catch(() => []),
+      consultarTudo('vw_rh_a_receber_deposito?select=*&order=data_deposito,chave').catch(() => []),
     ]);
-    // 05/11/2026 (RH): a planilha ficou sem ser lida de agosto a novembro e ninguém via; a data da leitura fica no alto
     const lida = await consultarTudo('rh_descontos?select=atualizado_em&order=atualizado_em.desc.nullslast&limit=1').catch(() => []);
-    RH = { colab, aberto, credor, credorDet, diverg, lidaEm: (lida[0] || {}).atualizado_em || null };
+    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null };
   } catch (e) {
-    alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${e.message}</div>`;
+    alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${cgEsc(e.message)}</div>`;
     return;
   }
   renderModuloRh();
 }
-
+let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null;
+function rhIr(campo, v) {
+  if (campo === 'aba') { RH_ABA = v; RH_PESSOA = null; }
+  else if (campo === 'dia') RH_DIA = RH_DIA === v ? null : v;
+  else if (campo === 'credor') RH_CREDOR = RH_CREDOR === v ? null : v;
+  else if (campo === 'pessoa') RH_PESSOA = RH_PESSOA === v ? null : v;
+  renderModuloRh();
+}
 function renderModuloRh() {
   const alvo = document.getElementById('view-rh');
   if (!alvo || RH === null) return;
-  const { colab } = RH;
-  const n = (v) => Number(v) || 0;   // PostgREST pode devolver numeric como texto
-  // ---- o recorte da pessoa fixada, num lugar so ----
-  // Dali para baixo o modulo inteiro le estas listas ja recortadas: nao ha como um
-  // pedaco da tela falar de uma pessoa e o outro de todo mundo. `colab` (a lista de
-  // nomes) fica inteira, porque e o seletor. A conta de quem emprestou e o agregado
-  // de credorDet por credor — as MESMAS contas da vw_rh_credor, linha a linha —,
-  // entao ela tambem recorta sem inventar numero.
-  const P = RH_PESSOA && colab.some(c => c.colaborador === RH_PESSOA) ? RH_PESSOA : null;
-  const soP = (arr) => P ? arr.filter(r => r.colaborador === P) : arr;
-  const aberto = soP(RH.aberto), credorDet = soP(RH.credorDet), diverg = soP(RH.diverg);
-  const credor = !P ? RH.credor : (() => {
-    const m = new Map();
-    credorDet.forEach(d => {
-      const a = m.get(d.credor) || { credor: d.credor, emprestimos: 0, funcionarios: 1, emprestado: 0,
-        ja_descontado_do_funcionario: 0, a_descontar_do_funcionario: 0, ja_reembolsado: 0,
-        a_reembolsar: 0, devolver_agora: 0 };
-      a.emprestimos += 1;
-      a.emprestado += n(d.valor_total);
-      a.ja_descontado_do_funcionario += n(d.descontado);
-      a.a_descontar_do_funcionario += n(d.a_descontar);
-      a.ja_reembolsado += n(d.reembolsado);
-      a.a_reembolsar = a.emprestado - a.ja_reembolsado;
-      a.devolver_agora = a.ja_descontado_do_funcionario - a.ja_reembolsado;
-      m.set(d.credor, a);
-    });
-    return [...m.values()].sort((x, y) => y.devolver_agora - x.devolver_agora);
+  const n = (v) => Number(v) || 0;
+  const R = (v) => 'R$ ' + fmt(n(v));
+  const ddmm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—';
+  const mesTxt = (d) => d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '') : '—';
+  const NC = (x) => cgEsc(cgNome(x.nome_completo || x.colaborador || ''));   // nome completo do cadastro, nunca o primeiro nome
+  const js = (v) => cgEsc(JSON.stringify(v));
+  const hoje = cgHojeIso();
+  const lida = (() => {
+    if (!RH.lidaEm) return '<span style="color:var(--farol-perto);font-weight:700;">planilha sem data de leitura</span>';
+    const d = new Date(RH.lidaEm), dias = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return `<span title="${dias > 7 ? `há ${dias} dias: o que mudou depois não está aqui` : ''}" style="${dias > 7 ? 'color:var(--farol-fora);font-weight:700;' : 'color:var(--tx-4);'}">planilha lida ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>`;
   })();
-  const soma = (arr, f) => arr.reduce((s, x) => s + n(f(x)), 0);
-  const ddmm = (d) => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) : '—';
-  const mesTxt = (d) => new Date(d + 'T12:00:00')
-    .toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+  const ativos = RH.colab.filter((c) => c.situacao_base !== 'HISTORICO');
+  const histC = RH.colab.filter((c) => c.situacao_base === 'HISTORICO' && n(c.a_descontar_historico) > 0);
+  const P = RH_PESSOA && RH.colab.some((c) => c.colaborador === RH_PESSOA) ? RH_PESSOA : null;
+  const cP = P ? RH.colab.find((c) => c.colaborador === P) : null;
+  const soP = (arr) => P ? arr.filter((r) => r.colaborador === P) : arr;
+  const abas = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">
+    <button type="button" class="preset-btn ${RH_ABA === 'ativos' ? 'active' : ''}" onclick="rhIr('aba','ativos')">Em dia (ativos)</button>
+    <button type="button" class="preset-btn ${RH_ABA === 'hist' ? 'active' : ''}" onclick="rhIr('aba','hist')">Histórico (saíram) · ${histC.length}</button>
+    <span style="margin-left:auto;font-size:12px;">${lida}</span></div>
+    ${P ? `<div style="margin:0 0 10px;"><button type="button" class="preset-btn active" onclick="rhIr('pessoa',null)">${cgEsc(cgNome(cP.nome_completo || P))} ✕</button></div>` : ''}`;
+  const titulo = '<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;">Descontos em folha</div>';
 
-  if (!aberto.length && !colab.length) {
-    alvo.innerHTML = '<div class="contexto">Sem descontos importados — rode <b>script/import_gastos_funcionarios.py</b>.</div>';
+  if (RH_ABA === 'hist') {
+    const H = RH.hist, tot = histC.reduce((a, c) => a + n(c.a_descontar_historico), 0);
+    const pessoa = (c) => H.filter((h) => h.colaborador === c.colaborador);
+    let h = `${titulo}${abas}<div class="cards"><div class="card neutral"><div class="card-lbl">Ficou em aberto</div><div class="card-val">${R(tot)}</div>
+      <div class="card-pct">${histC.length} ${histC.length === 1 ? 'pessoa que saiu' : 'pessoas que saíram'} · só consulta</div></div></div>
+      <div id="tabelaRhHist" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Ficou devendo</th><th>Último desconto pago</th><th>Quem emprestou</th></tr></thead><tbody>`;
+    histC.forEach((c) => {
+      const L = pessoa(c), ult = L.map((x) => x.ultimo_pago).filter(Boolean).sort().pop();
+      const cred = [...new Set(L.filter((x) => n(x.a_descontar) > 0).map((x) => x.credor === 'EMPRESA' ? 'empresa' : cgNome(x.credor)))].join(', ');
+      const ab = P === c.colaborador;
+      h += `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})'><td>${ab ? '▾ ' : '▸ '}${NC(c)}</td><td>${R(c.a_descontar_historico)}</td><td>${ult ? cgData(ult) : '—'}</td><td>${cgEsc(cred || '—')}</td></tr>`;
+      if (ab) h += `<tr><td colspan="4"><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Data</th><th>Valor</th><th>Descontado</th><th>Ficou</th><th>Último pago</th></tr></thead><tbody>
+        ${L.sort((a, b) => n(b.a_descontar) - n(a.a_descontar)).map((x) => `<tr style="${n(x.a_descontar) > 0 ? '' : 'color:var(--tx-4);'}"><td>${cgEsc(x.descricao || '')}${x.credor && x.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(x.credor))}</span>` : ''}</td>
+          <td>${cgData(x.data_concessao)}</td><td>${R(x.valor_total)}</td><td>${R(x.descontado)}</td><td>${n(x.a_descontar) ? R(x.a_descontar) : 'quitado'}</td><td>${x.ultimo_pago ? cgData(x.ultimo_pago) : '—'}</td></tr>`).join('')}</tbody></table></td></tr>`;
+    });
+    h += `</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td></tr></tfoot></table></div>`;
+    const dv = RH.diverg.filter((d) => d.situacao_base === 'HISTORICO');
+    if (dv.length) h += `<details style="margin-top:14px;"><summary class="caption-label" style="cursor:pointer;text-align:left;">Empréstimos de quem saiu que não fecham na planilha (${dv.length})</summary>
+      <div id="tabelaRhDivHist" style="overflow-x:auto;"><table><thead><tr><th>Funcionário</th><th>Descrição</th><th>Data</th><th>Concedido</th><th>Soma das parcelas</th><th>Diferença</th><th>Tipo</th></tr></thead><tbody>
+      ${dv.map((d) => `<tr><td>${cgEsc(cgNome(d.colaborador))}</td><td>${cgEsc(d.descricao || '')}</td><td>${cgData(d.data_concessao)}</td><td>${R(d.valor_total)}</td><td>${R(d.soma_parcelas)}</td><td>${R(d.diferenca)}</td><td>${cgEsc(d.tipo || '')}</td></tr>`).join('')}</tbody></table></div></details>`;
+    alvo.innerHTML = h;
     return;
   }
 
-  const totalAberto = soma(aberto, r => r.valor);
-  const devolverAgora = soma(credor, c => c.devolver_agora);
-  const aReceberCredor = soma(credor, c => c.a_descontar_do_funcionario);
-
-  // Por dia de desconto. A planilha usa uma data unica como "estacionamento"
-  // de divida antiga sem plano — se um so dia concentra mais de um quarto do
-  // saldo, isso NAO e folha daquele mes e a tela precisa dizer.
-  const porDia = {};
-  aberto.forEach(r => { porDia[r.data_desconto] = (porDia[r.data_desconto] || 0) + n(r.valor); });
-  const maiorDia = Object.entries(porDia).sort((a, b) => b[1] - a[1])[0] || [null, 0];
-  const estacionado = totalAberto && maiorDia[1] / totalAberto > 0.25 ? maiorDia : null;
-
-  // A proxima folha e o proximo dia de desconto que ainda vai acontecer —
-  // tirando o dia estacionado, que nao e folha de verdade.
-  const hojeIso = new Date().toISOString().slice(0, 10);
-  const futuros = Object.keys(porDia)
-    .filter(d => d >= hojeIso && (!estacionado || d !== estacionado[0])).sort();
-  const proxDia = futuros[0] || null;
-  const proxValor = proxDia ? porDia[proxDia] : 0;
-  const proxN = proxDia ? aberto.filter(r => r.data_desconto === proxDia).length : 0;
-
-  const divSoma = soma(diverg, d => d.diferenca);
-  const faltaParcela = diverg.filter(d => d.tipo === 'FALTA PARCELA');
-
-  const cards = `<div class="cards">
-    <div class="card neutral"><div class="card-lbl">A descontar ${P ? '— ' + P : '(saldo total)'}</div>
-      <div class="card-val">R$ ${fmt(totalAberto)}</div>
-      <div class="card-pct">${aberto.length} parcelas de ${new Set(aberto.map(r => r.colaborador)).size} pessoas</div></div>
-    <div class="card blue"><div class="card-lbl">Próxima folha</div>
-      <div class="card-val">R$ ${fmt(proxValor)}</div>
-      <div class="card-pct">${proxDia ? ddmm(proxDia) + ' · ' + proxN + ' parcelas' : 'nada agendado'}</div></div>
-    <div class="card neg highlight"><div class="card-lbl">Devolver a quem emprestou</div>
-      <div class="card-val">R$ ${fmt(devolverAgora)}</div>
-      <div class="card-pct">já saiu do funcionário e não voltou pra pessoa</div></div>
-    ${estacionado ? `<div class="card neg"><div class="card-lbl">Parado em ${ddmm(estacionado[0])}</div>
-      <div class="card-val">R$ ${fmt(estacionado[1])}</div>
-      <div class="card-pct">${pct(estacionado[1] / totalAberto * 100)}% do saldo num dia só — dívida sem plano</div></div>` : ''}
-    ${diverg.length ? `<div class="card neutral"><div class="card-lbl">Não fecha na planilha</div>
-      <div class="card-val">R$ ${fmt(divSoma)}</div>
-      <div class="card-pct">${diverg.length} empréstimos · ${faltaParcela.length} sem parcela lançada</div></div>` : ''}
+  // ---------------- aba Em dia (ativos) ----------------
+  const aberto = soP(RH.aberto);
+  const dias = [...new Set(RH.aberto.map((r) => String(r.data_desconto).slice(0, 10)))].sort();
+  const prox = dias.find((d) => d >= hoje) || dias[dias.length - 1] || null;
+  const dia = RH_DIA && dias.includes(RH_DIA) ? RH_DIA : prox;
+  const mesPag = dia ? dia.slice(0, 7) + '-01' : null;
+  const pidP = cP ? cP.pessoa_id : null;
+  const confDia = (RH.conf || []).filter((x) => String(x.mes_pagamento).slice(0, 10) === mesPag && (!P || x.pessoa_id === pidP));
+  const naoBate = confDia.filter((x) => x.situacao === 'DIFERENTE');
+  const doDia = aberto.filter((r) => String(r.data_desconto).slice(0, 10) === dia);
+  const totDia = doDia.reduce((a, r) => a + n(r.valor), 0), pesDia = new Set(doDia.map((r) => r.colaborador)).size;
+  const ativosP = P ? ativos.filter((c) => c.colaborador === P) : ativos.filter((c) => n(c.a_descontar) > 0);
+  const falta = ativosP.reduce((a, c) => a + n(c.a_descontar), 0), ultima = ativosP.map((c) => c.quitacao_prevista).filter(Boolean).sort().pop();
+  const depAll = soP(RH.dep || []), depAb = depAll.filter((d) => d.status !== 'PAGO');
+  const credor = RH.credor.filter((c) => n(c.devolver_agora) > 0), devolver = credor.reduce((a, c) => a + n(c.devolver_agora), 0);
+  const situacaoConf = !confDia.length ? (dia && dia <= hoje ? '' : 'a conferir quando o pagamento entrar')
+    : naoBate.length ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${naoBate.length} não ${naoBate.length === 1 ? 'bate' : 'batem'}</span>`
+    : confDia.every((x) => x.situacao === 'CONFERE') ? '<span style="color:var(--farol-ok);font-weight:700;">✓ bate com o pagamento</span>' : 'previsto';
+  let h = `${titulo}${abas}<div class="cards">
+    <div class="card blue"><div class="card-lbl">Sai na folha de ${ddmm(dia)}</div><div class="card-val">${R(totDia)}</div><div class="card-pct">${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}${situacaoConf ? ' · ' + situacaoConf : ''}</div></div>
+    <div class="card neutral"><div class="card-lbl">Falta descontar</div><div class="card-val">${R(falta)}</div><div class="card-pct">${ativosP.length} ${ativosP.length === 1 ? 'pessoa' : 'pessoas'}${ultima ? ` · última parcela em ${mesTxt(ultima)}` : ''}</div></div>
+    ${depAb.length ? `<div class="card neutral"><div class="card-lbl">Rita deposita</div><div class="card-val">${R(depAb.reduce((a, d) => a + n(d.valor), 0))}</div><div class="card-pct">em ${depAb.map((d) => ddmm(d.data_deposito)).join(' e ')}</div></div>` : ''}
+    ${devolver > 0 && !P ? `<div class="card neg"><div class="card-lbl">Devolver a ${credor.map((c) => cgNome(c.credor)).join(' e ')}</div><div class="card-val">${R(devolver)}</div><div class="card-pct">já saiu do funcionário, não voltou a quem emprestou</div></div>` : ''}
   </div>`;
 
-  const contexto = estacionado ? `<div class="contexto" title="A planilha usa essa data para guardar dívida antiga que não tem plano de desconto — parte é de gente que já saiu. O cartão “Próxima folha” já ignora esse dia.">
-    <b>R$ ${fmt(estacionado[1])} dos R$ ${fmt(totalAberto)} em aberto estão numa data só (${ddmm(estacionado[0])})</b> — dívida antiga, sem plano de desconto.
-  </div>` : '';
+  // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
+  const confDe = (r) => confDia.find((x) => x.pessoa_id === r.pessoa_id);
+  const visto = new Set();
+  h += `<div class="section-label">Folha de ${ddmm(dia)}${dia ? '/' + dia.slice(2, 4) : ''}: quanto sai de cada um${RH_DIA && RH_DIA !== prox ? ` <button type="button" class="preset-btn active" style="margin-left:8px;" onclick="rhIr('dia',null)">${ddmm(RH_DIA)} ✕</button>` : ''}</div>
+    <div id="tabelaRhFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>O quê</th><th>Parcela</th><th>Valor</th><th>Sai de</th><th>No pagamento</th><th>Confere</th></tr></thead><tbody>
+    ${doDia.map((r) => { const c = confDe(r), pri = !visto.has(r.colaborador); visto.add(r.colaborador);
+      const okTxt = !c ? '<span style="color:var(--tx-5);">–</span>' : c.situacao === 'CONFERE' ? '<span style="color:var(--farol-ok);">✓</span>' : c.situacao === 'DIFERENTE' ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${R(c.diferenca)}</span>` : '<span style="color:var(--tx-4);">previsto</span>';
+      return `<tr><td>${pri ? NC(r) : ''}</td><td>${cgEsc(r.descricao || '')}${r.credor && r.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(r.credor))}</span>` : ''}</td>
+        <td>${r.parcela_n ? `${r.parcela_n} de ${r.parcelas_total}` : '—'}</td><td>${R(r.valor)}</td><td>${r.onde === 'POR FORA' ? 'por fora' : cgEsc(r.onde || '—')}</td>
+        <td>${pri && c && c.situacao !== 'PREVISTO' ? R(c.no_pagamento) : ''}</td><td>${pri ? okTxt : ''}</td></tr>`; }).join('') || '<tr><td colspan="7">Nada nesta folha.</td></tr>'}
+    </tbody><tfoot><tr class="liq"><td>Total · ${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}</td><td></td><td></td><td>${R(totDia)}</td><td></td><td>${confDia.some((x) => x.situacao !== 'PREVISTO') ? R(confDia.reduce((a, x) => a + n(x.no_pagamento), 0)) : ''}</td><td></td></tr></tfoot></table></div>`;
 
-  // ---- proximas folhas, mes a mes ----
-  const porMes = {};
-  aberto.forEach(r => {
-    const p = porMes[r.mes] || (porMes[r.mes] = { valor: 0, n: 0, pessoas: new Set(), parado: 0 });
-    p.valor += n(r.valor); p.n += 1; p.pessoas.add(r.colaborador);
-    if (estacionado && r.data_desconto === estacionado[0]) p.parado += n(r.valor);
-  });
-  const linhasMes = Object.keys(porMes).sort().map(m => {
-    const p = porMes[m];
-    return `<tr><td>${mesTxt(m)}</td><td>${p.pessoas.size}</td><td>${p.n}</td>
-      <td>R$ ${fmt(n(p.valor))}</td>
-      <td class="${p.parado ? 'negativo' : ''}">${p.parado ? 'R$ ' + fmt(n(p.parado)) : '—'}</td></tr>`;
-  }).join('');
+  // Bloco 2: próximas folhas, uma barra por dia de desconto (o clique troca o bloco 1)
+  const futuros = dias.filter((d) => d >= (prox || hoje));
+  const porDia = futuros.map((d) => [d, aberto.filter((r) => String(r.data_desconto).slice(0, 10) === d).reduce((a, r) => a + n(r.valor), 0)]).filter(([, v]) => v > 0);
+  const maxV = Math.max(1, ...porDia.map(([, v]) => v));
+  if (porDia.length > 1) h += `<div class="section-label">Próximas folhas</div><div style="display:flex;flex-direction:column;gap:4px;max-width:640px;">
+    ${porDia.map(([d, v]) => `<div onclick="rhIr('dia','${d}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;" title="ver quem sai na folha de ${ddmm(d)}">
+      <span style="width:62px;color:${d === dia ? 'var(--tx-1)' : 'var(--tx-3)'};font-weight:${d === dia ? 700 : 400};">${mesTxt(d)}</span>
+      <span style="flex:1;background:var(--surface-2);border-radius:3px;height:14px;"><span style="display:block;height:14px;border-radius:3px;width:${Math.max(2, v / maxV * 100)}%;background:${d === dia ? 'var(--brand)' : 'var(--info)'};"></span></span>
+      <span style="width:96px;">${R(v)}</span></div>`).join('')}</div>`;
 
-  // ---- quem deve ----
-  // A lista de nomes e o seletor da tela: clicar num nome fixa a pessoa, clicar de
-  // novo solta. RH_NOMES guarda os nomes na ordem em que sao desenhados.
-  const colabLista = colab.filter(c => n(c.a_descontar) > 0);
-  RH_NOMES = colabLista.map(c => c.colaborador);
-  const linhasColab = colabLista.map((c, i) => `<tr${c.colaborador === P ? ' style="background:var(--brand-wine);"' : ''}>
-    <td onclick="rhFixar(${i})" style="cursor:pointer;" title="${c.colaborador === P ? 'clique para soltar o recorte' : 'clique para a tela falar só desta pessoa'}">${c.colaborador === P ? '✕ ' : ''}${c.colaborador}</td>
-    <td>R$ ${fmt(n(c.a_descontar))}</td>
-    <td>${c.parcelas_abertas}</td>
-    <td>${ddmm(c.proximo_desconto)}</td>
-    <td>${ddmm(c.quitacao_prevista)}</td>
-    <td class="${n(c.sem_previsao) > 0 ? 'negativo' : ''}">${n(c.sem_previsao) > 0 ? 'R$ ' + fmt(n(c.sem_previsao)) : '—'}</td>
-    <td>R$ ${fmt(n(c.ja_descontado))}</td></tr>`).join('');
+  // Bloco 3: quem deve (o seletor da tela)
+  const dvA = RH.diverg.filter((d) => d.situacao_base === 'ATIVO');
+  const sit = (c) => { const D = dvA.filter((d) => d.colaborador === c.colaborador); if (!D.length) return '<span style="color:var(--farol-ok);">em dia</span>';
+    const fp = D.filter((d) => d.tipo === 'FALTA PARCELA').reduce((a, d) => a + n(d.diferenca), 0), pm = D.filter((d) => d.tipo !== 'FALTA PARCELA').reduce((a, d) => a + Math.abs(n(d.diferenca)), 0);
+    return [fp ? `<span style="color:var(--farol-perto);" title="sobrou valor sem parcela lançada: ninguém está cobrando">falta parcela ${R(fp)}</span>` : '', pm ? `<span style="color:var(--farol-perto);" title="quase sempre vale replanejado com a parcela antiga ainda na planilha">parcela a mais ${R(pm)}</span>` : ''].filter(Boolean).join('<br>'); };
+  const quem = ativos.filter((c) => n(c.a_descontar) > 0);
+  h += `<div class="section-label">Quem deve</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Falta</th><th>Parcelas que faltam</th><th>Próxima</th><th>Última</th><th>Situação</th></tr></thead><tbody>
+    ${quem.map((c) => { const ab = P === c.colaborador;
+      let t = `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})' title="${ab ? 'clique para soltar' : 'clique para a tela falar só desta pessoa'}">
+        <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${R(c.a_descontar)}</td><td>${n(c.parcelas_abertas)}</td><td>${cgData(c.proximo_desconto)}</td><td>${mesTxt(c.quitacao_prevista)}</td><td>${sit(c)}</td></tr>`;
+      if (ab) { const E = [...new Set(RH.aberto.filter((r) => r.colaborador === c.colaborador).map((r) => r.chave))].map((k) => RH.aberto.filter((r) => r.chave === k && r.colaborador === c.colaborador));
+        t += `<tr><td colspan="6"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
+          ${E.map((L) => `<tr><td>${cgEsc(L[0].descricao || '')}${L[0].credor && L[0].credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(L[0].credor))}</span>` : ''}</td>
+            <td>${L.length}${L[0].parcelas_total ? ` (de ${L[0].parcelas_total})` : ''}</td><td>${R(L.reduce((a, r) => a + n(r.valor), 0))}</td><td>${cgData(L[0].data_desconto)}</td><td>${cgData(L[L.length - 1].data_desconto)}</td></tr>`).join('')}</tbody></table></td></tr>`; }
+      return t; }).join('')}
+    </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td><td></td></tr></tfoot></table></div>`;
 
-  // ---- conta com quem emprestou do bolso ----
-  const linhasCredor = credor.map(c => `<tr>
-    <td>${c.credor}</td><td>${c.emprestimos}</td><td>${c.funcionarios}</td>
-    <td>R$ ${fmt(n(c.emprestado))}</td>
-    <td>R$ ${fmt(n(c.ja_descontado_do_funcionario))}</td>
-    <td>R$ ${fmt(n(c.ja_reembolsado))}</td>
-    <td class="negativo">R$ ${fmt(n(c.devolver_agora))}</td>
-    <td>R$ ${fmt(n(c.a_descontar_do_funcionario))}</td></tr>`).join('');
+  // Bloco 4: depósitos da Rita (Vales Cidadão) — ela deposita na conta, não sai da folha
+  if (depAll.length) h += `<div class="section-label">Depósitos da Rita (Vales Cidadão)</div><div id="tabelaRhDeposito" style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Nome completo</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
+    ${depAll.map((d) => `<tr><td>${cgData(d.data_deposito)}</td><td>${NC(d)}</td><td>${R(d.valor)}</td><td>${d.status === 'PAGO' ? '<span style="color:var(--farol-ok);">✓ depositou</span>' : (String(d.data_deposito).slice(0, 10) < hoje ? '<span style="color:var(--farol-perto);font-weight:700;">aguardando (passou da data)</span>' : 'aguardando')}</td></tr>`).join('')}</tbody></table></div>`;
 
-  const linhasCredorDet = credorDet
-    .filter(d => n(d.a_reembolsar) > 0)
-    .sort((a, b) => n(b.a_reembolsar) - n(a.a_reembolsar))
-    .map(d => `<tr>
-      <td>${d.credor} → ${d.colaborador}</td>
-      <td>${d.descricao}</td>
-      <td>${ddmm(d.data_concessao)}</td>
-      <td>R$ ${fmt(n(d.valor_total))}</td>
-      <td>R$ ${fmt(n(d.descontado))}</td>
-      <td>R$ ${fmt(n(d.a_descontar))}</td>
-      <td class="negativo">R$ ${fmt(n(d.a_reembolsar))}</td>
-      <td>${d.situacao}</td></tr>`).join('');
-
-  // ---- o que nao fecha ----
-  const linhasDiv = diverg.map(d => `<tr>
-    <td>${d.colaborador}</td><td>${d.descricao}</td><td>${ddmm(d.data_concessao)}</td>
-    <td>R$ ${fmt(n(d.valor_total))}</td><td>R$ ${fmt(n(d.soma_parcelas))}</td>
-    <td class="${n(d.diferenca) > 0 ? 'negativo' : ''}">R$ ${fmt(n(d.diferenca))}</td>
-    <td>${d.tipo}</td></tr>`).join('');
-
-  alvo.innerHTML = `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Descontos em folha</div>
-    <div class="caption-label" style="text-align:center;">
-      Vales e empréstimos que a empresa adiantou e recupera no contracheque. É saldo, não fluxo — sem janela de período.
-      ${(() => {
-        if (!RH.lidaEm) return '<br><b style="color:var(--farol-perto);">Não sei quando a planilha foi lida.</b>';
-        const d = new Date(RH.lidaEm), dias = Math.floor((Date.now() - d.getTime()) / 86400000);
-        const quando = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
-        return `<br>Planilha lida em <b${dias > 7 ? ' style="color:var(--farol-perto);"' : ''}>${quando}</b>${dias > 7 ? ` — há ${dias} dias: o que mudou depois não está aqui` : ''}.`;
-      })()}
-    </div>
-    ${P ? `<div class="contexto" style="border-color:var(--brand);">
-      <b>Filtrando:</b>
-      <button class="preset-btn active" onclick="rhSoltar()">${P} ✕</button>
-      <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cartões e as quatro tabelas falam só desta pessoa. A lista "Quem ainda tem desconto a fazer" continua inteira, para você trocar de nome.</div>
-    </div>` : ''}
-    ${cards}${contexto}
-    <div class="section-label">Quanto sai de cada folha</div>
-    <div id="tabelaRhMes"><table>
-      <tr><th>Mês</th><th>Pessoas</th><th>Parcelas</th><th>Valor</th><th>Do dia parado</th></tr>
-      ${linhasMes}
-      <tr class="liq"><td>TOTAL</td><td>${new Set(aberto.map(r => r.colaborador)).size}</td><td>${aberto.length}</td>
-        <td>R$ ${fmt(totalAberto)}</td><td>${estacionado ? 'R$ ' + fmt(estacionado[1]) : '—'}</td></tr>
-    </table></div>
-
-    <div class="section-label">Quem ainda tem desconto a fazer</div>
-    <div id="tabelaRhColab"><table>
-      <tr><th>Funcionário</th><th>A descontar</th><th>Parcelas</th><th>Próximo</th>
-          <th>Quitação prevista</th><th>Sem parcela</th><th>Já descontado</th></tr>
-      ${linhasColab}
-      ${(() => { const cs = colab.filter(c => n(c.a_descontar) > 0);
-        const t = cs.reduce((a, c) => ({ v: a.v + n(c.a_descontar), p: a.p + Number(c.parcelas_abertas || 0),
-          sp: a.sp + n(c.sem_previsao), jd: a.jd + n(c.ja_descontado) }), { v: 0, p: 0, sp: 0, jd: 0 });
-        return `<tr class="liq"><td>TOTAL</td><td>R$ ${fmt(t.v)}</td><td>${t.p}</td><td>—</td><td>—</td>
-          <td>${t.sp > 0.005 ? 'R$ ' + fmt(t.sp) : '—'}</td><td>R$ ${fmt(t.jd)}</td></tr>`; })()}
-    </table></div>
-
-    ${credor.length ? `
-    <div class="section-label">Quem emprestou do próprio bolso</div>
-    <div class="contexto" title="Devolver mais do que isso é pôr dinheiro novo: o resto ainda nem saiu do contracheque. A Jane também tem crédito no módulo Reembolsos (gastos do bolso pela empresa) — são dívidas de origens diferentes, não somadas aqui."><b>Devolver agora</b> é o que já foi descontado do funcionário e ainda não voltou para quem emprestou
-      (a Jane também tem crédito em <a href="javascript:void(0)" onclick="mostrarModulo('reembolsos')" style="color:#a5a49a;">Reembolsos</a>).</div>
-    <div id="tabelaRhCredor"><table>
-      <tr><th>Quem emprestou</th><th>Empréstimos</th><th>Funcionários</th><th>Emprestado</th>
-          <th>Já descontado</th><th>Já devolvido</th><th>Devolver agora</th><th>Ainda a descontar</th></tr>
-      ${linhasCredor}
-      ${(() => { const t = credor.reduce((a, c) => ({ e: a.e + Number(c.emprestimos || 0), f: a.f + Number(c.funcionarios || 0),
-          em: a.em + n(c.emprestado), jd: a.jd + n(c.ja_descontado_do_funcionario), jr: a.jr + n(c.ja_reembolsado),
-          da: a.da + n(c.devolver_agora), ad: a.ad + n(c.a_descontar_do_funcionario) }), { e: 0, f: 0, em: 0, jd: 0, jr: 0, da: 0, ad: 0 });
-        return `<tr class="liq"><td>TOTAL</td><td>${t.e}</td><td>${t.f}</td><td>R$ ${fmt(t.em)}</td>
-          <td>R$ ${fmt(t.jd)}</td><td>R$ ${fmt(t.jr)}</td><td>R$ ${fmt(t.da)}</td><td>R$ ${fmt(t.ad)}</td></tr>`; })()}
-    </table></div>
-    <div id="tabelaRhCredorDet" style="margin-top:10px;"><table>
-      <tr><th>Empréstimo</th><th>Descrição</th><th>Data</th><th>Valor</th>
-          <th>Descontado</th><th>A descontar</th><th>A devolver</th><th>Situação</th></tr>
-      ${linhasCredorDet}
-    </table></div>` : ''}
-
-    ${diverg.length ? `
-    <div class="section-label">Empréstimos que não fecham</div>
-    <div class="contexto">A soma das parcelas não bate com o valor concedido — corrigir na planilha e reimportar, o painel não conserta sozinho.</div>
-    <div id="tabelaRhDiverg"><table>
-      <tr><th>Funcionário</th><th>Descrição</th><th>Data</th><th>Concedido</th>
-          <th>Soma das parcelas</th><th>Diferença</th><th title="FALTA PARCELA: sobrou valor sem desconto lançado, ninguém está cobrando. PARCELA A MAIS: quase sempre vale replanejado, com a parcela antiga ainda na base.">Tipo</th></tr>
-      ${linhasDiv}
-    </table></div>` : ''}`;
+  // Bloco 5: devolver a quem emprestou (só quando há o que devolver; o detalhe abre no clique)
+  if (credor.length && !P) h += `<div class="section-label">Devolver a quem emprestou</div><div id="tabelaRhCredor" style="overflow-x:auto;"><table><thead><tr><th>Quem emprestou</th><th>Emprestado</th><th>Já descontado</th><th>Já devolvido</th><th>Devolver agora</th><th>Ainda a descontar</th></tr></thead><tbody>
+    ${credor.map((c) => { const ab = RH_CREDOR === c.credor;
+      let t = `<tr style="cursor:pointer;" onclick='rhIr("credor",${js(c.credor)})'><td>${ab ? '▾ ' : '▸ '}${cgEsc(cgNome(c.credor))}</td><td>${R(c.emprestado)}</td><td>${R(c.ja_descontado_do_funcionario)}</td><td>${R(c.ja_reembolsado)}</td><td style="font-weight:700;">${R(c.devolver_agora)}</td><td>${R(c.a_descontar_do_funcionario)}</td></tr>`;
+      if (ab) t += `<tr><td colspan="6"><table style="font-size:12.5px;"><thead><tr><th>Para quem</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Descontado</th><th>A descontar</th><th>A devolver</th></tr></thead><tbody>
+        ${RH.credorDet.filter((d) => d.credor === c.credor && n(d.a_reembolsar) > 0).map((d) => { const pc = RH.colab.find((x) => x.colaborador === d.colaborador) || d;
+          return `<tr><td>${NC(pc)}</td><td>${cgEsc(d.descricao || '')}</td><td>${cgData(d.data_concessao)}</td><td>${R(d.valor_total)}</td><td>${R(d.descontado)}</td><td>${R(d.a_descontar)}</td><td>${R(d.a_reembolsar)}</td></tr>`; }).join('')}</tbody></table></td></tr>`;
+      return t; }).join('')}</tbody></table></div>`;
+  alvo.innerHTML = h;
 }
 
 // ---------------------------------------------------------------- Acertos dos motoboys

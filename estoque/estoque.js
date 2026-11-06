@@ -1819,7 +1819,7 @@ function turnoDesenhar(alvo) {
   if (TURNO.avisos.length) {
     h += `<div class="section-label" style="text-align:left;">Turnos que pedem atenção</div>
       <div id="tabelaTurnoAviso" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Setor e turno</th><th>Líder</th><th>Aviso</th></tr></thead><tbody>
-      ${TURNO.avisos.map((a) => `<tr><td>${trEscH(plpDm(a.data).slice(0, 5))}</td><td>${trEscH(estNomeLoja(a.unidade))}</td><td>${trEscH(a.setor)} · ${trEscH(a.turno)}</td><td>${trEscH(a.apelido || a.nome || '–')}</td><td style="white-space:normal; color:var(--farol-perto); font-weight:700;">${trEscH(a.aviso)}</td></tr>`).join('')}
+      ${TURNO.avisos.map((a) => `<tr><td>${trEscH(plpDm(a.data).slice(0, 5))}</td><td>${trEscH(estNomeLoja(a.unidade))}</td><td>${trEscH(a.setor)} · ${trEscH(a.turno)}</td><td>${trEscH(a.nome || a.apelido || '–')}</td><td style="white-space:normal; color:var(--farol-perto); font-weight:700;">${trEscH(a.aviso)}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
   alvo.innerHTML = h;
