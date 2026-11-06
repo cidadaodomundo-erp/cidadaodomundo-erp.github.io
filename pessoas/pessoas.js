@@ -1031,24 +1031,55 @@ function cgColunasConferir(c, p) {
 let CG_ADM = null;   // { id da pessoa, docs já gravados, novos a subir }
 const CG_ADM_MAX = 15 * 1048576, CG_ADM_MAX_EMAIL = 22 * 1048576;
 const CG_ADM_DOCS = ['CTPS', 'RG', 'CPF', 'Título de eleitor', 'CNH', 'Comprovante de endereço (até 90 dias)', 'PIS', 'Certidão de nascimento ou casamento', 'Certidão e CPF dos dependentes', 'Exame admissional', 'Termo de opção sindical', 'Dados bancários', 'Foto 3x4'];
+// 06/11/2026 (dono 16:23: "quais são os campos obrigatórios ... e ve quais pode aplicar lista suspensa"; proposta 2026-11-06-rh-admissao-campos-e-listas)
+const CG_UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 const CG_ADM_BLOCOS = [
   ['Pessoais', [['cpf', 'CPF *'], ['nascimento', 'Nascimento *', 'date'], ['nome_mae', 'Nome da mãe *'], ['nome_pai', 'Nome do pai'], ['municipio_nascimento', 'Município de nascimento'],
-    ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'VIÚVO', 'UNIÃO ESTÁVEL']], ['raca_cor', 'Raça/cor', ['', 'BRANCO', 'PARDO', 'AMARELO', 'NEGRO', 'NÃO INFORMADO']],
-    ['grau_instrucao', 'Grau de instrução', ['', 'ENSINO FUNDAMENTAL INCOMPLETO', 'ENSINO FUNDAMENTAL COMPLETO', 'ENSINO MÉDIO INCOMPLETO', 'ENSINO MÉDIO COMPLETO', 'ENSINO SUPERIOR INCOMPLETO', 'ENSINO SUPERIOR COMPLETO']]]],
-  ['Endereço e contato', [['telefone', 'Telefone *'], ['email', 'E-mail'], ['cep', 'CEP'], ['rua', 'Rua'], ['numero', 'Número'], ['complemento', 'Complemento'], ['bairro', 'Bairro'], ['cidade', 'Cidade']]],
-  ['Contrato', [['experiencia_dias', 'Experiência (dias)', 'number'], ['prorrogavel_dias', 'Prorrogável (dias)', 'number'], ['tipo_salario', 'Salário por', ['MENSAL', 'HORA']], ['entrada', 'Entrada', 'time'], ['intervalo', 'Intervalo'], ['saida', 'Saída', 'time'], ['folga', 'Folga']]],
-  ['Documentos', [['pis', 'PIS'], ['ctps', 'CTPS'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF'], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'], ['rg_orgao', 'Órgão'], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'], ['cnh_categoria', 'Categoria']]],
-  ['Benefícios', [['vt_itinerario', 'Itinerário do VT'], ['vt_valor_passagem', 'Valor da passagem', 'number'], ['va_valor_dia', 'VA por dia', 'number']]],
-  ['Banco', [['banco', 'Banco'], ['agencia', 'Agência'], ['conta', 'Conta']]],
+    ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'SEPARADO', 'VIÚVO']],
+    ['raca_cor', 'Raça/cor (a pessoa declara)', ['', 'BRANCA', 'PRETA', 'PARDA', 'AMARELA', 'INDÍGENA', 'NÃO INFORMADO']],
+    ['grau_instrucao', 'Grau de instrução', ['', 'ANALFABETO', 'ATÉ O 5º ANO INCOMPLETO', '5º ANO COMPLETO', '6º AO 9º ANO INCOMPLETO', 'ENSINO FUNDAMENTAL COMPLETO', 'ENSINO MÉDIO INCOMPLETO',
+      'ENSINO MÉDIO COMPLETO', 'ENSINO SUPERIOR INCOMPLETO', 'ENSINO SUPERIOR COMPLETO', 'PÓS-GRADUAÇÃO', 'MESTRADO', 'DOUTORADO']]]],
+  ['Endereço e contato', [['telefone', 'Telefone com DDD *'], ['email', 'E-mail'], ['cep', 'CEP (preenche o endereço)'], ['rua', 'Rua'], ['numero', 'Número'], ['complemento', 'Complemento'], ['bairro', 'Bairro'], ['cidade', 'Cidade']]],
+  ['Contrato', [['experiencia_dias', 'Experiência (dias)', ['30', '45', '60', '90']], ['prorrogavel_dias', 'Prorrogável (dias)', 'number'], ['tipo_salario', 'Salário por', ['MENSAL', 'HORA']],
+    ['entrada', 'Entrada', 'time'], ['intervalo', 'Intervalo', ['', '15 MIN', '1H', '1H30', '2H']], ['saida', 'Saída', 'time'],
+    ['folga', 'Folga', ['', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'ESCALA/VARIÁVEL']]]],
+  ['Documentos', [['pis', 'PIS'], ['ctps', 'CTPS (digital = CPF)'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF', ['', ...CG_UFS]], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'],
+    ['rg_orgao', 'Órgão', ['', 'SESP', 'SSP', 'DETRAN', 'II', 'PC', 'OUTRO']], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'],
+    ['cnh_categoria', 'Categoria', ['', 'A', 'B', 'AB', 'C', 'D', 'E', 'AC', 'AD', 'AE']]]],
+  ['Benefícios', [['vt_itinerario', 'Itinerário do VT'], ['vt_valor_passagem', 'Valor da passagem', 'number'], ['va_valor_dia', 'VA por mês', 'number']]],
+  ['Banco', [['banco', 'Banco', ['', '001 BANCO DO BRASIL', '104 CAIXA', '237 BRADESCO', '341 ITAÚ', '033 SANTANDER', '260 NUBANK', '077 INTER', '336 C6', '380 PICPAY', '323 MERCADO PAGO', '748 SICREDI', '756 SICOOB', 'OUTRO']],
+    ['agencia', 'Agência'], ['conta', 'Conta']]],
 ];
+// o que a ficha nova já traz preenchido (sempre editável)
+const CG_ADM_PADRAO = { experiencia_dias: '45', prorrogavel_dias: '45', tipo_salario: 'MENSAL', ctps_uf: 'PR', vt_valor_passagem: '6.13', va_valor_dia: '160' };
+const CG_ADM_ON = { cpf: 'oninput="cgMascara(this,\'cpf\')" onchange="cgAdmCpf(this.value)"', telefone: 'oninput="cgMascara(this,\'tel\')"',
+  cep: 'oninput="cgMascara(this,\'cep\')" onchange="cgAdmCep(this.value)"', experiencia_dias: 'onchange="cgAdmProrrog()"' };
+function cgMascara(el, tipo) {
+  const d = el.value.replace(/\D/g, '');
+  if (tipo === 'cpf') el.value = d.slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  else if (tipo === 'cep') el.value = d.slice(0, 8).replace(/(\d{5})(\d)/, '$1-$2');
+  else if (tipo === 'tel') { const t = d.slice(0, 11); el.value = t.length > 10 ? t.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3') : t.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/[-\s(]+$/, ''); }
+}
+function cgAdmCpf(v) { const c = document.getElementById('cgA_ctps'); if (c && !c.value) c.value = String(v || '').replace(/\D/g, ''); }
+function cgAdmProrrog() { const e = document.getElementById('cgA_experiencia_dias'), p = document.getElementById('cgA_prorrogavel_dias'); if (e && p) p.value = Math.max(0, 90 - Number(e.value || 0)); }
+async function cgAdmCep(v) {
+  const cep = String(v || '').replace(/\D/g, '');
+  if (cep.length !== 8) return;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`), j = await r.json();
+    if (j.erro) return avisoAcao('atencao', '! CEP não encontrado: preencha o endereço à mão.');
+    [['rua', j.logradouro], ['bairro', j.bairro], ['cidade', j.localidade ? `${j.localidade}/${j.uf}` : '']].forEach(([c, val]) => { const el = document.getElementById('cgA_' + c); if (el && val) el.value = String(val).toUpperCase(); });
+    const n = document.getElementById('cgA_numero'); if (n) n.focus();
+  } catch (e) { avisoAcao('atencao', '! Não consegui buscar o CEP agora: preencha o endereço à mão.'); }
+}
 function cgAdmDaPessoa(id) { return (CARGOS.adm || []).find((a) => a.pessoa_id === id) || null; }
 function cgFormAdmissao(a, id) {
   if (!CG_ADM || CG_ADM.id !== id) CG_ADM = { id, docs: (a.documentos || []).slice(), novos: [] };
   const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
   const ctl = ([c, , t]) => {
-    const atual = a[c] == null ? '' : String(a[c]);
-    if (Array.isArray(t)) return `<select id="cgA_${c}" style="width:100%">${(t.includes(atual) || !atual ? t : [...t, atual]).map((o) => `<option value="${cgEsc(o)}" ${o === atual ? 'selected' : ''}>${cgEsc(o === '' ? '—' : o)}</option>`).join('')}</select>`;
-    return `<input id="cgA_${c}" type="${t || 'text'}" value="${cgEsc(t === 'date' ? atual.slice(0, 10) : atual)}" style="width:100%">`;
+    const atual = a[c] == null ? (a.id ? '' : CG_ADM_PADRAO[c] || '') : String(a[c]), on = CG_ADM_ON[c] || '';
+    if (Array.isArray(t)) return `<select id="cgA_${c}" ${on} style="width:100%">${(t.includes(atual) || !atual ? t : [...t, atual]).map((o) => `<option value="${cgEsc(o)}" ${o === atual ? 'selected' : ''}>${cgEsc(o === '' ? '—' : o)}</option>`).join('')}</select>`;
+    return `<input id="cgA_${c}" type="${t || 'text'}" ${on} value="${cgEsc(t === 'date' ? atual.slice(0, 10) : atual)}" style="width:100%">`;
   };
   const titulo = (t) => `<div style="font-size:13px;font-weight:800;color:var(--tx-1);margin:14px 0 6px;">${t}</div>`;
   setTimeout(() => { (a.dependentes || []).forEach(cgAdmDepAdd); cgAdmDocsPintar(); });
@@ -1075,7 +1106,7 @@ function cgAdmDepAdd(d) {
   e.className = 'cg-adm-dep';
   e.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:6px;';
   e.innerHTML = `<input data-c="nome" placeholder="Nome" value="${cgEsc(v.nome || '')}"><input data-c="nascimento" type="date" title="Nascimento" value="${cgEsc(v.nascimento || '')}">
-    <input data-c="cpf" placeholder="CPF" value="${cgEsc(v.cpf || '')}"><input data-c="parentesco" placeholder="Parentesco" value="${cgEsc(v.parentesco || '')}">
+    <input data-c="cpf" placeholder="CPF" value="${cgEsc(v.cpf || '')}"><select data-c="parentesco">${['', 'FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].concat(v.parentesco && !['FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].includes(String(v.parentesco).toUpperCase()) ? [v.parentesco] : []).map((o) => `<option value="${cgEsc(o)}" ${String(o).toUpperCase() === String(v.parentesco || '').toUpperCase() ? 'selected' : ''}>${o ? cgEsc(o) : 'parentesco'}</option>`).join('')}</select>
     <button type="button" class="preset-btn" onclick="this.parentNode.remove()">Tirar</button>`;
   box.appendChild(e);
 }
@@ -1120,7 +1151,7 @@ function cgAdmColher() {
   for (const [, cs] of CG_ADM_BLOCOS) for (const [c] of cs) a[c] = document.getElementById('cgA_' + c).value.trim();
   a.va_no_local = document.getElementById('cgA_va_no_local').checked;
   a.obs = document.getElementById('cgA_obs').value.trim();
-  a.dependentes = [...document.querySelectorAll('.cg-adm-dep')].map((e) => Object.fromEntries([...e.querySelectorAll('input')].map((i) => [i.dataset.c, i.value.trim()]))).filter((d) => d.nome);
+  a.dependentes = [...document.querySelectorAll('.cg-adm-dep')].map((e) => Object.fromEntries([...e.querySelectorAll('input,select')].map((i) => [i.dataset.c, i.value.trim()]))).filter((d) => d.nome);
   return a;
 }
 function cgAdmEtapa(rot, sit, em, motivo, a, etapa) {
@@ -1157,25 +1188,26 @@ function cgFormPessoa(p) {
   const inp = (nome, atual, tipo = 'text') => `<input id="cgF_${nome}_${id}" type="${tipo}" value="${cgEsc(atual == null ? '' : atual)}" style="width:100%">`;
   const chk = (nome, atual, rot) => `<label style="display:inline-flex;gap:4px;align-items:center;margin-right:12px;"><input id="cgF_${nome}_${id}" type="checkbox" ${atual ? 'checked' : ''}>${rot}</label>`;
   const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
+  const ob = (rot) => p ? rot : rot + ' *';
   return `<div style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
-      ${campo('Nome completo', inp('nome', v.nome))}
-      ${campo('Loja', sel('unidade', ['AGUA VERDE', 'AHU', 'SÃO BRAZ'], v.unidade))}
-      ${campo('Empresa da folha', sel('empresa', ['', 'FF AGUA VERDE', 'CIDADAO AV', 'CIDADAO AHU', 'FF SAO BRAZ'], v.empresa))}
-      ${campo('Contrato', sel('contrato', ['CLT', 'INTERMITENTE', 'SEM REGISTRO'], v.contrato))}
-      ${campo('Cargo do plano', `<input id="cgF_cargo_${id}" list="cgCargos" value="${cgEsc(v.cargo || '')}" style="width:100%" onchange="cgSugerirSalario(${id})"><datalist id="cgCargos">${cargos.map(c => `<option value="${cgEsc(c)}">`).join('')}</datalist>`)}
-      ${campo('Setor no nome do cargo', sel('departamento', ['', ...CG_DEPTOS], v.departamento))}
+      ${campo(ob('Nome completo'), inp('nome', v.nome))}
+      ${campo('Loja', sel('unidade', ['AGUA VERDE', 'AHU', 'SÃO BRAZ'], v.unidade).replace('<select ', `<select onchange="cgFormLoja(${id})" `))}
+      ${campo(ob('Empresa da folha'), sel('empresa', cgEmpresasDaLoja(v.unidade), v.empresa || (p ? '' : cgEmpresasDaLoja(v.unidade)[0])))}
+      ${campo('Contrato', sel('contrato', ['CLT', 'INTERMITENTE', 'SEM REGISTRO'], v.contrato).replace('<select ', `<select onchange="cgFormContrato(${id})" `))}
+      ${campo(ob('Cargo do plano'), `<select id="cgF_cargo_${id}" style="width:100%" onchange="cgFormCargo(${id})">${cgOpcoesCargo(v.unidade, v.cargo)}</select>`)}
+      ${campo('Setor no nome do cargo', sel('departamento', ['', ...CG_DEPTOS], v.departamento).replace('<select ', `<select onchange="cgFormCargo(${id})" `))}
       ${campo('Nome do cargo com setor', inp('cargo_completo', v.cargo_completo))}
       ${campo('Jornada (horas/mês)', `<select id="cgF_horas_${id}" style="width:100%" onchange="cgSugerirSalario(${id})">${[...new Set(['180', '220', String(v.horas ?? '220')])].map((o) => `<option value="${o}" ${o === String(v.horas ?? '220') ? 'selected' : ''}>${o}</option>`).join('')}</select>`)}
-      ${campo('Salário base', inp('salario', v.salario, 'number'))}
+      ${campo(ob('Salário base'), inp('salario', v.salario, 'number'))}
       ${campo('Setor do rateio dos canais', sel('setor_rateio', ['', ...CG_SETORES], v.setor_rateio))}
       ${campo('Turno', sel('turno', ['', 'DIA', 'NOITE', 'DIA/ NOITE'], v.turno))}
-      ${campo('VT por dia', inp('vt_por_dia', v.vt_por_dia, 'number'))}
-      ${campo('Dias de trabalho no mês', inp('vt_dias', v.vt_dias, 'number'))}
+      ${campo('VT por dia', sel('vt_por_dia', ['0', '1', '2', '3', '4', '5'], v.vt_por_dia == null ? '2' : String(v.vt_por_dia)))}
+      ${campo('Dias de trabalho no mês', sel('vt_dias', ['20', '24', '25', '26'], v.vt_dias == null ? '24' : String(v.vt_dias)))}
       ${campo(p ? 'Admissão' : 'Admissão *', inp('admissao', v.admissao ? String(v.admissao).slice(0, 10) : '', 'date').replace('<input ', '<input onchange="cgAdmData(this.value)" '))}
       ${p ? campo('Desligamento', inp('desligamento', v.desligamento ? String(v.desligamento).slice(0, 10) : '', 'date')) : ''}
       ${p ? campo('Matrícula', inp('matricula', v.matricula)) : ''}
-      ${campo('Como aparece no contas a pagar', inp('apelidos', [v.apelido, ...(v.apelidos || [])].filter(Boolean).join(', ')))}
+      ${campo(`<span title="obrigatório quando o primeiro nome já existe na mesma empresa">Como aparece no contas a pagar${p ? '' : ' (*se o 1º nome repetir)'}</span>`, inp('apelidos', [v.apelido, ...(v.apelidos || [])].filter(Boolean).join(', ')))}
       ${campo('Observação para o RH', inp('obs_rh', v.obs_rh))}
     </div>
     <div style="margin-top:8px;font-size:12px;">${chk('recebe_va', v.recebe_va, 'recebe VA')}${chk('pega_adiantamento', v.pega_adiantamento, 'pega adiantamento')}${chk('recebe_bonificacao', v.recebe_bonificacao, 'recebe bonificação')}${chk('usa_ponto', v.usa_ponto, 'bate ponto na Flash')}${chk('no_plano', v.no_plano, 'está no plano de cargos')}</div>
@@ -1184,20 +1216,53 @@ function cgFormPessoa(p) {
     <div style="margin-top:12px;display:flex;gap:8px;"><button type="button" class="preset-btn active" onclick="cgSalvar(${id})">${p ? 'Salvar' : 'Salvar e enviar à Flash e à contabilidade'}</button><button type="button" class="preset-btn" onclick="cgFormFechar()">Cancelar</button></div>
   </div>`;
 }
+// a loja decide a empresa (só a Água Verde escolhe) e a tabela de cargos (o Ahú usa a da Água Verde)
+function cgEmpresasDaLoja(u) { return u === 'AHU' ? ['CIDADAO AHU'] : u === 'SÃO BRAZ' ? ['FF SAO BRAZ'] : ['FF AGUA VERDE', 'CIDADAO AV']; }
+function cgOpcoesCargo(u, atual) {
+  const und = u === 'SÃO BRAZ' ? 'SÃO BRAZ' : 'AGUA VERDE';
+  const L = [...new Set(CARGOS.tabela.filter((t) => t.unidade === und).map((t) => t.cargo))].sort();
+  const ops = ['', ...L, 'FORA DO PLANO'], a = String(atual || '');
+  return (a && !ops.includes(a) ? [...ops, a] : ops).map((o) => `<option value="${cgEsc(o)}" ${o === a ? 'selected' : ''}>${o ? cgEsc(o) : '—'}</option>`).join('');
+}
+function cgFormLoja(id) {
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`), u = g('unidade').value, e = cgEmpresasDaLoja(u);
+  g('empresa').innerHTML = e.map((o) => `<option value="${cgEsc(o)}">${cgEsc(o)}</option>`).join('');
+  const c = g('cargo').value; g('cargo').innerHTML = cgOpcoesCargo(u, c);
+  cgFormCargo(id);
+}
+function cgFormContrato(id) {
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`), ts = document.getElementById('cgA_tipo_salario');
+  if (ts) ts.value = g('contrato').value === 'INTERMITENTE' ? 'HORA' : 'MENSAL';
+}
+// cargo + setor → nome do cargo com setor e setor do rateio sugerido; salário pela tabela
+function cgFormCargo(id) {
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`);
+  const cargo = g('cargo').value, dep = g('departamento').value;
+  if (cargo === 'FORA DO PLANO') { g('no_plano').checked = false; }
+  else if (cargo) {
+    g('no_plano').checked = true;
+    if (dep) { const ins = ['OPERACIONAL', 'ADMINISTRATIVO'].includes(dep) ? dep : 'DE ' + dep;
+      g('cargo_completo').value = / NIVEL /.test(cargo) ? cargo.replace(/ NIVEL /, ` ${ins} NIVEL `) : `${cargo} ${ins}`; }
+    const rat = { ADMINISTRATIVO: 'ADMIN', COZINHA: 'COZINHA', 'PRODUÇÃO': 'PRODUÇÃO', LIMPEZA: 'COZINHA' }[dep];
+    if (rat && !g('setor_rateio').value) g('setor_rateio').value = rat;
+  }
+  cgSugerirSalario(id);
+}
 function cgSugerirSalario(id) {
   const g = (n) => document.getElementById(`cgF_${n}_${id}`);
   const cargo = (g('cargo').value || '').toUpperCase().trim();
   const und = g('unidade').value === 'SÃO BRAZ' ? 'SÃO BRAZ' : 'AGUA VERDE';
   const t = CARGOS.tabela.find(x => x.unidade === und && x.cargo === cargo && String(x.horas) === g('horas').value);
   const el = document.getElementById('cgSug_' + id);
-  if (t && !g('salario').value) g('salario').value = t.salario;
-  if (t) { el.innerHTML = `Tabela de cargos: ${cgR(t.salario)} <a href="javascript:void(0)" onclick="document.getElementById('cgF_salario_${id}').value='${t.salario}'">usar</a>`; }
-  else el.textContent = '';
+  // 06/11/2026: a tabela manda — trocou cargo, jornada ou loja, o salário acompanha (continua editável)
+  if (t) { g('salario').value = t.salario; el.innerHTML = `Salário pela tabela de cargos: ${cgR(t.salario)} (${cgEsc(cargo)}, ${cgEsc(g('horas').value)} h).`; }
+  else el.textContent = cargo && cargo !== 'FORA DO PLANO' ? 'Esse cargo não tem salário na tabela desta jornada: preencha o salário.' : '';
 }
 async function cgSalvar(id) {
   const g = (n) => document.getElementById(`cgF_${n}_${id}`);
   const nomes = g('apelidos').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-  const cargo = g('cargo').value.toUpperCase().trim();
+  // fora do plano: o cargo é o que foi escrito em "nome do cargo com setor"
+  const cargo = g('cargo').value === 'FORA DO PLANO' ? g('cargo_completo').value.toUpperCase().trim() : g('cargo').value.toUpperCase().trim();
   const m = cargo.match(/^([A-ZÇÃÕÁÉÍÓÚÂÊ]+).*?NIVEL\s*(\d)/);
   const corpo = {
     nome: g('nome').value, unidade: g('unidade').value, empresa: g('empresa').value, contrato: g('contrato').value,
@@ -1211,8 +1276,24 @@ async function cgSalvar(id) {
     usa_ponto: g('usa_ponto').checked, no_plano: g('no_plano').checked,
   };
   if (!corpo.nome || !cargo || !corpo.salario) { cgAviso('Preencha nome, cargo e salário.', false); return; }
-  avisoAcao('enviando', 'Gravando…');
   const adm = id ? cgAdmDaPessoa(id) : {};
+  if (adm && !adm.id) {   // admissão nova: o mínimo para iniciar (dono 06/11 16:23)
+    const A = cgAdmColher(), falta = [];
+    if (!corpo.nome.trim()) falta.push('nome completo');
+    if (String(A.cpf).replace(/\D/g, '').length !== 11) falta.push('CPF');
+    if (String(A.telefone).replace(/\D/g, '').length < 10) falta.push('telefone com DDD');
+    if (!corpo.empresa) falta.push('empresa da folha');
+    if (!cargo) falta.push('cargo (fora do plano: escreva o nome do cargo com setor)');
+    if (!(Number(corpo.salario) > 0)) falta.push('salário maior que zero');
+    if (!corpo.admissao) falta.push('data de admissão');
+    if (!A.nascimento) falta.push('nascimento');
+    if (!A.nome_mae) falta.push('nome da mãe');
+    const pn = corpo.nome.trim().toUpperCase().split(/\s+/)[0];
+    if (!nomes.length && pn && CARGOS.pessoas.some((x) => x.ativo && x.empresa === corpo.empresa && String(x.nome || '').trim().toUpperCase().split(/\s+/)[0] === pn))
+      falta.push(`"como aparece no contas a pagar" (já existe ${cgNome(pn)} na ${corpo.empresa})`);
+    if (falta.length) return avisoAcao('atencao', `! Falta preencher: ${falta.join(', ')}.`);
+  }
+  avisoAcao('enviando', 'Gravando…');
   if (adm) {
     try {
       const documentos = await cgAdmSubirDocs();
