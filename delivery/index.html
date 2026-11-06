@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Delivery do dia · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- DELIVERY DO DIA (06/11/2026, Fase 1 da mudança do portal do Fábio para o ERP). Só leitura, sem nenhum botão que
+     mude dado. Junta numa página as ideias de quatro telas do portal antigo: Tempo de Entrega, Placar do Delivery,
+     Cancelamentos e Qualidade/Avaliações do dia. Lê só o banco do ERP, pela função delivery_dia(dia), que obedece
+     as regras de leitura de cada tabela (quem é de filial vê só a própria loja). Sem caixa de anotação. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .dl-topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 14px; }
+  .dl-topo h1 { font-size:20px; margin:0; }
+  .dl-topo input { font:inherit; padding:5px 8px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+  .dl-abas { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .dl-abas button { font:inherit; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .dl-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .dl-fontes { font-size:12px; opacity:.85; margin:-6px 0 12px; display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; }
+  .dl-nota { font-size:12px; opacity:.75; margin:8px 0 0; line-height:1.45; }
+  .dl-tab { width:100%; border-collapse:collapse; font-size:14px; }
+  .dl-tab th, .dl-tab td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
+  .dl-tab td.n, .dl-tab th.n { text-align:right; white-space:nowrap; }
+  .dl-ruim { color:var(--farol-fora); font-weight:700; }
+  .dl-ok { color:var(--farol-ok); font-weight:700; }
+  .dl-vazio { padding:18px; opacity:.75; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="dl-topo">
+      <h1 id="titulo">Delivery do dia</h1>
+      <input type="date" id="dia" aria-label="Dia">
+    </div>
+    <div class="dl-fontes" id="fontes"></div>
+    <div class="dl-abas" id="abas">
+      <button data-aba="placar" class="on">Placar</button>
+      <button data-aba="tempo">Tempo de entrega</button>
+      <button data-aba="cancel">Cancelamentos</button>
+      <button data-aba="quali">Avaliações do dia</button>
+    </div>
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="conteudo"><div class="dl-vazio">Carregando…</div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../nucleo/telas-extra.js?v=20261106a"></script>
+<script>
+const TELA = 'delivery';
+let DADOS = null, ABA = (location.hash || '#placar').slice(1);
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz', 'BOQUEIRAO': 'Boqueirão' };
+const un = (u) => NOME_UN[u] || u || '—';
+const n0 = (v) => v == null ? '—' : Number(v).toLocaleString('pt-BR');
+const rs = (v) => v == null ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dlMin = (v) => v == null ? '—' : String(v).replace('.', ',') + ' min';
+const dlPct = (a, b) => (!b ? '—' : Math.round(100 * a / b) + '%');
+const esc = trEscH;
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+function hojeBR() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); }
+
+async function carregar() {
+  const dia = document.getElementById('dia').value || hojeBR();
+  document.getElementById('conteudo').innerHTML = '<div class="dl-vazio">Carregando…</div>';
+  const r = await trRpcSeguro('delivery_dia', { p_dia: dia });
+  if (r.status === 401) { exigirLogin('Entre de novo para ver o delivery.'); return; }
+  if (!r.ok) {
+    const el = document.getElementById('erroMsg');
+    el.style.display = 'block'; el.textContent = 'Não deu para ler o delivery: ' + await trErroDe(r);
+    document.getElementById('conteudo').innerHTML = '';
+    return;
+  }
+  document.getElementById('erroMsg').style.display = 'none';
+  DADOS = await r.json();
+  fontes();
+  desenhar();
+}
+
+function fontes() {
+  const f = document.getElementById('fontes');
+  f.innerHTML = '<span>iFood</span><span id="f1"></span><span>TrackEat</span><span id="f2"></span><span>Avaliações</span><span id="f3"></span>';
+  const u = DADOS.ultimo_dado || {};
+  carimboDados('#f1', u.ifood, { avisoMin: 30, velhoMin: 120 });
+  carimboDados('#f2', u.trackeat, { avisoMin: 30, velhoMin: 120 });
+  carimboDados('#f3', u.avaliacoes, { avisoMin: 360, velhoMin: 1440 });
+}
+
+function tabela(id, cab, linhas) {
+  if (!linhas.length) return '<div class="dl-vazio">Nada neste dia.</div>';
+  return '<div id="' + id + '"><table class="dl-tab"><thead><tr>' +
+    cab.map((c) => '<th' + (c.n ? ' class="n"' : '') + '>' + c.t + '</th>').join('') + '</tr></thead><tbody>' +
+    linhas.map((l) => '<tr>' + l.map((v, i) => '<td' + (cab[i].n ? ' class="n"' : '') + (cab[i].v ? ' data-valor="' + esc(cab[i].v(v)) + '"' : '') + '>' + (v == null ? '—' : v) + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+}
+
+function desenhar() {
+  document.querySelectorAll('#abas button').forEach((b) => b.classList.toggle('on', b.dataset.aba === ABA));
+  const U = DADOS.unidades || [];
+  const c = document.getElementById('conteudo');
+  const soma = (k) => U.reduce((s, x) => s + Number(x[k] || 0), 0);
+
+  if (ABA === 'placar') {
+    const ped = soma('pedidos'), canc = soma('cancelados');
+    c.innerHTML =
+      '<div class="cards">' +
+      '<div class="card"><div class="card-lbl">Pedidos no iFood</div><div class="card-val">' + n0(ped) + '</div></div>' +
+      '<div class="card"><div class="card-lbl">Vendido (concluído)</div><div class="card-val">' + rs(soma('valor_concluido')) + '</div></div>' +
+      '<div class="card"><div class="card-lbl">Cancelados</div><div class="card-val ' + (canc ? 'dl-ruim' : '') + '">' + n0(canc) + ' · ' + dlPct(canc, ped) + '</div></div>' +
+      '<div class="card"><div class="card-lbl">Perdido em cancelamento</div><div class="card-val">' + rs(soma('valor_cancelado')) + '</div></div>' +
+      '</div>' +
+      tabela('tabelaPlacar',
+        [{ t: 'Loja' }, { t: 'Pedidos', n: 1 }, { t: 'Concluídos', n: 1 }, { t: 'Vendido', n: 1 }, { t: 'Cancelados', n: 1 }, { t: '% cancelado', n: 1 }, { t: 'Valor cancelado', n: 1 }],
+        U.map((x) => [un(x.unidade), n0(x.pedidos), n0(x.concluidos), rs(x.valor_concluido),
+          x.cancelados ? '<span class="dl-ruim">' + n0(x.cancelados) + '</span>' : '0', dlPct(x.cancelados, x.pedidos), rs(x.valor_cancelado)])) +
+      '<p class="dl-nota">Fonte: pedidos do iFood (API) no banco do ERP, pelo dia do pedido. Vendido = valor dos itens dos pedidos concluídos. Pedidos do site próprio e do salão não entram aqui.</p>';
+  } else if (ABA === 'tempo') {
+    c.innerHTML =
+      tabela('tabelaTempo',
+        [{ t: 'Loja' }, { t: 'Pedido → entregue (iFood)', n: 1 }, { t: 'Pedido → entregue (TrackEat)', n: 1 }, { t: 'Saiu → entregou', n: 1 }, { t: 'Entregas TrackEat', n: 1 }, { t: 'Depois do prometido', n: 1 }],
+        U.map((x) => [un(x.unidade), dlMin(x.min_pedido_ate_concluir), dlMin(x.min_criacao_ate_entrega), dlMin(x.min_saida_ate_entrega), n0(x.entregas_trackeat),
+          x.com_promessa ? '<span class="' + (x.atrasadas / x.com_promessa > 0.2 ? 'dl-ruim' : 'dl-ok') + '">' + n0(x.atrasadas) + ' de ' + n0(x.com_promessa) + ' · ' + dlPct(x.atrasadas, x.com_promessa) + '</span>' : '—'])) +
+      '<p class="dl-nota">Tempos são a mediana (metade dos pedidos levou menos, metade mais). "Depois do prometido" compara a hora da entrega no TrackEat com a promessa ao cliente. ' +
+      'O Boqueirão não usa TrackEat, e no iFood o tempo dele inclui pedidos agendados, por isso pode aparecer alto.</p>';
+  } else if (ABA === 'cancel') {
+    const L = DADOS.cancelamentos || [];
+    c.innerHTML = tabela('tabelaCancel',
+      [{ t: 'Loja' }, { t: 'Motivo' }, { t: 'Tipo' }, { t: 'Pedidos', n: 1 }, { t: 'Valor', n: 1 }],
+      L.map((x) => [un(x.unidade), esc(x.motivo), esc(x.origem === 'TOTAL' ? 'inteiro' : x.origem === 'PARTIAL' ? 'parcial' : x.origem), n0(x.qtd), rs(x.valor)])) +
+      '<p class="dl-nota">Fonte: motivo informado pelo iFood em cada pedido cancelado do dia.</p>';
+  } else {
+    const L = DADOS.avaliacoes_ruins || [];
+    c.innerHTML =
+      tabela('tabelaNotas',
+        [{ t: 'Loja' }, { t: 'Avaliações no dia', n: 1 }, { t: 'Nota média', n: 1 }, { t: 'Notas 1 e 2', n: 1 }],
+        U.map((x) => [un(x.unidade), n0(x.avaliacoes), x.nota_media == null ? '—' : String(x.nota_media).replace('.', ','), x.avaliacoes_ruins ? '<span class="dl-ruim">' + n0(x.avaliacoes_ruins) + '</span>' : '0'])) +
+      '<h3 style="margin:18px 0 8px;font-size:15px">Avaliações ruins (1 e 2)</h3>' +
+      tabela('tabelaRuins',
+        [{ t: 'Loja' }, { t: 'Pedido' }, { t: 'Nota', n: 1 }, { t: 'Comentário' }, { t: 'Respondida' }],
+        L.map((x) => [un(x.unidade), esc(x.pedido), n0(x.nota), esc(x.comentario || '—'), x.respondida ? 'sim' : '<span class="dl-ruim">não</span>'])) +
+      '<p class="dl-nota">Fonte: avaliações do iFood (API), pelo dia em que o cliente avaliou. Avaliações do Google ainda não chegam ao ERP.</p>';
+  }
+}
+
+document.getElementById('abas').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-aba]'); if (!b) return;
+  ABA = b.dataset.aba; history.replaceState(null, '', '#' + ABA); if (DADOS) desenhar();
+});
+const campoDia = document.getElementById('dia');
+campoDia.value = hojeBR(); campoDia.max = hojeBR();
+campoDia.addEventListener('change', carregar);
+
+if (!rmbSessao()) exigirLogin('Entre para ver o delivery.');
+else { registrarUso(TELA); avisarCasca({ tipo: 'casca-modulo', nome: TELA }); carregar(); setInterval(() => { if (campoDia.value === hojeBR()) carregar(); }, 5 * 60 * 1000); }
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>
