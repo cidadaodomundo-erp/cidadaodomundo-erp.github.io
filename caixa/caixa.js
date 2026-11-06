@@ -92,6 +92,28 @@ function caixaDrillFiltro(cx) {
   const d = CAIXA_DRILL_DADOS;
   if (d) renderDiaConcartao(d.unidade, d.dia, d.trs, d.pix, d.cobr, d.forma, d.descs, d.onl);
 }
+// CONFERÊNCIA EM ORDEM (dono 06/11/2026, via Financeiro: "a Hellen não conseguisse avançar pro caixa seguinte [sem] resolver
+// o anterior" / "deixar todos os caixas explicados com o check verde"). Dia da vez = o mais antigo, desde o recomeço, com item
+// que trava (aguardando no prazo, quebra esperando desconto e envio SB→AV não travam; caixa aberto trava). Os seguintes esperam.
+function caixaDiaDaVez(u) {
+  const H = CAIXA_HELLEN;
+  if (!H || H.erro || !(H.lojas || []).includes(u) || !H.trs) return null;
+  const trava = caixaHellenItens().filter(x => x.u === u && !['aguardando', 'quebra'].includes(x.bloco) && x.acao !== 'naochegou' && x.acao !== 'cofre');
+  const dias = [...new Set(trava.map(x => x.dia))].sort();
+  return { dia: dias[0] || null, fila: dias.slice(1) };
+}
+const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
+function caixaTravarDia(unidade, dia) {
+  const cont = document.getElementById('concartao-dia');
+  if (!cont) return;
+  if (!document.getElementById('cxTravaCss')) { const st = document.createElement('style'); st.id = 'cxTravaCss';
+    st.textContent = '.cx-travado button:not(.cx-livre), .cx-travado input, .cx-travado select, .cx-travado textarea { pointer-events:none; opacity:.4; }'; document.head.appendChild(st); }
+  const dv = caixaDiaDaVez(unidade), trava = dv && dv.dia && dia > dv.dia;
+  cont.classList.toggle('cx-travado', !!trava);
+  const old = document.getElementById('cxTravaAviso'); if (old) old.remove();
+  if (trava) cont.insertAdjacentHTML('afterbegin', `<div id="cxTravaAviso" class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">🔒 Este dia espera o ${caixaDdm(dv.dia)}.</b> Resolva o dia da vez primeiro — dá para olhar, não para mexer. <button class="preset-btn cx-livre" onclick="abrirDiaConcartao('${String(unidade).replace(/'/g, "\\'")}', '${dv.dia}')">abrir o ${caixaDdm(dv.dia)}</button></div>`);
+}
+let CAIXA_ANTES = {};   // loja → mostra os dias antes do recomeço (só consulta)
 async function abrirDiaConcartao(unidade, dia) {
   const cont = document.getElementById('concartao-dia');
   if (!cont) return;
@@ -123,6 +145,7 @@ async function abrirDiaConcartao(unidade, dia) {
   ]);
   CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
+  caixaTravarDia(unidade, dia);
 }
 // calc = { robo } (03/11/2026, lista da Hellen): faz o mesmo cruzamento sem desenhar e devolve as pendências do dia
 function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, calc) {
@@ -1471,7 +1494,12 @@ function caixaHellenHtml() {
   if (H === null) return caixaHellenLojas().length ? '<div class="section-label">Para você resolver</div><div class="contexto">Montando a sua lista…</div>' : '';
   if (!H.lojas.length) return '';
   if (H.erro) return `<div class="section-label">Para você resolver</div><div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar a lista: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
-  const itens = caixaHellenItens();
+  const todos = caixaHellenItens();
+  const DV = {}; [...new Set(todos.map(x => x.u))].forEach(u => { DV[u] = caixaDiaDaVez(u); });
+  const naoTrava = x => ['aguardando', 'quebra'].includes(x.bloco) || x.acao === 'naochegou' || x.acao === 'cofre';
+  const itens = todos.filter(x => naoTrava(x) || !DV[x.u] || x.dia === DV[x.u].dia);
+  const lojaC = u => ({ 'AGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB' }[u] || u);
+  const vez = Object.entries(DV).filter(([, d]) => d && d.dia).map(([u, d]) => `<b>${lojaC(u)}</b> ${caixaDdm(d.dia)}${d.fila.length ? ` <span style="color:var(--tx-4);">· na fila: ${d.fila.length} ${d.fila.length === 1 ? 'dia' : 'dias'}</span>` : ''}`);
   const dm = d => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
   const rotCx = cx => cx === 'SALÃO' ? 'Salão' : cx === 'DELIVERY' ? 'Delivery' : '—';
   const lojaCurta = u => ({ 'AGUA VERDE': 'AV', 'ÁGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB', 'SAO BRAZ': 'SB' }[String(u).toUpperCase()] || u);
@@ -1519,6 +1547,7 @@ function caixaHellenHtml() {
     </style>
     <div class="section-label">Para você resolver (${acao.length})${esp.length ? ` <span style="font-weight:400;color:var(--tx-4);">+ ${esp.length} aguardando</span>` : ''}</div>
     <div class="contexto" style="text-align:left; border-color:${acao.length ? '#f5a623' : 'var(--farol-ok)'};">
+      ${vez.length ? `<div style="font-size:13px;margin-bottom:4px;" title="um dia por vez em cada loja: o seguinte abre quando este ficar ✔ fechou">Dia da vez: ${vez.join(' &nbsp;·&nbsp; ')}</div>` : ''}
       ${itens.length ? blocos : `<b style="color:var(--farol-ok);">✓ Nada para você resolver</b> — desde o recomeço de cada loja até ontem, tudo bateu ou já foi explicado.`}
       ${rodape}
     </div>`;
@@ -1677,6 +1706,12 @@ function renderModuloCaixa() {
         if (o.length) { situacao = `<b style="color:#f5a623;">conferir ${o.join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; }
         else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
       }
+      // dias antes do recomeço: a lista não cobre, não ficam verdes — escondidos (Financeiro, 06/11), com link de consulta
+      const temLista = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs;
+      if (temLista && iso < caixaHellenCorte(unidade) && !CAIXA_ANTES[unidade]) return '';
+      const dvz = temLista && iso >= caixaHellenCorte(unidade) ? caixaDiaDaVez(unidade) : null;
+      if (dvz && dvz.dia && iso === dvz.dia) situacao += ' <b style="color:var(--tx-1);">← dia da vez</b>';
+      else if (dvz && dvz.dia && iso > dvz.dia && !aberto) { situacao = `<span style="color:#9aa4af;">🔒 espera o ${caixaDdm(dvz.dia)}</span> <span style="color:#9aa4af;font-size:11px;">(${situacao.replace(/<[^>]+>/g, '')})</span>`; cor = ''; }
       if (alerta) pend++;
       if (F.soPend && !alerta) return '';
       // carimbo de conferido por caixa (10/09/2026)
@@ -1710,6 +1745,8 @@ function renderModuloCaixa() {
       </div>
       <div style="overflow-x:auto;"><table style="border-collapse:collapse; width:100%; font-size:12px;">
         ${cabecalho}${linhas || `<tr><td colspan="4" style="padding:8px 6px; color:#9aa4af;">nenhum dia com pendência na janela</td></tr>`}</table></div>
+      ${CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && dias.some(d => d < caixaHellenCorte(unidade))
+        ? `<a href="javascript:void(0)" style="font-size:11.5px;color:var(--tx-4);" onclick="CAIXA_ANTES['${unidade.replace(/'/g, "\'")}']=!CAIXA_ANTES['${unidade.replace(/'/g, "\'")}'];renderModuloCaixa()">${CAIXA_ANTES[unidade] ? 'esconder' : 'ver'} dias antes de ${caixaDdm(caixaHellenCorte(unidade))} (só consulta)</a>` : ''}
     </div>`;
   }
 
