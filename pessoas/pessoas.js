@@ -3027,7 +3027,8 @@ function renderModuloRh() {
   const ativosP = P ? ativos.filter((c) => c.colaborador === P) : ativos.filter((c) => n(c.a_descontar) > 0);
   const falta = ativosP.reduce((a, c) => a + n(c.a_descontar), 0), ultima = ativosP.map((c) => c.quitacao_prevista).filter(Boolean).sort().pop();
   const depAll = soP(RH.dep || []), depAb = depAll.filter((d) => d.status !== 'PAGO');
-  const credor = RH.credor.filter((c) => n(c.devolver_agora) > 0), devolver = credor.reduce((a, c) => a + n(c.devolver_agora), 0);
+  // 06/11/2026 (dono 12:54): só o futuro aberto na planilha — o que se repassa a quem emprestou conforme desconta
+  const credor = RH.credor.filter((c) => n(c.a_reembolsar) > 0), devolver = credor.reduce((a, c) => a + n(c.a_reembolsar), 0);
   const situacaoConf = !confDia.length ? (dia && dia <= hoje ? '' : 'a conferir quando o pagamento entrar')
     : naoBate.length ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${naoBate.length} não ${naoBate.length === 1 ? 'bate' : 'batem'}</span>`
     : confDia.every((x) => x.situacao === 'CONFERE') ? '<span style="color:var(--farol-ok);font-weight:700;">✓ bate com o pagamento</span>' : 'previsto';
@@ -3035,7 +3036,7 @@ function renderModuloRh() {
     <div class="card blue"><div class="card-lbl">Sai na folha de ${ddmm(dia)}</div><div class="card-val">${R(totDia)}</div><div class="card-pct">${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}${situacaoConf ? ' · ' + situacaoConf : ''}</div></div>
     <div class="card neutral"><div class="card-lbl">Falta descontar</div><div class="card-val">${R(falta)}</div><div class="card-pct">${ativosP.length} ${ativosP.length === 1 ? 'pessoa' : 'pessoas'}${ultima ? ` · última parcela em ${mesTxt(ultima)}` : ''}</div></div>
     ${depAb.length ? `<div class="card neutral"><div class="card-lbl">Rita deposita</div><div class="card-val">${R(depAb.reduce((a, d) => a + n(d.valor), 0))}</div><div class="card-pct">em ${depAb.map((d) => ddmm(d.data_deposito)).join(' e ')}</div></div>` : ''}
-    ${devolver > 0 && !P ? `<div class="card neg"><div class="card-lbl">Devolver a ${credor.map((c) => cgNome(c.credor)).join(' e ')}</div><div class="card-val">${R(devolver)}</div><div class="card-pct">já saiu do funcionário, não voltou a quem emprestou</div></div>` : ''}
+    ${devolver > 0 && !P ? `<div class="card neutral"><div class="card-lbl">A repassar à ${credor.map((c) => cgNome(c.credor)).join(' e ao ')}</div><div class="card-val">${R(devolver)}</div><div class="card-pct">conforme desconta</div></div>` : ''}
   </div>`;
 
   // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
@@ -3082,12 +3083,12 @@ function renderModuloRh() {
     ${depAll.map((d) => `<tr><td>${cgData(d.data_deposito)}</td><td>${NC(d)}</td><td>${R(d.valor)}</td><td>${d.status === 'PAGO' ? '<span style="color:var(--farol-ok);">✓ depositou</span>' : (String(d.data_deposito).slice(0, 10) < hoje ? '<span style="color:var(--farol-perto);font-weight:700;">aguardando (passou da data)</span>' : 'aguardando')}</td></tr>`).join('')}</tbody></table></div>`;
 
   // Bloco 5: devolver a quem emprestou (só quando há o que devolver; o detalhe abre no clique)
-  if (credor.length && !P) h += `<div class="section-label">Devolver a quem emprestou</div><div id="tabelaRhCredor" style="overflow-x:auto;"><table><thead><tr><th>Quem emprestou</th><th>Emprestado</th><th>Já descontado</th><th>Já devolvido</th><th>Devolver agora</th><th>Ainda a descontar</th></tr></thead><tbody>
+  if (credor.length && !P) h += `<div class="section-label">A repassar a quem emprestou</div><div id="tabelaRhCredor" style="overflow-x:auto;"><table><thead><tr><th>Quem emprestou</th><th>Emprestado</th><th>A repassar (conforme desconta)</th></tr></thead><tbody>
     ${credor.map((c) => { const ab = RH_CREDOR === c.credor;
-      let t = `<tr style="cursor:pointer;" onclick='rhIr("credor",${js(c.credor)})'><td>${ab ? '▾ ' : '▸ '}${cgEsc(cgNome(c.credor))}</td><td>${R(c.emprestado)}</td><td>${R(c.ja_descontado_do_funcionario)}</td><td>${R(c.ja_reembolsado)}</td><td style="font-weight:700;">${R(c.devolver_agora)}</td><td>${R(c.a_descontar_do_funcionario)}</td></tr>`;
-      if (ab) t += `<tr><td colspan="6"><table style="font-size:12.5px;"><thead><tr><th>Para quem</th><th>Descrição</th><th>Data</th><th>Valor</th><th>Descontado</th><th>A descontar</th><th>A devolver</th></tr></thead><tbody>
+      let t = `<tr style="cursor:pointer;" onclick='rhIr("credor",${js(c.credor)})'><td>${ab ? '▾ ' : '▸ '}${cgEsc(cgNome(c.credor))}</td><td>${R(c.emprestado)}</td><td style="font-weight:700;">${R(c.a_reembolsar)}</td></tr>`;
+      if (ab) t += `<tr><td colspan="3"><table style="font-size:12.5px;"><thead><tr><th>Funcionário</th><th>O quê</th><th>Falta descontar (a repassar)</th></tr></thead><tbody>
         ${RH.credorDet.filter((d) => d.credor === c.credor && n(d.a_reembolsar) > 0).map((d) => { const pc = RH.colab.find((x) => x.colaborador === d.colaborador) || d;
-          return `<tr><td>${NC(pc)}</td><td>${cgEsc(d.descricao || '')}</td><td>${cgData(d.data_concessao)}</td><td>${R(d.valor_total)}</td><td>${R(d.descontado)}</td><td>${R(d.a_descontar)}</td><td>${R(d.a_reembolsar)}</td></tr>`; }).join('')}</tbody></table></td></tr>`;
+          return `<tr><td>${NC(pc)}</td><td>${cgEsc(d.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgData(d.data_concessao)}</span></td><td>${R(d.a_reembolsar)}</td></tr>`; }).join('')}</tbody></table></td></tr>`;
       return t; }).join('')}</tbody></table></div>`;
   alvo.innerHTML = h;
 }
