@@ -2305,13 +2305,22 @@ function cgHojeItens() {
   const irPara = (tela, r, aba) => `<button type="button" class="preset-btn" onclick="${aba ? `try{sessionStorage.setItem('pesAbaPedida','${aba}')}catch(e){};` : ''}mostrarModulo('${tela}')">${r}</button>`;
   const CALC_ABA = { ADIANTAMENTO: 'adt', DEZ_POR_CENTO: 'dez', VT_VA: 'vtva', BONIFICACAO: 'bonif' };
   const daLoja = (u) => !F.unidade || !u || u === F.unidade;
+  // 06/11/2026 (dono: "direcionar para a tela certa dentro da Flash"): a Flash abre na empresa do ?company=; sem ele cai na última usada
+  // e a pendência de São Braz aparecia na lista vazia da Água Verde. Com o id do ponto (flash_ponto_id) abre o espelho da própria pessoa.
+  const FLASH_EMPRESA = { 'AGUA VERDE': 'rqnYiy_xbQ_tEHSWtt8Xo', 'SÃO BRAZ': 'u7u6gvHUmX6DcouyfNIir', 'SAO BRAZ': 'u7u6gvHUmX6DcouyfNIir', 'AHU': 'dJDYVezbaM-6JxDuDK4aP' };
+  const linkFlash = (x) => {
+    const emp = FLASH_EMPRESA[String(x.empresa || '').toUpperCase()], q = emp ? `company=${emp}` : '';
+    if (x.flash_ponto_id && /^PONTO|^EVENTO/.test(x.tipo || '')) { const r = String(x.referencia || cgHojeIso()).slice(0, 10);
+      return `https://hros.flashapp.com.br/time-and-attendance/person-details/${x.flash_ponto_id}/timesheet?month=${Number(r.slice(5, 7))}&year=${r.slice(0, 4)}${q ? '&' + q : ''}`; }
+    return x.link_flash ? x.link_flash + (q ? (x.link_flash.includes('?') ? '&' : '?') + q : '') : '';
+  };
   const acaoFlash = (x) => {
     const emp = `<div style="font-size:11px;color:var(--tx-4);">${cgEsc(x.empresa || '')}</div>`;
     if (x.grupo === 'Pagar' && x.pix_copia_cola) return `<b>${cgR(x.valor)}</b> <button type="button" class="preset-btn" data-pix="${cgEsc(x.pix_copia_cola)}" onclick="cgFcCopiar(this)">Copiar PIX</button>`;
-    return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${x.link_flash ? `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(x.link_flash)}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
+    return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${linkFlash(x) ? `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(linkFlash(x))}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
   };
   if (Array.isArray(H.L)) for (const x of H.L) if (daLoja(x.empresa)) itens.push({ ...x, sub: [x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).join(' · '), acao: acaoFlash(x) });
-  for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="https://hros.flashapp.com.br/employees" target="_blank" rel="noopener">Abrir na Flash</a>` });
+  for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="https://hros.flashapp.com.br/employees${FLASH_EMPRESA[String(i.empresa || i.unidade || '').toUpperCase()] ? '?company=' + FLASH_EMPRESA[String(i.empresa || i.unidade || '').toUpperCase()] : ''}" target="_blank" rel="noopener">Abrir na Flash</a>` });
   for (const p of CARGOS.pessoas) if (p.ativo && daLoja(p.unidade)) for (const a of cgAlertasCadastro(p)) itens.push({ grupo: 'Cadastro', o_que: 'Cadastro', nome: p.nome, sub: p.unidade, detalhe: a.todo, acao: irPara('cargos', 'Abrir cadastro') });
   for (const a of CARGOS.adm || []) {
     const p = CARGOS.pessoas.find((x) => x.id === a.pessoa_id) || {};
