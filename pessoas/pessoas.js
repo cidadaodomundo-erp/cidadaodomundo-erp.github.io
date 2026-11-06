@@ -1144,6 +1144,7 @@ function cgAdmDocsPintar() {
   if (!el || !CG_ADM) return;
   const linha = (t, n, i, novo) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px;">✓ <b>${cgEsc(t)}</b> <span style="color:var(--tx-3);overflow-wrap:anywhere;">${cgEsc(n)}</span> <a href="javascript:void(0)" style="color:var(--tx-3);" onclick="cgAdmDocTirar(${i},${novo})">tirar</a></div>`;
   const soma = CG_ADM.novos.reduce((s, n) => s + n.arquivo.size, 0);
+  setTimeout(() => cgObrigPintar(CG_ADM.id || 0));
   const tipos = cgAdmTiposAnexados(), falta = CG_ADM_OBRIG.filter(([, re]) => !tipos.some((t) => re.test(t))).map(([r]) => r);
   el.innerHTML = `<div style="margin-bottom:4px;font-weight:700;color:${falta.length ? 'var(--farol-perto)' : 'var(--farol-ok)'};">Obrigatórios: ${4 - falta.length} de 4${falta.length ? ` · ! falta subir: ${falta.join(', ')} (dá para salvar e subir depois)` : ' ✓'}</div>`
     + CG_ADM.docs.map((d, i) => linha(d.tipo, d.nome, i, false)).join('') + CG_ADM.novos.map((n, i) => linha(n.tipo, n.arquivo.name, i, true)).join('')
@@ -1219,7 +1220,8 @@ function cgFormPessoa(p) {
   const chk = (nome, atual, rot) => `<label style="display:inline-flex;gap:4px;align-items:center;margin-right:12px;"><input id="cgF_${nome}_${id}" type="checkbox" ${atual ? 'checked' : ''}>${rot}</label>`;
   const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
   const ob = (rot) => p ? rot : rot + ' *';
-  return `<div style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;">
+  if (!p) setTimeout(() => cgObrigPintar(id));
+  return `<div ${p ? '' : `oninput="cgObrigPintar(${id})" onchange="cgObrigPintar(${id})"`} style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
       ${campo(ob('Nome completo'), inp('nome', v.nome))}
       ${campo('Loja', sel('unidade', ['AGUA VERDE', 'AHU', 'SÃO BRAZ'], v.unidade).replace('<select ', `<select onchange="cgFormLoja(${id})" `))}
@@ -1229,7 +1231,7 @@ function cgFormPessoa(p) {
       ${campo('Setor no nome do cargo', sel('departamento', ['', ...CG_DEPTOS], v.departamento).replace('<select ', `<select onchange="cgFormCargo(${id})" `))}
       ${campo('Nome do cargo com setor', inp('cargo_completo', v.cargo_completo))}
       ${campo('Jornada (horas/mês)', `<select id="cgF_horas_${id}" style="width:100%" onchange="cgSugerirSalario(${id})">${[...new Set(['180', '220', String(v.horas ?? '220')])].map((o) => `<option value="${o}" ${o === String(v.horas ?? '220') ? 'selected' : ''}>${o}</option>`).join('')}</select>`)}
-      ${campo(ob('Salário base'), inp('salario', v.salario, 'number'))}
+      ${campo(ob('Salário base'), inp('salario', v.salario, 'number').replace('<input ', `<input oninput="cgSalarioConf(${id})" `))}
       ${campo('Setor do rateio dos canais', sel('setor_rateio', ['', ...CG_SETORES], v.setor_rateio))}
       ${campo('Turno', sel('turno', ['', 'DIA', 'NOITE', 'DIA/ NOITE'], v.turno))}
       ${campo('VT por dia', sel('vt_por_dia', ['0', '1', '2', '3', '4', '5'], v.vt_por_dia == null ? '2' : String(v.vt_por_dia)))}
@@ -1285,8 +1287,39 @@ function cgSugerirSalario(id) {
   const t = CARGOS.tabela.find(x => x.unidade === und && x.cargo === cargo && String(x.horas) === g('horas').value);
   const el = document.getElementById('cgSug_' + id);
   // 06/11/2026: a tabela manda — trocou cargo, jornada ou loja, o salário acompanha (continua editável)
-  if (t) { g('salario').value = t.salario; el.innerHTML = `Salário pela tabela de cargos: ${cgR(t.salario)} (${cgEsc(cargo)}, ${cgEsc(g('horas').value)} h).`; }
-  else el.textContent = cargo && cargo !== 'FORA DO PLANO' ? 'Esse cargo não tem salário na tabela desta jornada: preencha o salário.' : '';
+  if (t) g('salario').value = t.salario;
+  else if (cargo === 'FORA DO PLANO') g('salario').value = '';
+  cgSalarioConf(id);
+}
+// a linha "pela tabela" ao lado do salário, e o aviso quando o valor digitado é outro (dono 06/11 17:37)
+function cgSalarioTabela(id) {
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`);
+  const cargo = (g('cargo').value || '').toUpperCase().trim(), u = g('unidade').value;
+  const und = u === 'SÃO BRAZ' ? 'SÃO BRAZ' : 'AGUA VERDE';
+  return { cargo, u, t: CARGOS.tabela.find((x) => x.unidade === und && x.cargo === cargo && String(x.horas) === g('horas').value) };
+}
+function cgSalarioConf(id) {
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`), el = document.getElementById('cgSug_' + id);
+  if (!el || !g('cargo')) return;
+  const { cargo, u, t } = cgSalarioTabela(id), lj = { 'AGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB' }[u] || u;
+  const rot = cargo.replace(/^(\S+).*NIVEL (\d)$/, (m, a, n) => `${cgNome(a)} N${n}`);
+  if (t) { const dif = Math.abs(cgN(g('salario').value) - cgN(t.salario)) >= 0.01;
+    el.innerHTML = `pela tabela: <b>${cgR(t.salario)}</b> (${cgEsc(rot)} · ${cgEsc(g('horas').value)} h · ${cgEsc(lj)})${dif ? ` · <span style="color:var(--farol-perto);font-weight:700;">diferente da tabela</span> <a href="javascript:void(0)" onclick="document.getElementById('cgF_salario_${id}').value='${t.salario}';cgSalarioConf(${id});cgObrigPintar(${id})">usar ${cgR(t.salario)}</a>` : ''}`; }
+  else el.innerHTML = cargo === 'FORA DO PLANO' ? 'fora do plano: digite o salário' : cargo ? '<span style="color:var(--farol-perto);">esse cargo não tem salário na tabela nesta jornada: digite o salário</span>' : 'escolha o cargo: o salário vem da tabela';
+}
+// obrigatório vazio fica amarelo claro (só na ficha nova); some quando preenche
+function cgObrigPintar(id) {
+  if (id) return;
+  const g = (n) => document.getElementById(`cgF_${n}_${id}`), A = (c) => document.getElementById('cgA_' + c);
+  const L = [[g('nome')], [g('empresa')], [g('cargo')], [g('salario'), (e) => cgN(e.value) > 0], [g('admissao')],
+    [A('cpf'), (e) => e.value.replace(/\D/g, '').length === 11], [A('telefone'), (e) => e.value.replace(/\D/g, '').length >= 10]];
+  const semId = !cgAdmTemIdentidade();
+  [A('nascimento'), A('nome_mae')].forEach((e) => { if (e) { if (semId) L.push([e]); else e.classList.remove('cg-obrig-vazio'); } });
+  const nome = g('nome'), ap = g('apelidos'), emp = g('empresa');
+  if (ap) { const pn = String(nome && nome.value || '').trim().toUpperCase().split(/\s+/)[0];
+    const repete = pn && CARGOS.pessoas.some((x) => x.ativo && emp && x.empresa === emp.value && String(x.nome || '').trim().toUpperCase().split(/\s+/)[0] === pn);
+    if (repete) L.push([ap]); else ap.classList.remove('cg-obrig-vazio'); }
+  L.forEach(([e, ok]) => { if (!e) return; const cheio = ok ? ok(e) : String(e.value || '').trim() !== ''; e.classList.toggle('cg-obrig-vazio', !cheio); });
 }
 async function cgSalvar(id) {
   const g = (n) => document.getElementById(`cgF_${n}_${id}`);
