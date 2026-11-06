@@ -1439,8 +1439,9 @@ function cgAbaFolha() {
   const E = emp.filter((x) => String(x.competencia).slice(0, 10) === comp);
   const P = pes.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
   const ok = (a, b) => Math.abs(cgN(a) - cgN(b)) < 0.01;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;">${comps.slice(0, 6).reverse().map((c) =>
-      `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.folhaComp='${c}';CARGOS_F.folhaCol=null;CARGOS_F.folhaAberta=null;renderModuloCargos()">${cgMesRot(c)}${(CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : ''}</button>`).join('')}</div>
+  let h = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">${cgSelPeriodo('Mês', [...comps].sort().map((c) => [c, cgMesRot(c) + ((CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : '')]), comp,
+      "(v) => { CARGOS_F.folhaComp = v; CARGOS_F.folhaCol = null; CARGOS_F.folhaAberta = null; renderModuloCargos(); }")}
+      ${cgBotaoPasso('🖨 Imprimir / PDF do pagamento', `cgImprimirFolha('${comp}')`, true)}</div>
     ${cgFolhaImportarHtml()}
     ${(CARGOS.folha.previa || new Set()).has(comp)
       ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números podem mudar quando a folha final chegar; o que está em "conferir" já vale para pedir à contabilidade.</div>`
@@ -1575,7 +1576,7 @@ function cgFolhaValidacaoHtml(comp) {
   const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
   if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
     ${v.obs ? `<span style="color:var(--tx-3);">${cgEsc(v.obs)}</span>` : ''} O robô já pode atualizar o Saipos e a lista de pagamento.
-    <a href="javascript:void(0)" onclick="cgFolhaValidar('${comp}',false)" style="color:var(--tx-4);margin-left:6px;">desfazer</a></div>`;
+    <a href="javascript:void(0)" onclick="if(confirm('Desfazer a validação de ${cgEsc(cgMesRot(comp))}? O robô para de atualizar o Saipos e a lista de pagamento até validar de novo.'))cgFolhaValidar('${comp}',false)" style="color:var(--tx-4);margin-left:6px;">desfazer</a></div>`;
   return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Conferência de ${cgEsc(cgMesRot(comp))} ainda não validada.</b>
     Depois de validar, o robô atualiza o Saipos (salários e bonificação) e a lista de pagamento.
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
@@ -1584,7 +1585,7 @@ function cgFolhaValidacaoHtml(comp) {
 }
 async function cgFolhaValidar(comp, sim) {
   const el = document.getElementById('cgFolhaObs'), obs = sim && el ? el.value.trim() || null : null;
-  avisoAcao('atencao', sim ? '… validando a conferência' : '… desfazendo a validação');
+  avisoAcao('atencao', sim ? '… validando a conferência (não feche a tela)' : '… desfazendo a validação');
   const r = await trRpcSeguro('rh_folha_validar', { p_competencia: comp, p_validar: sim, p_obs: obs });
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgFolhaValidar(comp, sim));
   await cgFolhaCarregar();
@@ -2628,6 +2629,53 @@ async function cgRescFluxo() {
 }
 
 // ---------- ADIANTAMENTO DO DIA 20 ----------
+// IMPRIMIR A LISTA DO PAGAMENTO (06/11/2026, dono 14:53: "imprimir PDF ... pra Hellen imprimir a lista pra usar no lançamento no banco").
+// Só o que ela precisa para lançar: empresa (uma página cada), nome completo e valor, subtotal e total. grupos = [{nome, linhas: [{nome, valor, obs}]}]
+function cgImprimirPagamento(titulo, grupos) {
+  try {
+    const G = grupos.map((g) => ({ ...g, linhas: g.linhas.filter((l) => cgN(l.valor) > 0.004).sort((a, b) => String(a.nome).localeCompare(String(b.nome))) })).filter((g) => g.linhas.length);
+    if (!G.length) return avisoAcao('atencao', '! Nada a pagar nesta lista.');
+    const R = (v) => 'R$ ' + cgN(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tot = G.reduce((a, g) => a + g.linhas.reduce((b, l) => b + cgN(l.valor), 0), 0), nTot = G.reduce((a, g) => a + g.linhas.length, 0);
+    const w = window.open('', '_blank');
+    if (!w) throw new Error('o navegador bloqueou a janela de impressão — libere pop-ups para o painel');
+    const e = cgEsc;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(titulo)}</title><style>
+      body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:24px;} h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#000;margin:0 0 14px;}
+      h2{font-size:15px;margin:0 0 8px;} table{border-collapse:collapse;width:100%;font-size:13px;} th,td{border:1px solid #ccc;padding:5px 8px;text-align:left;}
+      th{background:#ccc;} td.v{white-space:nowrap;} tr.t td{font-weight:bold;background:#ccc;} .grupo{page-break-after:always;margin-bottom:18px;} .grupo:last-child{page-break-after:auto;}
+      .obs{font-size:11px;color:#000;} @media print{body{margin:10mm;} .noprint{display:none;}}</style></head><body>
+      <div class="noprint" style="margin-bottom:12px;"><button onclick="window.print()" style="font-size:14px;padding:8px 14px;">Imprimir / salvar em PDF</button></div>
+      ${G.map((g) => { const st = g.linhas.reduce((a, l) => a + cgN(l.valor), 0);
+        return `<div class="grupo"><h1>${e(titulo)}</h1><p class="sub">${nTot} pessoas · total ${R(tot)} · impresso em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+        <h2>${e(g.nome)}</h2><table><thead><tr><th style="width:36px;">#</th><th>Nome completo</th><th style="width:130px;">Valor</th><th style="width:70px;">Pago</th></tr></thead><tbody>
+        ${g.linhas.map((l, i) => `<tr><td>${i + 1}</td><td>${e(cgNome(l.nome))}${l.obs ? ` <span class="obs">${e(l.obs)}</span>` : ''}</td><td class="v">${R(l.valor)}</td><td></td></tr>`).join('')}
+        <tr class="t"><td></td><td>Subtotal · ${g.linhas.length} ${g.linhas.length === 1 ? 'pessoa' : 'pessoas'}</td><td class="v">${R(st)}</td><td></td></tr></tbody></table></div>`; }).join('')}
+      <script>setTimeout(function(){window.print();},300);<\/script></body></html>`);
+    w.document.close();
+    avisoAcao('ok', `✓ Lista aberta às ${avisoHora()} (${nTot} pessoas, ${R(tot)}) — na janela de impressão, escolha a impressora ou "Salvar como PDF".`);
+  } catch (err) { avisoAcao('erro', '✗ Não abriu a lista: ' + err.message, () => cgImprimirPagamento(titulo, grupos)); }
+}
+function cgImprimirAdt(mes) {
+  const F = CARGOS_F, emp = (x) => cgEmpresaCurta(x.empresa || x.unidade || '');
+  const L = CARGOS.adt.filter((a) => String(a.mes).slice(0, 10) === mes && (!F.unidade || a.unidade === F.unidade));
+  const fora = (CARGOS.adtFora || []).filter((x) => String(x.mes).slice(0, 10) === mes && cgN(x.adiantamento) > 0 && (!F.unidade || x.unidade === F.unidade));
+  const dia = (L[0] && L[0].dia_pagamento) || (mes.slice(0, 8) + '20');
+  const grupos = [...new Set(L.map(emp))].sort().map((g) => ({ nome: g, linhas: L.filter((a) => emp(a) === g).map((a) => ({ nome: a.nome, valor: a.valor })) }));
+  if (fora.length) grupos.push({ nome: 'Sem registro (por fora)', linhas: fora.map((x) => ({ nome: x.nome, valor: x.adiantamento, obs: x.conta ? 'sai da conta ' + x.conta : '' })) });
+  cgImprimirPagamento(`Adiantamento de ${cgMesRot(mes)} — pagamento ${cgData(dia)}`, grupos);
+}
+function cgImprimirFolha(comp) {
+  const F = CARGOS_F;
+  const Q = (CARGOS.folha.quadro || []).filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade) && !(x.vinculo && /diretor/i.test(x.vinculo)));
+  const R = (CARGOS.folha.pag || []).filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade) && x.liquido_folha == null);
+  const ff = (CARGOS.adtFora || []).find((y) => String(y.mes).slice(0, 10) === comp && y.vence_saldo);
+  const mp = (R.find((x) => x.mes_pagamento) || (CARGOS.folha.pag || []).find((x) => String(x.competencia).slice(0, 10) === comp && x.mes_pagamento) || {}).mes_pagamento;
+  const quando = ff ? 'pagamento ' + cgData(ff.vence_saldo) : mp ? 'paga em ' + cgMesRot(mp) : '';
+  const grupos = [...new Set(Q.map((x) => cgEmpresaCurta(x.empresa)))].map((g) => ({ nome: g, linhas: Q.filter((x) => cgEmpresaCurta(x.empresa) === g).map((x) => ({ nome: x.nome, valor: x.valor_a_pagar })) }));
+  if (R.length) grupos.push({ nome: 'Sem registro (por fora)', linhas: R.map((x) => ({ nome: x.nome, valor: x.valor_a_pagar })) });
+  cgImprimirPagamento(`Folha de ${cgMesRot(comp)}${quando ? ' — ' + quando : ''}`, grupos);
+}
 function cgAbaAdt() {
   const F = CARGOS_F;
   const meses = [...new Set(CARGOS.adt.map((a) => String(a.mes).slice(0, 10)))];
@@ -2651,6 +2699,7 @@ function cgAbaAdt() {
     ${cgPassos([['calculado', linhas.length > 0], ['enviado ao RH', !!enviado, enviado ? cgDiaMes(enviado.enviado_em) : ''], ['pago', pago, cgDiaMes(dia)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
       ${travado ? '' : cgBotaoPasso(linhas.length ? 'Recalcular' : 'Calcular', `cgAdtGerar('${mes}')`, linhas.length > 0)}
+      ${linhas.length || fora.length ? cgBotaoPasso('🖨 Imprimir / PDF da lista', `cgImprimirAdt('${mes}')`, true) : ''}
     </div>
     <div class="cards" style="max-width:520px;">
       <div class="card neutral"><div class="card-lbl">Total</div><div class="card-val">${cgR0(tot)}</div></div>
