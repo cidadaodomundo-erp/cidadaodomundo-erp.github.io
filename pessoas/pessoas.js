@@ -680,6 +680,8 @@ const CG_TELAS = {
             abas: [['pessoas', 'Pessoas'], ['custo', 'Custo do mês'], ['setor', 'Por setor'], ['tabela', 'Tabela de cargos']] },
   // 02/11/2026 (dono): as Pendências da Flash ganham tela própria, junto com o resto do que está pendente no módulo
   phoje: { titulo: 'O que fazer hoje', abas: [['hoje', 'O que fazer hoje']] },
+  // 06/11/2026 (dono 18:18: "vamos levar todo o processo das admissões pra uma tela nova, a inclusão e o acompanhamento")
+  padm: { titulo: 'Admissões', leg: 'Nova admissão e o andamento de cada uma: leitura dos documentos, Flash e contabilidade.', abas: [['adm', 'Admissões']] },
   // 29/10/2026 14:24 (dono): o que era "Acompanhar" virou tela própria (custo) ou foi para o Financeiro (acertos)
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
@@ -708,7 +710,7 @@ function cgEntrarTela(t) {
 }
 const entrarPesHoje = () => cgEntrarTela('phoje'), entrarPesCargos = () => cgEntrarTela('cargos'), entrarPesCalc = () => cgEntrarTela('pcalc'), entrarPesFerias = () => cgEntrarTela('pferias'),
       entrarPesResc = () => cgEntrarTela('presc'), entrarPesEnvio = () => cgEntrarTela('penvio'), entrarPesConf = () => cgEntrarTela('pconf'),
-      entrarPesCusto = () => cgEntrarTela('pcusto'), entrarPesAcertos = () => cgEntrarTela('pacertos');
+      entrarPesCusto = () => cgEntrarTela('pcusto'), entrarPesAcertos = () => cgEntrarTela('pacertos'), entrarPesAdm = () => cgEntrarTela('padm');
 
 const CG_SETORES = ['ADMIN', 'COZINHA', 'DELIVERY', 'PRODUÇÃO', 'SALÃO'];
 const CG_DEPTOS = ['ATENDIMENTO', 'COZINHA', 'PRODUÇÃO', 'OPERACIONAL', 'LIMPEZA', 'ADMINISTRATIVO'];
@@ -833,6 +835,7 @@ function renderModuloCargos() {
   else if (F.aba === 'folha') h += cgAbaFolha();
   else if (F.aba === 'ferias') h += cgAbaFerias();
   else if (F.aba === 'hoje') h += cgAbaHoje();
+  else if (F.aba === 'adm') h += cgAbaAdm();
   // 02/11/2026 (dono): o Pagamento fora da folha é uma aba dos Cálculos; o desenho segue em renderForaFolha
   else if (F.aba === 'fora') { h += '<div id="cgFora"><div class="contexto">Carregando o pagamento por fora…</div></div>'; Promise.resolve().then(entrarForaFolha); }
   else if (F.aba === 'adt') h += cgAbaAdt();
@@ -878,9 +881,8 @@ function cgAbaPessoas() {
       ${card(F.desligados ? 'Desligados' : 'Pessoas', base.length, !F.soConferir, 'CARGOS_F.soConferir=false;renderModuloCargos()', false)}
       ${card('Com alerta', nAl, F.soConferir, 'CARGOS_F.soConferir=true;renderModuloCargos()', nAl > 0)}
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-6px 0 8px;"><button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Novo registro</button><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
-    ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Novo registro</div>${cgFormPessoa(null)}` : ''}
-    ${cgAdmAndamento()}`;
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-6px 0 8px;"><button type="button" class="preset-btn active" onclick="mostrarModulo('padm')">Nova admissão → Admissões</button><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
+`;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
     <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th style="text-align:right;" title="o que a pessoa custou de verdade em ${cgMesCustoFechado() ? cgMesRot(cgMesCustoFechado()) : 'o último mês fechado'} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta</th></tr></thead>
     <tbody>${vis.map((p) => { const A = alertas(p), ab = F.editando === p.id;
@@ -1065,7 +1067,8 @@ const CG_ADM_BLOCOS = [
     ['agencia', 'Agência'], ['conta', 'Conta']]],
 ];
 // o que a ficha nova já traz preenchido (sempre editável)
-const CG_ADM_PADRAO = { experiencia_dias: '45', prorrogavel_dias: '45', tipo_salario: 'MENSAL', ctps_uf: 'PR', vt_valor_passagem: '6.13', va_valor_dia: '160' };
+const CG_ADM_PADRAO = { experiencia_dias: '30', prorrogavel_dias: '60',   // 06/11/2026 (dono): 30 + 60 = 90; alertas aos 30 e aos 90
+  tipo_salario: 'MENSAL', ctps_uf: 'PR', vt_valor_passagem: '6.13', va_valor_dia: '160' };
 const CG_ADM_ON = { cpf: 'oninput="cgMascara(this,\'cpf\')" onchange="cgAdmCpf(this.value)"', telefone: 'oninput="cgMascara(this,\'tel\')"',
   cep: 'oninput="cgMascara(this,\'cep\')" onchange="cgAdmCep(this.value)"', experiencia_dias: 'onchange="cgAdmProrrog()"' };
 function cgMascara(el, tipo) {
@@ -2450,7 +2453,8 @@ async function cgHojeCarregar() {
     const [L, r, calc, fer] = await Promise.all([ler('vw_rh_flash_caixa?select=*&order=faltam_dias.asc.nullslast,parado_dias.desc.nullslast'), trRpcSeguro('rh_flash_caixa_leitura', {}),
       ler('vw_rh_calculos_mes?select=*&order=data_limite'), ler('vw_rh_ferias_alertas?select=*&order=limite_gozo')]);
     if (!r.ok) throw new Error(await trErroDe(r));
-    CARGOS.hoje = { L, calc, fer, leitura: (await r.json())[0] || {} };
+    const lemb = await ler('vw_rh_lembretes_hoje?select=*&order=data,tipo,lembrete_id,pessoa_id');
+    CARGOS.hoje = { L, calc, fer, lemb, leitura: (await r.json())[0] || {} };
   } catch (e) { CARGOS.hoje = { erro: e.message }; }
   if (CARGOS_F.aba === 'hoje') renderModuloCargos();
 }
@@ -2524,6 +2528,63 @@ function cgHojeItens() {
     return 3; };
   return itens.sort((a, b) => faixa(a) - faixa(b) || (fd(a) ?? 999) - (fd(b) ?? 999) || cgN(b.parado_dias) - cgN(a.parado_dias));
 }
+// LEMBRETES DO RH (dono 06/11/2026 18:18: "um campo de lembretes para a Hellen ... coisas que envolvem RH e não vem na tela" e
+// "alertas de vencimento de experiencia, a primeira é 30 dias após registro, a segunda é 90"). Fonte vw_rh_lembretes_hoje.
+function cgLembretesHtml() {
+  const H = CARGOS.hoje || {}, L = Array.isArray(H.lemb) ? H.lemb : [], hoje = cgHojeIso();
+  const quando = (x) => { const f = Number(x.faltam_dias); return f === 0 ? 'hoje' : f > 0 ? `faltam ${f} ${f === 1 ? 'dia' : 'dias'}` : `venceu há ${-f} ${f === -1 ? 'dia' : 'dias'}`; };
+  const linha = (x) => {
+    const exp = /^EXPERIENCIA/.test(x.tipo || ''), f = Number(x.faltam_dias);
+    const cor = f < 0 ? 'var(--farol-fora)' : f <= 1 ? 'var(--farol-perto)' : 'var(--tx-3)';
+    const oque = exp ? `${x.tipo === 'EXPERIENCIA_30' ? '1º vencimento da experiência (30 dias)' : 'fim da experiência (90 dias)'}: <b>${cgEsc(cgNome(x.nome || ''))}</b>` : cgEsc(x.o_que || '');
+    const rep = x.repetir === 'SEMANAL' ? ' · toda semana' : x.repetir === 'MENSAL' ? ' · todo mês' : '';
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:6px 0;border-top:1px solid var(--line);">
+      <span style="flex:1 1 260px;">${exp ? '📅 ' : '📝 '}${oque}${x.o_que && exp ? ` <span style="color:var(--tx-4);">— ${cgEsc(x.o_que)}</span>` : ''}</span>
+      <span style="color:${cor};font-weight:700;white-space:nowrap;">${cgData(x.data)} · ${quando(x)}${rep}</span>
+      ${x.lembrete_id ? cgBotaoPasso('✓ Feito', `cgLembreteFeito(${x.lembrete_id},false)`, true) : ''}</div>`;
+  };
+  const erro = H.lemb && H.lemb.erro ? `<div style="color:var(--farol-fora);">✗ Não li os lembretes: ${cgEsc(H.lemb.erro)}</div>` : '';
+  return `<div class="contexto" style="text-align:left;margin-bottom:12px;">
+    <div style="font-weight:800;margin-bottom:6px;">Lembretes do RH${L.length ? ` (${L.length})` : ''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <input id="cgLembTxt" type="text" placeholder="lembrar de… (ex.: pedir o exame da Ana)" style="flex:1 1 260px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      <input id="cgLembData" type="date" value="${hoje}" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
+      <select id="cgLembRep" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;"><option value="NAO">não repete</option><option value="SEMANAL">toda semana</option><option value="MENSAL">todo mês</option></select>
+      ${cgBotaoPasso('Adicionar', 'cgLembreteSalvar()')}</div>
+    ${erro}${L.map(linha).join('') || '<div style="color:var(--tx-4);margin-top:6px;">Nada para lembrar até amanhã.</div>'}
+    ${CARGOS.lembFeito ? `<div style="font-size:12px;color:var(--tx-4);margin-top:6px;">✓ ${cgEsc(CARGOS.lembFeito.txt)} <a href="javascript:void(0)" onclick="cgLembreteFeito(${CARGOS.lembFeito.id},true)">desfazer</a></div>` : ''}</div>`;
+}
+async function cgLembreteSalvar() {
+  const t = document.getElementById('cgLembTxt'), d = document.getElementById('cgLembData'), r0 = document.getElementById('cgLembRep');
+  const texto = (t && t.value || '').trim();
+  if (!texto) return avisoAcao('atencao', '! Escreva o lembrete.');
+  avisoAcao('enviando', '… gravando o lembrete');
+  const r = await trRpcSeguro('rh_lembrete_salvar', { p_id: null, p_texto: texto, p_quando: d && d.value || cgHojeIso(), p_repetir: r0 ? r0.value : 'NAO' });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou o lembrete: ${await trErroDe(r)}`, cgLembreteSalvar);
+  await cgHojeCarregar();
+  avisoAcao('ok', `✓ Lembrete gravado às ${avisoHora()}${d && d.value > cgHojeIso() ? ` — aparece aqui a partir da véspera (${cgData(d.value)})` : ''}.`);
+}
+async function cgLembreteFeito(id, desfazer) {
+  avisoAcao('enviando', desfazer ? '… desfazendo' : '… marcando como feito');
+  const r = await trRpcSeguro('rh_lembrete_feito', { p_id: id, p_desfazer: !!desfazer });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgLembreteFeito(id, desfazer));
+  const x = ((CARGOS.hoje || {}).lemb || []).find((l) => l.lembrete_id === id);
+  CARGOS.lembFeito = desfazer ? null : { id, txt: x ? (x.o_que || 'lembrete') + (x.repetir && x.repetir !== 'NAO' ? ' (passou para a próxima data)' : '') : 'lembrete' };
+  await cgHojeCarregar();
+  avisoAcao('ok', desfazer ? `✓ Desfeito às ${avisoHora()}.` : `✓ Feito às ${avisoHora()}.`);
+}
+// ADMISSÕES (tela própria, 06/11/2026): a inclusão (+ Nova admissão) e o acompanhamento
+function cgAbaAdm() {
+  const F = CARGOS_F;
+  const rec = (CARGOS.adm || []).slice(0, 15);
+  const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
+  let h = `<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">${F.formando === 0 ? '' : '<button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Nova admissão</button>'}</div>
+    ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Nova admissão</div>${cgFormPessoa(null)}` : ''}
+    ${cgAdmAndamento()}`;
+  if (rec.length) h += `<div class="section-label" style="text-align:left;">Últimas admissões</div><div id="tabelaCgAdm" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Enviada em</th><th>Situação</th></tr></thead><tbody>
+    ${rec.map((a) => `<tr><td>${cgEsc(cgNome(nome(a)))}</td><td>${a.criado_em ? cgData(a.criado_em) : '–'}</td><td style="white-space:normal;">${cgAdmEtapas(a)}</td></tr>`).join('')}</tbody></table></div>`;
+  return h;
+}
 function cgAbaHoje() {
   const F = CARGOS_F;
   if (CARGOS.hoje === undefined) { cgHojeCarregar(); return '<div class="contexto">Lendo as pendências…</div>'; }
@@ -2540,11 +2601,11 @@ function cgAbaHoje() {
   const atraso = (atrasada ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Leitura da Flash atrasada: pode faltar pendência nesta lista.</b></div>' : '')
     + (falhou.length ? `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);"><b style="color:var(--farol-fora);">✗ Não consegui ler ${falhou.join(', ')}: pode faltar pendência.</b> <button type="button" class="preset-btn" onclick="cgHojeCarregar()">Tentar de novo</button></div>` : '');
   const T = cgHojeItens();
-  if (!T.length) return `${topoFlash}${atraso}${atrasada || falhou.length ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente em Pessoas.</b></div>'}${rodape}`;
+  if (!T.length) return `${cgLembretesHtml()}${topoFlash}${atraso}${atrasada || falhou.length ? '' : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nada pendente em Pessoas.</b></div>'}${rodape}`;
   const de = (g) => T.filter((x) => x.grupo === g);
   const card = (g) => { const n = de(g), pe = g === 'Pagar' ? cgR(n.reduce((a, x) => a + cgN(x.valor), 0)) : ''; return n.length ? `<div class="card neutral" style="cursor:pointer;${F.fcGrupo === g ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CARGOS_F.fcGrupo=CARGOS_F.fcGrupo==='${g}'?null:'${g}';renderModuloCargos()"><div class="card-lbl">${g}</div><div class="card-val">${n.length}</div>${pe ? `<div class="card-pct">${pe}</div>` : ''}</div>` : ''; };
   const vis = F.fcGrupo && de(F.fcGrupo).length ? de(F.fcGrupo) : T;
-  return `${topoFlash}${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Admissão', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
+  return `${cgLembretesHtml()}${topoFlash}${atraso}<div class="cards">${['Aprovar', 'Corrigir', 'Pagar', 'Admissão', 'Cadastro', 'Folha', 'Férias'].map(card).join('')}</div>
     <div id="tabelaCgHoje" style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Quem</th><th>Detalhe</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>
     ${vis.map((x) => `<tr><td>${cgEsc(x.o_que || '')}</td>
       <td>${x.nome ? cgEsc(cgNome(x.nome)) : '–'}${x.sub ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(x.sub)}</div>` : ''}</td>

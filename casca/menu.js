@@ -234,6 +234,11 @@ window.CASCA_MENU = [
     "icone": "📌"
    },
    {
+    "chave": "padm",
+    "rotulo": "Admissões",
+    "icone": "🆕"
+   },
+   {
     "chave": "pcalc",
     "rotulo": "Cálculos da folha",
     "icone": "🧮"

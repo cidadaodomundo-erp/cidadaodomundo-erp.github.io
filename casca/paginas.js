@@ -38,6 +38,7 @@ window.CASCA_PAGINAS = {
   // 26/10/2026 (bloco 4): Pessoas
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
+  padm: 'pessoas/index.html#padm',
   atividades: 'atividades/index.html',
   cargos: 'pessoas/index.html#cargos',
   // 29/10/2026 (dono): cada passo da folha é uma tela
@@ -107,7 +108,7 @@ window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas'];
 window.CASCA_TELAS_POR_LOJA = ['caixa',
   'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao', 'reqpedir', 'reqseparar',
   'listas', 'listasfin',
-  'phoje', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
+  'phoje', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora', 'atividades'];
