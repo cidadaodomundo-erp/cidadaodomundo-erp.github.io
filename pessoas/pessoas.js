@@ -1220,7 +1220,7 @@ function cgFormPessoa(p) {
   const chk = (nome, atual, rot) => `<label style="display:inline-flex;gap:4px;align-items:center;margin-right:12px;"><input id="cgF_${nome}_${id}" type="checkbox" ${atual ? 'checked' : ''}>${rot}</label>`;
   const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
   const ob = (rot) => p ? rot : rot + ' *';
-  if (!p) setTimeout(() => cgObrigPintar(id));
+  setTimeout(() => { cgSalarioConf(id); if (!p) cgObrigPintar(id); });
   return `<div ${p ? '' : `oninput="cgObrigPintar(${id})" onchange="cgObrigPintar(${id})"`} style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
       ${campo(ob('Nome completo'), inp('nome', v.nome))}
