@@ -1405,44 +1405,67 @@ function caixaHellenItens() {
       const doDia = A => (A || []).filter(x => x.unidade === u && x.dia === dia);
       let r;
       try { r = renderDiaConcartao(u, dia, deLoja.filter(x => viz.includes(String(x.dia))), doDia(H.pix), doDia(H.cobr), doDia(H.forma), [], [], { robo: doDia(H.robo) }); }
-      catch (e) { add({ u, dia, ordem: 9, oque: 'não consegui conferir este dia (' + e.message + ')', acao: 'abrir' }); continue; }
+      catch (e) { add({ u, dia, ordem: 9, oque: 'não consegui conferir este dia (' + e.message + ')', acao: 'abrir', bloco: 'erro' }); continue; }
       if (!r) continue;
       // caixa esquecido aberto aparece em todo turno seguinte: uma linha só, no dia em que abriu
       r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
-        oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa' }));
+        oque: 'caixa ainda aberto no Saipos desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar o caixa',
+        bloco: 'aberto', venda: 'aberto desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16) }));
       r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
-        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para }));
+        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para, bloco: 'troca', hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para }));
       // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
       r.abertas.filter(x => !String(x.chave).startsWith('dinheiro:')).forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
-        oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x }));
+        oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x, ...caixaHellenCampos(x) }));
     }
     // online pago com a forma errada (canal do pedido ≠ forma registrada)
     (H.onl || []).filter(x => x.unidade === u && x.dia >= corte).forEach(x => add({ u, dia: x.dia, caixa: x.caixa || '', ordem: 2, valor: +x.valor,
-      oque: `venda ${x.numero || ''} registrada como ${x.tipo}, mas o pedido é do canal ${x.canal}`, acao: 'abrir', botao: x.canal_ok === false ? 'trocar a forma' : 'conferir' }));
+      oque: `venda ${x.numero || ''} registrada como ${x.tipo}, mas o pedido é do canal ${x.canal}`, acao: 'abrir', botao: x.canal_ok === false ? 'trocar a forma' : 'conferir',
+      bloco: 'online', hora: String(x.hora || '').slice(11, 16), venda: x.numero ? 'nº ' + x.numero : '', forma: x.tipo + ' · canal ' + x.canal }));
     // cofre: contado diferente do Saipos, e hoje sem contagem
     const cof = (COFRE_DIA || []).filter(r => r.unidade === u && r.dia >= corte);
     cof.filter(r => r.contagem_cobre_cofre === true && r.diferenca != null && Math.abs(+r.diferenca) >= 0.01).forEach(r => add({ u, dia: r.dia, ordem: 3, valor: +r.diferenca,
-      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'abrir', botao: 'abrir o dia' }));
+      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'abrir', botao: 'abrir o dia', bloco: 'cofre', venda: `contado ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, forma: 'Dinheiro' }));
     const ult = cof[cof.length - 1];
     if (ult && ult.contado == null) {
       const ultC = [...cof].reverse().find(r => r.contado != null);
-      add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'contar', botao: 'contar' });
+      add({ u, dia: ult.dia, ordem: 4, oque: 'dinheiro de hoje ainda não contado' + (ultC ? ' (última contagem ' + dm(ultC.dia) + ')' : ' (nenhuma contagem desde o recomeço de ' + dm(corte) + ')'), acao: 'contar', botao: 'contar', bloco: 'contagem', venda: ultC ? 'última contagem ' + dm(ultC.dia) : 'nenhuma contagem desde ' + dm(corte), forma: 'Dinheiro' });
     }
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
-      oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir' }));
+      oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir', bloco: 'quebra', quem: q.responsavel || 'sem responsável' }));
   });
   // dinheiro do SB para a AV parado há mais de 2 dias, ou marcado como não chegou
   const doisDias = mais(H.hoje, -2);
   if (H.lojas.includes('AGUA VERDE') || H.lojas.includes('SÃO BRAZ')) (COFRE_ENVIOS || []).forEach(x => {
-    if (x.situacao === 'ROBO VAI LANCAR' && x.data_envio <= doisDias) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio do São Braz para a Água Verde: o dinheiro chegou?', acao: 'naochegou', id: +x.saida_id_titulo });
-    else if (String(x.situacao).startsWith('MARCADO')) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio para a Água Verde marcado como não chegou' + (x.nao_recebido_obs ? ' (' + x.nao_recebido_obs + ')' : '') + ': explicar a diferença no São Braz', acao: 'cofre', botao: 'ver o cofre' });
+    if (x.situacao === 'ROBO VAI LANCAR' && x.data_envio <= doisDias) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio do São Braz para a Água Verde: o dinheiro chegou?', acao: 'naochegou', id: +x.saida_id_titulo, bloco: 'cofre', venda: 'envio SB → AV', forma: 'Dinheiro' });
+    else if (String(x.situacao).startsWith('MARCADO')) add({ u: 'SÃO BRAZ', dia: x.data_envio, ordem: 3, valor: +x.valor, oque: 'envio para a Água Verde marcado como não chegou' + (x.nao_recebido_obs ? ' (' + x.nao_recebido_obs + ')' : '') + ': explicar a diferença no São Braz', acao: 'cofre', botao: 'ver o cofre', bloco: 'cofre', venda: 'envio SB → AV não chegou', forma: 'Dinheiro' });
   });
   itens.sort((a, b) => (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0) || a.u.localeCompare(b.u) || a.ordem - b.ordem);
   itens.forEach((x, i) => { x.i = i; });
   CAIXA_HELLEN_CALC = { valid: CAIXA_VALID, envios: COFRE_ENVIOS, itens };
   return itens;
 }
+// 06/11/2026 (dono, via Financeiro: "arrumar a tabulação desse bloco, está com a leitura ruim"): cada pendência em campos fixos
+function caixaHellenCampos(x) {
+  const sp = String(x.saipos || '').replace(/<[^>]+>/g, '');
+  const venda = (sp.match(/venda [\d]+(?: \([\d]+\))?|mesa [\w]+/i) || [''])[0].replace(/^venda /i, 'nº ');
+  const quem = (sp.match(/motoboy ([^·]+)/i) || [])[1];
+  const pix = String(x.chave).startsWith('pix:');
+  const espera = x.p === 3 || /aguardando|pode levar até/i.test(x.leitura || '');
+  return { bloco: espera ? 'aguardando' : pix ? 'pix' : 'semcobr', hora: x.hora, venda, quem: quem ? quem.trim() : '', forma: x.forma || '' };
+}
+const CAIXA_BLOCOS = [
+  ['aberto', 'Caixa aberto no Saipos', 'o caixa ficou aberto: fechar no Saipos para o dia entrar na conferência'],
+  ['contagem', 'Dinheiro sem contagem', 'gaveta + cofre ainda não contados hoje'],
+  ['cofre', 'Dinheiro do cofre e envios', 'contagem diferente do Saipos, ou envio do São Braz sem confirmação'],
+  ['troca', 'Bandeira trocada no Saipos', 'registrada numa forma, passou em outra: trocar no Saipos'],
+  ['pix', 'PIX que não entrou no banco', 'registrado como PIX e nenhum crédito desse valor no banco em até 5 dias'],
+  ['semcobr', 'Venda sem cobrança ou cobrado diferente', 'o Saipos registrou e a maquininha não mostra (ou mostra outro valor)'],
+  ['online', 'Online com a forma errada', 'a forma registrada não bate com o canal do pedido'],
+  ['quebra', 'Quebra a descontar ou repor', 'quebra registrada esperando desconto ou reposição'],
+  ['erro', 'Dia que não consegui conferir', 'abrir o dia para ver o que aconteceu'],
+  ['aguardando', 'Aguardando — não precisa fazer nada', 'vale leva até 7 dias para aparecer na Rede; a maquininha ainda não mandou o dia'],
+];
 function caixaHellenHtml() {
   const H = CAIXA_HELLEN;
   if (H === null) return caixaHellenLojas().length ? '<div class="section-label">Para você resolver</div><div class="contexto">Montando a sua lista…</div>' : '';
@@ -1451,23 +1474,52 @@ function caixaHellenHtml() {
   const itens = caixaHellenItens();
   const dm = d => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
   const rotCx = cx => cx === 'SALÃO' ? 'Salão' : cx === 'DELIVERY' ? 'Delivery' : '—';
-  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
+  const lojaCurta = u => ({ 'AGUA VERDE': 'AV', 'ÁGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB', 'SAO BRAZ': 'SB' }[String(u).toUpperCase()] || u);
   const marca = ['hellen@cidadaodomundo.com.br', 'neto@cidadaodomundo.com.br'].includes(String((rmbSessao() || {}).email || '').toLowerCase());
-  const btn = x => x.acao === 'explicar' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenExplicar(${x.i})">Explicar</button>`
-    : x.acao === 'naochegou' ? (marca ? `<button class="preset-btn" onclick="event.stopPropagation(); cofreNaoChegou(${x.id})">Não chegou</button>` : '')
-    : x.acao === 'cofre' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenCofre()">${x.botao}</button>`
-    : x.acao === 'contar' ? `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenAbrir(${x.i})">contar</button>`
-    : `<button class="preset-btn" onclick="event.stopPropagation(); caixaHellenAbrir(${x.i})">${x.botao || 'abrir o dia'}</button>`;
-  const linhas = itens.map(x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="abre o dia com as vendas lado a lado">
-      <td style="white-space:nowrap;">${nomeLoja(x.u)}</td><td style="white-space:nowrap;">${dm(x.dia)}</td><td>${rotCx(x.caixa)}</td>
-      <td style="text-align:left;">${trEscH(x.oque)}</td><td style="text-align:right; white-space:nowrap;">${x.valor == null ? '—' : 'R$ ' + fmt(Math.abs(x.valor))}</td><td style="white-space:nowrap;">${btn(x)}</td></tr>`).join('');
+  const B = (rot, f) => `<button class="preset-btn cx-res-btn" onclick="event.stopPropagation(); ${f}">${rot}</button>`;
+  const btn = x => x.bloco === 'aguardando' ? ''
+    : x.acao === 'explicar' ? B('Explicar', `caixaHellenExplicar(${x.i})`)
+    : x.acao === 'naochegou' ? (marca ? B('Não chegou', `cofreNaoChegou(${x.id})`) : '')
+    : x.acao === 'cofre' ? B(x.botao, 'caixaHellenCofre()')
+    : x.acao === 'contar' ? B('Contar', `caixaHellenAbrir(${x.i})`)
+    : B(x.botao ? x.botao.charAt(0).toUpperCase() + x.botao.slice(1) : 'Abrir o dia', `caixaHellenAbrir(${x.i})`);
+  const v = (t) => t ? trEscH(t) : '<span style="color:var(--tx-5);">—</span>';
+  const linha = x => `<tr style="cursor:pointer;" onclick="caixaHellenAbrir(${x.i})" title="${trEscH(x.oque)}">
+      <td data-r="Loja"><b>${lojaCurta(x.u)}</b></td><td data-r="Dia">${dm(x.dia)}</td><td data-r="Hora">${v(x.hora)}</td><td data-r="Caixa">${rotCx(x.caixa)}</td>
+      <td data-r="Venda" class="cx-res-txt">${v(x.venda)}</td><td data-r="Forma" class="cx-res-txt">${v(x.forma)}</td><td data-r="Quem" class="cx-res-txt">${v(x.quem)}</td>
+      <td data-r="Valor" style="text-align:right;">${x.valor == null ? v('') : 'R$ ' + fmt(Math.abs(x.valor))}</td><td class="cx-res-acao">${btn(x)}</td></tr>`;
+  const cab = '<thead><tr><th>Loja</th><th>Dia</th><th>Hora</th><th>Caixa</th><th>Venda</th><th>Forma</th><th>Quem</th><th style="text-align:right;">Valor</th><th>Ação</th></tr></thead>';
+  const acao = itens.filter(x => x.bloco !== 'aguardando'), esp = itens.filter(x => x.bloco === 'aguardando');
+  const blocos = CAIXA_BLOCOS.map(([k, tit, leg]) => {
+    const L = itens.filter(x => (x.bloco || 'semcobr') === k);
+    if (!L.length) return '';
+    const tab = `<div id="tabelaCxRes_${k}" class="cx-res" style="overflow-x:auto;"><table>${cab}<tbody>${L.map(linha).join('')}</tbody></table></div>`;
+    const t = `<b>${tit}</b> <span style="color:var(--tx-3);">(${L.length})</span> <span style="font-size:12px;color:var(--tx-4);">— ${leg}</span>`;
+    return k === 'aguardando'
+      ? `<details style="margin-top:12px;color:var(--tx-4);"><summary style="cursor:pointer;">${t}</summary>${tab}</details>`
+      : `<div style="margin-top:12px;">${t}${tab}</div>`;
+  }).join('');
   const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
   const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
   const rodape = rb.length ? `<div class="caption-label" style="text-align:left; margin-top:6px;">🤖 ${vai.length ? `o robô vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''} — não precisa fazer nada.</div>` : '';
-  return `<div class="section-label">Para você resolver (${itens.length})</div>
-    <div class="contexto" style="text-align:left; border-color:${itens.length ? '#f5a623' : 'var(--farol-ok)'};">
-      ${itens.length ? `<div style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Dia</th><th>Caixa</th><th style="text-align:left;">O que aconteceu</th><th style="text-align:right;">Valor</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`
-        : `<b style="color:var(--farol-ok);">✓ Nada para você resolver</b> — desde o recomeço de cada loja até ontem, tudo bateu ou já foi explicado.`}
+  return `<style>
+      .cx-res table { table-layout:fixed; width:100%; min-width:860px; }
+      .cx-res td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .cx-res th:nth-child(1), .cx-res td:nth-child(1) { width:48px; } .cx-res th:nth-child(2), .cx-res td:nth-child(2) { width:56px; }
+      .cx-res th:nth-child(3), .cx-res td:nth-child(3) { width:56px; } .cx-res th:nth-child(4), .cx-res td:nth-child(4) { width:74px; }
+      .cx-res th:nth-child(8), .cx-res td:nth-child(8) { width:100px; } .cx-res th:nth-child(9), .cx-res td:nth-child(9) { width:200px; }
+      .cx-res-btn { width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      @media (max-width:700px) {
+        .cx-res table, .cx-res tbody, .cx-res tr, .cx-res td { display:block; width:auto !important; min-width:0; }
+        .cx-res thead { display:none; }
+        .cx-res tr { border:1px solid var(--line); border-radius:8px; padding:8px; margin:6px 0; display:grid; grid-template-columns:repeat(3, auto); gap:2px 10px; }
+        .cx-res td { border:0 !important; padding:0 !important; white-space:normal; }
+        .cx-res td.cx-res-acao { grid-column:1 / -1; margin-top:6px; }
+      }
+    </style>
+    <div class="section-label">Para você resolver (${acao.length})${esp.length ? ` <span style="font-weight:400;color:var(--tx-4);">+ ${esp.length} aguardando</span>` : ''}</div>
+    <div class="contexto" style="text-align:left; border-color:${acao.length ? '#f5a623' : 'var(--farol-ok)'};">
+      ${itens.length ? blocos : `<b style="color:var(--farol-ok);">✓ Nada para você resolver</b> — desde o recomeço de cada loja até ontem, tudo bateu ou já foi explicado.`}
       ${rodape}
     </div>`;
 }
