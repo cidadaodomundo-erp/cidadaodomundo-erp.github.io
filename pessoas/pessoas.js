@@ -47,7 +47,31 @@ function rmbStatusTxt(g) {
     default: return String(g.situacao || '').toLowerCase();
   }
 }
-let RMB_FORM = { aberto: false };
+let RMB_FORM = { aberto: false }, RMB_HIST = { aberto: false, antigos: null };
+async function rmbHistorico() {
+  RMB_HIST.aberto = !RMB_HIST.aberto;
+  if (RMB_HIST.aberto && RMB_HIST.antigos === null) {
+    RMB_HIST.antigos = 'lendo'; renderModuloReembolsos(REEMBOLSOS);
+    // os arquivados em 07/11 (antes do Pedir reembolso): rmb_gastos, que só quem vê pessoal lê (os outros veem só os novos)
+    RMB_HIST.antigos = await consultarTudo('rmb_gastos?select=id,pessoa,data_gasto,valor,descricao,subtipo,status,aprovado_por,pago_em,motivo_recusa&status=eq.ARQUIVADO&order=data_gasto.desc,id.desc')
+      .catch((e) => ({ erro: e.message }));
+  }
+  renderModuloReembolsos(REEMBOLSOS);
+}
+function rmbHistoricoHtml(nomeDe) {
+  const A = RMB_HIST.antigos;
+  if (A === 'lendo') return '<div class="contexto">Lendo o histórico…</div>';
+  if (A && A.erro) return `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler o histórico: ${cgEsc(A.erro)}</div>`;
+  const novos = ((REEMBOLSOS || {}).ped || []).filter((g) => g.situacao === 'PAGO' || g.situacao === 'RECUSADO');
+  const L = [...novos.map((g) => ({ data: g.data_gasto, pessoa: g.pessoa, valor: g.valor, oque: g.descricao, sit: rmbStatusTxt(g), quem: g.aprovado_por })),
+    ...(Array.isArray(A) ? A : []).map((g) => ({ data: g.data_gasto, pessoa: g.pessoa, valor: g.valor, oque: g.descricao, sit: 'antes de 07/11', quem: g.aprovado_por }))];
+  if (!L.length) return '<div class="contexto">Sem histórico para este login.</div>';
+  const tot = L.reduce((a, x) => a + Number(x.valor || 0), 0);
+  return `<div class="caption-label" style="text-align:left;margin-top:8px;">Histórico · ${L.length} reembolsos · ${cgR(tot)}</div>
+    <div id="tabelaRmbHist" style="overflow-x:auto;"><table><thead><tr><th>Gasto em</th><th>Quem</th><th>O que foi</th><th>Valor</th><th>Situação</th><th>Aprovado por</th></tr></thead><tbody>
+    ${L.map((x) => `<tr><td>${cgData(x.data)}</td><td>${cgEsc(nomeDe(x.pessoa))}</td><td style="white-space:normal;">${cgEsc(x.oque || '')}</td><td>${cgR(Number(x.valor) || 0)}</td><td>${cgEsc(x.sit)}</td><td>${cgEsc(String(x.quem || '–').split('@')[0])}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
 function renderModuloReembolsos(dados) {
   const alvo = document.getElementById('view-reembolsos');
   if (!alvo || !dados) return;
@@ -97,6 +121,9 @@ function renderModuloReembolsos(dados) {
   }
   if (minha) { const meus = ped.filter((g) => g.meu); h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve <b>${R(deve(meus))}</b> a você${deve(meus) ? ' (aprovado e ainda não pago)' : ''}.</div>`; }
   h += `<div class="caption-label" style="text-align:left;margin-top:8px;">A Hellen aprova (o pedido dela, o dono). Pago na sexta, por PIX.</div>`;
+  // 07/11/2026 (dono 03:07: "deixa um botão de histórico na tela pra mostrar os reembolsos"): só leitura
+  h += `<div style="margin-top:10px;"><button type="button" class="preset-btn" onclick="rmbHistorico()">${RMB_HIST.aberto ? 'Esconder o histórico' : 'Histórico'}</button></div>`;
+  if (RMB_HIST.aberto) h += rmbHistoricoHtml(nomeDe);
   alvo.innerHTML = h;
   if (RMB_FORM.aberto) renderRmbPix();
 }
