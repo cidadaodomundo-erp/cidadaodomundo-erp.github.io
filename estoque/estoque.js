@@ -2840,33 +2840,39 @@ function posRender() {
   const itens = (POS.itens || []).filter((i) => (!busca || String(i.nome_base).toUpperCase().includes(busca))
       && (!POS.curva || i.curva === POS.curva) && (!POS.grupo || (POS.grupo === '__fora' ? !i.grupo : i.grupo === POS.grupo))
       // "sem custo" que tira do total = sem valor E com mercadoria (Estoque, 22/10: sem custo com saldo zero não tira um centavo)
-      && (!POS.semCusto || (i.valor == null && Number(i.saldo || 0) !== 0)))
+      && (!POS.semCusto || (i.valor == null && Number(i.saldo || 0) !== 0))
+      && (!POS.soNeg || Number(i.saldo) < 0))
     .sort((a, b) => {
       const num = ['saldo', 'custo_unitario', 'valor'].includes(POS.ord);
       const va = a[POS.ord], vb = b[POS.ord];
       const r = num ? (va == null ? -Infinity : Number(va)) - (vb == null ? -Infinity : Number(vb)) : String(va || '').localeCompare(String(vb || ''), 'pt-BR');
       return (POS.desc ? -r : r) || Number(b.valor || 0) - Number(a.valor || 0);   // empate: maior valor primeiro (dono, 22/10)
     });
+  // 07/11/2026 (auditoria operacao-7, Estoque): o valor parado soma só o saldo positivo; o negativo vem à parte (valor_negativo)
   const grupos = [...new Set((POS.itens || []).map((i) => i.grupo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const comValor = Number(D.itens || 0) - Number(D.itens_sem_valor || 0);
   const semCustoN = Number(D.itens_sem_custo_com_saldo != null ? D.itens_sem_custo_com_saldo : D.itens_sem_valor || 0);
   let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Posição de estoque — ${trEscH(estNomeLoja(POS.unidade))} · ${dm(POS.dia)}</div>
     <div class="caption-label" style="text-align:left;">Quanto dinheiro está parado em cada item: o saldo do sistema × o custo da nossa base, numa foto por dia. As quantidades, item a item, ficam no Controle de estoque.</div>
-    <div class="cards cards-3">
+    <div class="cards${Number(D.valor_negativo) < 0 ? '' : ' cards-3'}">
       <div class="card neutral"><div class="card-lbl">Valor parado</div><div class="card-val">R$ ${fmt(Number(D.valor || 0))}</div><div class="card-pct">em ${comValor} itens · ${varTxt}</div></div>
       <div class="card neutral"><div class="card-lbl">Curva A</div><div class="card-val">R$ ${fmt(Number(D.valor_curva_a || 0))}</div><div class="card-pct">${D.valor ? Math.round(100 * Number(D.valor_curva_a) / Number(D.valor)) : 0}% do valor parado</div></div>
       <div class="card ${semCustoN ? 'highlight' : 'pos'}" style="cursor:pointer;" onclick="POS.semCusto=true; POS.ord='valor'; POS.desc=true; posRender();" title="ver a lista">
         <div class="card-lbl">Sem custo na base</div><div class="card-val">${semCustoN}</div>
         <div class="card-pct">itens com mercadoria e sem custo: ficam fora da conta, o valor é um piso · ver a lista</div></div>
+      ${Number(D.valor_negativo) < 0 ? `<div class="card neg" style="cursor:pointer;" onclick="POS.soNeg=true; POS.ord='valor'; POS.desc=false; posRender();" title="ver a lista">
+        <div class="card-lbl">Saldo negativo</div><div class="card-val">−R$ ${fmt(Math.abs(Number(D.valor_negativo)))}</div>
+        <div class="card-pct">em ${Number(D.itens_negativos || 0)} ${Number(D.itens_negativos) === 1 ? 'item' : 'itens'} · entrada ou produção a lançar · ver a lista</div></div>` : ''}
     </div>`;
   // histórico: uma linha por dia
-  h += `<div id="tabelaPosicaoDias"><table><thead><tr><th>Dia</th><th>Foto</th><th style="text-align:right;">Valor parado</th><th style="text-align:right;">Curva A</th><th style="text-align:right;">Sem custo, com mercadoria</th></tr></thead><tbody>`;
+  h += `<div id="tabelaPosicaoDias"><table><thead><tr><th>Dia</th><th>Foto</th><th style="text-align:right;">Valor parado</th><th style="text-align:right;">Curva A</th><th style="text-align:right;">Sem custo, com mercadoria</th><th>Saldo negativo</th></tr></thead><tbody>`;
   (POS.dias || []).slice().reverse().forEach((d) => {
     h += `<tr style="cursor:pointer;${d.dia === POS.dia ? ' background:var(--surface-2);' : ''}" onclick="POS.dia='${d.dia}'; posCarregarItens();" title="ver a foto deste dia">
       <td><b>${dm(d.dia)}</b></td>
       <td style="color:var(--tx-4);" title="${d.origem === 'DIA' ? 'foto tirada no próprio dia' : 'remontado do extrato com o custo de hoje: a variação é só de quantidade'}">${d.origem === 'DIA' ? 'do dia' : 'remontada'}</td>
       <td style="text-align:right;">R$ ${fmt(Number(d.valor))}</td><td style="text-align:right;">R$ ${fmt(Number(d.valor_curva_a))}</td>
-      <td style="text-align:right;">${Number(d.itens_sem_custo_com_saldo != null ? d.itens_sem_custo_com_saldo : d.itens_sem_valor)}</td></tr>`;
+      <td style="text-align:right;">${Number(d.itens_sem_custo_com_saldo != null ? d.itens_sem_custo_com_saldo : d.itens_sem_valor)}</td>
+      <td style="${Number(d.valor_negativo) < 0 ? 'color:var(--farol-fora);' : 'color:var(--tx-5);'}">${Number(d.valor_negativo) < 0 ? `−R$ ${fmt(Math.abs(Number(d.valor_negativo)))} · ${Number(d.itens_negativos || 0)}` : '—'}</td></tr>`;
   });
   h += `</tbody></table></div>
     <div class="caption-label" style="text-align:left;">O histórico começa em 21/10, o primeiro dia com a contagem como ponto de partida. "remontada": dia refeito com o custo de hoje, então a diferença é só de quantidade.</div>`;
@@ -2875,6 +2881,7 @@ function posRender() {
       <input id="posBusca" placeholder="Procurar item…" value="${trEscH(POS.busca || '')}" oninput="POS.busca=this.value; posRender(); const c=document.getElementById('posBusca'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); }" style="flex:1 1 200px; ${sel}">
       <select onchange="POS.curva=this.value; POS.ord='valor'; POS.desc=true; posRender();" style="${sel}"><option value="">curva: todas</option>${['A', 'B', 'C'].map((c) => `<option${c === POS.curva ? ' selected' : ''}>${c}</option>`).join('')}</select>
       <select onchange="POS.grupo=this.value; POS.ord='valor'; POS.desc=true; posRender();" style="${sel}"><option value="">grupo: todos</option>${grupos.map((g) => `<option${g === POS.grupo ? ' selected' : ''}>${trEscH(g)}</option>`).join('')}<option value="__fora"${POS.grupo === '__fora' ? ' selected' : ''}>fora da folha de contagem</option></select>
+      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox"${POS.soNeg ? ' checked' : ''} onchange="POS.soNeg=this.checked; posRender();"> só saldo negativo</label>
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox"${POS.semCusto ? ' checked' : ''} onchange="POS.semCusto=this.checked; POS.ord='valor'; POS.desc=true; posRender();"> só sem custo</label>
       <span class="caption-label">${itens.length} de ${(POS.itens || []).length}</span>
     </div>`;
