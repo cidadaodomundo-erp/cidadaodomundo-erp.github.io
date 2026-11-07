@@ -13,133 +13,130 @@
 // banco decidem quem pode o que (o status de nascimento e do gatilho,
 // nao do navegador). anon segue so leitura. Pre-requisito: os 4 usuarios
 // criados no Supabase e rmb_pessoas.email preenchido (REEMBOLSOS-PAINEL.md).
-// 07/11/2026: virou PEDIR REEMBOLSO (dono: "sem histórico, somente pras pessoas pedirem daqui pra frente"; proposta do Financeiro
-// 2026-11-07-pedir-reembolso.md). A tela só grava o pedido; status, título e baixa são do banco e do robô.
+// 07/11/2026: virou PEDIR REEMBOLSO (dono: "sem histórico, somente pras pessoas pedirem daqui pra frente"; "pode ser acima de
+// 300 a Hellen"). Contrato do Financeiro (2026-11-07-pedir-reembolso.md): grava por rmb_pedir, lista por vw_rmb_pedidos,
+// opções de rmb_tipo, decide por rmb_decidir; os botões só para rmb_sou_aprovador(). A trava de verdade está no banco.
 let REEMBOLSOS = null;
-const RMB_DESDE = '2026-11-07';
-// "o que foi" → subtipo do plano de contas (nunca "REEMBOLSO": a despesa é a do que foi comprado)
-const RMB_OQUE = [['taxa cozinha', 'TAXAS COZINHA'], ['taxa salão', 'TAXAS SALAO'], ['motoboy', 'MOTOBOY'], ['mercado / insumo', 'MATERIA PRIMA'],
-  ['manutenção', 'MANUTENCAO'], ['sistema / assinatura', 'SISTEMA DE GESTAO'], ['outro', 'DESPESAS ADMINISTRATIVAS']];
-const RMB_STATUS_TXT = { ARQUIVADO: 'arquivado' };
 function rmbSair() { localStorage.removeItem('rmbSessao'); entrarReembolsos(); }
 async function reembolsosLogin() { if (!(await rmbFazerLogin())) return; await entrarReembolsos(); }
 function rmbEuEmail() { return String((rmbSessao() || {}).email || '').toLowerCase(); }
-function rmbSouGestor() { return souODono() || rmbEuEmail() === 'hellen@cidadaodomundo.com.br'; }
 async function carregarReembolsos() {
-  const pess = await consultarTudo('rmb_pessoas?select=pessoa,nome_completo,email,chave_pix&order=pessoa')
-    .catch(() => consultarTudo('rmb_pessoas?select=pessoa,nome_completo,email&order=pessoa'));
-  const [gastos, cfg] = await Promise.all([
-    consultarTudo(`rmb_gastos?select=id,pessoa,data_gasto,valor,descricao,subtipo,unidade,comprovante_url,status,aprovado_por,aprovado_em,pago_em,motivo_recusa,criado_em&criado_em=gte.${RMB_DESDE}&status=neq.ARQUIVADO&order=criado_em.desc,id.desc`),
-    consultarTudo('rmb_config?select=*').catch(() => [])]);
-  const lim = Number(((cfg || [])[0] || {}).limite_aprovacao) || 300;
-  return { pess: pess || [], gastos: gastos || [], limite: lim };
+  const [tipos, ped, pess, apr, plano] = await Promise.all([
+    consultarTudo('rmb_tipo?select=codigo,rotulo,ordem&order=ordem,codigo'),
+    consultarTudo('vw_rmb_pedidos?select=*&order=criado_em.desc,id.desc'),
+    consultarTudo('rmb_pessoas?select=pessoa,nome_completo,email,chave_pix&order=pessoa').catch(() => []),
+    trRpcSeguro('rmb_sou_aprovador', {}).then(async (r) => r.ok ? !!(await r.json()) : false).catch(() => false),
+    consultarTudo('fin_plano_contas?select=subtipo&order=subtipo').catch(() => [])]);
+  return { tipos: tipos || [], ped: ped || [], pess: pess || [], aprovador: apr, subtipos: [...new Set((plano || []).map((x) => x.subtipo).filter(Boolean))] };
 }
 async function entrarReembolsos() {
   const alvo = document.getElementById('view-reembolsos');
   if (!alvo) return;
-  await carregarEmailDono();
   alvo.innerHTML = '<div class="contexto">Carregando os reembolsos…</div>';
   try { REEMBOLSOS = await carregarReembolsos(); }
   catch (e) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os reembolsos: ${cgEsc(e.message)} <button class="preset-btn" onclick="entrarReembolsos()">Tentar de novo</button></div>`; return; }
   renderModuloReembolsos(REEMBOLSOS);
 }
-// a próxima sexta (o dia de pagar reembolso)
-function rmbProxSexta() { const d = new Date(cgHojeIso() + 'T12:00:00'); do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5); return d.toLocaleDateString('en-CA'); }
-// 07/11/2026 (dono: "pode ser acima de 300 a Hellen"): a Hellen aprova todos; o pedido dela vai ao dono
-function rmbStatusTxt(g, hellen) {
-  const s = g.status;
-  if (s === 'PEDIDO' || s === 'REVISAR') return hellen && g.pessoa === hellen ? 'esperando o dono' : 'esperando a Hellen';
-  if (s === 'APROVADO') return 'aprovado: vai ser lançado';
-  if (s === 'LANCADO' || s === 'LANÇADO') return `vai ser pago sexta, ${cgDiaMes(rmbProxSexta())}`;
-  if (s === 'PAGO') return `✓ pago${g.pago_em ? ' em ' + cgDiaMes(String(g.pago_em)) : ''}`;
-  if (s === 'RECUSADO') return `recusado${g.motivo_recusa ? ': ' + g.motivo_recusa : ''}`;
-  return RMB_STATUS_TXT[s] || String(s || '').toLowerCase();
+function rmbStatusTxt(g) {
+  switch (g.situacao) {
+    case 'PEDIDO': return g.so_o_dono ? 'esperando o dono' : 'esperando a Hellen';
+    case 'APROVADO': return 'aprovado: vai ser lançado';
+    case 'LANCADO': return g.vence_em ? `vai ser pago em ${cgDiaMes(String(g.vence_em))}` : 'lançado: vai ser pago na sexta';
+    case 'PAGO': return `✓ pago${g.pago_em ? ' em ' + cgDiaMes(String(g.pago_em)) : ''}`;
+    case 'RECUSADO': return `recusado${g.motivo_recusa ? ': ' + g.motivo_recusa : ''}`;
+    default: return String(g.situacao || '').toLowerCase();
+  }
 }
+let RMB_FORM = { aberto: false };
 function renderModuloReembolsos(dados) {
   const alvo = document.getElementById('view-reembolsos');
   if (!alvo || !dados) return;
-  const { pess, gastos, limite } = dados, eu = rmbEuEmail(), gestor = rmbSouGestor();
+  const { tipos, ped, pess, aprovador, subtipos } = dados, eu = rmbEuEmail();
   const minha = pess.find((p) => String(p.email || '').toLowerCase() === eu) || null;
   const nomeDe = (k) => { const p = pess.find((x) => x.pessoa === k); return cgNome((p && (p.nome_completo || p.pessoa)) || k || ''); };
-  const vis = gestor ? gastos : gastos.filter((g) => minha && g.pessoa === minha.pessoa);
   const R = (v) => cgR(Number(v) || 0);
-  const corSt = (g) => g.status === 'PAGO' ? 'var(--farol-ok)' : g.status === 'RECUSADO' ? 'var(--farol-fora)' : (g.status === 'PEDIDO' ? 'var(--farol-perto)' : 'var(--tx-3)');
-  const hellen = (pess.find((p) => String(p.email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br') || {}).pessoa || null;
-  const podeDecidir = (g) => gestor && g.status === 'PEDIDO' && !(minha && g.pessoa === minha.pessoa);
-  const deve = (lst) => lst.filter((g) => ['APROVADO', 'LANCADO', 'LANÇADO'].includes(g.status)).reduce((a, g) => a + Number(g.valor || 0), 0);
-  const F = RMB_FORM;
+  const corSt = (g) => g.situacao === 'PAGO' ? 'var(--farol-ok)' : g.situacao === 'RECUSADO' ? 'var(--farol-fora)' : g.situacao === 'PEDIDO' ? 'var(--farol-perto)' : 'var(--tx-3)';
+  const podeDecidir = (g) => aprovador && g.situacao === 'PEDIDO' && !g.meu;
+  const deve = (lst) => lst.filter((g) => ['APROVADO', 'LANCADO'].includes(g.situacao)).reduce((a, g) => a + Number(g.valor || 0), 0);
+  const st = 'padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;width:100%;';
   let h = `<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;">Pedir reembolso</div>`;
   if (!eu) return void (alvo.innerHTML = h + '<div class="contexto">Entre com o seu login para pedir reembolso.</div>');
-  if (!minha && !gestor) h += `<div class="contexto" style="border-color:var(--farol-perto);text-align:left;">O seu login (${cgEsc(eu)}) ainda não está cadastrado para reembolso. Peça à Hellen para incluir.</div>`;
-  h += `<div style="margin:0 0 10px;">${F.aberto ? '' : `<button type="button" class="preset-btn active" onclick="RMB_FORM.aberto=true;renderModuloReembolsos(REEMBOLSOS)" ${!minha && !gestor ? 'disabled' : ''}>+ Pedir reembolso</button>`}</div>`;
-  if (F.aberto) {
+  if (!minha && !aprovador) h += `<div class="contexto" style="border-color:var(--farol-perto);text-align:left;">O seu login (${cgEsc(eu)}) ainda não está cadastrado para reembolso. Peça à Hellen para incluir.</div>`;
+  h += `<div style="margin:0 0 10px;">${RMB_FORM.aberto ? '' : `<button type="button" class="preset-btn active" onclick="RMB_FORM.aberto=true;renderModuloReembolsos(REEMBOLSOS)" ${!minha && !aprovador ? 'disabled' : ''}>+ Pedir reembolso</button>`}</div>`;
+  if (RMB_FORM.aberto) {
     const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
-    const st = 'padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;width:100%;';
-    const quem = gestor ? `<select id="rmbPessoa" style="${st}">${pess.map((p) => `<option value="${cgEsc(p.pessoa)}" ${minha && p.pessoa === minha.pessoa ? 'selected' : ''}>${cgEsc(cgNome(p.nome_completo || p.pessoa))}</option>`).join('')}</select>`
+    const quem = aprovador ? `<select id="rmbPessoa" style="${st}" onchange="renderRmbPix()">${pess.map((p) => `<option value="${cgEsc(p.pessoa)}" ${minha && p.pessoa === minha.pessoa ? 'selected' : ''}>${cgEsc(cgNome(p.nome_completo || p.pessoa))}</option>`).join('')}</select>`
       : `<input id="rmbPessoa" type="hidden" value="${cgEsc(minha ? minha.pessoa : '')}"><div style="padding:6px 0;color:var(--tx-1);font-size:13px;">${cgEsc(minha ? cgNome(minha.nome_completo || minha.pessoa) : '')}</div>`;
     const lojaPad = (typeof pesLojaVista === 'function' && pesLojaVista()) || 'AGUA VERDE';
-    const pix = minha && minha.chave_pix ? `<div style="font-size:12px;color:var(--tx-4);margin-top:6px;">Recebe no PIX: <b>${cgEsc(minha.chave_pix)}</b></div>`
-      : (minha ? campo('Sua chave PIX (uma vez só) *', `<input id="rmbPix" placeholder="CPF, celular, e-mail ou chave aleatória" style="${st}">`) : '');
     h += `<div class="contexto" style="text-align:left;">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
         ${campo('Quem', quem)}
         ${campo('Valor (R$) *', `<input id="rmbValor" type="number" step="0.01" min="0" style="${st}">`)}
-        ${campo('Data do gasto *', `<input id="rmbData" type="date" value="${cgHojeIso()}" style="${st}">`)}
+        ${campo('Data do gasto *', `<input id="rmbData" type="date" value="${cgHojeIso()}" max="${cgHojeIso()}" style="${st}">`)}
         ${campo('Loja', `<select id="rmbLoja" style="${st}">${['AGUA VERDE', 'AHU', 'SÃO BRAZ'].map((u) => `<option ${u === lojaPad ? 'selected' : ''}>${u}</option>`).join('')}</select>`)}
-        ${campo('O que foi *', `<select id="rmbOque" style="${st}"><option value=""></option>${RMB_OQUE.map(([r, sub]) => `<option value="${sub}">${r}</option>`).join('')}</select>`)}
-        ${campo('O que comprou *', `<input id="rmbDesc" placeholder="ex.: gás da cozinha" style="${st}">`)}
+        ${campo('O que foi *', `<select id="rmbTipo" style="${st}"><option value=""></option>${tipos.map((t) => `<option value="${cgEsc(t.codigo)}">${cgEsc(t.rotulo)}</option>`).join('')}</select>`)}
+        ${campo('O que comprou *', `<input id="rmbDesc" maxlength="200" placeholder="ex.: gás da cozinha" style="${st}">`)}
         ${campo('Comprovante (foto ou PDF) *', `<input id="rmbNota" type="file" accept="image/*,application/pdf" style="font-size:12px;">`)}
-        ${pix}
+        <div id="rmbPixBox"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;">${cgBotaoPasso('Enviar pedido', 'rmbEnviarGasto()')}<button type="button" class="preset-btn" onclick="RMB_FORM.aberto=false;renderModuloReembolsos(REEMBOLSOS)">Cancelar</button></div></div>`;
   }
-  if (!vis.length) h += `<div class="contexto">${gestor ? 'Nenhum pedido desde 07/11.' : 'Você ainda não pediu nenhum reembolso.'}</div>`;
+  if (!ped.length) h += `<div class="contexto">${aprovador ? 'Nenhum pedido desde 07/11.' : 'Você ainda não pediu nenhum reembolso.'}</div>`;
   else {
-    h += `<div id="tabelaRmb" style="overflow-x:auto;"><table><thead><tr><th>Pedido em</th>${gestor ? '<th>Quem</th>' : ''}<th>O que foi</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${vis.map((g) => `<tr><td>${cgData(g.data_gasto)}</td>${gestor ? `<td>${cgEsc(nomeDe(g.pessoa))} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(g.unidade || '')}</span></td>` : ''}
-        <td style="white-space:normal;">${cgEsc(g.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(String(g.subtipo || '').toLowerCase())}</span></td>
-        <td>${R(g.valor)}</td><td style="color:${corSt(g)};font-weight:700;">${cgEsc(rmbStatusTxt(g, hellen))}</td>
+    h += `<div id="tabelaRmb" style="overflow-x:auto;"><table><thead><tr><th>Gasto em</th>${aprovador ? '<th>Quem</th>' : ''}<th>O que foi</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${ped.map((g) => `<tr><td>${cgData(g.data_gasto)}</td>${aprovador ? `<td>${cgEsc(nomeDe(g.pessoa))} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(g.unidade || '')}${g.chave_pix ? ' · PIX ' + cgEsc(g.chave_pix) : ''}</span></td>` : ''}
+        <td style="white-space:normal;">${cgEsc(g.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(String(g.o_que_foi || '').toLowerCase())}</span></td>
+        <td>${R(g.valor)}</td><td style="color:${corSt(g)};font-weight:700;">${cgEsc(rmbStatusTxt(g))}</td>
         <td style="white-space:nowrap;">${g.comprovante_url ? `<button type="button" class="preset-btn" onclick='rmbVerNota(${JSON.stringify(g.comprovante_url)})'>comprovante</button>` : ''}
-          ${podeDecidir(g) ? ` ${cgBotaoPasso('Aprovar', `rmbDecidir(${g.id},true)`)} ${cgBotaoPasso('Recusar', `rmbDecidir(${g.id},false)`, true)}` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+          ${podeDecidir(g) ? (g.tipo === 'OUTRO' ? ` <select id="rmbSub_${g.id}" style="padding:4px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;"><option value="">categoria…</option>${subtipos.map((s0) => `<option>${cgEsc(s0)}</option>`).join('')}</select>` : '')
+            + ` ${cgBotaoPasso('Aprovar', `rmbDecidir(${g.id},true)`)} ${cgBotaoPasso('Recusar', `rmbDecidir(${g.id},false)`, true)}` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   }
-  if (gestor) {
-    const porP = [...new Set(gastos.map((g) => g.pessoa))].map((p) => [p, deve(gastos.filter((g) => g.pessoa === p))]).filter(([, v]) => v > 0);
+  if (aprovador) {
+    const porP = [...new Set(ped.map((g) => g.pessoa))].map((p) => [p, deve(ped.filter((g) => g.pessoa === p))]).filter(([, v]) => v > 0);
     if (porP.length) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve: ${porP.map(([p, v]) => `<b>${cgEsc(nomeDe(p))}</b> ${R(v)}`).join(' · ')}</div>`;
-  } else if (minha) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve <b>${R(deve(vis))}</b> a você${deve(vis) ? ' (aprovado e ainda não pago)' : ''}.</div>`;
+  }
+  if (minha) { const meus = ped.filter((g) => g.meu); h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve <b>${R(deve(meus))}</b> a você${deve(meus) ? ' (aprovado e ainda não pago)' : ''}.</div>`; }
   h += `<div class="caption-label" style="text-align:left;margin-top:8px;">A Hellen aprova (o pedido dela, o dono). Pago na sexta, por PIX.</div>`;
   alvo.innerHTML = h;
+  if (RMB_FORM.aberto) renderRmbPix();
 }
-let RMB_FORM = { aberto: false };
+// a chave PIX de quem recebe: preenche uma vez; depois só aparece
+function renderRmbPix() {
+  const box = document.getElementById('rmbPixBox'), sel = document.getElementById('rmbPessoa');
+  if (!box || !sel || !REEMBOLSOS) return;
+  const p = REEMBOLSOS.pess.find((x) => x.pessoa === sel.value) || {};
+  box.innerHTML = p.chave_pix ? `<div style="font-size:12px;color:var(--tx-4);padding-top:16px;">Recebe no PIX: <b>${cgEsc(p.chave_pix)}</b></div>`
+    : `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">Chave PIX de quem recebe (uma vez só) *<input id="rmbPix" placeholder="CPF, celular, e-mail ou aleatória" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;width:100%;"></label>`;
+}
 async function rmbEnviarGasto() {
   const g = (id) => document.getElementById(id);
   const pessoa = g('rmbPessoa').value, data = g('rmbData').value, valor = Number(String(g('rmbValor').value).replace(',', '.'));
-  const subtipo = g('rmbOque').value, desc = g('rmbDesc').value.trim(), unidade = g('rmbLoja').value, arquivo = g('rmbNota').files[0] || null;
+  const tipo = g('rmbTipo').value, desc = g('rmbDesc').value.trim(), unidade = g('rmbLoja').value, arquivo = g('rmbNota').files[0] || null;
   const pix = g('rmbPix') ? g('rmbPix').value.trim() : null;
-  const falta = [!pessoa && 'quem', !(valor > 0) && 'valor', !data && 'data', !subtipo && 'o que foi', !desc && 'o que comprou', !arquivo && 'comprovante', g('rmbPix') && !pix && 'chave PIX'].filter(Boolean);
+  const falta = [!(valor > 0) && 'valor', !data && 'data', !tipo && 'o que foi', !desc && 'o que comprou', !arquivo && 'comprovante', g('rmbPix') && !pix && 'chave PIX'].filter(Boolean);
   if (falta.length) return avisoAcao('atencao', '! Falta preencher: ' + falta.join(', ') + '.');
   if (arquivo.size > 15000000) return avisoAcao('atencao', '! Comprovante maior que 15 MB: use uma foto menor.');
   avisoAcao('enviando', '… enviando o pedido');
   try {
     await rmbGarantirTokenValido();
-    if (pix) { const rp = await trRpcSeguro('rmb_pix_salvar', { p_chave: pix }); if (!rp.ok) throw new Error('a chave PIX não gravou: ' + await trErroDe(rp)); }
-    const caminho = `${pessoa}/${cgHojeIso()}-${Math.round(performance.now())}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
+    const caminho = `${pessoa || 'eu'}/${cgHojeIso()}-${Math.round(performance.now())}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
     const sobe = () => fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` }, body: arquivo });
     let up = await sobe(); if (await rmbRenovarSeExpirado(up)) up = await sobe();
     if (!up.ok) throw new Error('o comprovante não subiu (' + up.status + ')');
-    const corpo = JSON.stringify({ pessoa, data_gasto: data, valor, descricao: desc, subtipo, unidade, comprovante_url: caminho, origem: 'PAINEL' });
-    const grava = () => fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos`, { method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }), body: corpo });
-    let r = await grava(); if (await rmbRenovarSeExpirado(r)) r = await grava();
-    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    const r = await trRpcSeguro('rmb_pedir', { p_valor: valor, p_data: data, p_tipo: tipo, p_descricao: desc, p_unidade: unidade, p_comprovante: caminho, p_pix: pix || null, p_pessoa: pessoa || null });
+    if (!r.ok) throw new Error(await trErroDe(r));
     RMB_FORM.aberto = false;
     await entrarReembolsos();
-    avisoAcao('ok', `✓ Pedido enviado às ${avisoHora()} — a Hellen aprova; o pagamento é na sexta.`);
+    avisoAcao('ok', `✓ Pedido enviado às ${avisoHora()} — agora é com a Hellen; o pagamento é na sexta.`);
   } catch (e) { avisoAcao('erro', '✗ Não enviou o pedido: ' + e.message, rmbEnviarGasto); }
 }
 async function rmbDecidir(id, aprova) {
-  let motivo = null;
+  let motivo = null, subtipo = null;
+  const s0 = document.getElementById('rmbSub_' + id);
+  if (aprova && s0) { subtipo = s0.value || null; if (!subtipo) return avisoAcao('atencao', '! Escolha a categoria do gasto antes de aprovar.'); }
   if (!aprova) { motivo = prompt('Motivo da recusa (a pessoa vai ver):'); if (motivo === null) return; motivo = motivo.trim(); if (!motivo) return avisoAcao('atencao', '! Escreva o motivo da recusa.'); }
   avisoAcao('enviando', aprova ? '… aprovando' : '… recusando');
-  const r = await trRpcSeguro('rmb_decidir', { p_id: id, p_aprova: aprova, p_motivo: motivo });
+  const r = await trRpcSeguro('rmb_decidir', { p_id: id, p_aprova: aprova, p_motivo: motivo, p_subtipo: subtipo });
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => rmbDecidir(id, aprova));
   await entrarReembolsos();
   avisoAcao('ok', aprova ? `✓ Aprovado às ${avisoHora()}: o robô lança no Saipos e o pagamento é na sexta.` : `✓ Recusado às ${avisoHora()}.`);
