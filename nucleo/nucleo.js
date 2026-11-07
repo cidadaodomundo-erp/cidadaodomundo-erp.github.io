@@ -386,6 +386,65 @@ if (typeof MutationObserver !== 'undefined') {
   window.addEventListener('resize', vigia);
   document.addEventListener('toggle', vigia, true);   // tabela dentro de grupo recolhido só tem largura depois de aberto
 }
+// ------------------------------------------------------------------
+// GUIA DE PRIMEIRO ACESSO (07/11/2026, dono: "intuitivo e guiar o usuário"; pedido do Organizador: "3–5 passos apontando os
+// elementos, uma vez por usuário por tela, com Pular e um botão '?' para rever"). A tela registra os passos e chama
+// guiaTalvez(tela) depois de desenhar: na 1ª vez daquele login naquele aparelho, o guia abre sozinho; o "?" no canto
+// reabre quando quiser. Passo cujo elemento não está na tela é pulado (cada login vê partes diferentes).
+//   guiaRegistrar('agenda', [{ sel: '.ag-bloco', texto: '…' }, …]); guiaTalvez('agenda');
+// ------------------------------------------------------------------
+const GUIAS = {};
+function guiaChave(tela) { const s = rmbSessao(); return 'guiaVisto:' + ((s && s.email) || '') + ':' + tela; }
+function guiaVisto(tela) { try { return localStorage.getItem(guiaChave(tela)) === '1'; } catch (e) { return true; } }
+function guiaMarcar(tela) { try { localStorage.setItem(guiaChave(tela), '1'); } catch (e) {} }
+function guiaRegistrar(tela, passos) {
+  GUIAS[tela] = passos;
+  if (document.getElementById('guiaRever')) return;
+  const b = document.createElement('button');
+  b.id = 'guiaRever'; b.type = 'button'; b.textContent = '?'; b.title = 'Rever o guia desta tela';
+  b.style.cssText = 'position:fixed; left:14px; bottom:14px; z-index:10040; width:34px; height:34px; border-radius:50%; cursor:pointer;'
+    + ' border:1px solid var(--line-2); background:var(--surface-2); color:var(--tx-2); font:700 16px/1 inherit;';
+  b.onclick = () => guiaAbrir(tela, 0);
+  document.body.appendChild(b);
+}
+function guiaTalvez(tela) { if (GUIAS[tela] && !guiaVisto(tela)) setTimeout(() => guiaAbrir(tela, 0), 500); }
+function guiaFechar(tela) {
+  guiaMarcar(tela);
+  ['guiaVeu', 'guiaLuz', 'guiaBalao'].forEach((id) => { const e = document.getElementById(id); if (e) e.remove(); });
+}
+function guiaAbrir(tela, i) {
+  const passos = (GUIAS[tela] || []).filter((p) => document.querySelector(p.sel));
+  if (!passos.length) return;
+  i = Math.max(0, Math.min(i, passos.length - 1));
+  const p = passos[i], alvo = document.querySelector(p.sel);
+  alvo.scrollIntoView({ block: 'center', behavior: 'instant' });
+  const r = alvo.getBoundingClientRect();
+  const pega = (id, css) => { let e = document.getElementById(id); if (!e) { e = document.createElement('div'); e.id = id; document.body.appendChild(e); } e.style.cssText = css; return e; };
+  // o véu escurece tudo menos o elemento (sombra enorme em volta da "luz")
+  pega('guiaVeu', 'position:fixed; inset:0; z-index:10060;');
+  pega('guiaLuz', `position:fixed; z-index:10061; pointer-events:none; left:${r.left - 6}px; top:${r.top - 6}px; width:${r.width + 12}px; height:${r.height + 12}px;`
+    + ' border-radius:10px; outline:2px solid var(--info); box-shadow:0 0 0 9999px rgba(0,0,0,.55);');
+  const larg = Math.min(340, window.innerWidth - 24);
+  const embaixo = r.bottom + 190 < window.innerHeight;
+  const top = embaixo ? r.bottom + 14 : Math.max(12, r.top - 14 - 170);
+  const left = Math.max(12, Math.min(r.left, window.innerWidth - larg - 12));
+  const balao = pega('guiaBalao', `position:fixed; z-index:10062; left:${left}px; top:${top}px; width:${larg}px; box-sizing:border-box;`
+    + ' background:var(--surface); color:var(--tx-1); border:1px solid var(--info); border-radius:10px; padding:12px 14px; font-size:14px; line-height:1.45;');
+  const ult = i === passos.length - 1;
+  balao.innerHTML = `<div style="font-size:11px; color:var(--tx-4); margin-bottom:4px;">Passo ${i + 1} de ${passos.length}</div>
+    <div>${p.texto}</div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+      <button type="button" class="preset-btn" data-g="pular">${ult ? 'Fechar' : 'Pular'}</button>
+      ${i ? '<button type="button" class="preset-btn" data-g="volta">Voltar</button>' : ''}
+      <button type="button" class="preset-btn active" data-g="vai">${ult ? 'Entendi' : 'Próximo'}</button></div>`;
+  balao.onclick = (e) => {
+    const g = e.target.closest('[data-g]'); if (!g) return;
+    if (g.dataset.g === 'vai' && !ult) guiaAbrir(tela, i + 1);
+    else if (g.dataset.g === 'volta') guiaAbrir(tela, i - 1);
+    else guiaFechar(tela);
+  };
+  document.getElementById('guiaVeu').onclick = () => guiaFechar(tela);
+}
 let AVISO_REFAZER = null;
 function avisoHora() { return new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }); }
 function avisoAcao(estado, texto, refazer) {

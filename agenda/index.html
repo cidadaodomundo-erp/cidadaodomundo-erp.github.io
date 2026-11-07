@@ -19,7 +19,7 @@
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
-<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107g">
 <style>
   .na-casca body::before { display:none !important; }
   .ag-dia { font-size:14px; font-weight:800; color:var(--tx-1); margin:16px 2px 4px; }
@@ -50,7 +50,7 @@
   </div>
 </div>
 
-<script src="../nucleo/nucleo.js?v=20261107t"></script>
+<script src="../nucleo/nucleo.js?v=20261107g"></script>
 <script>
 const AG = { dados: null };
 const agHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
@@ -79,7 +79,7 @@ async function entrarAgenda() {
     if (AGP.veEquipe === null) { const r = await trRpcSeguro('agenda_ve_equipe', {}); AGP.veEquipe = r.ok ? (await r.json()) === true : false; }
     if (AGENDA_TODOS) await agPessoaEntrar(null);
     else alvo.innerHTML = '<h2>Minha agenda</h2>' + (AGP.veEquipe ? '' : '<div class="contexto">A sua agenda chega em breve.</div>');
-    if (AGP.veEquipe) agEquipeMontar();
+    if (AGP.veEquipe) agEquipeMontar().then(agGuia);
     return;
   }
   alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
@@ -186,7 +186,18 @@ function agDesenhar() {
   alvo.innerHTML = h;
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
-  agEquipeMontar();
+  agEquipeMontar().then(agGuia);
+}
+// GUIA DE PRIMEIRO ACESSO (07/11/2026, exemplo do padrão novo; mecanismo no nucleo.js): abre uma vez por login; "?" revê
+function agGuia() {
+  guiaRegistrar('agenda', [
+    { sel: '.ag-bloco', texto: '<b>Depende de você</b>: só o que pede uma ação sua, de hoje e dos próximos dias. É isto que conta no número vermelho do menu.' },
+    { sel: '.ag-lin button[title="tirar da agenda"]', texto: 'Resolveu? Toque no <b>✓</b> e a linha sai da agenda (e do número do menu).' },
+    { sel: '.ag-lin .preset-btn[onclick^="agIr"]', texto: '<b>abrir</b> leva direto à tela onde se resolve aquilo.' },
+    { sel: 'details.ag-saber > summary', texto: '<b>Para saber</b>: o que não pede nada de você (aguardando conciliação, contas dos próximos dias). Fica fechado; toque para abrir.' },
+    { sel: '#tabelaAgEquipe', texto: '<b>Agenda da equipe</b>: clique na pessoa para ver a agenda dela, do jeito que ela vê.' },
+  ]);
+  guiaTalvez('agenda');
 }
 async function agFeito(id) {
   avisoAcao('enviando', '… tirando da agenda');
