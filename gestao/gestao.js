@@ -6477,7 +6477,8 @@ function cpTitulos(linhas, saiu, aguarda) {
     const k = r.id_titulo ? `${r.origem}|${r.id_titulo}|${r.vencimento}|${r.conta_exibida}` : `linha${i}`;
     let t = mapa.get(k);
     if (!t) {
-      t = { vencimento: r.vencimento, situacao: r.situacao, dias_vencida: r.dias_vencida, origem: r.origem,
+      // 07/11/2026 (dono: "sempre espere o tempo de conciliação"): o banco já diz 'AGUARDANDO CONCILIACAO' — mesma faixa do 'aguardando'
+      t = { vencimento: r.vencimento, situacao: r.situacao === 'AGUARDANDO CONCILIACAO' ? 'AGUARDANDO EXTRATO' : r.situacao, dias_vencida: r.dias_vencida, origem: r.origem,
             unidade: r.unidade, conta_exibida: r.conta_exibida || '', descricao: String(r.titulo || r.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),
             fornecedor: r.fornecedor || '', liquido: 0, partes: [], saiuTodas: true, saiuBanco: undefined, aguardaTodas: true };
       mapa.set(k, t);
@@ -6612,7 +6613,7 @@ async function cpAtualizar() {
 
 // ---- pecas comuns das duas telas ----
 const CP_SIT = {
-  PAGAR: [['VENCIDA', 'Vencidas', 'neg'], ['AGUARDANDO EXTRATO', 'Aguardando o extrato', 'neutral'], ['VENCE HOJE', 'Vence hoje', 'highlight'], ['PROXIMOS 7 DIAS', 'Próximos 7 dias', 'blue'], ['DEPOIS', null, 'neutral']],
+  PAGAR: [['VENCIDA', 'Vencidas', 'neg'], ['AGUARDANDO EXTRATO', 'Aguardando conciliação', 'neutral'], ['VENCE HOJE', 'Vence hoje', 'highlight'], ['PROXIMOS 7 DIAS', 'Próximos 7 dias', 'blue'], ['DEPOIS', null, 'neutral']],
   RECEBER: [['VENCIDA', 'Atrasados', 'neg'], ['VENCE HOJE', 'Vence hoje', 'highlight'], ['PROXIMOS 7 DIAS', 'Próximos 7 dias', 'blue'], ['DEPOIS', null, 'neutral']],
 };
 

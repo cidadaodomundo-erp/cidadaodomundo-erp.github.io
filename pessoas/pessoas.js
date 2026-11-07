@@ -2395,6 +2395,7 @@ function cgFaltamDias(iso) {
   return Math.round((Date.parse(String(iso).slice(0, 10)) - Date.parse(hoje)) / 86400000);
 }
 function cgFcPrazo(x) {
+  if (x.prazoTxt) return x.prazoTxt;
   const f = x.faltam_dias === null || x.faltam_dias === undefined ? null : Number(x.faltam_dias), p = cgN(x.parado_dias), ferias = x.tipo === 'FERIAS', L = [];
   if (f !== null) {
     const v = ferias ? ['começa', 'começou'] : ['vence', 'venceu'];
@@ -2445,7 +2446,11 @@ function cgHojeItens() {
     // 05/11/2026 (RH): programada vence no PAGAMENTO, que o banco já dá em pagar_ate (dia útil: a sexta 06/11, não o domingo 08/11)
     const prog = x.situacao === 'programada' && (x.pagar_ate || x.limite_gozo);
     const ref = prog ? (x.pagar_ate || new Date(Date.parse(String(x.limite_gozo).slice(0, 10)) - 2 * 86400000).toISOString().slice(0, 10)) : x.limite_gozo;
-    itens.push({ grupo: prog ? 'Pagar' : 'Férias', tipo: 'FERIAS_ALERTA', o_que: prog ? 'Pagar as férias' : 'Férias', nome: x.nome, sub: x.unidade, valor: prog ? x.valor_estimado : null,
+    // 07/11/2026 (dono: "sempre espere o tempo de conciliação"): pago e ainda não conciliado não é atraso (vw_rh_ferias_alertas.pagamento)
+    const aguarda = prog && x.pagamento === 'AGUARDANDO_CONCILIACAO';
+    const prazoTxt = aguarda ? `<span style="color:var(--tx-4);">⏳ aguardando conciliação${x.extrato_ate ? ' (extrato até ' + cgDiaMes(String(x.extrato_ate)) + ')' : ''}</span>`
+      : prog && x.pagamento === 'NAO_PAGO' ? `<span style="color:var(--farol-fora);font-weight:700;">não pago: venceu ${cgDiaMes(String(ref))}</span>` : null;
+    itens.push({ grupo: prog ? 'Pagar' : 'Férias', tipo: 'FERIAS_ALERTA', o_que: prog ? 'Pagar as férias' : 'Férias', nome: x.nome, sub: x.unidade, valor: prog ? x.valor_estimado : null, prazoTxt, aguarda,
       detalhe: String(x.mensagem || '').replace(/(\d+)\.00\b/g, '$1'), faltam_dias: cgFaltamDias(ref),
       acao: prog ? `${x.valor_estimado != null ? `<b>cerca de ${cgR(x.valor_estimado)}</b><div style="font-size:11px;color:var(--tx-4);">o valor certo é o do recibo</div>` : ''}${irPara('pferias', 'Abrir férias')}` : irPara('pferias', 'Abrir férias') });
   }
@@ -2453,6 +2458,7 @@ function cgHojeItens() {
   // 2 qualquer parado, férias/pagamento em até 15 dias · 3 o resto (prazo longe, sem prazo); dentro da faixa, o prazo mais perto e depois o mais parado
   const fd = (x) => (x.faltam_dias === null || x.faltam_dias === undefined ? null : Number(x.faltam_dias));
   const faixa = (x) => { const f = fd(x), p = cgN(x.parado_dias);
+    if (x.aguarda) return 3;   // pago, esperando a conciliação: não é urgência
     if (f !== null && f <= 0) return 0;
     if (p >= 3 || (f !== null && f <= 3)) return 1;
     if (p > 0 || (f !== null && f <= 15 && (x.grupo === 'Pagar' || /FERIAS/.test(x.tipo || '')))) return 2;   // parado é ação de agora
