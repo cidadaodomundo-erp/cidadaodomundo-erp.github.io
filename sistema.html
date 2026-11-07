@@ -31,12 +31,22 @@
     dois renovando ao mesmo tempo derrubam o login (a lição de 21/08 no dashboard.html).
 -->
 <script>
-  // SIMULAÇÃO DO VISUAL CLARO (07/11/2026): ?tema=proposta liga e fica na aba (as telas de dentro leem daqui); ?tema=oficial desliga
+  // CLARO OU ESCURO, CADA UM ESCOLHE (dono 07/11/2026 04:34). Vale o que o login gravou no banco (painel_meu_tema, lido
+  // depois de entrar); até lá, a cópia deste navegador. Sem escolha = escuro (o de hoje). ?tema=proposta|claro e
+  // ?tema=oficial|escuro ainda funcionam (links da simulação). As telas de dentro leem o sessionStorage (nucleo.js).
+  function temaAplicar(t) {
+    const claro = t === 'claro';
+    try { localStorage.setItem('painelTema', claro ? 'claro' : 'escuro'); if (claro) sessionStorage.setItem('temaProposta', '1'); else sessionStorage.removeItem('temaProposta'); } catch (e) {}
+    document.documentElement.classList.toggle('tema-proposta', claro);
+    document.querySelectorAll('iframe').forEach((f) => { try { f.contentDocument.documentElement.classList.toggle('tema-proposta', claro); } catch (e) {} });
+    const b = document.getElementById('btnTema');
+    if (b) { b.textContent = claro ? '🌙' : '☀️'; b.title = claro ? 'Mudar para o visual escuro' : 'Mudar para o visual claro'; }
+  }
   try {
     const t = new URLSearchParams(location.search).get('tema');
-    if (t === 'proposta') sessionStorage.setItem('temaProposta', '1');
-    else if (t === 'oficial') sessionStorage.removeItem('temaProposta');
-    if (sessionStorage.getItem('temaProposta') === '1') document.documentElement.classList.add('tema-proposta');
+    const pedido = t === 'proposta' || t === 'claro' ? 'claro' : t === 'oficial' || t === 'escuro' ? 'escuro' : null;
+    temaAplicar(pedido || localStorage.getItem('painelTema') || 'escuro');
+    if (pedido) window.TEMA_DO_LINK = pedido;   // o link manda: grava no login depois de entrar
   } catch (e) {}
 </script>
 <style>
@@ -102,7 +112,8 @@
   .acoes { margin-left:auto; display:flex; gap:8px; flex-shrink:0; }
   /* 07/11/2026: a busca de telas (casca/busca.js) */
   .busca { position:relative; margin-left:auto; flex-shrink:1; min-width:0; }
-  .busca + .acoes { margin-left:0; }
+  .busca + .acoes, #btnTema + .acoes { margin-left:0; }
+  #btnTema { flex-shrink:0; }
   .busca input { width:230px; max-width:100%; box-sizing:border-box; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1); font:inherit; font-size:13px; }
   .busca input:focus { outline:none; border-color:var(--marca-amarelo); }
   .busca-res { position:absolute; right:0; top:calc(100% + 4px); width:320px; max-width:90vw; max-height:60vh; overflow:auto; background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:4px; z-index:60; }
@@ -214,7 +225,6 @@
 <div class="app">
   <aside class="side" id="side">
     <div class="marca"><img src="logo.png" alt=""><span>Cidadão do Mundo</span></div>
-    <div class="tema-faixa"><b style="color:var(--marca-amarelo);">Simulação do visual claro</b><br>só o visual muda; as telas são as de hoje. <a href="sistema.html?tema=oficial" style="color:var(--tx-3);">voltar ao visual de hoje</a></div>
     <button class="mi" id="miInicio" type="button"><span class="ic">🏠</span>Início</button>
     <nav id="menu"></nav>
     <div class="rodape"><span id="quem"></span><button class="btn" type="button" id="btnSair">Sair</button></div>
@@ -226,6 +236,7 @@
       <div class="ti" id="titulo">Início</div>
       <div class="vendo" id="vendo"></div>
       <div class="busca" id="buscaCx"><input id="busca" type="search" placeholder="🔎 Buscar tela… (Ctrl+K)" autocomplete="off" spellcheck="false" aria-label="Buscar tela" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" role="listbox" hidden></div></div>
+      <button class="btn" type="button" id="btnTema" title="Mudar para o visual claro">☀️</button>
       <div class="acoes" id="acoes"></div>
     </div>
     <div class="faixa-loja" id="faixaLoja" hidden></div>
@@ -793,8 +804,31 @@ async function carregarSinalAgenda() {
   } catch (e) {}   // sem o número, o menu segue igual
 }
 
+// o tema do login (banco) manda; o clique troca e grava (o navegador guarda uma cópia)
+async function temaDoLogin() {
+  try {
+    if (window.TEMA_DO_LINK) { temaGravar(window.TEMA_DO_LINK); return; }
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/painel_meu_tema', { method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: '{}' });
+    if (!r.ok) return;
+    const t = await r.json();
+    if (t === 'claro' || t === 'escuro') temaAplicar(t);
+  } catch (e) {}
+}
+async function temaGravar(t) {
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/rpc/painel_tema_gravar', { method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_tema: t }) });
+  } catch (e) {}   // sem rede: fica a cópia deste navegador
+}
+$('btnTema').addEventListener('click', () => {
+  const novo = document.documentElement.classList.contains('tema-proposta') ? 'escuro' : 'claro';
+  temaAplicar(novo);
+  temaGravar(novo);
+});
+temaAplicar(document.documentElement.classList.contains('tema-proposta') ? 'claro' : 'escuro');   // acerta o ícone
+
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
+  temaDoLogin();
   [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
