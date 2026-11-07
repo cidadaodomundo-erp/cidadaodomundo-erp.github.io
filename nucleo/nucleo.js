@@ -372,12 +372,15 @@ async function trRpcSeguro(fn, args) {
 let EMAIL_DONO = null;
 
 async function carregarEmailDono() {
-  if (EMAIL_DONO !== null) return EMAIL_DONO;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/rmb_config?chave=eq.email_dono&select=valor`,
-                        { headers: rmbHeaders() });
-  const d = r.ok ? await r.json() : [];
-  EMAIL_DONO = (d[0] && d[0].valor) || '';
-  return EMAIL_DONO;
+  if (EMAIL_DONO) return EMAIL_DONO;
+  // 07/11/2026: login vencido na abertura dava 401 aqui, e o '' ficava guardado: o dono virava "não é o dono" até recarregar
+  // (a Minha agenda dizia "chega em breve"). Agora renova e tenta de novo; se ainda falhar, fica null e a próxima chamada relê.
+  const ler = () => fetch(`${SUPABASE_URL}/rest/v1/rmb_config?chave=eq.email_dono&select=valor`, { headers: rmbHeaders() });
+  let r = null;
+  try { r = await ler(); if (await rmbRenovarSeExpirado(r)) r = await ler(); } catch (e) { r = null; }
+  const d = r && r.ok ? await r.json().catch(() => null) : null;
+  EMAIL_DONO = d ? ((d[0] && d[0].valor) || '') : null;
+  return EMAIL_DONO || '';
 }
 
 function souODono() {

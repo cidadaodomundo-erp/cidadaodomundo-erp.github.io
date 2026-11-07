@@ -50,7 +50,7 @@
   </div>
 </div>
 
-<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/nucleo.js?v=20261107a"></script>
 <script>
 const AG = { dados: null };
 const agHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
@@ -66,7 +66,12 @@ function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome });
 
 async function entrarAgenda() {
   const alvo = document.getElementById('view-agenda');
+  await rmbGarantirTokenValido().catch(() => {});
   await carregarEmailDono();
+  if (EMAIL_DONO === null) {   // não deu para confirmar quem está logado: nunca concluir "não é o dono" por falha de leitura
+    alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui confirmar o seu login agora. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>';
+    return;
+  }
   // 07/11/2026 (dono 03:11): cada login tem a sua agenda (minha_agenda). Fica escondida da equipe até o "manda" do dono na
   // mensagem do Avisos (AGENDA_TODOS); até lá o dono confere a de cada um pelo "ver como".
   if (!souODono()) {
