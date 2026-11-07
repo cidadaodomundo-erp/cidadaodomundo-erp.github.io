@@ -420,7 +420,8 @@ let VE_PESSOAL = null;
 const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
 // 07/11/2026: a Minha agenda também (até a agenda de cada pessoa ir ao ar, com o "manda" do dono)
-const SO_DONO = new Set(['atividades', 'agenda']);
+// 07/11/2026 12:15: a agenda saiu daqui — cada login vê a sua ("manda" do dono no chat Avisos, 12:09)
+const SO_DONO = new Set(['atividades']);
 // 07/11/2026 (dono 03:59): a Minha agenda também abre para quem vê a agenda da equipe (agenda_quem_ve_equipe: o Fabio)
 let VE_EQUIPE = null;
 const EMAIL_DONO = 'neto@cidadaodomundo.com.br';

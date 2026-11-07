@@ -213,7 +213,7 @@ async function agFeito(id) {
 // (o Avisos lê de lá): ✓ Concluí, ⏱ Preciso de mais tempo (1 a 3 dias), 🙋 Preciso de ajuda (vai para a Ajuda do painel).
 // "abrir" leva à tela da atividade e registra que a pessoa abriu. O dono vê a de cada um pelo "ver como" (só leitura).
 // =====================================================================================================================
-const AGENDA_TODOS = false;   // liga com o "manda" do dono na mensagem do Avisos (aí também sai do SO_DONO da casca)
+const AGENDA_TODOS = true;   // ligado 07/11/2026 12:15: "manda" do dono no chat Avisos (12:09); comunicado sai seg 09/11 08:00
 const AGP = { linhas: [], verComo: null, form: null, pessoas: null, veEquipe: null };
 const AG_ESTADO = { 'A fazer': '', 'Atrasada': 'atraso', 'Travada': 'atraso', 'Mais tempo': '', 'Pediu ajuda': 'alerta', 'Concluí': 'feito' };
 const AG_ORDEM = ['Travada', 'Atrasada', 'Pediu ajuda', 'A fazer', 'Mais tempo', 'Concluí'];
