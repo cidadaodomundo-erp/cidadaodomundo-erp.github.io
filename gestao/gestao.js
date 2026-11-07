@@ -2611,11 +2611,13 @@ function renderLucroUni() {
   const movTot = {};
   saldos.forEach(s => { movTot[s.conta] = (movTot[s.conta] || 0) + nu(s.movimento); });
   const caixaU = {};
+  let ajJan = 0;   // ajuste do corte que cai DENTRO da janela: a ponte mostra numa linha propria
   contas.filter(c => !ehCartao(c.conta) && (!ctxLoja || c.unidade === ctxLoja)).forEach(c => {
     const a = caixaU[c.unidade] || (caixaU[c.unidade] = { ini: 0, fim: 0 });
     const k = ajusteCorte(c.conta, c.saldo_inicial, movTot[c.conta]);
     const ajIni = k && k.mes < fechados[0] ? k.ajuste : 0;
     const ajFim = k && k.mes <= fechados[fechados.length - 1] ? k.ajuste : 0;
+    ajJan += ajFim - ajIni;
     const abre = nu(c.saldo_inicial) + (movAntes[c.conta] || 0) + ajIni;
     a.ini += abre;
     a.fim += abre + (movAte[c.conta] || 0) + (ajFim - ajIni);
@@ -2769,9 +2771,10 @@ function renderLucroUni() {
         ${Math.abs(aporte) > 0.005 ? linhaPonte('(±) Repasse entre as unidades', aporte, 'soma perto de zero na rede — só muda de bolso') : ''}
         <tr class="sub"><td><b>= deveria ter sobrado</b></td><td><b>${rs(chegou)}</b></td></tr>
         <tr class="liq"><td>Sobrou de verdade no caixa${xpDentro ? ' + XP' : ''}</td><td>${rs(sobrouCaixa)}</td></tr>
+        ${Math.abs(ajJan) > 0.005 ? linhaPonte('(±) Ajuste da trava do corte (cofres)', ajJan, 'caixa do Saipos regravado antes do corte de 21/10') : ''}
         <tr><td style="color:#8a897e;">Diferença de competência × caixa
               <div style="color:#6f6e64; font-size:10.5px;">nota lançada num mês, dinheiro que andou em outro</div></td>
-            <td style="color:#8a897e;">${rs(sobrouCaixa - chegou)}</td></tr>
+            <td style="color:#8a897e;">${rs(sobrouCaixa - chegou - ajJan)}</td></tr>
       </tbody>
     </table></div>
     <div class="contexto">
@@ -2943,12 +2946,18 @@ function farolMetasSemanaFechada(titulo) {
   // o farol: verde, perto e fora (cinza = meta so da Rede ou sem dado, fica fora da conta)
   const perto = atencao.filter(c => c.cor === '#f5a623'), fora = atencao.filter(c => c.cor === '#ff6b6b');
   const nomes = (l) => l.map(c => nomeMeta(c.k)).join(', ');
-  const borda = fora.length ? 'var(--farol-fora)' : perto.length ? 'var(--farol-perto)' : 'var(--farol-ok)';
+  // 07/11/2026 (verificador, farol-metas-cinza-some): a meta cinza que conta (sem dado) aparece pelo nome;
+  // na visao Rede completa todas ficam cinza, e a linha diz o motivo em vez de "0 de 9 no verde".
+  const cinza = atencao.filter(c => c.cor === '#8a897e' && !metaSoRede(c.k));
+  const naRede = typeof PERIMETRO !== 'undefined' && PERIMETRO === 'rede';
+  const borda = naRede ? 'var(--line-2)' : fora.length ? 'var(--farol-fora)' : perto.length ? 'var(--farol-perto)' : 'var(--farol-ok)';
   return '<div class="section-label">' + (titulo ? titulo(sem.ini, sem.fim) : 'Metas da semana fechada ' + ddmm(sem.ini) + ' a ' + ddmm(sem.fim)) + '</div>' +
     '<div class="contexto" style="border-color:' + borda + '; cursor:pointer;" onclick="mostrarModulo(\'indicadores\')" title="Abrir os Indicadores e metas">' +
+    (naRede ? '<b>Sem farol na Rede iFood completa:</b> as metas valem em Minha gestão' :
     '<b>' + verdes + ' de ' + nContam + ' metas no verde</b>' +
     (perto.length ? ' · <span style="color:var(--farol-perto); font-weight:700;">● ' + perto.length + ' perto</span> (' + nomes(perto) + ')' : '') +
     (fora.length ? ' · <span style="color:var(--farol-fora); font-weight:700;">● ' + fora.length + ' fora</span> (' + nomes(fora) + ')' : '') +
+    (cinza.length ? ' · ' + cinza.length + ' sem dado (' + nomes(cinza) + ')' : '')) +
     (concIncompleta ? ' · provisório: conciliação do iFood só até ' + ddmm(HOME_PEND.concAte) : '') +
     ' · <b>Indicadores e metas →</b></div>';
 }
