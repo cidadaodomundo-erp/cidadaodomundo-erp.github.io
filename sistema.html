@@ -60,6 +60,8 @@
   .mi.on { background:var(--brand); color:var(--tx-1); }
   .mi:focus-visible, .grp:focus-visible, .btn:focus-visible, .card:focus-visible { outline:2px solid var(--marca-amarelo); outline-offset:1px; }
   .mi .ic { width:18px; text-align:center; flex-shrink:0; font-size:13px; }
+  .sinal { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; background:var(--farol-fora); color:var(--bg); font-size:11px; font-weight:700; line-height:18px; text-align:center; flex-shrink:0; }
+  .grp .sinal { margin-left:8px; }
   .grp { display:flex; align-items:center; width:100%; background:none; border:none; border-top:1px solid var(--line);
          color:var(--tx-5); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.8px;
          padding:14px 12px 6px; margin-top:6px; cursor:pointer; text-align:left; }
@@ -368,14 +370,17 @@ let VE_PESSOAL = null;
 // tela só de DONO e FINANCEIRO
 const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
-const SO_DONO = new Set(['atividades']);
+// 07/11/2026: a Minha agenda também (até a agenda de cada pessoa ir ao ar, com o "manda" do dono)
+const SO_DONO = new Set(['atividades', 'agenda']);
+const EMAIL_DONO = 'neto@cidadaodomundo.com.br';
+function ehDono() { return String((sessao() || {}).email || '').toLowerCase() === EMAIL_DONO; }
 let VE_GESTAO = null;
 function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
-  if (SO_DONO.has(chave) && String((sessao() || {}).email || '').toLowerCase() !== 'neto@cidadaodomundo.com.br') return false;
+  if (SO_DONO.has(chave) && !ehDono()) return false;
   if (!PODE) return true;
   if (it.link) return false;                     // atalhos também somem para acesso restrito (igual ao painel)
   return PODE.includes(chave);
@@ -383,20 +388,24 @@ function visivel(chave) {
 let GRUPOS_ABERTOS = {};
 try { GRUPOS_ABERTOS = JSON.parse(localStorage.getItem('cascaGrupos') || '{}') || {}; } catch (e) {}
 
+// 07/11/2026 (dono, pelo Organizador: "no menu aparecer um sinal quando a agenda tiver mensagem não resolvida"):
+// número ao lado da tela; some quando zera. Grupo fechado mostra a soma no próprio título.
+const SINAIS = {};
+function sinalHtml(n) { return n > 0 ? `<span class="sinal" title="${n} sem resolver">${n}</span>` : ''; }
 function desenharMenu() {
   // na simulação, a Hoje mora dentro de "Agora" (não fica solta no alto) e uma faixa avisa que é simulação
   let h = PROPOSTA ? `<div style="margin:4px 8px 8px;padding:6px 8px;border:1px solid var(--marca-amarelo);border-radius:8px;font-size:11.5px;line-height:1.4;color:var(--tx-2);"><b style="color:var(--marca-amarelo);">Simulação do menu novo</b><br>as telas são as de hoje; só o menu muda. <a href="sistema.html${location.hash}" style="color:var(--tx-3);">voltar ao menu de hoje</a></div>` : '';
   if (!PROPOSTA) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
-    `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}</button>`).join('');
+    `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${sinalHtml(SINAIS[i.chave])}</button>`).join('');
   // 22/10/2026: o menu segue os MÓDULOS do formato A (o mesmo agrupamento dos cartões do Início)
   MODULOS.forEach((g) => {
     const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => PROPOSTA || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
     if (!itens.length) return;
     const tem = itens.some((i) => i.chave === ATUAL);
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
-    h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}<span class="seta">▶</span></button>`;
+    h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}${aberto ? '' : sinalHtml(itens.reduce((a, i) => a + (SINAIS[i.chave] || 0), 0))}<span class="seta">▶</span></button>`;
     h += '<div class="itens">' + itens.map((i) =>
-      `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}</button>`
+      `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`
     ).join('') + '</div>';
   });
   $('menu').innerHTML = h;
@@ -505,6 +514,7 @@ window.addEventListener('message', (e) => {
       history.replaceState(null, '', '#' + e.data.nome);
       desenharMenu();
     }
+    else if (e.data.tipo === 'casca-sinal' && ITENS[e.data.nome]) { SINAIS[e.data.nome] = Math.max(0, Number(e.data.n) || 0); desenharMenu(); }
     else if (e.data.tipo === 'casca-login') mostrarPorta(e.data.recado || 'Sua sessão acabou. Entre de novo.');
     else if (e.data.tipo === 'casca-loja-pedir') trocarLoja(e.data.loja);   // a tela pediu uma loja (ex.: Estoque na Rede)
     return;
@@ -641,6 +651,24 @@ async function carregarDescricoes() {
   } catch (e) { return {}; }
 }
 
+// o sinal da Minha agenda, calculado pela casca ao entrar (a mesma regra da agenda, que manda o número de novo ao abrir):
+// o que depende do dono com prazo até hoje + contas vencidas DE VERDADE (situação VENCIDA, sem as "aguardando
+// conciliação"), contadas por título como no Contas a pagar
+async function carregarSinalAgenda() {
+  if (!ehDono() || !visivel('agenda')) return;
+  try {
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const ler = async (q) => { const r = await fetch(SUPABASE_URL + '/rest/v1/' + q, { headers: cabecalho() }); if (!r.ok) throw new Error(r.status); return r.json(); };
+    const [pend, venc] = await Promise.all([
+      ler('dono_pendencia?select=id,prazo&resolvido_em=is.null'),
+      ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&vencimento=lt.${hoje}`)]);
+    const nPend = pend.filter((p) => !p.prazo || p.prazo <= hoje).length;
+    const nVenc = new Set(venc.map((c, i) => c.id_titulo ? `${c.origem}|${c.id_titulo}|${c.vencimento}|${c.conta_exibida || ''}` : `l${i}`)).size;
+    SINAIS.agenda = nPend + nVenc;
+    desenharMenu();
+  } catch (e) {}   // sem o número, o menu segue igual
+}
+
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
   [PODE, DESC, , VE_PESSOAL, VE_GESTAO] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao()]);
@@ -650,7 +678,11 @@ async function montar() {
   const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link);
   if (pedido && visivel(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
   else if (PODE && minhas.length) abrir(minhas[0]);     // acesso restrito abre direto no que é dele, como o painel
+  // 07/11/2026 (dono, pelo Organizador: "a tela inicial poderia abrir já na tela da agenda"): por ora só o dono;
+  // os outros logins quando a agenda deles for ao ar
+  else if (visivel('agenda') && ehDono()) abrir('agenda');
   else inicio();
+  carregarSinalAgenda();
 }
 
 (async function abrirCasca() {

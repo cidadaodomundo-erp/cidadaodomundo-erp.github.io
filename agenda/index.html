@@ -61,7 +61,7 @@ async function entrarAgenda() {
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext] = await Promise.all([
     ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
-    ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta,conta_exibida&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
+    ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
     ler(`vw_rh_calculos_mes?select=nome,calculo,data_limite,calculado_em,fechado_em,enviado_em,pessoas,total&data_limite=gte.${hoje}&data_limite=lte.${fim}&order=data_limite`),
@@ -79,11 +79,13 @@ function agDesenhar() {
   const ultMin = Object.values(ult).sort()[0] || null;
   const conciliou = (dia, conta) => { const u = (conta && ult[conta]) || ultMin; return !!u && String(dia).slice(0, 10) <= u; };
   const itens = [];   // { dia, txt, ir, chat, tipo: 'atraso'|'alerta'|'', id (pendência) }
+  AG.sinal = 0;
   const add = (o) => itens.push(Object.assign({ tipo: '' }, o));
   const falhou = [];
   const ok = (x, rot) => { if (x && x.erro) { falhou.push(rot); return false; } return Array.isArray(x); };
   // 1) o que depende de mim (os chats gravam)
   if (ok(pend, 'o que depende de você')) pend.forEach((p) => {
+    if (!p.prazo || p.prazo <= hoje) AG.sinal++;
     const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
@@ -96,11 +98,14 @@ function agDesenhar() {
     const val = (c) => Math.max(0, (Number(c.debito) || 0) - (Number(c.credito) || 0));
     // a situação já vem do banco (vw_fin_contas_pagar: 'VENCIDA' só depois da conciliação; antes, 'AGUARDANDO CONCILIACAO')
     const venc = cp.filter((c) => c.vencimento < hoje && c.situacao === 'VENCIDA'), agu = cp.filter((c) => c.vencimento < hoje && c.situacao !== 'VENCIDA');
-    if (venc.length) add({ dia: hoje, txt: `<b>${venc.length}</b> contas vencidas, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
-    if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${agu.length} ${agu.length === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — o extrato ainda não chegou ao dia do vencimento</span>`, ir: 'contaspagar' });
+    // 07/11/2026 (Organizador: "o mesmo número em toda tela"): conta-se TÍTULO, como o Contas a pagar (cpTitulos), não linha de rateio
+    const nTit = (L) => new Set(L.map((c, i) => c.id_titulo ? `${c.origem}|${c.id_titulo}|${c.vencimento}|${c.conta_exibida || ''}` : `l${i}`)).size;
+    AG.sinal += nTit(venc);
+    if (venc.length) add({ dia: hoje, txt: `<b>${nTit(venc)}</b> ${nTit(venc) === 1 ? 'conta vencida' : 'contas vencidas'}, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
+    if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${nTit(agu)} ${nTit(agu) === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — o extrato ainda não chegou ao dia do vencimento</span>`, ir: 'contaspagar' });
     [...new Set(cp.filter((c) => c.vencimento >= hoje).map((c) => c.vencimento))].forEach((d) => {
       const L = cp.filter((c) => c.vencimento === d), m = L.slice().sort((a, b) => val(b) - val(a))[0];
-      add({ dia: d, txt: `<b>${agR0(L.reduce((a, c) => a + val(c), 0))}</b> a pagar (${L.length} ${L.length === 1 ? 'conta' : 'contas'}; maior: ${agE(String(m.descricao || '').replace(/\s*\(parc\..*$/, '').slice(0, 60))} ${agR0(val(m))})`, ir: 'contaspagar' });
+      add({ dia: d, txt: `<b>${agR0(L.reduce((a, c) => a + val(c), 0))}</b> a pagar (${nTit(L)} ${nTit(L) === 1 ? 'conta' : 'contas'}; maior: ${agE(String(m.descricao || '').replace(/\s*\(parc\..*$/, '').slice(0, 60))} ${agR0(val(m))})`, ir: 'contaspagar' });
     });
   }
   // 4) férias: pagar (até) e começar
@@ -133,6 +138,8 @@ function agDesenhar() {
     });
   });
   alvo.innerHTML = h;
+  // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
+  avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
 }
 async function agFeito(id) {
   avisoAcao('enviando', '… tirando da agenda');
