@@ -198,6 +198,7 @@
 <script src="casca/menu.js?v=20261106d"></script>
 <script src="casca/paginas.js?v=20261106a"></script>
 <script src="casca/modulos.js?v=20261106d"></script>
+<script src="casca/modulos-proposta.js?v=20261107b"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -218,10 +219,16 @@ SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i);
 // Qualidade & Super e Negociações saem do menu e viram um atalho para o portal da operação; o endereço antigo ainda abre
 const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes']);
 ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
+// SIMULAÇÃO DO MENU NOVO (dono 07/11/2026): só com ?menu=proposta (casca/modulos-proposta.js); sem ele, nada muda
+const PROPOSTA = window.CASCA_PROPOSTA || null;
+if (PROPOSTA) {
+  Object.entries(PROPOSTA.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
+  Object.entries(PROPOSTA.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
+}
 
 // FORMATO A (22/10/2026): os módulos de casca/modulos.js. Tela do menu que não está em nenhum módulo cai em "Outras
 // telas" — nada some por esquecimento.
-const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []).map((m) => Object.assign({}, m));
+const MODULOS = (PROPOSTA ? PROPOSTA.modulos : Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []).map((m) => Object.assign({}, m));
 (function outrasTelas() {
   const usadas = new Set(MODULOS.flatMap((m) => [...(m.lancar || []), ...(m.acompanhar || [])]));
   const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k) && !FORA_DO_MENU.has(k));
@@ -377,11 +384,13 @@ let GRUPOS_ABERTOS = {};
 try { GRUPOS_ABERTOS = JSON.parse(localStorage.getItem('cascaGrupos') || '{}') || {}; } catch (e) {}
 
 function desenharMenu() {
-  let h = SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
+  // na simulação, a Hoje mora dentro de "Agora" (não fica solta no alto) e uma faixa avisa que é simulação
+  let h = PROPOSTA ? `<div style="margin:4px 8px 8px;padding:6px 8px;border:1px solid var(--marca-amarelo);border-radius:8px;font-size:11.5px;line-height:1.4;color:var(--tx-2);"><b style="color:var(--marca-amarelo);">Simulação do menu novo</b><br>as telas são as de hoje; só o menu muda. <a href="sistema.html${location.hash}" style="color:var(--tx-3);">voltar ao menu de hoje</a></div>` : '';
+  if (!PROPOSTA) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
     `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}</button>`).join('');
   // 22/10/2026: o menu segue os MÓDULOS do formato A (o mesmo agrupamento dos cartões do Início)
   MODULOS.forEach((g) => {
-    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
+    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => PROPOSTA || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
     if (!itens.length) return;
     const tem = itens.some((i) => i.chave === ATUAL);
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
