@@ -378,7 +378,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const fPrinc = formaPadrao(S.slice().sort((a, b) => +b.valor - +a.valor)[0].detalhe);
       const trocaTxt = formas.filter(f => (fS[f] || 0) > (fR[f] || 0) + 0.005).join(', ') + ' → ' + formas.filter(f => (fR[f] || 0) > (fS[f] || 0) + 0.005).join(', ');
       pend.push({ forma: fPrinc, caixa: S[0].caixa || R[0].caixa || null, chave: 'divid:' + ref, bloco: 'maquininha', efeito: dif, p: Math.abs(dif) < 0.005 ? 2 : 1,
-        cor: Math.abs(dif) < 0.005 ? '#f5a623' : '#ff6b6b', hora: hhmm(S[0].hora), valor: dif,
+        cor: Math.abs(dif) < 0.005 ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(S[0].hora), valor: dif,
         saipos: `${txtS} (${S.length} ${S.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaS)})`, real: `${txtR} (${R.length} ${R.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaR)})`,
         leitura: Math.abs(dif) < 0.005 ? `conta dividida, forma trocada no Saipos: ${trocaTxt}` : `conta dividida: Saipos ${reaisCc(somaS)} × maquininha ${reaisCc(somaR)} = ${dif > 0 ? '+' : '−'}${reaisCc(Math.abs(dif))}`,
         acao: Math.abs(dif) < 0.005 ? 'trocar a forma no Saipos para a que passou na maquininha' : (dif > 0 ? 'faltou ' : 'passou ') + reaisCc(Math.abs(dif)) + ' na conta dividida: conferir o valor digitado em cada cartão' });
@@ -404,25 +404,25 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     const r = restoR.splice(cands[0].i, 1)[0];
     s._explicado = true;
     const dv = Math.round((+s.valor - +r.valor) * 100) / 100;
-    pend.push({ forma: fs, caixa: s.caixa || r.caixa || null, chave: 'dif:' + s.referencia + ':' + r.referencia, bloco: 'maquininha', efeito: dv, p: 1, cor: '#ff6b6b', hora: hhmm(s.hora),
+    pend.push({ forma: fs, caixa: s.caixa || r.caixa || null, chave: 'dif:' + s.referencia + ':' + r.referencia, bloco: 'maquininha', efeito: dv, p: 1, cor: 'var(--farol-fora)', hora: hhmm(s.hora),
       saipos: limpa(s.detalhe) + ' ' + reaisCc(s.valor) + ' · ' + rotVenda(s) + quem(s), real: limpa(r.detalhe) + ' ' + reaisCc(r.valor) + ' às ' + hhmm(r.hora), valor: dv,
       leitura: 'mesma forma, mesmo caixa, ' + distMin(s, r) + ' min de distância: provavelmente a mesma venda com valor diferente',
       acao: dv > 0 ? 'faltam ' + reaisCc(dv) + ': o resto foi pago de outro jeito (dinheiro, PIX, outro cartão)? ou o valor registrado está errado?' : 'passou ' + reaisCc(-dv) + ' a mais na máquina: valor digitado errado na maquininha? gorjeta?' });
   });
   semParS.filter(s => !s._explicado).forEach(s => pend.push({ forma: formaPadrao(s.detalhe), caixa: s.caixa || null, chave: 'pdv:' + s.referencia + ':' + (+s.valor).toFixed(2), bloco: semForma(s) ? 'dinheiro' : 'maquininha', efeito: semForma(s) ? 0 : +s.valor,
-    p: madrugadaSemRede(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) ? '#9aa4af' : eVale(s) ? '#f5a623' : '#ff6b6b', hora: hhmm(s.hora),
+    p: madrugadaSemRede(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) ? '#9aa4af' : eVale(s) ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(s.hora),
     saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou este dia inteiro' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
     leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'registrado no Saipos, mas não passou na maquininha',
     acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou' : 'confirmar no caixa se cobrou, ou se passou em outra forma' }));
   restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || null, chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
-    p: 2, cor: '#f5a623', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
+    p: 2, cor: 'var(--farol-perto)', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
     leitura: 'passou na maquininha, mas não está registrado no Saipos', acao: 'achar a venda no Saipos (lançada em outra forma ou não lançada)' }));
   conferir.forEach(q => pend.push({ forma: formaPadrao(q.s.detalhe), caixa: q.s.caixa || null, chave: 'quase:' + q.s.referencia + ':' + q.r.referencia, bloco: 'maquininha', efeito: +q.s.valor - +q.r.valor,
-    p: 2, cor: '#f5a623', hora: hhmm(q.s.hora), saipos: limpa(q.s.detalhe) + ' ' + reaisCc(q.s.valor) + ' · ' + rotVenda(q.s) + quem(q.s), real: limpa(q.r.detalhe) + ' ' + reaisCc(q.r.valor) + ' às ' + hhmm(q.r.hora),
+    p: 2, cor: 'var(--farol-perto)', hora: hhmm(q.s.hora), saipos: limpa(q.s.detalhe) + ' ' + reaisCc(q.s.valor) + ' · ' + rotVenda(q.s) + quem(q.s), real: limpa(q.r.detalhe) + ' ' + reaisCc(q.r.valor) + ' às ' + hhmm(q.r.hora),
     valor: q.dv, leitura: (Math.abs(q.dv) <= 0.10 ? 'diferença de centavos' : 'quase o mesmo valor') + ' no mesmo horário: registrado ' + reaisCc(Math.abs(q.dv)) + (q.dv < 0 ? ' a mais' : ' a menos') + ' que a maquininha',
     acao: Math.abs(q.dv) <= 0.10 ? 'valor digitado na maquininha diferente do registrado: conferir qual está certo e acertar no Saipos' : 'conferir se é a mesma venda (gorjeta? digitação?)' }));
   pix.filter(x => !x.recebido).forEach(x => pend.push({ forma: formaPadrao(x.tipo), caixa: x.caixa || null, chave: 'pix:' + x.id_sale + ':' + (+x.valor).toFixed(2), bloco: x.subgrupo === 'CHAVE' ? 'pix_chave' : 'maquininha', efeito: +x.valor,
-    p: x.aguardando ? 3 : 1, cor: x.aguardando ? '#9aa4af' : '#ff6b6b', hora: hhmm(String(x.entrega || '').slice(11)),
+    p: x.aguardando ? 3 : 1, cor: x.aguardando ? '#9aa4af' : 'var(--farol-fora)', hora: hhmm(String(x.entrega || '').slice(11)),
     saipos: x.tipo + (x.subgrupo === 'CHAVE' ? ' (chave CNPJ)' : ' (QR da maquininha)') + ' · ' + rotVenda(x) + (x.entregador ? ' · motoboy ' + x.entregador : ''),
     real: x.aguardando ? 'banco ainda não mostrou' : 'nenhum PIX desse valor no banco até 5 dias depois', valor: +x.valor,
     leitura: x.aguardando ? 'sábado cai na segunda, domingo na segunda, feriado empurra mais — até 5 dias é normal' : 'registrado como PIX, o dinheiro não entrou',
@@ -432,11 +432,11 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const hojeIso = new Date().toLocaleDateString('en-CA');
   if (dia < hojeIso) caixaDinheiroDia(unidade, dia).forEach(d => {
     if (d.bateu) return;
-    if (d.faltaContar) pend.push({ forma: 'Dinheiro', caixa: d.caixa, chave: 'dinheiro:' + dia + ':' + d.caixa, bloco: 'dinheiro', efeito: d.vendido, p: 1, cor: '#f5a623', hora: 'turno',
+    if (d.faltaContar) pend.push({ forma: 'Dinheiro', caixa: d.caixa, chave: 'dinheiro:' + dia + ':' + d.caixa, bloco: 'dinheiro', efeito: d.vendido, p: 1, cor: 'var(--farol-perto)', hora: 'turno',
       saipos: d.rot + ' vendeu em dinheiro ' + reaisCc(d.vendido), real: d.aberto ? 'caixa ainda aberto no Saipos · gaveta não contada' : 'gaveta ainda não contada', valor: d.vendido,
       leitura: 'sem a contagem não dá para saber se o dinheiro chegou',
       acao: 'registrar a contagem aqui embaixo (dinheiro enviado e troco que ficou)' });
-    else if (d.contagem) pend.push({ forma: 'Dinheiro', caixa: d.caixa, chave: 'dinheiro:' + dia + ':' + d.caixa, bloco: 'dinheiro', efeito: d.dif, p: 1, cor: d.dif < 0 ? '#ff6b6b' : '#f5a623', hora: 'turno',
+    else if (d.contagem) pend.push({ forma: 'Dinheiro', caixa: d.caixa, chave: 'dinheiro:' + dia + ':' + d.caixa, bloco: 'dinheiro', efeito: d.dif, p: 1, cor: d.dif < 0 ? 'var(--farol-fora)' : 'var(--farol-perto)', hora: 'turno',
       saipos: d.rot + ' vendeu em dinheiro ' + reaisCc(d.vendidoConta), real: 'contado (enviado) ' + reaisCc(d.enviado) + (d.abriu !== null ? ' + ficou ' + reaisCc(d.ficou) + ' − abriu ' + reaisCc(d.abriu) + ' = ' + reaisCc(d.chegou) : '') + (d.saidas > 0 ? ' · saídas do dia ' + reaisCc(d.saidas) : ''), valor: d.dif,
       leitura: (d.dif < 0 ? 'faltou ' : 'sobrou ') + reaisCc(Math.abs(d.dif)) + ' na contagem' + (d.contagem.observacao ? ' — obs: ' + d.contagem.observacao : ''),
       acao: d.dif < 0 ? 'perguntar ao turno: saída paga pela gaveta sem lançar no Saipos? troco digitado errado?' : 'conferir o troco digitado e se alguma venda em dinheiro ficou fora do Saipos' });
@@ -449,7 +449,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   pix.filter(x => x.recebido).forEach(x => { const k = chaveBanco(x); usoBanco[k] = (usoBanco[k] || 0) + 1; });
   const pixRepetidos = pix.filter(x => x.recebido && usoBanco[chaveBanco(x)] > 1);
   pixRepetidos.forEach(x => pend.push({ forma: formaPadrao(x.tipo), caixa: x.caixa || null, chave: 'pixdup:' + x.id_sale + ':' + (+x.valor).toFixed(2), bloco: x.subgrupo === 'CHAVE' ? 'pix_chave' : 'maquininha', efeito: 0,
-    p: 2, cor: '#f5a623', hora: hhmm(String(x.entrega || '').slice(11)), saipos: x.tipo + ' · ' + rotVenda(x) + (x.entregador ? ' · motoboy ' + x.entregador : ''),
+    p: 2, cor: 'var(--farol-perto)', hora: hhmm(String(x.entrega || '').slice(11)), saipos: x.tipo + ' · ' + rotVenda(x) + (x.entregador ? ' · motoboy ' + x.entregador : ''),
     real: 'crédito de ' + reaisCc(x.valor) + ' em ' + String(x.data_banco || '').split('-').reverse().slice(0, 2).join('/') + ' usado por mais de um PIX',
     valor: +x.valor, leitura: 'mesmo valor repetido: o painel não sabe qual PIX entrou e qual não', acao: 'conferir no extrato se há um crédito para cada' }));
   pend.sort((a, b) => a.p - b.p || (a.hora < b.hora ? -1 : 1));
@@ -477,7 +477,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const somaS = saipos.filter(doDia).filter(noCxT).reduce((a, t) => a + +t.valor, 0), somaR = rede.filter(doDia).filter(noCxT).reduce((a, t) => a + +t.valor, 0);
   const pixPdv = pix.filter(noCxT).reduce((a, x) => a + +x.valor, 0), pixNoBanco = pix.filter(noCxT).filter(x => x.recebido).reduce((a, x) => a + +x.valor, 0);
   const bateram = casados.length + compostos.reduce((a, c) => a + c.itens.length + 1, 0) + arredond.length * 2 + pix.filter(x => x.recebido).length;
-  const num = (v, cor) => `<b style="color:${cor || '#e8e6dc'};">${reaisCc(v)}</b>`;
+  const num = (v, cor) => `<b style="color:${cor || 'var(--tx-creme)'};">${reaisCc(v)}</b>`;
   const difMaq = somaS - somaR;
   // o que casou atravessando a meia-noite explica parte da diferenca crua do dia
   const viradaSaipos = casados.filter(x => x.par && !doDia(x.par)).reduce((a, x) => a + +x.valor, 0);
@@ -493,13 +493,13 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // Caixas do Saipos como TABELA com linhas verticais (dono, 10/09/2026: "separar cada
   // info por blocos; o bloco dos caixas como tabela").
   const tdC = 'padding:4px 10px; text-align:right; white-space:nowrap; border-right:1px solid rgba(154,164,175,.25);';
-  const thC = 'padding:3px 10px; font-weight:normal; color:#a5a49a; font-size:11px; text-transform:uppercase; text-align:right; border-right:1px solid rgba(154,164,175,.25); border-bottom:1px solid rgba(154,164,175,.25);';
+  const thC = 'padding:3px 10px; font-weight:normal; color:var(--tx-3); font-size:11px; text-transform:uppercase; text-align:right; border-right:1px solid rgba(154,164,175,.25); border-bottom:1px solid rgba(154,164,175,.25);';
   const celC = v => +v > 0 ? reaisCc(v) : '<span style="color:#5a5850;">—</span>';
-  const turnoHtml = !turnos.length ? '' : `<div style="font-size:11px; color:#a5a49a; text-transform:uppercase; margin:8px 0 2px;">Caixas do Saipos — turno de ${dia.split('-').reverse().slice(0, 2).join('/')}</div>
+  const turnoHtml = !turnos.length ? '' : `<div style="font-size:11px; color:var(--tx-3); text-transform:uppercase; margin:8px 0 2px;">Caixas do Saipos — turno de ${dia.split('-').reverse().slice(0, 2).join('/')}</div>
     <div style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; border:1px solid rgba(154,164,175,.25);">
       <tr><th style="${thC} text-align:left;">caixa</th><th style="${thC} text-align:left;">estado</th><th style="${thC}">dinheiro</th><th style="${thC}">cartão</th><th style="${thC}">vale</th><th style="${thC}">PIX</th><th style="${thC}">online</th><th style="${thC}">outros</th><th style="${thC} border-right:0;">total</th></tr>
       ${turnos.map(t => {
-        const estado = t.fechado === false ? '<b style="color:#ff6b6b;">ABERTO</b> desde ' + hhmmTs(t.aberto_em)
+        const estado = t.fechado === false ? '<b style="color:var(--farol-fora);">ABERTO</b> desde ' + hhmmTs(t.aberto_em)
           : t.fechado === true ? '<span style="color:#3f9c5a;">fechado ' + hhmmTs(t.fechado_em) + '</span>' : '<span style="color:#9aa4af;">—</span>';
         return `<tr style="border-top:1px solid rgba(154,164,175,.12);">
           <td style="${tdC} text-align:left;"><b>${rotuloCaixa(t)}</b></td><td style="${tdC} text-align:left;">${estado}</td>
@@ -513,9 +513,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // conferir" (pede acao) e "Ja tratado ou aguardando" (explicadas, resolve sozinho,
   // absorvido, bateram) — e TODAS as tabelas com linhas verticais entre as colunas.
   const GRUPOS_PEND = [
-    { id: 'saipos', cor: '#ff6b6b', titulo: 'O Saipos registrou, mas a maquininha ou o banco não tem', sub: 'dinheiro que pode não ter entrado, ou vale ainda por aparecer' },
-    { id: 'maquina', cor: '#f5a623', titulo: 'A maquininha tem, mas o Saipos não registrou', sub: 'venda sem registro no Saipos, ou lançada em outra forma' },
-    { id: 'quase', cor: '#f5a623', titulo: 'Quase bate — conferir', sub: 'valor quase igual no mesmo horário, ou o mesmo crédito do banco servindo a mais de um PIX' },
+    { id: 'saipos', cor: 'var(--farol-fora)', titulo: 'O Saipos registrou, mas a maquininha ou o banco não tem', sub: 'dinheiro que pode não ter entrado, ou vale ainda por aparecer' },
+    { id: 'maquina', cor: 'var(--farol-perto)', titulo: 'A maquininha tem, mas o Saipos não registrou', sub: 'venda sem registro no Saipos, ou lançada em outra forma' },
+    { id: 'quase', cor: 'var(--farol-perto)', titulo: 'Quase bate — conferir', sub: 'valor quase igual no mesmo horário, ou o mesmo crédito do banco servindo a mais de um PIX' },
     { id: 'auto', cor: '#9aa4af', titulo: 'Deve se resolver sozinho', sub: 'madrugada que a maquininha entrega amanhã, PIX de fim de semana, mesmo valor dos dois lados em horários distantes' },
   ];
   const grupoDe = x => x.cor === '#9aa4af' ? 'auto' : x.chave.startsWith('rede:') ? 'maquina' : (x.chave.startsWith('quase:') || x.chave.startsWith('pixdup:')) ? 'quase' : 'saipos';
@@ -532,18 +532,18 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   };
   const btnExp = x => podeExplicar ? `<button onclick="caixaExplicar(${x.i})" style="font:inherit; font-size:11px; padding:2px 8px; cursor:pointer;">explicar</button>` : '';
   // celulas com linha vertical a direita (a ultima sem)
-  const thL = 'padding:4px 8px; font-weight:normal; color:#a5a49a; font-size:11px; text-transform:uppercase; text-align:left; border-right:1px solid rgba(154,164,175,.25); border-bottom:1px solid rgba(154,164,175,.25); white-space:nowrap;';
+  const thL = 'padding:4px 8px; font-weight:normal; color:var(--tx-3); font-size:11px; text-transform:uppercase; text-align:left; border-right:1px solid rgba(154,164,175,.25); border-bottom:1px solid rgba(154,164,175,.25); white-space:nowrap;';
   const tdL = 'padding:6px 8px; text-align:left; vertical-align:top; border-right:1px solid rgba(154,164,175,.25);';
   const tabelaCss = 'border-collapse:collapse; font-size:12px; width:100%; text-align:left; border:1px solid rgba(154,164,175,.25);';
   const caixa = (titulo, cor, corpo, destaque, extra) => `<div style="border:1px solid rgba(154,164,175,.25); border-radius:6px; padding:8px 10px; margin-top:12px;">
     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-bottom:6px;">
       <div style="font-size:13px; text-transform:uppercase; font-weight:700; ${destaque ? 'background:#f2efe6; color:#111110; padding:4px 12px; border-radius:4px;' : 'color:' + cor + ';'}">${titulo}</div>${extra || ''}</div>${corpo}</div>`;
   const btnCx = (ativo, cx, rot) => `<button class="navbtn ${ativo ? 'active' : ''}" onclick="caixaDrillFiltro('${cx}')">${rot}</button>`;
-  const filtroCx = `<span style="font-size:12px; color:#a5a49a;">caixa:</span>${btnCx(!CAIXA_DRILL_CX, '', 'Todos')}${btnCx(CAIXA_DRILL_CX === 'SALÃO', 'SALÃO', 'Salão')}${btnCx(CAIXA_DRILL_CX === 'DELIVERY', 'DELIVERY', 'Delivery')}`;
-  const vendaCel = q => `${q.venda || '—'}${q.deDia ? `<div style="font-size:11px; color:#f5a623;" title="a venda é de outro dia; o pagamento foi lançado neste">venda ${q.deDia}</div>` : ''}${q.moto ? `<div style="font-size:11px;">🛵 ${q.moto}</div>` : (q.entrega ? '<div style="font-size:11px;">entrega</div>' : '')}`;
+  const filtroCx = `<span style="font-size:12px; color:var(--tx-3);">caixa:</span>${btnCx(!CAIXA_DRILL_CX, '', 'Todos')}${btnCx(CAIXA_DRILL_CX === 'SALÃO', 'SALÃO', 'Salão')}${btnCx(CAIXA_DRILL_CX === 'DELIVERY', 'DELIVERY', 'Delivery')}`;
+  const vendaCel = q => `${q.venda || '—'}${q.deDia ? `<div style="font-size:11px; color:var(--farol-perto);" title="a venda é de outro dia; o pagamento foi lançado neste">venda ${q.deDia}</div>` : ''}${q.moto ? `<div style="font-size:11px;">🛵 ${q.moto}</div>` : (q.entrega ? '<div style="font-size:11px;">entrega</div>' : '')}`;
   const linhaP = (p, g) => { const q = partes(p); return `<tr style="border-top:1px solid rgba(154,164,175,.12);">
     <td style="${tdL} white-space:nowrap; border-left:3px solid ${g.cor};">${p.hora}</td>
-    <td style="${tdL} white-space:nowrap; color:#a5a49a;">${vendaCel(q)}</td>
+    <td style="${tdL} white-space:nowrap; color:var(--tx-3);">${vendaCel(q)}</td>
     <td style="${tdL}">${q.forma}</td>
     <td style="${tdL}">${p.real}</td>
     <td style="${tdL} text-align:right; white-space:nowrap; font-weight:600;">${reaisCc(p.valor)}</td>
@@ -564,28 +564,28 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const confs = (CAIXA_CONF || []).filter(c => c.unidade === unidade && c.dia === dia);
   const hojeStr = new Date().toLocaleDateString('en-CA');
   const carimboCx = cx => { const rot = cx === 'SALÃO' ? 'Salão' : 'Delivery'; const c = confs.find(x => x.caixa === cx); const n = pendCx(cx);
-      if (c) return `<span><b style="color:#3f9c5a;">${rot} ✔ conferido</b> <span style="color:#a5a49a;">por ${String(c.quem || '').split('@')[0]} em ${String(c.conferido_em || '').slice(0, 16).replace('T', ' ')}</span>${podeExplicar ? ` <button onclick="caixaDesconferir('${cx}')" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}</span>`;
+      if (c) return `<span><b style="color:#3f9c5a;">${rot} ✔ conferido</b> <span style="color:var(--tx-3);">por ${String(c.quem || '').split('@')[0]} em ${String(c.conferido_em || '').slice(0, 16).replace('T', ' ')}</span>${podeExplicar ? ` <button onclick="caixaDesconferir('${cx}')" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}</span>`;
       if (dia >= hojeStr) return `<span style="color:#9aa4af;">${rot}: turno em aberto</span>`;
-      if (abertoCx(cx)) return `<span style="color:#ff6b6b;">${rot}: caixa ainda aberto no Saipos</span>`;
-      if (n > 0) return `<span style="color:#f5a623;">${rot}: ${n} pendência(s) antes de conferir</span>`;
+      if (abertoCx(cx)) return `<span style="color:var(--farol-fora);">${rot}: caixa ainda aberto no Saipos</span>`;
+      if (n > 0) return `<span style="color:var(--farol-perto);">${rot}: ${n} pendência(s) antes de conferir</span>`;
       return podeExplicar ? `<button onclick="caixaConferir('${cx}')" style="font:inherit; font-size:12px; padding:3px 10px; cursor:pointer; font-weight:600;">Marcar ${rot} como conferido</button>` : `<span style="color:#7bc47f;">${rot}: sem pendência (o responsável carimba)</span>`; };
-  const linhaE = p => { const q = partes(p); return `<tr style="border-top:1px solid rgba(154,164,175,.12); color:#a5a49a;">
+  const linhaE = p => { const q = partes(p); return `<tr style="border-top:1px solid rgba(154,164,175,.12); color:var(--tx-3);">
     <td style="${tdL} white-space:nowrap;">${p.hora}</td>
     <td style="${tdL} white-space:nowrap;">${vendaCel(q)}</td>
     <td style="${tdL}">${q.forma}</td>
     <td style="${tdL}">${p.real}</td>
     <td style="${tdL} text-align:right; white-space:nowrap;">${reaisCc(p.valor)}</td>
-    <td style="${tdL} color:#e8e6dc;">${p.v.tipo ? '<b>' + caixaRotTipo(p.v.tipo) + '</b>' + (p.v.quebra > 0 ? ' · quebra R$ ' + fmt(+p.v.quebra) + (p.v.responsavel ? ' (' + p.v.responsavel + ')' : '') : '') + ' · ' : ''}${p.v.motivo}</td>
+    <td style="${tdL} color:var(--tx-creme);">${p.v.tipo ? '<b>' + caixaRotTipo(p.v.tipo) + '</b>' + (p.v.quebra > 0 ? ' · quebra R$ ' + fmt(+p.v.quebra) + (p.v.responsavel ? ' (' + p.v.responsavel + ')' : '') : '') + ' · ' : ''}${p.v.motivo}</td>
     <td style="${tdL} white-space:nowrap;">${String(p.v.quem || '').split('@')[0]} · ${String(p.v.validado_em || '').slice(0, 10).split('-').reverse().slice(0, 2).join('/')}</td>
     <td style="${tdL} border-right:0; white-space:nowrap;">${podeExplicar ? `<button onclick="caixaDesfazer(${p.i})" style="font:inherit; font-size:11px; padding:2px 8px; cursor:pointer;">desfazer</button>` : ''}</td></tr>`; };
   const cabE = `<tr><th style="${thL}">hora</th><th style="${thL}">venda</th><th style="${thL}">o Saipos diz</th><th style="${thL}">a maquininha / o banco diz</th><th style="${thL} text-align:right;">valor</th><th style="${thL}">motivo</th><th style="${thL}">quem</th><th style="${thL} border-right:0;"></th></tr>`;
-  const resumoDet = (n, rotulo) => `<summary style="cursor:pointer; font-size:12px; color:#a5a49a; padding:4px 0;">${rotulo} <b style="color:#e8e6dc;">(${n})</b></summary>`;
+  const resumoDet = (n, rotulo) => `<summary style="cursor:pointer; font-size:12px; color:var(--tx-3); padding:4px 0;">${rotulo} <b style="color:var(--tx-creme);">(${n})</b></summary>`;
   const blocoResto = [
     explicadas.length ? `<details open style="margin-top:4px;">${resumoDet(explicadas.length, 'Explicadas')}
       <div style="overflow-x:auto;"><table style="${tabelaCss} min-width:820px;">${cabE}${explicadas.map(linhaE).join('')}</table></div></details>` : '',
     resolvidos.length ? `<details style="margin-top:4px;">${resumoDet(resolvidos.length, 'Absorvido pelo painel — conta dividida, centavos e forma diferente da registrada')}
       <div style="overflow-x:auto;"><table style="${tabelaCss}"><tr><th style="${thL}">hora</th><th style="${thL}">o que</th><th style="${thL} border-right:0;">detalhe</th></tr>
-        ${resolvidos.map(r => `<tr style="border-top:1px solid rgba(154,164,175,.12); color:#a5a49a;"><td style="${tdL} white-space:nowrap;">${r.hora}</td><td style="${tdL} white-space:nowrap;">${r.tipo}</td><td style="${tdL} border-right:0;">${r.texto}</td></tr>`).join('')}</table></div></details>` : '',
+        ${resolvidos.map(r => `<tr style="border-top:1px solid rgba(154,164,175,.12); color:var(--tx-3);"><td style="${tdL} white-space:nowrap;">${r.hora}</td><td style="${tdL} white-space:nowrap;">${r.tipo}</td><td style="${tdL} border-right:0;">${r.texto}</td></tr>`).join('')}</table></div></details>` : '',
     casados.length ? `<details style="margin-top:4px;">${resumoDet(casados.length, 'Pagamentos de cartão/vale que bateram')}
       <div style="overflow-x:auto;"><table style="${tabelaCss}"><tr><th style="${thL}">hora</th><th style="${thL}">venda</th><th style="${thL}">o Saipos diz</th><th style="${thL}">a maquininha diz</th><th style="${thL} border-right:0; text-align:right;">valor</th></tr>
         ${casados.map(s => `<tr style="border-top:1px solid rgba(154,164,175,.12); color:#8a897e;"><td style="${tdL} white-space:nowrap;">${hhmm(s.hora)}</td><td style="${tdL} white-space:nowrap;">${rotVenda(s)}</td><td style="${tdL}">${limpa(s.detalhe)}</td><td style="${tdL}">${limpa(s.par.detalhe)} às ${hhmm(s.par.hora)}</td><td style="${tdL} border-right:0; text-align:right; white-space:nowrap;">${reaisCc(s.valor)}</td></tr>`).join('')}</table></div></details>` : '',
@@ -645,7 +645,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const blocoCaixa = cx => {
     const rot = cx === 'SALÃO' ? 'Caixa Salão' : 'Caixa Delivery';
     const t = turnos.find(x => cxDeT(x) === cx);
-    const estado = !t ? '' : t.fechado === false ? `<b style="color:#ff6b6b;">ABERTO no Saipos</b> desde ${hhmmTs(t.aberto_em)}` : t.fechado === true ? `<span style="color:#3f9c5a;">fechado ${hhmmTs(t.fechado_em)}</span>` : '';
+    const estado = !t ? '' : t.fechado === false ? `<b style="color:var(--farol-fora);">ABERTO no Saipos</b> desde ${hhmmTs(t.aberto_em)}` : t.fechado === true ? `<span style="color:#3f9c5a;">fechado ${hhmmTs(t.fechado_em)}</span>` : '';
     const linhas = {};
     const L = f => linhas[f] || (linhas[f] = { forma: f, saipos: 0, real: 0, nS: 0, nR: 0, ordem: 1, ajustar: [], conferir: [], esperar: [], notas: [], explicadas: 0 });
     // DINHEIRO x contagem
@@ -657,7 +657,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
           (d.diasJuntos.length ? ` · o vendido inclui ${d.diasJuntos.map(x => x.data.slice(8, 10) + '/' + x.data.slice(5, 7) + ' (' + reaisCc(+x.dinheiro_pdv) + ')').join(', ')}, contado junto` : ''), contrib: 0 });
         if (d.porSaidas) l.notas.push({ texto: `bateu descontando ${reaisCc(d.saidas)} de saídas pagas pela gaveta`, contrib: 0 });
       } else if (d.contadoJunto) { l.real = d.vendido; l.nR = 1; l.bateu = true; l.notas.push({ texto: `contado junto com ${d.contadoJunto.slice(8, 10)}/${d.contadoJunto.slice(5, 7)}`, contrib: 0 }); }
-      else { l.realTxt = dia >= hojeStr ? 'turno em aberto' : '<span style="color:#f5a623;">não contado</span>'; l.semReal = true; }
+      else { l.realTxt = dia >= hojeStr ? 'turno em aberto' : '<span style="color:var(--farol-perto);">não contado</span>'; l.semReal = true; }
     });
     // CARTAO / VALE / PENDENTE: registrado no Saipos x passou na Rede (so o proprio dia)
     saipos.filter(doDia).filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaDe(x)); l.saipos += +x.valor; l.nS++; if (ehPendente(x.detalhe)) l.ordem = 4; });
@@ -688,10 +688,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const dif = l.semReal ? null : Math.round((l.saipos - l.real) * 100) / 100;
       const ok = dif !== null && Math.abs(dif) < 0.01 || l.bateu;
       const temAcao = l.ajustar.length || l.conferir.length || l.esperar.length;
-      const corDif = ok ? '#7bc47f' : dif > 0 ? '#ff6b6b' : '#f5a623';
+      const corDif = ok ? '#7bc47f' : dif > 0 ? 'var(--farol-fora)' : 'var(--farol-perto)';
       const difTxt = l.semReal ? '<span style="color:#9aa4af;">—</span>' : ok ? '<span style="color:#7bc47f;">✔</span>' : `<b style="color:${corDif};">${reaisCc(dif)}</b>`;
       const realTxt = l.realTxt ? l.realTxt : l.online ? (ok ? '<span style="color:#7bc47f;">canal certo</span>' : reaisCc(l.real) + ' <span style="color:#9aa4af;">no canal certo</span>') : reaisCc(l.real);
-      const resumo = [l.ajustar.length ? `<span style="color:#f5a623;">${l.ajustar.length} ajustar no Saipos</span>` : '', l.conferir.length ? `<span style="color:#ff6b6b;">${l.conferir.length} conferir</span>` : '',
+      const resumo = [l.ajustar.length ? `<span style="color:var(--farol-perto);">${l.ajustar.length} ajustar no Saipos</span>` : '', l.conferir.length ? `<span style="color:var(--farol-fora);">${l.conferir.length} conferir</span>` : '',
         l.esperar.length ? `<span style="color:#9aa4af;">${l.esperar.length} aguardando</span>` : '', l.explicadas ? `<span style="color:#9aa4af;">${l.explicadas} explicada(s)</span>` : ''].filter(Boolean).join(' · ');
       const leitura = l.forma === 'Dinheiro' ? (ok ? '' : l.semReal ? 'registrar a contagem na linha abaixo' : dif > 0 ? 'faltou na gaveta' : 'sobrou na gaveta')
         : l.online ? '' : (!ok && !temAcao && dif !== null ? (dif > 0 ? 'registrado a mais no Saipos' : 'passou a mais na maquininha') : '');
@@ -699,16 +699,16 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const abertoDet = !!(temAcao || l.notas.length || (dif !== null && !ok));
       const hid = abertoDet ? '' : 'display:none;';
       const tr = bg => `<tr class="${cls}" style="${hid}${bg || ''}">`;
-      const sinal = v => Math.abs(v) < 0.005 ? '<span style="color:#6f6e64;">0</span>' : `<span style="color:${v > 0 ? '#ff6b6b' : '#f5a623'};">${v > 0 ? '+' : '−'} ${reaisCc(Math.abs(v))}</span>`;
+      const sinal = v => Math.abs(v) < 0.005 ? '<span style="color:#6f6e64;">0</span>' : `<span style="color:${v > 0 ? 'var(--farol-fora)' : 'var(--farol-perto)'};">${v > 0 ? '+' : '−'} ${reaisCc(Math.abs(v))}</span>`;
       const dinheiroLinha = l.forma === 'Dinheiro';
       const ddmm = d => String(d || '').split('-').reverse().slice(0, 2).join('/');
       const sub = [];
       // Registro da contagem DENTRO da tabela (dono, 10/09/2026 noite)
       const formContagem = x => {
         const idF = 'cxdia' + (cx === 'SALÃO' ? 'S' : 'D');
-        if (!podeExplicar || dia >= hojeStr) return `${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:#ff6b6b; font-weight:700;">2º</span> contar a gaveta</td><td style="${tdS}" colspan="4">${x.real} — ${x.acao.replace('aqui embaixo', 'pelo responsável da loja')}</td></tr>`;
+        if (!podeExplicar || dia >= hojeStr) return `${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:var(--farol-fora); font-weight:700;">2º</span> contar a gaveta</td><td style="${tdS}" colspan="4">${x.real} — ${x.acao.replace('aqui embaixo', 'pelo responsável da loja')}</td></tr>`;
         const ultTroco = cx === 'DELIVERY' ? '0.01' : ((CAIXA_CONTAGENS || []).filter(c => c.unidade === unidade && (c.caixa || 'SALÃO') === cx && c.data < dia && c.troco !== null).sort((a, b) => (a.data < b.data ? 1 : -1))[0] || {}).troco;
-        return `${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:#ff6b6b; font-weight:700;">2º</span> registrar a contagem</td>
+        return `${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:var(--farol-fora); font-weight:700;">2º</span> registrar a contagem</td>
           <td style="${tdS} border-right:0;" colspan="4"><div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
             <input type="number" step="0.01" min="0" id="${idF}Valor" placeholder="dinheiro enviado (R$)" title="o dinheiro que este caixa mandou para você, contado" style="padding:4px; width:160px; font:inherit;">
             <input type="number" step="0.01" min="0" id="${idF}Troco" value="${ultTroco === undefined || ultTroco === null ? '' : ultTroco}" placeholder="troco que ficou (R$)" title="o troco que ficou na gaveta deste caixa" style="padding:4px; width:150px; font:inherit;">
@@ -719,10 +719,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const statusPend = px => { const ex = valDe[px.chave];
         if (ex) return { status: `<span style="color:#9aa4af;">explicada${ex.tipo ? ' · <b>' + caixaRotTipo(ex.tipo) + '</b>' : ''}${ex.quebra > 0 ? ' · quebra R$ ' + fmt(+ex.quebra) + (ex.responsavel ? ' (' + ex.responsavel + ')' : '') : ''}: ${ex.motivo}</span>${podeExplicar ? ` <button onclick="caixaDesfazer(${px.i})" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}`, cor: '#8a897e', bg: '' };
         if (grupoDe(px) === 'auto') return { status: `<span style="color:#9aa4af;">⏳ ${px.acao} <span style="font-size:11px;">— ${px.leitura}</span></span>`, cor: '#8a897e', bg: '' };
-        return { status: `<span style="color:#ff6b6b; font-weight:700;">2º</span> ${px.acao}<div style="font-size:11px; color:#8a897e;">${px.leitura}</div>${btnExp(px)}`, cor: '#e8e6dc', bg: 'background:rgba(255,107,107,.05);' }; };
+        return { status: `<span style="color:var(--farol-fora); font-weight:700;">2º</span> ${px.acao}<div style="font-size:11px; color:#8a897e;">${px.leitura}</div>${btnExp(px)}`, cor: 'var(--tx-creme)', bg: 'background:rgba(255,107,107,.05);' }; };
       if (dinheiroLinha) {
         l.conferir.forEach(x => { if (x.chave && x.chave.startsWith('dinheiro:') && l.semReal) { sub.push(formContagem(x)); return; }
-          sub.push(`${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:#ff6b6b; font-weight:700;">2º</span> ${x.hora}</td><td style="${tdS}">${x.saipos}</td><td style="${tdS}">${x.real}</td><td style="${tdS} text-align:right; white-space:nowrap; font-weight:600;">${sinal(x.contrib)}</td><td style="${tdS} border-right:0;">${x.acao}<div style="font-size:11px; color:#8a897e;">${x.leitura}</div> ${btnExp(x)}</td></tr>`); });
+          sub.push(`${tr('background:rgba(255,107,107,.05);')}<td style="${tdS} white-space:nowrap;"><span style="color:var(--farol-fora); font-weight:700;">2º</span> ${x.hora}</td><td style="${tdS}">${x.saipos}</td><td style="${tdS}">${x.real}</td><td style="${tdS} text-align:right; white-space:nowrap; font-weight:600;">${sinal(x.contrib)}</td><td style="${tdS} border-right:0;">${x.acao}<div style="font-size:11px; color:#8a897e;">${x.leitura}</div> ${btnExp(x)}</td></tr>`); });
         l.notas.forEach(n => sub.push(`${tr()}<td style="${tdS} color:#8a897e; font-size:11px;" colspan="3">↳ ${n.texto}</td><td style="${tdS} text-align:right; white-space:nowrap;">${sinal(n.contrib)}</td><td style="${tdS} border-right:0;"></td></tr>`));
       } else {
         // DETALHE VENDA A VENDA (dono, 11/09/2026: "agrupado por forma; quando clicar, abrir no
@@ -739,9 +739,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
             if (!r) { const q = arredond.find(q => q.s === x); if (q) { r = q.r; extra = ' (centavos)'; } }
             if (r) {
               const fr = formaPadrao(r.detalhe);
-              passou = `${limpa(r.detalhe)} ${reaisCc(r.valor)} às ${hhmm(r.hora)}${!doDia(r) ? ` <span style="color:#f5a623;">(${ddmm(r.dia)})</span>` : ''}${extra}`;
-              if (fr !== l.forma) { contrib = +x.valor; cor = '#e8e6dc'; bg = 'background:rgba(245,166,35,.05);';
-                status = ehPendenteTxt(x.detalhe) ? `<span style="color:#f5a623; font-weight:700;">1º</span> fechar a venda com a forma <b>${fr}</b>` : `<span style="color:#f5a623; font-weight:700;">1º</span> trocar de ${l.forma} para <b>${fr}</b> <span style="color:#8a897e;">— no Saipos: caixa do dia → Ver → ${rotVenda(x)} → mudar a forma → salvar ajustes</span>`; }
+              passou = `${limpa(r.detalhe)} ${reaisCc(r.valor)} às ${hhmm(r.hora)}${!doDia(r) ? ` <span style="color:var(--farol-perto);">(${ddmm(r.dia)})</span>` : ''}${extra}`;
+              if (fr !== l.forma) { contrib = +x.valor; cor = 'var(--tx-creme)'; bg = 'background:rgba(245,166,35,.05);';
+                status = ehPendenteTxt(x.detalhe) ? `<span style="color:var(--farol-perto); font-weight:700;">1º</span> fechar a venda com a forma <b>${fr}</b>` : `<span style="color:var(--farol-perto); font-weight:700;">1º</span> trocar de ${l.forma} para <b>${fr}</b> <span style="color:#8a897e;">— no Saipos: caixa do dia → Ver → ${rotVenda(x)} → mudar a forma → salvar ajustes</span>`; }
               else if (!doDia(r)) { contrib = +x.valor; status = '<span style="color:#9aa4af;">✔ bateu · virada do dia: a maquininha registrou em outro dia</span>'; }
               else status = '<span style="color:#7bc47f;">✔ bateu</span>';
             }
@@ -760,8 +760,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
         });
         (onl || []).filter(x => noCxItem(x, cx) && formaPadrao(x.tipo) === l.forma).forEach(x => { const okC = x.canal_ok === true;
           det.push({ ord: min(String(x.hora || '').slice(11)), hora: hhmm(String(x.hora || '').slice(11)), venda: x.numero ? 'venda ' + x.numero + (x.numero_pedido ? ' (' + x.numero_pedido + ')' : '') : 'venda', reg: `${x.tipo} ${reaisCc(x.valor)}`,
-            passou: `pedido do canal ${x.canal}`, contrib: okC ? 0 : +x.valor, cor: okC ? '#8a897e' : '#e8e6dc', bg: okC ? '' : 'background:rgba(255,107,107,.05);',
-            status: okC ? '<span style="color:#7bc47f;">✔ canal certo</span>' : `<span style="color:#ff6b6b; font-weight:700;">2º</span> ${x.canal_ok === false ? 'canal do pedido não bate com a forma: trocar a forma no Saipos' : 'forma online sem regra cadastrada: conferir'}` }); });
+            passou: `pedido do canal ${x.canal}`, contrib: okC ? 0 : +x.valor, cor: okC ? '#8a897e' : 'var(--tx-creme)', bg: okC ? '' : 'background:rgba(255,107,107,.05);',
+            status: okC ? '<span style="color:#7bc47f;">✔ canal certo</span>' : `<span style="color:var(--farol-fora); font-weight:700;">2º</span> ${x.canal_ok === false ? 'canal do pedido não bate com a forma: trocar a forma no Saipos' : 'forma online sem regra cadastrada: conferir'}` }); });
         l.notas.forEach(n => det.push({ ord: 9e9, hora: '', venda: '', reg: `<span style="color:#8a897e;">↳ ${n.texto}</span>`, passou: '', contrib: n.contrib, status: '', cor: '#8a897e', bg: '' }));
         det.sort((a, b) => a.ord - b.ord);
         det.forEach(d => sub.push(`${tr(d.bg)}<td style="${tdS} white-space:nowrap; color:${d.cor};">${d.hora}${d.venda ? ' · ' + d.venda : ''}</td><td style="${tdS} color:${d.cor};">${d.reg}</td><td style="${tdS} color:${d.cor};">${d.passou}</td><td style="${tdS} text-align:right; white-space:nowrap;">${sinal(d.contrib)}</td><td style="${tdS} border-right:0; color:${d.cor};">${d.status}</td></tr>`));
@@ -770,7 +770,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       const contribs = [...l.ajustar, ...l.conferir, ...l.esperar, ...l.notas].map(x => +x.contrib || 0).filter(v => Math.abs(v) >= 0.005);
       const somaC = Math.round(contribs.reduce((a, v) => a + v, 0) * 100) / 100, restoC = Math.round((dif - somaC) * 100) / 100;
       if (!l.semReal && !ok && (contribs.length >= 2 || Math.abs(restoC) >= 0.01)) {
-        sub.push(`${tr('background:rgba(154,164,175,.05);')}<td style="${tdS} font-size:11px; color:#a5a49a;" colspan="3">${contribs.length ? `↳ soma das linhas: ${contribs.map(v => (v > 0 ? '+' : '−') + reaisCc(Math.abs(v))).join(' ')}` : '↳ nenhuma linha explica esta diferença'}${Math.abs(restoC) >= 0.01 ? ` · <span style="color:#f5a623;">sobram ${reaisCc(restoC)} sem linha</span> — conta dividida, centavos ou pagamento de outro dia: veja "Já tratado" embaixo` : ''}</td><td style="${tdS} text-align:right; white-space:nowrap;"><b style="color:${corDif};">= ${reaisCc(dif)}</b>${Math.abs(restoC) < 0.01 ? ' <span style="color:#7bc47f;">✔</span>' : ''}</td><td style="${tdS} border-right:0;"></td></tr>`);
+        sub.push(`${tr('background:rgba(154,164,175,.05);')}<td style="${tdS} font-size:11px; color:var(--tx-3);" colspan="3">${contribs.length ? `↳ soma das linhas: ${contribs.map(v => (v > 0 ? '+' : '−') + reaisCc(Math.abs(v))).join(' ')}` : '↳ nenhuma linha explica esta diferença'}${Math.abs(restoC) >= 0.01 ? ` · <span style="color:var(--farol-perto);">sobram ${reaisCc(restoC)} sem linha</span> — conta dividida, centavos ou pagamento de outro dia: veja "Já tratado" embaixo` : ''}</td><td style="${tdS} text-align:right; white-space:nowrap;"><b style="color:${corDif};">= ${reaisCc(dif)}</b>${Math.abs(restoC) < 0.01 ? ' <span style="color:#7bc47f;">✔</span>' : ''}</td><td style="${tdS} border-right:0;"></td></tr>`);
       }
       const nDet = sub.length;
       return `<tr style="border-top:1px solid rgba(154,164,175,.18); ${nDet ? 'cursor:pointer;' : ''}" ${nDet ? `onclick="caixaToggleForma('${fid}')" title="clique para ${abertoDet ? 'recolher' : 'ver venda a venda'}"` : ''}>
@@ -785,25 +785,25 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     const roboHtml = !roboCx.length ? '' : `<div style="margin-top:4px; font-size:12px; color:#9aa4af;">🤖 o robô troca no Saipos (não entra na diferença): ${roboCx.map(x => `${x.numero ? 'nº ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'} ${reaisCc(x.valor)} ${formaPadrao(x.forma_no_saipos)} → ${formaPadrao(x.forma_nova)}${x.acao !== 'TROCAR' ? ' (feito)' : ''}`).join(' · ')}</div>`;
     const descsCx = (descs || []).filter(x => !x.caixa || x.caixa === cx);
     const semMotivo = descsCx.filter(x => !x.motivo && !x.cupom).length;
-    const descHtml = !descsCx.length ? '' : `<details style="margin-top:4px; font-size:12px;"><summary style="cursor:pointer; color:#a5a49a;">Descontos manuais: ${descsCx.length}, ${reaisCc(descsCx.reduce((a, x) => a + +x.desconto, 0))}${semMotivo ? ` · <span style="color:#f5a623;">${semMotivo} sem motivo</span>` : ''} <span style="color:#6f6e64;">(informação; não entra na conferência)</span></summary>
+    const descHtml = !descsCx.length ? '' : `<details style="margin-top:4px; font-size:12px;"><summary style="cursor:pointer; color:var(--tx-3);">Descontos manuais: ${descsCx.length}, ${reaisCc(descsCx.reduce((a, x) => a + +x.desconto, 0))}${semMotivo ? ` · <span style="color:var(--farol-perto);">${semMotivo} sem motivo</span>` : ''} <span style="color:#6f6e64;">(informação; não entra na conferência)</span></summary>
       <div style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; border:1px solid rgba(154,164,175,.25); margin-top:4px;">
         <tr><th style="${thC} text-align:left;">hora</th><th style="${thC} text-align:left;">venda</th><th style="${thC}">conta</th><th style="${thC}">desconto</th><th style="${thC}">%</th><th style="${thC} text-align:left; border-right:0;">motivo no Saipos</th></tr>
-        ${descsCx.map(x => `<tr style="border-top:1px solid rgba(154,164,175,.12);"><td style="${tdC} text-align:left;">${String(x.hora || '').slice(11, 16)}</td><td style="${tdC} text-align:left;">${x.numero ? 'venda ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'}</td><td style="${tdC}">${reaisCc(+x.total + +x.desconto)}</td><td style="${tdC}"><b>${reaisCc(x.desconto)}</b></td><td style="${tdC}">${x.pct === null ? '—' : String(x.pct).replace('.', ',') + '%'}</td><td style="${tdC} text-align:left; border-right:0; ${x.motivo || x.cupom ? '' : 'color:#f5a623;'}">${x.motivo || (x.cupom ? 'cupom ' + x.cupom : 'sem motivo — perguntar ao turno quem liberou')}</td></tr>`).join('')}</table></div></details>`;
-    const abertoLinha = t && t.fechado === false ? `<tr style="background:rgba(245,166,35,.05);"><td style="${tdS}" colspan="5"><span style="color:#f5a623; font-weight:700;">1º</span> <b>fechar este caixa no Saipos</b> — aberto desde ${hhmmTs(t.aberto_em)}; enquanto estiver aberto, vendas novas ainda entram aqui</td></tr>` : '';
+        ${descsCx.map(x => `<tr style="border-top:1px solid rgba(154,164,175,.12);"><td style="${tdC} text-align:left;">${String(x.hora || '').slice(11, 16)}</td><td style="${tdC} text-align:left;">${x.numero ? 'venda ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'salão'}</td><td style="${tdC}">${reaisCc(+x.total + +x.desconto)}</td><td style="${tdC}"><b>${reaisCc(x.desconto)}</b></td><td style="${tdC}">${x.pct === null ? '—' : String(x.pct).replace('.', ',') + '%'}</td><td style="${tdC} text-align:left; border-right:0; ${x.motivo || x.cupom ? '' : 'color:var(--farol-perto);'}">${x.motivo || (x.cupom ? 'cupom ' + x.cupom : 'sem motivo — perguntar ao turno quem liberou')}</td></tr>`).join('')}</table></div></details>`;
+    const abertoLinha = t && t.fechado === false ? `<tr style="background:rgba(245,166,35,.05);"><td style="${tdS}" colspan="5"><span style="color:var(--farol-perto); font-weight:700;">1º</span> <b>fechar este caixa no Saipos</b> — aberto desde ${hhmmTs(t.aberto_em)}; enquanto estiver aberto, vendas novas ainda entram aqui</td></tr>` : '';
     return `<div style="border:1px solid rgba(154,164,175,.25); border-radius:6px; padding:8px 10px; margin-top:12px;">
       <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; margin-bottom:6px; font-size:12px;">
         <div style="font-size:13px; text-transform:uppercase; font-weight:700; background:#f2efe6; color:#111110; padding:4px 12px; border-radius:4px;">${rot}</div>
         ${estado ? `<span>${estado}</span>` : ''}
         ${cx === 'DELIVERY' && !Object.keys(moto).length && saipos.some(x => doDia(x) && x.caixa === 'DELIVERY')
           ? '<span style="color:#9aa4af;" title="o motoboy vem do sistema de entrega — Foody no Boqueirão, TrackEat na Água Verde, Ahú e São Braz (lido toda manhã, então o dia de hoje ainda não aparece)">🛵 motoboy ainda não registrado para este caixa</span>' : ''}
-        <span>${nA ? `<b style="color:#f5a623;">1º ajustar no Saipos: ${nA}</b>` : '<span style="color:#7bc47f;">1º nada a ajustar no Saipos</span>'} · ${nC ? `<b style="color:#ff6b6b;">2º conferir: ${nC}</b>` : '<span style="color:#7bc47f;">2º nada a conferir</span>'}${nE ? ` · <span style="color:#9aa4af;">aguardando: ${nE}</span>` : ''}</span>
+        <span>${nA ? `<b style="color:var(--farol-perto);">1º ajustar no Saipos: ${nA}</b>` : '<span style="color:#7bc47f;">1º nada a ajustar no Saipos</span>'} · ${nC ? `<b style="color:var(--farol-fora);">2º conferir: ${nC}</b>` : '<span style="color:#7bc47f;">2º nada a conferir</span>'}${nE ? ` · <span style="color:#9aa4af;">aguardando: ${nE}</span>` : ''}</span>
         <span style="margin-left:auto;">${carimboCx(cx)}</span>
       </div>
       <div style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; width:100%; border:1px solid rgba(154,164,175,.25);">
         <tr><th style="${thW} text-align:left;">forma <span style="font-weight:normal; text-transform:none;">(clique para ver venda a venda)</span></th><th style="${thW}">registrado no Saipos</th><th style="${thW}" title="maquininha (Rede), banco (PIX), contagem (dinheiro), canal do pedido (online)">passou de verdade</th><th style="${thW}">diferença</th><th style="${thW} text-align:left; border-right:0;">o que fazer</th></tr>
         ${abertoLinha}
         ${lista.map((l, i) => linhaForma(l, i)).join('')}
-        <tr style="border-top:2px solid rgba(154,164,175,.35);"><td style="${tdF} text-align:left;"><b>Total</b></td><td style="${tdF}"><b>${reaisCc(somaS)}</b></td><td style="${tdF}"><b>${reaisCc(somaR)}</b></td><td style="${tdF}"><b style="color:${Math.abs(somaS - somaR) < 0.01 ? '#7bc47f' : '#f5a623'};">${reaisCc(somaS - somaR)}</b></td><td style="${tdF} border-right:0;"></td></tr>
+        <tr style="border-top:2px solid rgba(154,164,175,.35);"><td style="${tdF} text-align:left;"><b>Total</b></td><td style="${tdF}"><b>${reaisCc(somaS)}</b></td><td style="${tdF}"><b>${reaisCc(somaR)}</b></td><td style="${tdF}"><b style="color:${Math.abs(somaS - somaR) < 0.01 ? '#7bc47f' : 'var(--farol-perto)'};">${reaisCc(somaS - somaR)}</b></td><td style="${tdF} border-right:0;"></td></tr>
       </table></div>
       ${roboHtml}
       ${descHtml}
@@ -816,7 +816,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       ${filtroCx}
       ${podeExplicar ? `<button onclick="caixaAtualizarDia(this)" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" style="font:inherit; font-size:12px; padding:3px 10px; cursor:pointer; margin-left:auto;">↻ Já corrigi no Saipos — atualizar este dia</button>` : ''}
     </div>
-    <div style="font-size:12px; color:#a5a49a;">Mesma leitura do fechamento do Saipos, preenchida sozinha: <b style="color:#e8e6dc;">registrado</b> é o que o turno lançou; <b style="color:#e8e6dc;">passou de verdade</b> é a maquininha, o banco e a contagem. Primeiro o <span style="color:#f5a623;">1º</span> (corrigir no Saipos e clicar atualizar), depois o <span style="color:#ff6b6b;">2º</span>. ${bateram} pagamento(s) bateram sozinhos${viradaSaipos || viradaRede ? ` · na virada do dia: ${viradaSaipos ? reaisCc(viradaSaipos) + ' do Saipos veio da véspera' : ''}${viradaSaipos && viradaRede ? ', ' : ''}${viradaRede ? reaisCc(viradaRede) + ' da maquininha caiu na madrugada seguinte' : ''}` : ''}.</div>
+    <div style="font-size:12px; color:var(--tx-3);">Mesma leitura do fechamento do Saipos, preenchida sozinha: <b style="color:var(--tx-creme);">registrado</b> é o que o turno lançou; <b style="color:var(--tx-creme);">passou de verdade</b> é a maquininha, o banco e a contagem. Primeiro o <span style="color:var(--farol-perto);">1º</span> (corrigir no Saipos e clicar atualizar), depois o <span style="color:var(--farol-fora);">2º</span>. ${bateram} pagamento(s) bateram sozinhos${viradaSaipos || viradaRede ? ` · na virada do dia: ${viradaSaipos ? reaisCc(viradaSaipos) + ' do Saipos veio da véspera' : ''}${viradaSaipos && viradaRede ? ', ' : ''}${viradaRede ? reaisCc(viradaRede) + ' da maquininha caiu na madrugada seguinte' : ''}` : ''}.</div>
     ${dia > CAIXA_DINHEIRO_ATE ? cofreLinhaDia(unidade, dia) : ''}
     ${blocosCaixa || '<div style="margin-top:10px; color:#9aa4af;">Nenhum caixa neste dia.</div>'}
     ${blocoResto ? caixa('Já tratado', '#9aa4af', blocoResto) : ''}
@@ -865,11 +865,11 @@ function caixaModalExplicar(x, d) {
     const ddmm = v => String(v || '').split('-').reverse().slice(0, 2).join('/');
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;';
-    ov.innerHTML = `<div style="background:#1a1a19; color:#e8e6dc; border:1px solid rgba(154,164,175,.35); border-radius:8px; max-width:640px; width:100%; padding:16px 18px; font-size:13px; max-height:92vh; overflow:auto;">
+    ov.innerHTML = `<div style="background:#1a1a19; color:var(--tx-creme); border:1px solid rgba(154,164,175,.35); border-radius:8px; max-width:640px; width:100%; padding:16px 18px; font-size:13px; max-height:92vh; overflow:auto;">
       <div style="font-size:14px; font-weight:700; margin-bottom:4px;">Explicar a diferença</div>
-      <div style="color:#a5a49a; font-size:12px; margin-bottom:10px;">${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — <b style="color:#e8e6dc;">R$ ${fmt(Math.abs(x.valor))}</b></div>
+      <div style="color:var(--tx-3); font-size:12px; margin-bottom:10px;">${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — <b style="color:var(--tx-creme);">R$ ${fmt(Math.abs(x.valor))}</b></div>
       <div style="display:grid; gap:4px; margin-bottom:10px;">
-        ${CAIXA_TIPOS_EXPL.map(t => `<label style="display:flex; gap:8px; align-items:flex-start; padding:5px 8px; border:1px solid rgba(154,164,175,.2); border-radius:5px; cursor:pointer;"><input type="radio" name="cxTipo" value="${t.id}" ${t.id === tipo0 ? 'checked' : ''} style="margin-top:3px;"><span><b>${t.rot}</b><br><span style="color:#a5a49a; font-size:11px;">${t.desc}</span></span></label>`).join('')}
+        ${CAIXA_TIPOS_EXPL.map(t => `<label style="display:flex; gap:8px; align-items:flex-start; padding:5px 8px; border:1px solid rgba(154,164,175,.2); border-radius:5px; cursor:pointer;"><input type="radio" name="cxTipo" value="${t.id}" ${t.id === tipo0 ? 'checked' : ''} style="margin-top:3px;"><span><b>${t.rot}</b><br><span style="color:var(--tx-3); font-size:11px;">${t.desc}</span></span></label>`).join('')}
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
         <label style="flex:1; min-width:140px;">valor da diferença (R$)<br><input type="number" step="0.01" min="0" id="cxValor" value="${Math.abs(x.valor).toFixed(2)}" style="width:100%; padding:4px; font:inherit;"></label>
@@ -1146,9 +1146,9 @@ function caixaAvisar() {
   const F = CAIXA_FILTRO;
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;';
-  ov.innerHTML = `<div style="background:var(--surface); color:#e8e6dc; border:1px solid rgba(154,164,175,.35); border-radius:8px; max-width:560px; width:100%; padding:16px 18px; font-size:13px;">
+  ov.innerHTML = `<div style="background:var(--surface); color:var(--tx-creme); border:1px solid rgba(154,164,175,.35); border-radius:8px; max-width:560px; width:100%; padding:16px 18px; font-size:13px;">
     <div style="font-size:14px; font-weight:700;">Avisar o Neto</div>
-    <div style="color:#a5a49a; font-size:12px; margin:2px 0 10px;">Ele recebe isto pelo resumo do robô. Não é urgência: se a loja estiver parada, ligue.</div>
+    <div style="color:var(--tx-3); font-size:12px; margin:2px 0 10px;">Ele recebe isto pelo resumo do robô. Não é urgência: se a loja estiver parada, ligue.</div>
     <label>o que houve<br><select id="avAssunto" style="width:100%; padding:4px; font:inherit;">${CAIXA_AVISO_ASSUNTOS.map(a => `<option>${a}</option>`).join('')}</select></label>
     <div style="display:flex; gap:8px; margin-top:8px;">
       <label style="flex:1;">loja<br><select id="avLoja" style="width:100%; padding:4px; font:inherit;"><option value="">todas</option>${['AGUA VERDE', 'AHU', 'SÃO BRAZ'].map(u => `<option ${F.loja === u ? 'selected' : ''}>${u}</option>`).join('')}</select></label>
@@ -1639,13 +1639,13 @@ function renderModuloCaixa() {
   const fmtDia = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)} (${DIAS_SEMANA[new Date(iso + 'T12:00:00').getDay()]})`;
   const vazio = '<span style="color:#9aa4af;">—</span>';
   const num = (v) => (v === undefined || v === null || Math.abs(+v) < 0.005) ? vazio : 'R$ ' + fmt(+v);
-  const dif = (v) => (v === undefined || v === null || Math.abs(+v) < 0.01) ? vazio : '<b style="color:#f5a623;">R$ ' + fmt(+v) + '</b>';
+  const dif = (v) => (v === undefined || v === null || Math.abs(+v) < 0.01) ? vazio : '<b style="color:var(--farol-perto);">R$ ' + fmt(+v) + '</b>';
   const cartaoDe = {}, pixDe = {};
   // com o filtro de caixa, cartao e PIX vem das views por caixa (mesma regua)
   (F.caixa ? (CAIXA_CARTAO_CX || []).filter(r => r.caixa === F.caixa) : CAIXA_CARTAO).forEach(r => { cartaoDe[r.unidade + '|' + r.dia + '|' + r.grupo] = r; });
   (F.caixa ? (CAIXA_PIX_CX || []).filter(r => r.caixa === F.caixa) : CAIXA_PIX).forEach(r => { pixDe[r.unidade + '|' + r.dia] = r; });
   const saldoDe = (u, g) => { const l = CAIXA_CARTAO.filter(r => r.unidade === u && r.grupo === g); return l.length ? l[l.length - 1].saldo_acumulado : null; };
-  const corSaldo = s => s === null ? '#9aa4af' : Math.abs(s) < 0.01 ? '#3f9c5a' : '#f5a623';
+  const corSaldo = s => s === null ? '#9aa4af' : Math.abs(s) < 0.01 ? '#3f9c5a' : 'var(--farol-perto)';
   const td = 'padding:3px 6px; text-align:right; white-space:nowrap;';
   const sep = ' border-left:1px solid rgba(154,164,175,.25);';
   const th = 'padding:3px 6px; font-weight:normal; text-align:right; white-space:nowrap;';
@@ -1665,7 +1665,7 @@ function renderModuloCaixa() {
     ${btn(F.soPend, `caixaFiltrar('soPend',${!F.soPend})`, 'só pendências')}
     ${btn(F.naoConf, `caixaFiltrar('naoConf',${!F.naoConf})`, 'não conferidos')}
     <span style="width:12px;"></span>
-    <span style="font-size:12px; color:#a5a49a;" title="muda o módulo inteiro para um caixa só: tabela do dia, contagem, conferido e o clique no dia">caixa:</span>${btn(!F.caixa, "caixaFiltrar('caixa','')", 'Os dois')}${btn(F.caixa === 'SALÃO', "caixaFiltrar('caixa','SALÃO')", 'Salão')}${btn(F.caixa === 'DELIVERY', "caixaFiltrar('caixa','DELIVERY')", 'Delivery')}
+    <span style="font-size:12px; color:var(--tx-3);" title="muda o módulo inteiro para um caixa só: tabela do dia, contagem, conferido e o clique no dia">caixa:</span>${btn(!F.caixa, "caixaFiltrar('caixa','')", 'Os dois')}${btn(F.caixa === 'SALÃO', "caixaFiltrar('caixa','SALÃO')", 'Salão')}${btn(F.caixa === 'DELIVERY', "caixaFiltrar('caixa','DELIVERY')", 'Delivery')}
     <button onclick="caixaAvisar()" title="manda um recado para o Neto com a loja e o dia que você está vendo — ele recebe pelo resumo do robô" style="font:inherit; font-size:12px; padding:3px 12px; cursor:pointer; margin-left:auto; font-weight:600;">✉ Avisar o Neto</button>
   </div>`;
 
@@ -1712,7 +1712,7 @@ function renderModuloCaixa() {
       const dinEnv = dinCont.reduce((a, d) => a + d.enviado, 0);
       const dinDif = Math.round(dinCont.reduce((a, d) => a + (d.bateu ? 0 : d.dif), 0) * 100) / 100;
       const faltaContar = dinCx.some(d => d.faltaContar);
-      const difDin = v => Math.abs(v) < 0.01 ? vazio : '<b style="color:' + (v < 0 ? '#ff6b6b' : '#f5a623') + ';">R$ ' + fmt(v) + '</b>';
+      const difDin = v => Math.abs(v) < 0.01 ? vazio : '<b style="color:' + (v < 0 ? 'var(--farol-fora)' : 'var(--farol-perto)') + ';">R$ ' + fmt(v) + '</b>';
       // memoria de validacao (09/09/2026): o que foi explicado sai da diferenca do
       // bloco; dia com diferenca ja zerada ignora as explicadas (o vale apareceu)
       const vals = (CAIXA_VALID || []).filter(v => v.unidade === unidade && v.dia === iso && (!F.caixa || !v.caixa || v.caixa === F.caixa));
@@ -1732,18 +1732,18 @@ function renderModuloCaixa() {
       if (aberto) situacao = '<span style="color:#9aa4af;">dia em aberto</span>';
       else if (itDia) {
         const ac = itDia.filter(x => x.bloco !== 'aguardando');
-        if (ac.length) { situacao = `<b style="color:${ac.some(x => x.bloco === 'aberto') ? '#ff6b6b' : '#f5a623'};">conferir ${[...new Set(ac.map(x => tipoIt[x.bloco] || 'maquininha'))].join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; if (ac.some(x => x.bloco === 'aberto')) semFech++; }
+        if (ac.length) { situacao = `<b style="color:${ac.some(x => x.bloco === 'aberto') ? 'var(--farol-fora)' : 'var(--farol-perto)'};">conferir ${[...new Set(ac.map(x => tipoIt[x.bloco] || 'maquininha'))].join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; if (ac.some(x => x.bloco === 'aberto')) semFech++; }
         else if (itDia.length) situacao = aguardHtml0;
         else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
       }
       else if (!temDinheiro && maqPdv === 0 && maqReal === 0 && chavePdv === 0) situacao = '<span style="color:#9aa4af;">sem movimento</span>';
-      else if (semFechDia && !dinExplicado) { situacao = '<b style="color:#ff6b6b;">turno não fechou</b>' + badge; cor = 'background:rgba(255,107,107,.07);'; alerta = true; semFech++; }
+      else if (semFechDia && !dinExplicado) { situacao = '<b style="color:var(--farol-fora);">turno não fechou</b>' + badge; cor = 'background:rgba(255,107,107,.07);'; alerta = true; semFech++; }
       else {
         const o = [];
         if (!dinExplicado) { if (faltaContar) o.push('dinheiro (falta contar)'); else if (Math.abs(dinDif) >= 0.01) o.push('dinheiro'); }
         if (Math.abs(maqResto) >= 0.01) o.push('maquininha');
         if (chaveResto > 0) o.push('PIX chave');
-        if (o.length) { situacao = `<b style="color:#f5a623;">conferir ${o.join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; }
+        if (o.length) { situacao = `<b style="color:var(--farol-perto);">conferir ${o.join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; }
         else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
       }
       // dias antes do recomeço: a lista não cobre, não ficam verdes — escondidos (Financeiro, 06/11), com link de consulta
@@ -1770,7 +1770,7 @@ function renderModuloCaixa() {
     }).join('');
     pendTotal += pend; semFechTotal += semFech;
 
-    const corBorda = semFech ? '#ff6b6b' : (pend ? '#f5a623' : '#3f9c5a');
+    const corBorda = semFech ? 'var(--farol-fora)' : (pend ? 'var(--farol-perto)' : '#3f9c5a');
     const resumo = pend
       ? `<b>${pend}</b> dia(s) para conferir${semFech ? ` (<b class="negativo">${semFech}</b> com turno sem fechamento)` : ''} nos últimos ${dias.length} dias.`
       : `Nenhuma pendência nos últimos ${dias.length} dias.`;
