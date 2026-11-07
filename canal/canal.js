@@ -334,8 +334,6 @@ function cardsCancel(m, a) {
 // fila de contestacao ainda esta dentro do prazo, qual motivo mais pesa nela, e o
 // botao que leva para la. Chega DEPOIS dos numeros, igual a faixa de alertas do
 // Placar — e' outra fonte e a tabela de motivos nao pode esperar por ela.
-// RECORTE PROPRIO, dito na tela: a fila e' da rede inteira e dos ultimos 60 dias,
-// o mesmo do modulo Contestacoes, e por isso NAO segue o filtro do topo.
 // 07/11/2026 (auditoria dos numeros, lote 2, canal-14 e canal-25): a fila segue a loja do seletor (Rede = as 3, sem
 // Boqueirao). A view lida aqui vem da planilha de pedidos, que parou em 28/10 (a extracao pelo portal foi desligada em
 // 30/10): fila vazia NAO e' "nada a contestar" — o verde falso saiu. A troca para a fila da API
@@ -2706,7 +2704,7 @@ function renderModuloContestacoes() {
   </div>
   <div class="contexto" style="border-color:var(--farol-perto);">Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não aparecem aqui; a rotina segue contestando normalmente.</div>
   <div class="cards">
-    <div class="card ${aContestarVoce.length ? 'neg' : 'pos'}"><div class="card-lbl">Você precisa contestar</div><div class="card-val">${aContestarVoce.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarVoce))}</div></div>
+    <div class="card ${aContestarVoce.length ? 'neg' : 'neutral'}"><div class="card-lbl">Você precisa contestar</div><div class="card-val">${aContestarVoce.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarVoce))}</div></div>
     <div class="card neutral"><div class="card-lbl">A rotina contesta</div><div class="card-val">${aContestarRotina.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarRotina))}</div></div>
     <div class="card neutral"><div class="card-lbl">Aguardando iFood</div><div class="card-val">${aguardando.length}</div><div class="card-pct">R$ ${fmt(soma(aguardando))}</div></div>
     <div class="card pos"><div class="card-lbl">Aprovadas</div><div class="card-val">${aprovadas.length}</div><div class="card-pct">R$ ${fmt(soma(aprovadas))} recuperados</div></div>
@@ -2717,12 +2715,12 @@ function renderModuloContestacoes() {
   ${aContestarVoce.length ? `<div id="tabelaContestVoce">${grade(aContestarVoce, colPrazo)}</div>
   <div class="caption-label" style="text-align:center;" title="A ordem é por faixa de prazo (até 2 dias, 3 a 5 dias, 6 dias ou mais, e por último os sem prazo no export) e, dentro da faixa, do maior valor para o menor. São motivos que dependem de avaliar evidência — item faltando, itens errados, pedido violado. Os textos sugeridos estão em rotinas/textos-contestacao.md; quando um motivo ganhar texto aprovado, ele passa para o bloco de baixo.">
   Na ordem de fazer: quem vence antes primeiro e, no mesmo prazo, o de maior valor.</div>`
-  : '<div class="contexto" style="border-color:var(--farol-ok);">Nada esperando você. ✔</div>'}
+  : `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: a fila de hoje não aparece aqui.</div>`}
 
   <div class="section-label">A rotina contesta sozinha</div>
   ${aContestarRotina.length ? `<div id="tabelaContestRotina">${grade(aContestarRotina, colPrazo)}</div>
   <div class="caption-label" style="text-align:center;">Entram na próxima execução da rotina (11:36; reservas às 14:36 e 16:36).</div>`
-  : '<div class="contexto" style="border-color:var(--farol-ok);">Nada na fila da rotina. ✔</div>'}
+  : `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: a fila de hoje não aparece aqui.</div>`}
 
   <div class="section-label">Aguardando resposta do iFood</div>
   ${aguardando.length ? `<div id="tabelaContestAguard">${grade(aguardando, colQuem)}</div>
@@ -3603,7 +3601,7 @@ function renderModuloFrete(linhas) {
     ${agregado.length ? matrizFrete : ''}
     ${agregado.length ? canais.map((c, i) => tabela(c, i)).join('')
       : '<div class="contexto" style="border-color:var(--farol-perto);">Sem entrega nesta janela e nestas unidades.</div>'}
-    <div class="caption-label" title="Faixa com menos de 30 entregas fica em cinza: o número existe, mas oscila demais para decidir em cima dele. Desde 14/10 as entregas do TrackEat (Água Verde, Ahú e São Braz) entram junto com as do Foody (Boqueirão) — a etiqueta no topo da tela lista as unidades com dado.">
+    <div class="caption-label" title="Faixa com menos de 30 entregas fica em cinza: o número existe, mas oscila demais para decidir em cima dele. As entregas vêm do TrackEat (Água Verde, Ahú e São Braz) — a etiqueta no topo da tela lista as unidades com dado.">
       A coluna do ticket é a que decide: quem está acima de 3 km costuma levar o carrinho maior e já paga o frete, enquanto o subsídio vai para quem está perto e gasta menos.
     </div>`;
 }
@@ -4492,7 +4490,7 @@ function renderModuloAtrasos() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Atrasos e turnos — entregas próprias${ATRASOS_UNIDADE !== 'TODAS' ? ' · ' + ATRASOS_UNIDADE : ''}, ${ddmm(ATRASOS.ini)} a ${ddmm(ATRASOS.fim)}</div>
   ${chips}
   ${foodyCobertura(ATRASOS.rows)}
-  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora.</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz; antes de out/26 parte vinha do Foody) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora.</div>
 
   ${(ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador) ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -4886,7 +4884,7 @@ function renderModuloLogfin() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Financeiro da logística — entregas próprias${LOGFIN_UNIDADE !== 'TODAS' ? ' · ' + LOGFIN_UNIDADE : ''}, ${ddmm(LOGFIN.ini)} a ${ddmm(LOGFIN.fim)}</div>
   ${chips}
   ${foodyCobertura(LOGFIN.rows)}
-  <div class="contexto" style="border-color:var(--farol-perto);" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: TrackEat (Água Verde, Ahú e São Braz) — só entrega com motoboy próprio.</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: TrackEat (Água Verde, Ahú e São Braz; antes de out/26 parte vinha do Foody) — só entrega com motoboy próprio.</div>
 
   <div class="cards">
     <div class="card"><div class="card-lbl">Entregas no período</div><div class="card-val">${entregas.toLocaleString('pt-BR')}</div><div class="card-pct">média de ${n1(dias ? entregas / dias : null)} por dia, em ${dias} dia(s) com entrega</div></div>
@@ -4894,7 +4892,7 @@ function renderModuloLogfin() {
     <div class="card ${complemento > corridas * 0.05 ? 'neg' : 'neutral'}"><div class="card-lbl">Custo total estimado</div><div class="card-val">R$ ${fmt(custoTotal)}</div><div class="card-pct">corridas + R$ ${fmt(complemento)} de complemento do garantido</div></div>
     <div class="card pos"><div class="card-lbl">Custo líquido do frete</div><div class="card-val">R$ ${fmt(custoLiquido)}</div><div class="card-pct">o frete cobrado do cliente acima de 3 km (R$ ${fmt(abate)} em ${acima3.length.toLocaleString('pt-BR')} corridas) abate o custo</div></div>
   </div>
-  <div class="caption-label" style="text-align:center;" title="Corridas = soma do valor pago por entrega registrado no sistema de entrega (TrackEat na Água Verde, Ahú e São Braz; Foody no Boqueirão). Complemento = quanto o garantido por hora paga além das corridas, calculado turno a turno; os valores vêm da tabela log_regras_pagamento, não do código. Até 3 km o frete do cliente é subsidiado na promoção (a verba está no módulo de promoções), por isso só o frete acima de 3 km abate aqui.">Garantido por hora: R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no fim de semana; só o frete acima de 3 km abate o custo.</div>
+  <div class="caption-label" style="text-align:center;" title="Corridas = soma do valor pago por entrega registrado no sistema de entrega (TrackEat). Complemento = quanto o garantido por hora paga além das corridas, calculado turno a turno; os valores vêm da regra de pagamento cadastrada. Até 3 km o frete do cliente é subsidiado na promoção (a verba está no módulo de promoções), por isso só o frete acima de 3 km abate aqui.">Garantido por hora: R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no fim de semana; só o frete acima de 3 km abate o custo.</div>
 
   <div class="section-label">Por turno (janelas do iFood: almoço 10h–14h · café 15h–16h · jantar 17h–23h · madrugada 0h–1h)</div>
   <div id="tabelaLogfinTurno"><table>
