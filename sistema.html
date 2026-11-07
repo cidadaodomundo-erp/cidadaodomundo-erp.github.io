@@ -529,7 +529,7 @@ window.addEventListener('message', (e) => {
 function inicio() {
   ATUAL = null;
   atualizarFaixaLoja();
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', location.pathname + location.search);   // mantém o ?menu=proposta da simulação
   $('titulo').textContent = 'Início';
   $('acoes').innerHTML = '';
   $('side').classList.remove('aberta');
