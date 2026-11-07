@@ -354,12 +354,17 @@ function contestEscopoTxt() {
 }
 let CANCEL_RECUP = null;
 
+// Prazo de contestacao: a hora exata (vence_aprox, Curitiba) manda; contestavel_ate (data em UTC + 7) so' de reserva.
+const contestPrazoDe = (r) => r.vence_aprox ? String(r.vence_aprox).slice(0, 16)
+  : (r.contestavel_ate ? String(r.contestavel_ate).slice(0, 10) + 'T23:59' : null);
+const contestDiasAte = (p) => p ? Math.ceil((new Date(p) - Date.now()) / 864e5) : null;
+
 async function carregarRecuperavelCancel() {
   const alvo = document.getElementById('cancelRecuperavel');
   if (!alvo) return;
   if (CANCEL_RECUP === null) {
     try {
-      CANCEL_RECUP = await consultarTudo(CONTEST_FONTE + '?select=id_curto,nome_loja,unidade,motivo_cancelamento,valor,contestavel_ate,descarte_escopo&bloco=eq.A_CONTESTAR');
+      CANCEL_RECUP = await consultarTudo(CONTEST_FONTE + '?select=id_curto,nome_loja,unidade,motivo_cancelamento,valor,contestavel_ate,vence_aprox,descarte_escopo&bloco=eq.A_CONTESTAR');
     } catch (e) {
       alvo.innerHTML = '<div class="contexto">Não consegui consultar a fila de contestação agora.</div>';
       return;
@@ -380,8 +385,9 @@ async function carregarRecuperavelCancel() {
   });
   const pior = [...porMotivoRecup.entries()].map(([mt, o]) => ({ mt: mt, n: o.n, valor: o.valor }))
     .sort((x, y) => y.valor - x.valor)[0];
-  const diasAte = (d) => d ? Math.ceil((new Date(String(d).slice(0, 10) + 'T23:59:59') - Date.now()) / 864e5) : null;
-  const curtos = fila.filter(r => { const d = diasAte(r.contestavel_ate); return d !== null && d <= 2; });
+  // 07/11/2026 (lote 2, canal-13): prazo pela hora exata (vence_aprox, hora de Curitiba); contestavel_ate e' a data em UTC
+  // e da um dia a mais a quem cancelou depois das 21:00 — so' fica de reserva.
+  const curtos = fila.filter(r => { const d = contestDiasAte(contestPrazoDe(r)); return d !== null && d <= 2; });
   alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-perto);">
     <b>R$ ${fmt(totalRecup)}</b> em <b>${fila.length}</b> pedido(s) cancelado(s) ainda estão dentro do prazo de contestação.
     O motivo que mais pesa nessa fila é <b>${pior.mt}</b>: custou R$ ${fmt(pior.valor)} em ${pior.n} pedido(s).
@@ -2641,7 +2647,8 @@ function renderModuloContestacoes() {
   const linhas = CONTESTACOES.linhas.filter(r => contestUnidadeOk(r.unidade)).map(r => ({ ...r, valor: Number(r.valor) || 0 }));
 
   const hojeISO = new Date().toISOString().slice(0, 10);
-  const diasAte = (d) => d ? Math.ceil((new Date(d + 'T23:59:59') - Date.now()) / 864e5) : null;
+  // 07/11/2026 (lote 2, canal-13): prazo pela hora exata (vence_aprox); contestavel_ate (data em UTC) so' de reserva.
+  const diasAte = contestDiasAte;
 
   const bloco = (b) => linhas.filter(r => r.bloco === b);
   // ORDEM DA FILA (12/09/2026): primeiro o PRAZO, depois o DINHEIRO. Ordenar so pela
@@ -2650,7 +2657,7 @@ function renderModuloContestacoes() {
   // prazo no export, que vai para o fim em vez de para o topo (string vazia
   // ordenava antes de tudo).
   const faixaPrazo = (r) => {
-    const d = diasAte(r.contestavel_ate);
+    const d = diasAte(contestPrazoDe(r));
     if (d === null) return 3;
     return d <= 2 ? 0 : d <= 5 ? 1 : 2;
   };
@@ -2698,8 +2705,9 @@ function renderModuloContestacoes() {
 
   const colPrazo = {
     cabecalho: '<th>Contestar até</th>',
-    celula: (r) => { const d = diasAte(r.contestavel_ate);
-      return `<td title="${PRAZO_ROT[faixaPrazo(r)]}"${d !== null && d <= 2 ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${dt(r.contestavel_ate)}${d !== null ? ` (${d}d)` : ''}</td>`; },
+    celula: (r) => { const p = contestPrazoDe(r); const d = diasAte(p);
+      const hh = p && r.vence_aprox ? ' ' + p.slice(11, 16) : '';
+      return `<td title="${PRAZO_ROT[faixaPrazo(r)]}"${d !== null && d <= 2 ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${dt(p)}${hh}${d !== null ? ` (${d}d)` : ''}</td>`; },
   };
   const colQuem = { cabecalho: '<th>Contestada por</th>', celula: (r) => `<td>${quem(r)}</td>` };
   // A fila da API nao traz a justificativa do iFood (era da planilha); no bloco do dono vai o porque a rotina devolveu.
