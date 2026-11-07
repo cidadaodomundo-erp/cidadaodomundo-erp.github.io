@@ -30,6 +30,10 @@
   .ag-lin.alerta { border-color:var(--farol-perto); }
   .ag-lin.atraso { border-color:var(--farol-fora); }
   .ag-lin.feito { opacity:.7; }
+  .ag-bloco { font-size:15px; font-weight:800; color:var(--tx-1); margin:18px 2px 2px; }
+  .ag-bloco .f { font-size:11.5px; font-weight:400; color:var(--tx-4); }
+  details.ag-saber > summary { cursor:pointer; list-style-position:inside; }
+  details.ag-saber { margin-top:14px; padding-top:4px; border-top:1px solid var(--line); }
   .ag-lin .bts { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
   .ag-form { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px 10px; margin:-2px 0 6px; border:1px dashed var(--line-2); border-radius:8px; }
   .ag-form input[type=text], .ag-form textarea { flex:1 1 220px; background:var(--surface-2); color:var(--tx-1); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; }
@@ -71,19 +75,21 @@ async function entrarAgenda() {
   }
   alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
-  const [pend, cp, fer, prev, calc, rmb, ext] = await Promise.all([
+  const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal] = await Promise.all([
     ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
     ler(`vw_rh_calculos_mes?select=nome,calculo,data_limite,calculado_em,fechado_em,enviado_em,pessoas,total&data_limite=gte.${hoje}&data_limite=lte.${fim}&order=data_limite`),
     ler('vw_rmb_pedidos?select=id,pessoa,valor,descricao,situacao,so_o_dono&situacao=eq.PEDIDO&so_o_dono=is.true&order=id'),
-    ler('vw_fin_conciliado_ate?select=conta,conciliado_ate&order=conta')]);
-  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext };
+    ler('vw_fin_conciliado_ate?select=conta,conciliado_ate&order=conta'),
+    ler('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
+    ler('rh_folha_validada?select=competencia')]);
+  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal };
   agDesenhar();
 }
 function agDesenhar() {
-  const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext } = AG.dados;
+  const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal } = AG.dados;
   // 07/11/2026 (dono: "sempre espere o tempo de conciliação nas baixas do a pagar do painel"): conta vencida só é "vencida"
   // depois que o extrato daquela conta já cobre o dia do vencimento; antes disso, "aguardando conciliação"
   // fonte única do Financeiro: até que dia cada conta está conciliada (vw_fin_conciliado_ate)
@@ -101,10 +107,10 @@ function agDesenhar() {
     const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
-    add({ dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.prazo && p.prazo < hoje ? 'atraso' : 'alerta' });
+    add({ dep: true, dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.prazo && p.prazo < hoje ? 'atraso' : 'alerta' });
   });
   // 2) reembolso que só eu aprovo (o da Hellen)
-  if (ok(rmb, 'reembolsos')) rmb.forEach((g) => add({ dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' }));
+  if (ok(rmb, 'reembolsos')) rmb.forEach((g) => (AG.sinal++, add({ dep: true, dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' })));
   // 3) contas a pagar: vencidas hoje, e o total de cada dia
   if (ok(cp, 'contas a pagar')) {
     const val = (c) => Math.max(0, (Number(c.debito) || 0) - (Number(c.credito) || 0));
@@ -113,7 +119,7 @@ function agDesenhar() {
     // 07/11/2026 (Organizador: "o mesmo número em toda tela"): conta-se TÍTULO, como o Contas a pagar (cpTitulos), não linha de rateio
     const nTit = (L) => new Set(L.map((c, i) => c.id_titulo ? `${c.origem}|${c.id_titulo}|${c.vencimento}|${c.conta_exibida || ''}` : `l${i}`)).size;
     AG.sinal += nTit(venc);
-    if (venc.length) add({ dia: hoje, txt: `<b>${nTit(venc)}</b> ${nTit(venc) === 1 ? 'conta vencida' : 'contas vencidas'}, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
+    if (venc.length) add({ dep: true, dia: hoje, txt: `<b>${nTit(venc)}</b> ${nTit(venc) === 1 ? 'conta vencida' : 'contas vencidas'}, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
     if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${nTit(agu)} ${nTit(agu) === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — o extrato ainda não chegou ao dia do vencimento</span>`, ir: 'contaspagar' });
     [...new Set(cp.filter((c) => c.vencimento >= hoje).map((c) => c.vencimento))].forEach((d) => {
       const L = cp.filter((c) => c.vencimento === d), m = L.slice().sort((a, b) => val(b) - val(a))[0];
@@ -124,13 +130,22 @@ function agDesenhar() {
   if (ok(fer, 'férias')) fer.forEach((x) => {
     if (x.situacao === 'programada' && x.pagar_ate && x.pagar_ate <= fim) {
       const passou = x.pagar_ate < hoje, espera = passou && (x.pagamento ? x.pagamento === 'AGUARDANDO_CONCILIACAO' : !conciliou(x.pagar_ate, null));
-      add({ dia: passou ? hoje : x.pagar_ate, txt: espera ? `<span style="color:var(--tx-3);">Férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}: aguardando conciliação</span> <span class="f">pagar até ${agDm(x.pagar_ate)}</span>`
+      if (passou && !espera) AG.sinal++;
+      add({ dep: passou && !espera, dia: passou ? hoje : x.pagar_ate, txt: espera ? `<span style="color:var(--tx-3);">Férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}: aguardando conciliação</span> <span class="f">pagar até ${agDm(x.pagar_ate)}</span>`
         : `${passou ? '✗ ' : ''}Pagar as férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}${passou ? ` <span class="f">vencia ${agDm(x.pagar_ate)}</span>` : ''}`,
         ir: 'pferias', tipo: espera ? '' : passou ? 'atraso' : 'alerta' }); }
     if (x.situacao === 'programada' && x.limite_gozo && x.limite_gozo >= hoje && x.limite_gozo <= fim) add({ dia: x.limite_gozo, txt: `${agE(agNome(x.nome))} começa as férias`, ir: 'pferias' });
   });
   // 5) folha: rescisões e o que vence de cálculo
   if (ok(prev, 'previsão da folha')) prev.filter((p) => p.tipo !== 'FERIAS').forEach((p) => add({ dia: p.dia, txt: `${agE(agNome(String(p.tipo).replace(/_/g, ' ')))}: <b>${agR(p.valor)}</b>${p.unidade ? ' · ' + agE(p.unidade) : ''}`, ir: p.tipo === 'RESCISAO' ? 'presc' : 'pcalc' }));
+  if (ok(folhaUlt, 'folha') && ok(folhaVal, 'folha validada') && folhaUlt[0]) {
+    const comp = String(folhaUlt[0].competencia).slice(0, 10);
+    if (!folhaVal.some((v) => String(v.competencia).slice(0, 10) === comp)) {
+      AG.sinal++;
+      const mes = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][Number(comp.slice(5, 7)) - 1];
+      add({ dep: true, dia: hoje, txt: `Validar a conferência da folha de <b>${mes}</b> (o robô só atualiza o Saipos e a lista de pagamento depois)`, ir: 'pconf', tipo: 'alerta' });
+    }
+  }
   if (ok(calc, 'cálculos da folha')) calc.forEach((c) => add({ dia: c.data_limite, txt: `${agE(c.nome)}: ${c.calculado_em ? `calculado, ${Number(c.pessoas || 0)} pessoas, <b>${agR(c.total)}</b>` : '<b>ainda não calculado</b>'}`, ir: 'pcalc', tipo: c.calculado_em ? '' : 'alerta' }));
 
   const alvo = document.getElementById('view-agenda');
@@ -138,17 +153,27 @@ function agDesenhar() {
   const ordemTipo = { atraso: 0, alerta: 1, '': 2 };
   let h = '<h2>Minha agenda</h2>';
   if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
-  dias.forEach((d) => {
-    const L = itens.filter((x) => x.dia === d).sort((a, b) => ordemTipo[a.tipo] - ordemTipo[b.tipo]);
-    if (!L.length && d !== hoje) return;
-    h += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
-    if (!L.length) h += '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada para você hoje</span></div>';
-    L.forEach((x) => {
-      const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
-      const feito = x.id ? `<button type="button" class="preset-btn" title="tirar da agenda" onclick="agFeito(${x.id})">✓</button>` : '';
-      h += `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
+  const linha = (x) => {
+    const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
+    const feito = x.id ? `<button type="button" class="preset-btn" title="tirar da agenda" onclick="agFeito(${x.id})">✓</button>` : '';
+    return `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
+  };
+  const porDia = (lista, vazio) => {
+    let b = '';
+    dias.forEach((d) => {
+      const L = lista.filter((x) => x.dia === d).sort((a, b2) => ordemTipo[a.tipo] - ordemTipo[b2.tipo]);
+      if (!L.length && (d !== hoje || !vazio)) return;
+      b += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
+      b += L.length ? L.map(linha).join('') : `<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">${vazio}</span></div>`;
     });
-  });
+    return b;
+  };
+  // 07/11/2026 (dono 03:44): em cima só o que exige ação dele (é o que conta no sinal do menu); o resto, recolhido
+  const dep = itens.filter((x) => x.dep), saber = itens.filter((x) => !x.dep);
+  h += `<div class="ag-bloco">Depende de você</div>` + porDia(dep, '✓ nada depende de você hoje');
+  let aberto = false; try { aberto = sessionStorage.getItem('agSaberAberto') === '1'; } catch (e) {}
+  if (saber.length) h += `<details class="ag-saber"${aberto ? ' open' : ''} ontoggle="try{sessionStorage.setItem('agSaberAberto',this.open?'1':'0')}catch(e){}">
+      <summary class="ag-bloco">Para saber <span class="f">· ${saber.length} ${saber.length === 1 ? 'item' : 'itens'}, sem ação sua</span></summary>${porDia(saber, '')}</details>`;
   alvo.innerHTML = h;
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });

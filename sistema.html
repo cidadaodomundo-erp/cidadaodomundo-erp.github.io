@@ -79,6 +79,16 @@
   @media (min-width:761px) { .app.menu-fechado .side { display:none; } }
   .ti { font-weight:800; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .acoes { margin-left:auto; display:flex; gap:8px; flex-shrink:0; }
+  /* 07/11/2026: a busca de telas (casca/busca.js) */
+  .busca { position:relative; margin-left:auto; flex-shrink:1; min-width:0; }
+  .busca + .acoes { margin-left:0; }
+  .busca input { width:230px; max-width:100%; box-sizing:border-box; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1); font:inherit; font-size:13px; }
+  .busca input:focus { outline:none; border-color:var(--marca-amarelo); }
+  .busca-res { position:absolute; right:0; top:calc(100% + 4px); width:320px; max-width:90vw; max-height:60vh; overflow:auto; background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:4px; z-index:60; }
+  .busca-res .br { display:flex; gap:8px; align-items:baseline; width:100%; text-align:left; padding:7px 9px; border:none; border-radius:6px; background:none; color:var(--tx-2); font:inherit; font-size:13.5px; cursor:pointer; }
+  .busca-res .br.sel, .busca-res .br:hover { background:var(--surface-2); color:var(--tx-1); }
+  .busca-res .br small { margin-left:auto; color:var(--tx-4); font-size:11px; white-space:nowrap; }
+  .busca-res .vazio { padding:8px 9px; color:var(--tx-4); font-size:12.5px; }
   .btn { background:var(--surface-2); border:1px solid var(--line); color:var(--tx-2); border-radius:8px;
          padding:6px 12px; font-size:12.5px; font-weight:700; cursor:pointer; text-decoration:none; }
   .btn:hover { border-color:var(--brand); color:var(--tx-1); }
@@ -152,6 +162,9 @@
     .ti { flex:1; min-width:0; }
     .acoes { margin-left:0; }
     .acoes .btn { min-height:40px; padding:6px 10px; }
+    .busca { order:10; flex:1 0 100%; margin:4px 0 0; }
+    .busca input { width:100%; font-size:16px; min-height:38px; }
+    .busca-res { left:0; right:0; width:auto; max-width:none; }
     #btnRecarregar { display:none; }
     .vendo { order:9; flex:1 0 100%; min-width:0; margin:0; padding:0; border:0; border-radius:0; background:none; color:var(--tx-3); font-size:12.5px; font-weight:600; }
     .vendo b { font-size:13px; padding:0; }
@@ -190,6 +203,7 @@
       <button class="ham" type="button" id="btnHam" aria-label="Abrir o menu">☰</button>
       <div class="ti" id="titulo">Início</div>
       <div class="vendo" id="vendo"></div>
+      <div class="busca" id="buscaCx"><input id="busca" type="search" placeholder="🔎 Buscar tela… (Ctrl+K)" autocomplete="off" spellcheck="false" aria-label="Buscar tela" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" role="listbox" hidden></div></div>
       <div class="acoes" id="acoes"></div>
     </div>
     <div class="faixa-loja" id="faixaLoja" hidden></div>
@@ -200,6 +214,7 @@
 <script src="casca/menu.js?v=20261107a"></script>
 <script src="casca/paginas.js?v=20261107a"></script>
 <script src="casca/modulos.js?v=20261107a"></script>
+<script src="casca/busca.js?v=20261107a"></script>
 <script src="casca/modulos-proposta.js?v=20261107e"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -425,6 +440,75 @@ $('menu').addEventListener('click', (e) => {
   if (b) abrir(b.dataset.chave);
 });
 $('miInicio').addEventListener('click', () => inicio());
+
+// -------------------------------------------------------------- busca de telas (07/11/2026, dono 03:44 pelo Organizador)
+// Acha TELA pelo nome, pelo grupo, pelas palavras de casca/busca.js e pela descrição da tela (painel_telas.responde, em DESC).
+// Sem acento, sem maiúscula. Só o que o login pode abrir (visivel). Enter abre a primeira (ou a marcada com as setas).
+const BUSCA_SIN = window.CASCA_BUSCA || {};
+const buscaNorm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
+const BUSCA_PARADAS = new Set(['a', 'o', 'as', 'os', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'para', 'pra', 'por', 'com', 'que', 'tela', 'ver', 'onde', 'como', 'qual', 'meu', 'minha']);
+let BUSCA_SEL = 0, BUSCA_ACHOU = [];
+function buscaGrupoNome(it) { const g = MENU.find((x) => x.id === it.grupo); return g ? g.nome : ''; }
+function buscaPontos(k, q, palavras) {
+  const it = ITENS[k], rot = buscaNorm(it.rotulo), sin = (BUSCA_SIN[k] || []).map(buscaNorm);
+  const desc = buscaNorm((typeof DESC === 'object' && DESC && DESC[k]) || ''), grupo = buscaNorm(buscaGrupoNome(it));
+  let p = 0;
+  if (rot === q) p = 120; else if (rot.startsWith(q)) p = 100; else if (rot.includes(q)) p = 85;
+  sin.forEach((x) => { if (x === q) p = Math.max(p, 110); else if (x.startsWith(q)) p = Math.max(p, 80); else if (x.length >= 4 && q.includes(x)) p = Math.max(p, 75); });
+  if (p) return p;
+  // palavra a palavra: todas precisam aparecer (começo de palavra) no nome, nas palavras, no grupo ou na descrição
+  if (!palavras.length) return 0;
+  const onde = [rot, ...sin, grupo, desc].join(' ').split(' ');
+  const acha = (w) => onde.some((x) => x.startsWith(w));
+  if (!palavras.every(acha)) return 0;
+  const noNome = palavras.filter((w) => rot.split(' ').some((x) => x.startsWith(w))).length;
+  return 40 + 10 * noNome;
+}
+function buscaProcurar(texto) {
+  const q = buscaNorm(texto);
+  if (!q) return [];
+  const palavras = q.split(' ').filter((w) => w.length >= 2 && !BUSCA_PARADAS.has(w));
+  return Object.keys(ITENS).filter((k) => visivel(k) && !FORA_DO_MENU.has(k))
+    .map((k) => ({ k, p: buscaPontos(k, q, palavras) })).filter((x) => x.p > 0)
+    .sort((a, b) => b.p - a.p || String(ITENS[a.k].rotulo).localeCompare(String(ITENS[b.k].rotulo), 'pt-BR')).slice(0, 8).map((x) => x.k);
+}
+function buscaDesenhar() {
+  const box = $('buscaRes'), v = $('busca').value;
+  if (!v.trim()) { box.hidden = true; return; }
+  BUSCA_ACHOU = buscaProcurar(v);
+  if (BUSCA_SEL >= BUSCA_ACHOU.length) BUSCA_SEL = 0;
+  box.innerHTML = BUSCA_ACHOU.length ? BUSCA_ACHOU.map((k, i) => { const it = ITENS[k];
+    return `<button type="button" class="br${i === BUSCA_SEL ? ' sel' : ''}" role="option" data-busca="${esc(k)}"><span>${esc(it.icone || '')}</span><span>${esc(it.rotulo)}${it.link ? ' ↗' : ''}</span><small>${esc(buscaGrupoNome(it))}</small></button>`; }).join('')
+    : '<div class="vazio">Nenhuma tela com esse nome. Tente outra palavra (ex.: "férias", "quanto devo", "estoque").</div>';
+  box.hidden = false;
+}
+function buscaAbrir(k) {
+  $('busca').value = ''; $('buscaRes').hidden = true; $('busca').blur();
+  registrarUsoCasca('busca');
+  abrir(k);
+}
+$('busca').addEventListener('input', () => { BUSCA_SEL = 0; buscaDesenhar(); });
+$('busca').addEventListener('focus', () => { if ($('busca').value.trim()) buscaDesenhar(); });
+$('busca').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!BUSCA_ACHOU.length) return;
+    BUSCA_SEL = (BUSCA_SEL + (e.key === 'ArrowDown' ? 1 : -1) + BUSCA_ACHOU.length) % BUSCA_ACHOU.length;
+    buscaDesenhar();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    BUSCA_ACHOU = buscaProcurar($('busca').value);
+    if (BUSCA_ACHOU.length) buscaAbrir(BUSCA_ACHOU[Math.min(BUSCA_SEL, BUSCA_ACHOU.length - 1)]);
+  } else if (e.key === 'Escape') { $('busca').value = ''; $('buscaRes').hidden = true; $('busca').blur(); }
+});
+$('buscaRes').addEventListener('mousedown', (e) => {   // mousedown: antes do blur fechar a lista
+  const b = e.target.closest('[data-busca]');
+  if (b) { e.preventDefault(); buscaAbrir(b.dataset.busca); }
+});
+$('busca').addEventListener('blur', () => setTimeout(() => { $('buscaRes').hidden = true; }, 150));
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); $('busca').focus(); $('busca').select(); }
+});
 function ehCelular() { return window.matchMedia('(max-width:760px)').matches; }
 $('btnHam').addEventListener('click', () => {
   if (ehCelular()) { $('side').classList.toggle('aberta'); return; }
@@ -659,12 +743,22 @@ async function carregarSinalAgenda() {
   try {
     const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
     const ler = async (q) => { const r = await fetch(SUPABASE_URL + '/rest/v1/' + q, { headers: cabecalho() }); if (!r.ok) throw new Error(r.status); return r.json(); };
-    const [pend, venc] = await Promise.all([
+    const opc = (q) => ler(q).catch(() => []);
+    const [pend, venc, rmb, fer, fUlt, fVal] = await Promise.all([
       ler('dono_pendencia?select=id,prazo&resolvido_em=is.null'),
-      ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&vencimento=lt.${hoje}`)]);
+      ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&vencimento=lt.${hoje}`),
+      opc('vw_rmb_pedidos?select=id&situacao=eq.PEDIDO&so_o_dono=is.true'),
+      opc(`vw_rh_ferias_alertas?select=pagar_ate,pagamento&situacao=eq.programada&pagar_ate=lt.${hoje}`),
+      opc('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
+      opc('rh_folha_validada?select=competencia')]);
+    // 07/11/2026 (dono 03:44): só o bloco "Depende de você" da agenda conta — pendências até hoje, vencidas de verdade (por
+    // título), reembolso que só o dono aprova, férias vencidas e não pagas (as "aguardando conciliação" não), folha a validar
     const nPend = pend.filter((p) => !p.prazo || p.prazo <= hoje).length;
     const nVenc = new Set(venc.map((c, i) => c.id_titulo ? `${c.origem}|${c.id_titulo}|${c.vencimento}|${c.conta_exibida || ''}` : `l${i}`)).size;
-    SINAIS.agenda = nPend + nVenc;
+    const nFer = fer.filter((x) => x.pagamento ? x.pagamento !== 'AGUARDANDO_CONCILIACAO' : false).length;
+    const comp = fUlt[0] ? String(fUlt[0].competencia).slice(0, 10) : null;
+    const nFolha = comp && !fVal.some((v) => String(v.competencia).slice(0, 10) === comp) ? 1 : 0;
+    SINAIS.agenda = nPend + nVenc + rmb.length + nFer + nFolha;
     desenharMenu();
   } catch (e) {}   // sem o número, o menu segue igual
 }
