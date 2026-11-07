@@ -2682,15 +2682,27 @@ async function cgFerSimCalcular() {
 // quando muda a data, o tipo ou o aviso. Cada mudança recalcula em rh_rescisao_calcular e redesenha só o resultado, sem tirar o foco.
 const RESC = { pessoa: '', saida: '', tipo: 'sem_justa_causa', aviso: 'trabalhado', a: null, fontes: {}, editados: new Set(), res: null, erro: null, seq: 0 };
 const RESC_TIPOS = [['sem_justa_causa', 'Sem justa causa'], ['pedido', 'Pedido de demissão'], ['acordo', 'Acordo'], ['justa_causa', 'Justa causa']];
-const RESC_AVISOS = [['trabalhado', 'Trabalhado'], ['indenizado', 'Indenizado'], ['dispensado', 'Dispensado'], ['descontado', 'Descontado']];
-// grupo, campos: [chave, rótulo, tipo, em branco]
-const RESC_CAMPOS = [
-  ['Aviso', [['data_aviso', 'Data do aviso', 'date'], ['reducao', 'Redução no aviso (não muda o valor)', 'reducao'], ['anos_aviso', 'Anos para o aviso', 'num', 'na data do aviso']]],
-  ['Salário', [['salario', 'Salário', 'num'], ['adicionais', 'Adicionais', 'num'], ['media_variavel', 'Média variável', 'num'], ['dias_saldo', 'Dias de saldo', 'num'], ['faltas_dias', 'Faltas (dias)', 'num']]],
-  ['Férias e 13º', [['ferias_vencidas_dias', 'Férias vencidas (dias)', 'num'], ['avos_ferias', 'Avos de férias', 'num', 'calcula'], ['avos13', 'Avos do 13º', 'num', 'calcula'], ['decimo_pago', '13º já pago', 'num']]],
-  ['Descontos', [['adiantamentos', 'Adiantamentos', 'num'], ['descontos', 'Outros descontos', 'num'], ['descontos_motivo', 'Motivo dos descontos', 'txt'], ['pega_vt', 'Desconta VT', 'sim'], ['va_rescisao', 'VA na rescisão', 'num']]],
+// 07/11/2026 (dono 02:52: "temos que ver as variáveis que precisam ser informadas pra simular a rescisão"; proposta do RH em
+// contexto/propostas-telas/2026-11-07-rescisao-simulador.md): o aviso ganhou 'parcial' e a tela, 3 blocos — o que aconteceu,
+// o que o painel já sabe (âmbar = conferir) e o que se informa se houver.
+const RESC_AVISOS = [['trabalhado', 'Trabalhado (inteiro)'], ['parcial', 'Cumpriu parte e foi dispensado do resto'], ['indenizado', 'Indenizado'],
+  ['descontado', 'Pedido: descontado'], ['dispensado', 'Pedido: dispensado']];
+// [chave, rótulo, tipo, em branco]
+const RESC_BLOCO_A = [['data_aviso', 'Data em que o aviso foi entregue', 'date'], ['ultimo_dia', 'Último dia trabalhado', 'date'],
+  ['reducao', 'Redução no aviso (não muda o valor)', 'reducao']];
+const RESC_BLOCO_B = [
+  ['Salário', [['salario', 'Salário', 'num'], ['adicionais', 'Adicionais', 'num'], ['dias_saldo', 'Dias de saldo', 'num'], ['pega_vt', 'Desconta VT', 'sim']]],
+  ['Médias', [['media_variavel', 'Média variável', 'num'], ['media_aviso', 'Média no aviso', 'num'], ['media_13', 'Média no 13º', 'num'], ['media_ferias', 'Média nas férias', 'num']]],
+  ['Faltas', [['faltas_dias', 'Faltas no mês (dias)', 'num'], ['atraso_horas', 'Atrasos (horas)', 'num'], ['faltas_aquisitivo', 'Faltas no período aquisitivo', 'num']]],
+  ['Férias, vales e descontos', [['ferias_vencidas_dias', 'Férias vencidas (dias)', 'num'], ['adiantamentos', 'Adiantamento do mês', 'num'],
+    ['vt_nao_usado', 'VT do mês seguinte já creditado', 'num'], ['va_nao_usado', 'VA do mês seguinte já creditado', 'num'], ['gratificacao_salao', 'Gratificação do salão do mês', 'num']]],
   ['FGTS', [['saldo_fgts', 'Saldo do FGTS', 'num']]],
 ];
+const RESC_BLOCO_C = [['dsr_dias', 'DSR perdido (dias)', 'num'], ['atestado_dias', 'Dias de atestado no mês', 'num'], ['decimo_pago', '13º já adiantado', 'num'],
+  ['va_rescisao', 'VA na rescisão', 'num'], ['descontos', 'Outros descontos', 'num'], ['descontos_motivo', 'Motivo dos outros descontos', 'txt'],
+  ['anos_aviso', 'Anos para o aviso (só para forçar)', 'num', 'calcula'], ['avos13', 'Avos do 13º (só para forçar)', 'num', 'calcula'], ['avos_ferias', 'Avos de férias (só para forçar)', 'num', 'calcula']];
+// campos que o painel estima e alguém precisa conferir: âmbar até editar ou tocar em "confere"
+const RESC_CONFERIR = new Set(['faltas_dias', 'faltas_aquisitivo', 'media_variavel', 'media_aviso', 'media_13', 'media_ferias', 'saldo_fgts']);
 const RESC_INPUT = 'width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);font:inherit;font-size:13px;';
 function cgRescPessoas() {
   const hoje = trHoje(), limite = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
@@ -2700,29 +2712,53 @@ function cgRescPessoas() {
 function cgRescOpcoes(L, v) { return L.map(([k, r]) => `<option value="${k}"${k === v ? ' selected' : ''}>${r}</option>`).join(''); }
 function cgAbaResc() {
   if (!RESC.saida) RESC.saida = trHoje();
-  let h = `<div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;text-align:left;margin-bottom:12px;">
-      <label style="font-size:12px;color:var(--tx-3);">Pessoa<select style="${RESC_INPUT}" onchange="cgRescEscolher('pessoa', this.value)"><option value="">escolha</option>${cgRescPessoas().map((p) => `<option value="${p.id}"${String(p.id) === String(RESC.pessoa) ? ' selected' : ''}>${cgEsc(p.rot)}</option>`).join('')}</select></label>
-      <label style="font-size:12px;color:var(--tx-3);">Data da rescisão<input type="date" style="${RESC_INPUT}" value="${cgEsc(RESC.saida)}" onchange="cgRescEscolher('saida', this.value)"></label>
-      <label style="font-size:12px;color:var(--tx-3);">Tipo<select style="${RESC_INPUT}" onchange="cgRescEscolher('tipo', this.value)">${cgRescOpcoes(RESC_TIPOS, RESC.tipo)}</select></label>
-      <label style="font-size:12px;color:var(--tx-3);">Aviso<select style="${RESC_INPUT}" onchange="cgRescEscolher('aviso', this.value)">${cgRescOpcoes(RESC_AVISOS, RESC.aviso)}</select></label>
+  const lab = (rot, campo) => `<label style="font-size:12px;color:var(--tx-3);display:block;">${rot}${campo}</label>`;
+  const grade = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;text-align:left;margin-bottom:12px;';
+  const titulo = (t, sub) => `<h4 style="margin:4px 0 6px;font-size:13.5px;">${t}${sub ? ` <span style="font-weight:400;font-size:11.5px;color:var(--tx-4);">${sub}</span>` : ''}</h4>`;
+  let h = titulo('1. O que aconteceu', 'sem isto não há conta') + `<div style="${grade}">
+      ${lab('Pessoa', `<select style="${RESC_INPUT}" onchange="cgRescEscolher('pessoa', this.value)"><option value="">escolha</option>${cgRescPessoas().map((p) => `<option value="${p.id}"${String(p.id) === String(RESC.pessoa) ? ' selected' : ''}>${cgEsc(p.rot)}</option>`).join('')}</select>`)}
+      ${lab('Tipo', `<select style="${RESC_INPUT}" onchange="cgRescEscolher('tipo', this.value)">${cgRescOpcoes(RESC_TIPOS, RESC.tipo)}</select>`)}
+      ${lab('Aviso', `<select style="${RESC_INPUT}" onchange="cgRescEscolher('aviso', this.value)">${cgRescOpcoes(RESC_AVISOS, RESC.aviso)}</select>`)}
+      ${lab('Data da rescisão (saída)', `<input type="date" style="${RESC_INPUT}" value="${cgEsc(RESC.saida)}" onchange="cgRescEscolher('saida', this.value)">`)}
+      ${RESC.a ? RESC_BLOCO_A.filter(([k]) => k !== 'ultimo_dia' || ['trabalhado', 'parcial'].includes(RESC.aviso)).map(cgRescCampoHtml).join('') : ''}
     </div>`;
+  if (RESC.a && RESC.aviso === 'parcial' && RESC.a.data_aviso && RESC.a.ultimo_dia) {
+    const cump = Math.max(0, Math.round((new Date(RESC.a.ultimo_dia + 'T12:00:00') - new Date(RESC.a.data_aviso + 'T12:00:00')) / 864e5));
+    h += `<div class="caption-label" style="text-align:left;margin:-6px 0 10px;">Cumpriu ${cump} ${cump === 1 ? 'dia' : 'dias'} do aviso (o aviso começa no dia seguinte à entrega); o resto é indenizado.</div>`;
+  }
   if (!RESC.pessoa) return h;
   if (!RESC.a) return h + '<div class="contexto">Lendo os dados da pessoa…</div>';
+  const nConf = [...RESC_CONFERIR].filter((k) => !RESC.editados.has(k)).length;
   h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-items:start;">
-      <div>${RESC_CAMPOS.map(([g, C]) => `<h4 style="margin:0 0 6px;font-size:13px;">${g}</h4>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px;">${C.map(cgRescCampoHtml).join('')}</div>`).join('')}</div>
+      <div>
+        ${titulo('2. O que o painel já sabe', nConf ? `${nConf} em âmbar para conferir` : 'tudo conferido')}
+        ${RESC_BLOCO_B.map(([g, C]) => `<div style="font-size:11.5px;font-weight:700;color:var(--tx-3);margin:2px 0 4px;">${g}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px;">${C.map(cgRescCampoHtml).join('')}</div>`).join('')}
+        ${titulo('3. Informar se houver', 'começa em zero')}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px;">${RESC_BLOCO_C.map(cgRescCampoHtml).join('')}</div>
+      </div>
       <div id="rescResultado">${cgRescResultadoHtml()}</div></div>`;
   return h;
 }
 function cgRescCampoHtml([k, rot, tipo, branco]) {
   const a = RESC.a, v = a[k] == null ? '' : a[k];
-  const fonte = RESC.editados.has(k) ? 'editado aqui' : (RESC.fontes[k] || '');
-  const cor = /^ESTIMADO/.test(fonte) ? 'var(--farol-perto)' : 'var(--tx-4)';
+  const editado = RESC.editados.has(k);
+  const fonte = editado ? 'editado aqui' : (RESC.fontes[k] || '');
+  const conferir = RESC_CONFERIR.has(k) && !editado;
+  const borda = conferir ? 'border-color:var(--farol-perto);' : '';
   const muda = `onchange="cgRescCampo('${k}', '${tipo}', this)"`;
   const campo = tipo === 'sim' ? `<select style="${RESC_INPUT}" ${muda}><option value="1"${a[k] ? ' selected' : ''}>Sim</option><option value="0"${a[k] ? '' : ' selected'}>Não</option></select>`
     : tipo === 'reducao' ? `<select style="${RESC_INPUT}" ${muda}>${cgRescOpcoes([['', 'Nenhuma'], ['2_horas', '2 horas por dia'], ['7_dias', '7 dias corridos']], String(v))}</select>`
-    : `<input style="${RESC_INPUT}" type="${tipo === 'date' ? 'date' : tipo === 'num' ? 'number' : 'text'}"${tipo === 'num' ? ' step="0.01" min="0"' : ''} value="${cgEsc(v)}"${branco ? ` placeholder="${cgEsc(branco)}"` : ''} ${muda}>`;
-  return `<label style="font-size:12px;color:var(--tx-3);display:block;">${rot}${campo}${fonte ? `<div style="font-size:10.5px;line-height:1.25;margin-top:2px;color:${cor};">${cgEsc(fonte)}</div>` : ''}</label>`;
+    : `<input style="${RESC_INPUT}${borda}" type="${tipo === 'date' ? 'date' : tipo === 'num' ? 'number' : 'text'}"${tipo === 'num' ? ' step="0.01" min="0"' : ''} value="${cgEsc(v)}"${branco ? ` placeholder="${cgEsc(branco)}"` : ''} ${muda}>`;
+  const nota = conferir ? `<div style="font-size:10.5px;line-height:1.25;margin-top:2px;color:var(--farol-perto);">conferir · <a href="javascript:void 0" style="color:inherit;" onclick="cgRescConfere('${k}', this)">confere</a></div>`
+    : editado ? '<div style="font-size:10.5px;line-height:1.25;margin-top:2px;color:var(--tx-4);">editado aqui</div>' : '';
+  return `<label title="${cgEsc(fonte)}" style="font-size:12px;color:var(--tx-3);display:block;">${rot}${campo}${nota}</label>`;
+}
+function cgRescConfere(k, el) {
+  RESC.editados.add(k);
+  const lab = el.closest('label'), inp = lab && lab.querySelector('input');
+  if (inp) inp.style.borderColor = '';
+  if (lab) { const d = lab.querySelector('div'); if (d) { d.textContent = 'conferido'; d.style.color = 'var(--tx-4)'; } }
 }
 function cgRescTotais() {
   const L = RESC.res || [], soma = (f) => L.filter(f).reduce((s, x) => s + cgN(x.valor), 0);
@@ -2742,7 +2778,7 @@ function cgRescResultadoHtml() {
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;">${cgBotaoPasso(`Levar ao fluxo · ${cgR(T.total)} em ${cgData(cgRescDataFluxo())}`, 'cgRescFluxo()')}</div>
     <div id="tabelaRescVerbas"><table><thead><tr><th>Verba</th><th>Referência</th><th style="text-align:right;">Valor</th></tr></thead><tbody>
       ${ver.map((x) => `<tr><td style="white-space:normal;">${cgEsc(x.verba)}</td><td>${cgEsc(x.referencia || '')}</td><td style="text-align:right;color:${cor(x)};">${x.tipo === 'desconto' ? '− ' : ''}${cgR(x.valor)}</td></tr>`).join('')}
-      ${base.map((x) => `<tr><td colspan="2" style="white-space:normal;color:var(--tx-4);">${cgEsc(x.verba)}${x.referencia ? ' · ' + cgEsc(x.referencia) : ''}</td><td style="text-align:right;color:var(--tx-4);">${cgR(x.valor)}</td></tr>`).join('')}
+      ${base.map((x) => `<tr><td colspan="2" style="white-space:normal;color:var(--tx-4);">${cgEsc(x.verba)}${x.referencia ? ' · ' + cgEsc(x.referencia) : ''}</td><td style="text-align:right;color:var(--tx-4);">${Number(x.ordem) !== 99 ? cgR(x.valor) : /^Proje/.test(x.verba) ? `${cgN(x.valor)} dias indenizados` : `salário ${cgR(x.valor)}`}</td></tr>`).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="2">Líquido</td><td style="text-align:right;">${cgR(T.liquido)}</td></tr></tfoot></table></div>
     <div class="caption-label" style="text-align:left;margin-top:6px;">Estimativa. O valor oficial é o da contabilidade (TRCT).</div>`;
 }
@@ -2770,8 +2806,10 @@ function cgRescCampo(k, tipo, el) {
   const v = el.value;
   RESC.a[k] = tipo === 'sim' ? v === '1' : v === '' ? null : tipo === 'num' ? Number(v) : v;
   RESC.editados.add(k);
+  el.style.borderColor = '';
   const f = el.parentElement.querySelector('div');
   if (f) { f.textContent = 'editado aqui'; f.style.color = 'var(--tx-4)'; }
+  if (k === 'data_aviso' || k === 'ultimo_dia') renderModuloCargos();   // os dias cumpridos do aviso parcial mudam
   cgRescCalcular();
 }
 async function cgRescCalcular() {
