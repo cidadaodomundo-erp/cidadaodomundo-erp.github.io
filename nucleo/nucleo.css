@@ -274,7 +274,7 @@
      vivem dentro de card e o fundo atras delas muda. A sombra na costura so
      aparece quando a tabela de fato rola (classe .rolavel, posta pelo JS). */
   div[id^="tabela"] tr, #extratoFin tr { --linha-fundo:var(--fundo-tabela, var(--bg)); }
-  div[id^="tabela"] tr:nth-child(even) { --linha-fundo:#171716; }
+  div[id^="tabela"] tr:nth-child(even) { --linha-fundo:var(--zebra); }
   div[id^="tabela"] tr.sub, #extratoFin tr.sub { --linha-fundo:#232321; }
   div[id^="tabela"] tr.liq, #extratoFin tr.liq { --linha-fundo:#111110; }
   div[id^="tabela"] td:first-child, #extratoFin td:first-child { position:sticky; left:0; z-index:2; background:var(--linha-fundo, var(--bg)); }
@@ -727,6 +727,7 @@
   html.tema-proposta .contexto { box-shadow:none; }
   html.tema-proposta table th { font-weight:600; }
   html.tema-proposta table td { border-color:var(--line); }
+  html.tema-proposta div[id^="tabela"] tr.sub, html.tema-proposta div[id^="tabela"] tr.liq, html.tema-proposta #extratoFin tr.sub, html.tema-proposta #extratoFin tr.liq { --linha-fundo:var(--surface-2); }
   .papel { --farol-ok:#1f6d3f; --farol-perto:#b26a00; --farol-fora:#b3261e; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c;
     --p-bg:#f6f5f1; --p-paper:#fff; --p-ink:#1e2226; --p-line:#dcdad3; --p-line2:#ebe9e3; --p-head:#efede6; --p-zebra:#f1f0eb;
     background:var(--p-bg); color:var(--p-ink); margin:-28px -32px -60px; padding:28px 32px 60px; }

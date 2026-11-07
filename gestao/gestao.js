@@ -7310,7 +7310,7 @@ function projListaContas() {
       const cor = r.situacao === 'VENCIDA' ? '#f85149' : (r.situacao === 'VENCE HOJE' ? '#e8b04b' : '#a5a49a');
       const rotulo = r.situacao === 'VENCIDA' ? `VENCIDA há ${r.dias_vencida} dia(s)`
                    : (r.situacao === 'VENCE HOJE' ? 'VENCE HOJE' : 'a vencer');
-      cabecalho = `<tr style="background:#1a1a19"><td colspan="4" style="border-left:3px solid ${cor}">
+      cabecalho = `<tr style="background:var(--surface)"><td colspan="4" style="border-left:3px solid ${cor}">
         <b style="color:${cor}">${ddmm(dataAtual)} — ${rotulo}</b>
         <span style="opacity:.7">· ${doDia.length} conta(s) · ${reais(somaDia)}</span></td></tr>`;
     }
@@ -7406,7 +7406,7 @@ function blocoCaixaDoDia() {
   const faltando = PROJ_CAIXA.filter(r => r.sobra_hoje < -0.005 && !String(r.conta || '').startsWith('CREDITO') && !PROJ_FORA_CAIXA.includes(r.conta));
   const unidades = [...new Set(PROJ_CAIXA.map(r => r.unidade).filter(Boolean))].sort();
   const contas = PROJ_CAIXA.filter(r => !finVazio() || r.unidade === finVazio());
-  const sel = 'background:#232321;border:1px solid #45443f;color:inherit;border-radius:6px;padding:5px 8px;font-size:13px';
+  const sel = 'background:var(--surface-2);border:1px solid var(--line-2);color:inherit;border-radius:6px;padding:5px 8px;font-size:13px';
   return `
   <div class="section-label">Pagar hoje, conta a conta</div>
   <div class="contexto" style="text-align:left; border-color:var(${faltando.length ? '--farol-fora' : '--farol-ok'});">
