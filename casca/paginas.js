@@ -102,7 +102,8 @@ window.CASCA_PAGINAS = {
 };
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas'];
+// 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades'];
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
@@ -112,4 +113,4 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'phoje', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
-  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora', 'atividades'];
+  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora'];
