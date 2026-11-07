@@ -921,10 +921,13 @@ function planoEmDesenvolvimento(ativos, esc) {
   ativos.forEach((i) => { (fases[i.fase_ordem] = fases[i.fase_ordem] || { titulo: i.fase_titulo, quando: i.fase_quando, itens: [] }).itens.push(i); });
   const cartoes = Object.keys(fases).sort((a, b) => a - b).map((k) => {
     const f = fases[k], n = f.itens.length, ok = f.itens.filter(pronto).length, and = f.itens.filter((i) => i.estado === 'andando').length;
-    const pct = n ? Math.round(ok / n * 100) : 0;
+    // os itens só viram "feito" perto de 31/12: a evolução está no que já saiu do papel (andando) — barra em três partes
+    const p = (x) => n ? (x / n * 100).toFixed(1) : 0, falta = n - ok - and;
     return `<div class="card neutral" style="text-align:left;"><div class="card-lbl" style="white-space:normal;">${esc(f.titulo)}</div>
-      <div class="card-val">${pct}%</div><div class="plano-trilho" style="margin:4px 0 6px;"><div class="plano-preenche" style="width:${pct}%;"></div></div>
-      <div class="card-pct">${ok} de ${n} prontos${and ? ` · ${and} andando` : ''}${f.quando ? ` · ${esc(f.quando)}` : ''}</div></div>`;
+      <div class="card-val">${ok + and} de ${n}</div>
+      <div title="pronto · andando · a começar" style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line);margin:4px 0 6px;">
+        <div style="width:${p(ok)}%;background:var(--farol-ok);"></div><div style="width:${p(and)}%;background:var(--farol-perto);"></div></div>
+      <div class="card-pct">${ok ? `<span style="color:var(--farol-ok);">${ok} pronto${ok === 1 ? '' : 's'}</span> · ` : ''}${and} andando${falta ? ` · ${falta} a começar` : ''}${f.quando ? ` · ${esc(f.quando)}` : ''}</div></div>`;
   }).join('');
   const hoje = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + 'T12:00:00');
   const corte = new Date(hoje); corte.setDate(corte.getDate() - 7);
