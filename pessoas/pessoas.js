@@ -1135,7 +1135,23 @@ function cgAdmAndamento() {
     || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA');
   if (!L.length) return '';
   const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
-  return `<div class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><b>${cgEsc(cgNome(nome(a)))}</b><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
+  return `<div class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><b>${cgEsc(cgNome(nome(a)))}</b>${cgAdmBotaoEditar(a)}</div><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
+}
+// 07/11/2026 (dono 11:54, chat RH; proposta 2026-11-07-rh-admissao-editar): a admissão se edita enquanto está em andamento
+// ou falta algum dos 4 documentos obrigatórios. Flash e contabilidade ✓ e os 4 anexados: o botão some.
+function cgAdmFaltaDocs(a) { const t = (a.documentos || []).map((d) => d.tipo || ''); return CG_ADM_OBRIG.filter(([, re]) => !t.some((x) => re.test(x))).map(([r]) => r); }
+function cgAdmEditavel(a) {
+  return a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || !!a.flash_aviso
+    || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA' || cgAdmFaltaDocs(a).length > 0;
+}
+function cgAdmBotaoEditar(a) {
+  if (!cgAdmEditavel(a) || !CARGOS.pessoas.some((p) => p.id === a.pessoa_id)) return '';
+  return CARGOS_F.formando === a.pessoa_id ? '<span style="color:var(--tx-4);font-size:12px;">editando ↑</span>'
+    : `<button type="button" class="preset-btn" onclick="cgAdmEditar(${a.pessoa_id})">Editar</button>`;
+}
+function cgAdmEditar(pid) {
+  CG_ADM = null; CARGOS_F.formando = pid; renderModuloCargos();
+  const e = document.getElementById('cgAdmEditando'); if (e) e.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 async function cgAdmTentar(id, etapa) {
   avisoAcao('enviando', 'Pedindo o envio…');
@@ -1143,7 +1159,7 @@ async function cgAdmTentar(id, etapa) {
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}.`, () => cgAdmTentar(id, etapa));
   await cgRecarregar(`Pedido de envio registrado: ${etapa === 'FLASH' ? 'Flash' : 'contabilidade'}.`);
 }
-function cgFormPessoa(p) {
+function cgFormPessoa(p, soAdm) {   // soAdm: edição da admissão na tela Admissões (sem Desligamento nem Matrícula; a matrícula vem da contabilidade)
   const v = p || { unidade: CARGOS_F.unidade || 'AGUA VERDE', contrato: 'CLT', horas: 220, recebe_va: true, pega_adiantamento: true, recebe_bonificacao: true, usa_ponto: true, no_plano: true, vt_por_dia: 2, vt_dias: 24, apelidos: [] };
   const id = p ? p.id : 0;
   const adm = p ? cgAdmDaPessoa(p.id) : {};   // registro novo e quem veio por admissão levam a ficha; o resto do cadastro segue sem ela
@@ -1171,8 +1187,8 @@ function cgFormPessoa(p) {
       ${campo('VT por dia', sel('vt_por_dia', ['0', '1', '2', '3', '4', '5'], v.vt_por_dia == null ? '2' : String(v.vt_por_dia)))}
       ${campo('Dias de trabalho no mês', sel('vt_dias', ['20', '24', '25', '26'], v.vt_dias == null ? '24' : String(v.vt_dias)))}
       ${campo(p ? 'Admissão' : 'Admissão *', inp('admissao', v.admissao ? String(v.admissao).slice(0, 10) : '', 'date').replace('<input ', '<input onchange="cgAdmData(this.value)" '))}
-      ${p ? campo('Desligamento', inp('desligamento', v.desligamento ? String(v.desligamento).slice(0, 10) : '', 'date')) : ''}
-      ${p ? campo('Matrícula', inp('matricula', v.matricula)) : ''}
+      ${p && !soAdm ? campo('Desligamento', inp('desligamento', v.desligamento ? String(v.desligamento).slice(0, 10) : '', 'date')) : ''}
+      ${p && !soAdm ? campo('Matrícula', inp('matricula', v.matricula)) : ''}
       ${campo(`<span title="obrigatório quando o primeiro nome já existe na mesma empresa">Como aparece no contas a pagar${p ? '' : ' (*se o 1º nome repetir)'}</span>`, inp('apelidos', [v.apelido, ...(v.apelidos || [])].filter(Boolean).join(', ')))}
       ${campo('Observação para o RH', inp('obs_rh', v.obs_rh))}
     </div>
@@ -1267,7 +1283,9 @@ async function cgSalvar(id) {
     ...(m ? { familia: m[1].replace(/^COZINHEIR.*/, 'COZINHEIRO'), nivel: m[2] } : {}),
     horas: g('horas').value, salario: g('salario').value, setor_rateio: g('setor_rateio').value, turno: g('turno').value,
     vt_por_dia: g('vt_por_dia').value, vt_dias: g('vt_dias').value, admissao: g('admissao').value,
-    desligamento: g('desligamento') ? g('desligamento').value : '', matricula: g('matricula') ? g('matricula').value : '', obs_rh: g('obs_rh').value,
+    // campo fora da tela (edição de admissão) mantém o que já está gravado
+    desligamento: g('desligamento') ? g('desligamento').value : ((id && (CARGOS.pessoas.find((x) => x.id === id) || {}).desligamento) || ''),
+    matricula: g('matricula') ? g('matricula').value : ((id && (CARGOS.pessoas.find((x) => x.id === id) || {}).matricula) || ''), obs_rh: g('obs_rh').value,
     apelido: nomes[0] || '', apelidos: nomes.slice(1),
     recebe_va: g('recebe_va').checked, pega_adiantamento: g('pega_adiantamento').checked, recebe_bonificacao: g('recebe_bonificacao').checked,
     usa_ponto: g('usa_ponto').checked, no_plano: g('no_plano').checked,
@@ -1294,6 +1312,7 @@ async function cgSalvar(id) {
   }
   avisoAcao('enviando', 'Gravando…');
   if (adm) {
+    const editando = !!adm.id, novos = CG_ADM ? CG_ADM.novos.length : 0, jaFoi = adm.contab_situacao === 'OK';
     try {
       const documentos = await cgAdmSubirDocs();
       const ra = await trRpcSeguro('rh_admissao_salvar', { p_id: adm.id || null, p: { cadastro: corpo, admissao: { ...cgAdmColher(), documentos } } });
@@ -1301,7 +1320,8 @@ async function cgSalvar(id) {
       adm.id = adm.id || await ra.json();
     } catch (e) { avisoAcao('erro', `✗ Não gravou: ${e.message}`, () => cgSalvar(id)); return; }
     CARGOS_F.formando = null; CG_ADM = null;
-    await cgRecarregar('Registro salvo. O robô envia à Flash e à contabilidade; a situação de cada um fica em Admissões em andamento.');
+    await cgRecarregar(!editando ? 'Registro salvo. O robô envia à Flash e à contabilidade; a situação de cada um fica em Admissões em andamento.'
+      : `Admissão atualizada${novos ? `. Documentos novos: o robô lê em até 40 min${jaFoi ? ' e manda a correção à contabilidade' : ''}` : ''}.`);
     // sem apelido o contas a pagar não acha a pessoa: o banco põe o primeiro nome quando está livre na empresa
     const pid = ((CARGOS.adm || []).find((a) => a.id === adm.id) || {}).pessoa_id;
     const nova = CARGOS.pessoas.find((x) => x.id === pid);
@@ -2515,11 +2535,15 @@ function cgAbaAdm() {
   const F = CARGOS_F;
   const rec = (CARGOS.adm || []).slice(0, 15);
   const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
-  let h = `<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">${F.formando === 0 ? '' : '<button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Nova admissão</button>'}</div>
+  // 07/11/2026 (dono 11:54, chat RH): editar a admissão enquanto está em andamento ou falta documento obrigatório
+  const pEd = F.formando ? CARGOS.pessoas.find((p) => p.id === F.formando) : null;
+  const edita = pEd && cgAdmDaPessoa(pEd.id);
+  let h = `<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">${F.formando === 0 || edita ? '' : '<button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Nova admissão</button>'}</div>
     ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Nova admissão</div>${cgFormPessoa(null)}` : ''}
+    ${edita ? `<div id="cgAdmEditando" class="section-label" style="text-align:left;">Editar admissão · ${cgEsc(cgNome(pEd.nome))}</div>${cgFormPessoa(pEd, true)}` : ''}
     ${cgAdmAndamento()}`;
-  if (rec.length) h += `<div class="section-label" style="text-align:left;">Últimas admissões</div><div id="tabelaCgAdm" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Enviada em</th><th>Situação</th></tr></thead><tbody>
-    ${rec.map((a) => `<tr><td>${cgEsc(cgNome(nome(a)))}</td><td>${a.criado_em ? cgData(a.criado_em) : '–'}</td><td style="white-space:normal;">${cgAdmEtapas(a)}</td></tr>`).join('')}</tbody></table></div>`;
+  if (rec.length) h += `<div class="section-label" style="text-align:left;">Últimas admissões</div><div id="tabelaCgAdm" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Enviada em</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${rec.map((a) => `<tr><td>${cgEsc(cgNome(nome(a)))}</td><td>${a.criado_em ? cgData(a.criado_em) : '–'}</td><td style="white-space:normal;">${cgAdmEtapas(a)}${cgAdmFaltaDocs(a).length ? `<div style="color:var(--farol-perto);font-weight:700;margin-top:4px;">! falta anexar: ${cgAdmFaltaDocs(a).join(', ')}</div>` : ''}</td><td>${cgAdmBotaoEditar(a)}</td></tr>`).join('')}</tbody></table></div>`;
   return h;
 }
 function cgAbaHoje() {
