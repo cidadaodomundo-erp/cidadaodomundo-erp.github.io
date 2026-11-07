@@ -29,6 +29,13 @@
   .ag-lin .f { font-size:11px; color:var(--tx-4); white-space:nowrap; }
   .ag-lin.alerta { border-color:var(--farol-perto); }
   .ag-lin.atraso { border-color:var(--farol-fora); }
+  .ag-lin.feito { opacity:.7; }
+  .ag-lin .bts { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .ag-form { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px 10px; margin:-2px 0 6px; border:1px dashed var(--line-2); border-radius:8px; }
+  .ag-form input[type=text], .ag-form textarea { flex:1 1 220px; background:var(--surface-2); color:var(--tx-1); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; }
+  .ag-eq { margin-top:26px; padding-top:10px; border-top:1px solid var(--line); }
+  .ag-eq select { background:var(--surface-2); color:var(--tx-1); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; }
+  @media (max-width:760px) { .ag-lin { flex-wrap:wrap; } .ag-lin .bts { width:100%; justify-content:flex-start; } }
 </style>
 </head>
 <body>
@@ -56,7 +63,12 @@ function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome });
 async function entrarAgenda() {
   const alvo = document.getElementById('view-agenda');
   await carregarEmailDono();
-  if (!souODono()) { alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Esta tela é só do dono.</div>'; return; }
+  // 07/11/2026 (dono 03:11): cada login tem a sua agenda (minha_agenda). Fica escondida da equipe até o "manda" do dono na
+  // mensagem do Avisos (AGENDA_TODOS); até lá o dono confere a de cada um pelo "ver como".
+  if (!souODono()) {
+    if (!AGENDA_TODOS) { alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">A sua agenda chega em breve.</div>'; return; }
+    return agPessoaEntrar(null);
+  }
   alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext] = await Promise.all([
@@ -140,6 +152,7 @@ function agDesenhar() {
   alvo.innerHTML = h;
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
+  agEquipeMontar();
 }
 async function agFeito(id) {
   avisoAcao('enviando', '… tirando da agenda');
@@ -147,6 +160,131 @@ async function agFeito(id) {
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agFeito(id));
   await entrarAgenda();
   avisoAcao('ok', `✓ Feito às ${avisoHora()}.`);
+}
+
+// =====================================================================================================================
+// A AGENDA DE CADA PESSOA (07/11/2026, dono 03:11 no Organizador; plano aprovado pelo Organizador).
+// Fonte: minha_agenda() — as atividades do robô (wa_tarefa) com o e-mail do login. Três botões gravam em agenda_acao
+// (o Avisos lê de lá): ✓ Concluí, ⏱ Preciso de mais tempo (1 a 3 dias), 🙋 Preciso de ajuda (vai para a Ajuda do painel).
+// "abrir" leva à tela da atividade e registra que a pessoa abriu. O dono vê a de cada um pelo "ver como" (só leitura).
+// =====================================================================================================================
+const AGENDA_TODOS = false;   // liga com o "manda" do dono na mensagem do Avisos (aí também sai do SO_DONO da casca)
+const AGP = { linhas: [], verComo: null, form: null, pessoas: null };
+const AG_ESTADO = { 'A fazer': '', 'Atrasada': 'atraso', 'Travada': 'atraso', 'Mais tempo': '', 'Pediu ajuda': 'alerta', 'Concluí': 'feito' };
+const AG_ORDEM = ['Travada', 'Atrasada', 'Pediu ajuda', 'A fazer', 'Mais tempo', 'Concluí'];
+const agHm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
+
+async function agPessoaLer(verComo) {
+  const r = await trRpcSeguro('minha_agenda', verComo ? { p_ver_como: verComo } : {});
+  if (!r.ok) throw new Error(await trErroDe(r));
+  return r.json();
+}
+async function agPessoaEntrar(verComo) {
+  const alvo = document.getElementById('view-agenda');
+  try { AGP.linhas = await agPessoaLer(verComo); AGP.verComo = verComo; }
+  catch (e) {
+    alvo.innerHTML = `<h2>Minha agenda</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui abrir a agenda: ${agE(e.message)}. <button type="button" class="preset-btn" onclick="agPessoaEntrar(null)">Tentar de novo</button></div>`;
+    return;
+  }
+  agPessoaRedesenhar();
+}
+// a lista de uma pessoa (soLeitura = o dono vendo a de outro: os botões aparecem, mas não gravam)
+function agPessoaHtml(L, soLeitura) {
+  const hoje = agHoje();
+  const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
+  const diaDe = (x) => (x.estado === 'Concluí' && x.dia < hoje) || x.dia < hoje ? hoje : x.dia;   // o que passou aparece em hoje
+  let h = '';
+  dias.forEach((d) => {
+    const doDia = L.filter((x) => diaDe(x) === d).sort((a, b) => AG_ORDEM.indexOf(a.estado) - AG_ORDEM.indexOf(b.estado));
+    if (!doDia.length && d !== hoje) return;
+    h += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
+    if (!doDia.length) h += '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada para hoje</span></div>';
+    doDia.forEach((x) => {
+      const id = Number(x.tarefa_id);
+      const nota = x.estado === 'Concluí' ? `✓ marcado às ${agHm(x.concluiu_em)} · o robô confere`
+        : x.estado === 'Atrasada' ? `atrasada desde ${agDm(x.dia)}`
+        : x.estado === 'Travada' ? 'travada: sem resposta ao robô'
+        : x.estado === 'Mais tempo' ? `novo prazo ${agSem(x.dia)} ${agDm(x.dia)}${x.prazo_motivo ? ' · ' + agE(x.prazo_motivo) : ''}`
+        : x.estado === 'Pediu ajuda' ? `pediu ajuda às ${agHm(x.ajuda_em)}${x.ajuda_resposta ? ' · resposta: ' + agE(x.ajuda_resposta) : ' · aguardando resposta'}`
+        : '';
+      const bt = (rot, fn, tit) => `<button type="button" class="preset-btn" title="${tit}" onclick="${soLeitura ? 'agSoLeitura()' : fn}">${rot}</button>`;
+      const abrir = x.tela ? bt('abrir', `agPessoaAbrir(${id})`, 'ir para a tela desta atividade') : '';
+      const bts = x.estado === 'Concluí' ? abrir
+        : [abrir,
+           bt('✓ Concluí', `agPessoaConcluir(${id})`, 'avisar que já fez'),
+           bt('⏱ Preciso de mais tempo', `agPessoaForm(${id},'prazo')`, 'pedir 1, 2 ou 3 dias'),
+           bt('🙋 Preciso de ajuda', `agPessoaForm(${id},'ajuda')`, 'contar o que travou')].join('');
+      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}"><span class="t">${agE(x.atividade)}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span></div>`;
+      if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
+    });
+  });
+  return h;
+}
+function agSoLeitura() { avisoAcao('atencao', 'Você está vendo a agenda de outra pessoa: os botões são dela e não gravam daqui.'); }
+function agPessoaRedesenhar() {
+  const v = document.getElementById('view-agenda');
+  v.innerHTML = '<h2>Minha agenda</h2>' + (AGP.linhas.length ? agPessoaHtml(AGP.linhas, false)
+    : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada na sua agenda nos próximos 7 dias</span></div>');
+  avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AGP.linhas.filter((x) => ['Atrasada', 'Travada'].includes(x.estado) || (x.estado === 'A fazer' && x.dia <= agHoje())).length });
+}
+function agPessoaForm(id, tipo) { AGP.form = AGP.form && AGP.form.id === id && AGP.form.tipo === tipo ? null : { id, tipo }; agPessoaRedesenhar(); }
+function agPessoaFormHtml(id, tipo) {
+  if (tipo === 'prazo') return `<div class="ag-form"><span>Quantos dias a mais?</span>${[1, 2, 3].map((n) =>
+    `<button type="button" class="preset-btn" onclick="agPessoaPrazo(${id},${n})">${n} ${n === 1 ? 'dia' : 'dias'}</button>`).join('')}<input type="text" id="agMotivo" maxlength="300" placeholder="motivo (se quiser)"></div>`;
+  return `<div class="ag-form"><textarea id="agAjudaTx" rows="2" maxlength="2000" placeholder="O que travou? Escreva com as suas palavras."></textarea><button type="button" class="preset-btn" onclick="agPessoaAjuda(${id})">Enviar pedido de ajuda</button></div>`;
+}
+function agPessoaAbrir(id) {
+  const x = AGP.linhas.find((l) => Number(l.tarefa_id) === id); if (!x || !x.tela) return;
+  trRpcSeguro('agenda_abrir', { p_tarefa: id });   // registra que abriu; não segura a pessoa
+  agIr(x.tela);
+}
+async function agPessoaGravar(fn, args, ok, refazer) {
+  avisoAcao('enviando', '… gravando');
+  const r = await trRpcSeguro(fn, args);
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, refazer);
+  const v = await r.json().catch(() => null);
+  AGP.form = null;
+  try { AGP.linhas = await agPessoaLer(null); } catch (e) {}
+  agPessoaRedesenhar();
+  avisoAcao('ok', `✓ ${ok(v)} (${avisoHora()}).`);
+}
+function agPessoaConcluir(id) {
+  agPessoaGravar('agenda_concluir', { p_tarefa: id }, () => 'Marcado como concluído; o robô confere', () => agPessoaConcluir(id));
+}
+function agPessoaPrazo(id, n) {
+  const m = ((document.getElementById('agMotivo') || {}).value || '').trim();
+  agPessoaGravar('agenda_pedir_prazo', { p_tarefa: id, p_dias: n, p_motivo: m || null },
+    (d) => `Prazo novo: ${agSem(d)} ${agDm(d)}. Ninguém cobra antes disso`, () => agPessoaPrazo(id, n));
+}
+function agPessoaAjuda(id) {
+  const t = ((document.getElementById('agAjudaTx') || {}).value || '').trim();
+  if (!t) return avisoAcao('atencao', 'Escreva em poucas palavras o que travou e toque em enviar.');
+  agPessoaGravar('agenda_pedir_ajuda', { p_tarefa: id, p_texto: t }, () => 'Pedido de ajuda enviado; a resposta chega pelo WhatsApp', () => agPessoaAjuda(id));
+}
+
+// a parte do dono: a agenda de cada pessoa da equipe, como ela vai ver (só leitura)
+async function agEquipeMontar() {
+  const alvo = document.getElementById('view-agenda');
+  if (!souODono() || !alvo) return;
+  let box = document.getElementById('agEquipe');
+  if (!box) { box = document.createElement('div'); box.id = 'agEquipe'; box.className = 'ag-eq'; alvo.appendChild(box); }
+  if (!AGP.pessoas) { const r = await trRpcSeguro('agenda_pessoas', {}); AGP.pessoas = r.ok ? await r.json() : []; }
+  const P = AGP.pessoas || [];
+  box.innerHTML = `<div class="ag-dia" style="margin-top:0;">Agenda da equipe · ver como <span class="f" style="font-weight:400;font-size:11px;color:var(--tx-4);">ainda escondida da equipe; liga com o seu "manda" na mensagem do Avisos</span></div>
+    <select id="agVerComo" onchange="agEquipeVer(this.value)"><option value="">escolha a pessoa (${P.length})</option>${P.map((p) =>
+      `<option value="${agE(p.email)}"${p.email === AGP.verComo ? ' selected' : ''}>${agE(p.pessoa || p.email)} · ${p.abertas} ${p.abertas === 1 ? 'atividade' : 'atividades'}${p.atrasadas ? ` · ${p.atrasadas} atrasada${p.atrasadas === 1 ? '' : 's'}` : ''}</option>`).join('')}</select>
+    <div id="agEquipeLista"></div>`;
+  if (AGP.verComo) agEquipeVer(AGP.verComo);
+}
+async function agEquipeVer(email) {
+  const lista = document.getElementById('agEquipeLista'); if (!lista) return;
+  AGP.verComo = email || null;
+  if (!email) { lista.innerHTML = ''; return; }
+  lista.innerHTML = '<div class="contexto">Carregando…</div>';
+  try {
+    const L = await agPessoaLer(email);
+    lista.innerHTML = L.length ? agPessoaHtml(L, true) : '<div class="contexto">Nenhuma atividade aberta para esta pessoa nos próximos 7 dias.</div>';
+  } catch (e) { lista.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ ${agE(e.message)}</div>`; }
 }
 
 const TELA = 'agenda';
