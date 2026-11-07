@@ -40,6 +40,7 @@ window.CASCA_PAGINAS = {
   phoje: 'pessoas/index.html#phoje',
   padm: 'pessoas/index.html#padm',
   atividades: 'atividades/index.html',
+  agenda: 'agenda/index.html',
   cargos: 'pessoas/index.html#cargos',
   // 29/10/2026 (dono): cada passo da folha é uma tela
   pcalc: 'pessoas/index.html#pcalc',

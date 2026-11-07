@@ -6,7 +6,7 @@
 window.CASCA_MODULOS = [
   { id: 'hoje', nome: 'Hoje na rede', icone: '📍',
     lancar: [],
-    acompanhar: ['hoje', 'estasemana', 'placar', 'indicadores', 'semana', 'fechamento'] },
+    acompanhar: ['hoje', 'agenda', 'estasemana', 'placar', 'indicadores', 'semana', 'fechamento'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'],
     acompanhar: ['controle', 'posicao'] },

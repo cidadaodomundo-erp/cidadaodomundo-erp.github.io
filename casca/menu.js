@@ -397,6 +397,11 @@ window.CASCA_MENU = [
     "icone": "📋"
    },
    {
+    "chave": "agenda",
+    "rotulo": "Minha agenda",
+    "icone": "🗓️"
+   },
+   {
     "chave": "rotinas",
     "rotulo": "Rotinas",
     "icone": "🤖"

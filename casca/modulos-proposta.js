@@ -25,7 +25,7 @@
     semAbas: true,
     modulos: [
       { id: 'p-agora', nome: 'Agora', icone: '📍',
-        lancar: [], acompanhar: ['hoje', 'estasemana', 'vendasagora', 'atividades'] },
+        lancar: [], acompanhar: ['hoje', 'agenda', 'estasemana', 'vendasagora', 'atividades'] },
       { id: 'p-dinheiro', nome: 'Dinheiro', icone: '💰',
         lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
         acompanhar: ['projecao', 'fluxo', 'rede'] },

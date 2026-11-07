@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Minha agenda · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- MINHA AGENDA (07/11/2026, dono 02:52: "uma tela de agenda e o que fazer no dia só pra mim no painel"; "pode montar a agenda" 03:03).
+     Só do dono. Hoje e os próximos 7 dias: o que depende dele (dono_pendencia, gravada pelos chats) e as datas que já estão no
+     banco (contas a pagar, férias, rescisões, cálculos da folha, reembolso que só ele aprova). Cada linha leva à tela onde age.
+     Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261106b">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ag-dia { font-size:14px; font-weight:800; color:var(--tx-1); margin:16px 2px 4px; }
+  .ag-dia.hoje { color:var(--marca-amarelo); }
+  .ag-lin { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:7px 10px; border:1px solid var(--line); border-radius:8px; margin:4px 0; background:var(--surface); }
+  .ag-lin .t { flex:1 1 auto; }
+  .ag-lin .f { font-size:11px; color:var(--tx-4); white-space:nowrap; }
+  .ag-lin.alerta { border-color:var(--farol-perto); }
+  .ag-lin.atraso { border-color:var(--farol-fora); }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-agenda" class="modulo" style="display:none;"><div id="view-agenda"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script>
+const AG = { dados: null };
+const agHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+const agMais = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toLocaleDateString('en-CA'); };
+const agDm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+const agSem = (d) => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(String(d).slice(0, 10) + 'T12:00:00').getDay()];
+const agR = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const agR0 = (v) => 'R$ ' + Math.round(Number(v || 0)).toLocaleString('pt-BR');
+const agE = (s) => trEscH(String(s == null ? '' : s));
+const agNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+// atalho para a tela onde o dono age (na casca abre a tela; solta, troca o endereço)
+function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome }); else location.href = '../sistema.html#' + nome; }
+
+async function entrarAgenda() {
+  const alvo = document.getElementById('view-agenda');
+  await carregarEmailDono();
+  if (!souODono()) { alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Esta tela é só do dono.</div>'; return; }
+  alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
+  const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
+  const [pend, cp, fer, prev, calc, rmb] = await Promise.all([
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+    ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta_exibida&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
+    ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado&order=limite_gozo'),
+    ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
+    ler(`vw_rh_calculos_mes?select=nome,calculo,data_limite,calculado_em,fechado_em,enviado_em,pessoas,total&data_limite=gte.${hoje}&data_limite=lte.${fim}&order=data_limite`),
+    ler('vw_rmb_pedidos?select=id,pessoa,valor,descricao,situacao,so_o_dono&situacao=eq.PEDIDO&so_o_dono=is.true&order=id')]);
+  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb };
+  agDesenhar();
+}
+function agDesenhar() {
+  const { hoje, fim, pend, cp, fer, prev, calc, rmb } = AG.dados;
+  const itens = [];   // { dia, txt, ir, chat, tipo: 'atraso'|'alerta'|'', id (pendência) }
+  const add = (o) => itens.push(Object.assign({ tipo: '' }, o));
+  const falhou = [];
+  const ok = (x, rot) => { if (x && x.erro) { falhou.push(rot); return false; } return Array.isArray(x); };
+  // 1) o que depende de mim (os chats gravam)
+  if (ok(pend, 'o que depende de você')) pend.forEach((p) => {
+    const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
+    if (dia > fim) return;
+    const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
+    add({ dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.prazo && p.prazo < hoje ? 'atraso' : 'alerta' });
+  });
+  // 2) reembolso que só eu aprovo (o da Hellen)
+  if (ok(rmb, 'reembolsos')) rmb.forEach((g) => add({ dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' }));
+  // 3) contas a pagar: vencidas hoje, e o total de cada dia
+  if (ok(cp, 'contas a pagar')) {
+    const val = (c) => Math.max(0, (Number(c.debito) || 0) - (Number(c.credito) || 0));
+    const venc = cp.filter((c) => c.vencimento < hoje);
+    if (venc.length) add({ dia: hoje, txt: `<b>${venc.length}</b> contas vencidas, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
+    [...new Set(cp.filter((c) => c.vencimento >= hoje).map((c) => c.vencimento))].forEach((d) => {
+      const L = cp.filter((c) => c.vencimento === d), m = L.slice().sort((a, b) => val(b) - val(a))[0];
+      add({ dia: d, txt: `<b>${agR0(L.reduce((a, c) => a + val(c), 0))}</b> a pagar (${L.length} ${L.length === 1 ? 'conta' : 'contas'}; maior: ${agE(String(m.descricao || '').replace(/\s*\(parc\..*$/, '').slice(0, 60))} ${agR0(val(m))})`, ir: 'contaspagar' });
+    });
+  }
+  // 4) férias: pagar (até) e começar
+  if (ok(fer, 'férias')) fer.forEach((x) => {
+    if (x.situacao === 'programada' && x.pagar_ate && x.pagar_ate <= fim) add({ dia: x.pagar_ate < hoje ? hoje : x.pagar_ate, txt: `${x.pagar_ate < hoje ? '✗ ' : ''}Pagar as férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}${x.pagar_ate < hoje ? ` <span class="f">vencia ${agDm(x.pagar_ate)}</span>` : ''}`, ir: 'pferias', tipo: x.pagar_ate < hoje ? 'atraso' : 'alerta' });
+    if (x.situacao === 'programada' && x.limite_gozo && x.limite_gozo >= hoje && x.limite_gozo <= fim) add({ dia: x.limite_gozo, txt: `${agE(agNome(x.nome))} começa as férias`, ir: 'pferias' });
+  });
+  // 5) folha: rescisões e o que vence de cálculo
+  if (ok(prev, 'previsão da folha')) prev.filter((p) => p.tipo !== 'FERIAS').forEach((p) => add({ dia: p.dia, txt: `${agE(agNome(String(p.tipo).replace(/_/g, ' ')))}: <b>${agR(p.valor)}</b>${p.unidade ? ' · ' + agE(p.unidade) : ''}`, ir: p.tipo === 'RESCISAO' ? 'presc' : 'pcalc' }));
+  if (ok(calc, 'cálculos da folha')) calc.forEach((c) => add({ dia: c.data_limite, txt: `${agE(c.nome)}: ${c.calculado_em ? `calculado, ${Number(c.pessoas || 0)} pessoas, <b>${agR(c.total)}</b>` : '<b>ainda não calculado</b>'}`, ir: 'pcalc', tipo: c.calculado_em ? '' : 'alerta' }));
+
+  const alvo = document.getElementById('view-agenda');
+  const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
+  const ordemTipo = { atraso: 0, alerta: 1, '': 2 };
+  let h = '<h2>Minha agenda</h2>';
+  if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
+  dias.forEach((d) => {
+    const L = itens.filter((x) => x.dia === d).sort((a, b) => ordemTipo[a.tipo] - ordemTipo[b.tipo]);
+    if (!L.length && d !== hoje) return;
+    h += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
+    if (!L.length) h += '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada para você hoje</span></div>';
+    L.forEach((x) => {
+      const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
+      const feito = x.id ? `<button type="button" class="preset-btn" title="tirar da agenda" onclick="agFeito(${x.id})">✓</button>` : '';
+      h += `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
+    });
+  });
+  alvo.innerHTML = h;
+}
+async function agFeito(id) {
+  avisoAcao('enviando', '… tirando da agenda');
+  const r = await trRpcSeguro('dono_pendencia_resolver', { p_id: id });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agFeito(id));
+  await entrarAgenda();
+  avisoAcao('ok', `✓ Feito às ${avisoHora()}.`);
+}
+
+const TELA = 'agenda';
+let MODULO_ATUAL = 'agenda';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-agenda').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarAgenda(); };
+entrarAgenda();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
