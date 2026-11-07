@@ -2825,6 +2825,13 @@ function posRender() {
   if (!alvo || !POS) return;
   const dm = (s) => s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) : '—';
   const sel = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
+  // 07/11/2026 (auditoria dos números, lote 2, operacao-6): loja sem foto (a foto só existe depois da primeira contagem
+  // fechada) mostrava "R$ 0,00 · em 0 itens", Curva A 0% e "Sem custo 0" em verde — parecia estoque zerado e tudo certo.
+  if (!(POS.dias || []).length) {
+    alvo.innerHTML = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Posição de estoque — ${trEscH(estNomeLoja(POS.unidade))}</div>
+      <div class="contexto" style="border-color:var(--farol-perto);">Sem posição para ${trEscH(estNomeLoja(POS.unidade))}: a primeira contagem da loja ainda não fechou. O valor parado aparece a partir dela.</div>`;
+    return;
+  }
   const D = (POS.dias || []).find((d) => d.dia === POS.dia) || {};
   const k = (POS.dias || []).findIndex((d) => d.dia === POS.dia);
   const ant = k > 0 ? POS.dias[k - 1] : null;

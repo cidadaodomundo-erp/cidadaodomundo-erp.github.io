@@ -57,14 +57,17 @@
 <script src="../nucleo/graficos.js?v=20261105a"></script>
 <script src="../nucleo/vendas.js?v=20261105c"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="canal.js?v=20261107a"></script>
+<script src="canal.js?v=20261107b"></script>
 <script>
 // O que é desta página: qual tela abrir, a carga de vendas antes dela e o que o painel antigo fazia ao trocar filtro.
 const TELAS_CANAL = ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'atendimento', 'negociacoes', 'avaliacoes',
   'relatorios', 'qualidade', 'cardapio', 'clientes', 'site', 'atrasos', 'frete', 'logfin'];
 const TELA = TELAS_CANAL.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'resumo';
 // as mesmas listas do painel antigo, só com as telas daqui
-const MODULOS_COM_RODAPE = new Set(['resumo', 'cancelamentos', 'promocoes', 'negociacoes', 'avaliacoes', 'relatorios', 'contestacoes']);
+// 07/11/2026 (auditoria dos números, lote 2, canal-15 e canal-28): o rodapé do Líquido sai das telas do Canal. Ele dizia
+// que o Líquido usa a coluna Valor Líquido do relatório (não usa: é o bruto menos o que o iFood cobra e o marketing) e
+// citava um "Recebido direto" que não existe em tela nenhuma. Volta quando o texto do núcleo for corrigido.
+const MODULOS_COM_RODAPE = new Set([]);
 const MODULOS_COM_FILTRO_TOPO = new Set(['resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site']);
 let VENDAS_CARREGADAS = false;
 // O Placar, o Fluxo projetado e as Contas moram no painel antigo: aqui o núcleo de vendas os encontra vazios.

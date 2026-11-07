@@ -336,6 +336,21 @@ function cardsCancel(m, a) {
 // Placar — e' outra fonte e a tabela de motivos nao pode esperar por ela.
 // RECORTE PROPRIO, dito na tela: a fila e' da rede inteira e dos ultimos 60 dias,
 // o mesmo do modulo Contestacoes, e por isso NAO segue o filtro do topo.
+// 07/11/2026 (auditoria dos numeros, lote 2, canal-14 e canal-25): a fila segue a loja do seletor (Rede = as 3, sem
+// Boqueirao). A view lida aqui vem da planilha de pedidos, que parou em 28/10 (a extracao pelo portal foi desligada em
+// 30/10): fila vazia NAO e' "nada a contestar" — o verde falso saiu. A troca para a fila da API
+// (proposta 2026-10-30-contestacoes-fila-api.md) espera a liberacao de leitura da vw_contestacoes_fila_api no banco.
+const CONTEST_SEM_DADO_DESDE = '29/10';
+function contestUnidadeOk(u) {
+  const l = (typeof canalComSeletor === 'function' && canalComSeletor()) ? lojaAtual() : null;
+  if (l && l !== 'REDE') return u === l;
+  const vis = typeof unidadesVisiveis === 'function' ? unidadesVisiveis() : [];
+  return vis.length ? vis.includes(u) : u !== 'BOQUEIRAO';
+}
+function contestEscopoTxt() {
+  const l = (typeof canalComSeletor === 'function' && canalComSeletor()) ? lojaAtual() : null;
+  return l && l !== 'REDE' ? lojaNome(l) : 'Rede (as 3)';
+}
 let CANCEL_RECUP = null;
 
 async function carregarRecuperavelCancel() {
@@ -343,15 +358,15 @@ async function carregarRecuperavelCancel() {
   if (!alvo) return;
   if (CANCEL_RECUP === null) {
     try {
-      CANCEL_RECUP = await consultarTudo('vw_contestacoes_status?select=id_curto,nome_loja,motivo_cancelamento,valor,contestavel_ate&bloco=eq.A_CONTESTAR');
+      CANCEL_RECUP = await consultarTudo('vw_contestacoes_status?select=id_curto,nome_loja,unidade,motivo_cancelamento,valor,contestavel_ate&bloco=eq.A_CONTESTAR');
     } catch (e) {
       alvo.innerHTML = '<div class="contexto">Não consegui consultar a fila de contestação agora.</div>';
       return;
     }
   }
-  const fila = CANCEL_RECUP.map(r => ({ ...r, valor: Number(r.valor) || 0 }));
+  const fila = CANCEL_RECUP.filter(r => contestUnidadeOk(r.unidade)).map(r => ({ ...r, valor: Number(r.valor) || 0 }));
   if (!fila.length) {
-    alvo.innerHTML = '<div class="contexto" style="border-color:var(--farol-ok);">Nada dentro do prazo de contestação neste momento. ✔</div>';
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: não dá para dizer quanto ainda se recupera. A rotina segue contestando.</div>`;
     return;
   }
   const totalRecup = fila.reduce((s, r) => s + r.valor, 0);
@@ -369,8 +384,8 @@ async function carregarRecuperavelCancel() {
     <b>R$ ${fmt(totalRecup)}</b> em <b>${fila.length}</b> pedido(s) cancelado(s) ainda estão dentro do prazo de contestação.
     O motivo que mais pesa nessa fila é <b>${pior.mt}</b>: custou R$ ${fmt(pior.valor)} em ${pior.n} pedido(s).
     ${curtos.length ? `<b style="color:var(--farol-fora);">${curtos.length} vence(m) em até 2 dias.</b>` : ''}
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="A fila de contestação é da rede inteira e dos últimos 60 dias — o mesmo recorte do módulo Contestações. Por isso ela não bate com a tabela de motivos acima, que segue o período e as unidades escolhidos no topo. O motivo aqui é o texto cru do cancelamento, não a categoria do arquivo de classificação.">
-      Rede inteira, últimos 60 dias — este bloco não segue o filtro do topo.
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="A fila de contestação segue a loja escolhida no topo e não o período: é tudo o que ainda está dentro do prazo — o mesmo recorte do módulo Contestações. Por isso ela não bate com a tabela de motivos acima. O motivo aqui é o texto cru do cancelamento, não a categoria do arquivo de classificação. Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não entram nesta conta.">
+      ${contestEscopoTxt()}, tudo o que está no prazo — este bloco não segue o período do topo. Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não entram.
     </div>
     <div style="margin-top:8px;"><button class="preset-btn" onclick="mostrarModulo('contestacoes')">Abrir a fila de contestações →</button></div>
   </div>`;
@@ -808,8 +823,8 @@ function blocoMecanicas() {
   <div class="section-label">Cada promoção isolada — quanto custa e quanto o iFood devolve</div>
   <div class="caption-label" style="text-align:center;">
     O relatório do iFood mistura as promoções que caem no mesmo pedido ("Campanha Inteligente + Frete Grátis").
-    Aqui elas foram <b>separadas</b>: cada mecânica-base cobra seu valor fixo por pedido (a Campanha Inteligente custa
-    exatamente R$ 5,00) e o que sobra é o custo real do Frete Grátis.
+    Aqui elas foram <b>separadas</b>: o custo de cada mecânica-base sai dos pedidos em que ela veio sozinha (a Campanha
+    Inteligente custa até R$ 5,00 por pedido para a loja) e o que sobra é o custo real do Frete Grátis.
   </div>
   <div id="tabelaMecanicas">
     <table>
@@ -826,8 +841,8 @@ function blocoMecanicas() {
 }
 
 // ------------------------------------------------------------------
-// TESTE DE PROMOÇÕES (desde 10/08/2026): Hits + Campanha Inteligente +
-// Frete grátis até R$9,99 em todas as lojas, anúncios desligados.
+// TESTE DE PROMOÇÕES (desde 10/08/2026): Hits + Campanha Inteligente + Frete grátis
+// (R$ 9,99 no começo; R$ 6,99 desde 13/08; o de 9,99 desligado em 13/10). Anúncios pagos à parte.
 // Verbas SEMANAIS configuradas no portal (fonte de verdade: tabela verbas_promo).
 // Acompanhamento diário via incentivos por pedido (quem bancou: loja/rede vs iFood).
 // VERBA DO TESTE DE PROMOCOES — decisao do dono em 12/09/2026: a verba do portal
@@ -878,26 +893,21 @@ function blocoTestePromos() {
   const ant = periodoAnterior();
   const antR = ant ? promoTesteResumo(ant.ini, ant.fim) : null;
 
-  const dias = Math.round((new Date(fDataFim.value) - new Date(fDataIni.value)) / 864e5) + 1;
-  // A verba do teste vigora desde 10/08/2026 — fora dessa janela, % da verba nao se aplica.
-  const dentroDoTeste = fDataIni.value >= '2026-08-10';
   const alav = (o) => o.nosso > 0.005 ? o.ifood / o.nosso : null;
   const alavTxt = alavancagemTxt;   // farol unico: a meta de metas_kpi — esta tabela nem tinha âmbar
 
+  // 07/11/2026 (auditoria dos numeros, lote 2, canal-19): saiu a coluna "% da verba do dia". O numerador era TODA a
+  // promocao da loja (Frete gratis, Clube, cupom...) e o denominador a verba de 10/08 (vw_verbas_promo), que nao e' mais
+  // a do portal (desde 19/10 a verba do Hits mora em hits_config). Dava vermelho falso de "Hits racionando" (AV 142,7%).
+  // A medida certa do Hits e' vw_hits_verba_x_consumo, ainda sem tela.
   const linhas = atual.lojas.map(o => {
     const nome = LOJAS[o.loja];
-    const verba = verbaDaLoja(nome);
-    // verba DIARIA x dias do periodo (era `* dias / 7`, lendo como semanal — ver a
-    // nota em VERBAS_PROMO. Decisao do dono em 12/09/2026).
-    const verbaPeriodo = (dentroDoTeste && verba !== null) ? verba * dias : null;
-    const usoPct = verbaPeriodo ? o.nosso / verbaPeriodo * 100 : null;
     const prev = antR && antR.lojas.find(x => x.loja === o.loja);
     return `<tr>
       <td>${nome}</td><td>${o.ped.toLocaleString('pt-BR')}</td>
       <td>R$ ${fmt(o.nosso)}</td><td>R$ ${fmt(o.ifood)}</td>
       <td>${alavTxt(alav(o))}</td>
       <td>${o.ped ? 'R$ ' + fmt(o.nosso / o.ped) : '—'}</td>
-      <td>${usoPct === null ? '—' : `<span${usoPct > 100 ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${pct(usoPct)}%</span>`}</td>
       <td>${variacaoSpan(o.nosso, prev ? prev.nosso : (antR ? 0 : null), 'neutro')}</td>
     </tr>`;
   }).join('');
@@ -906,7 +916,7 @@ function blocoTestePromos() {
   const alavGeral = alav(t);
   return `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Teste de promoções — quem está pagando a conta</div>
-  <div class="caption-label" style="text-align:center;" title="Teste desde 10/08/2026: Hits + Campanha Inteligente + Frete grátis até R$ 9,99 em todas as lojas, anúncios desligados. Nosso = incentivo da loja + incentivo da rede (os dois saem do nosso bolso); iFood = incentivo do iFood. Fonte: pedidos do dia, no período filtrado no topo.">
+  <div class="caption-label" style="text-align:center;" title="Teste desde 10/08/2026: Hits + Campanha Inteligente + Frete grátis (até R$ 6,99 desde 13/08) e anúncios pagos à parte. Nosso = incentivo da loja + incentivo da rede (os dois saem do nosso bolso); iFood = incentivo do iFood. Fonte: pedidos do dia, no período filtrado no topo.">
     Quanto cada loja gastou de promoção e quanto o iFood pôs em cima — <b>alavancagem</b> é o R$ do iFood para cada R$ 1 nosso, e a meta é acima de <b>1,00x</b>.
   </div>
   <div class="cards">
@@ -917,12 +927,9 @@ function blocoTestePromos() {
   </div>
   <div id="tabelaTestePromo">
     <table>
-      <tr><th>Loja</th><th>Pedidos</th><th>Nós (R$)</th><th>iFood (R$)</th><th>Alavanc.</th><th>Nosso R$/pedido</th><th title="O que gastamos comparado ao teto diário configurado no portal (Hits + Campanha Inteligente somados), multiplicado pelos dias do período. A verba vem da tabela verbas_promo, não do código, e só é calculada de 10/08/2026 em diante. Lojas do Boqueirão não têm verba cadastrada e aparecem com traço.">% da verba do dia</th><th>Nosso invest. vs anterior</th></tr>
+      <tr><th>Loja</th><th>Pedidos</th><th>Nós (R$)</th><th>iFood (R$)</th><th>Alavanc.</th><th>Nosso R$/pedido</th><th>Nosso invest. vs anterior</th></tr>
       ${linhas}
     </table>
-  </div>
-  <div class="caption-label" style="text-align:center;">
-    Acima de 100% na "% da verba do dia" (em vermelho) quer dizer que o Hits passou a racionar a exibição da loja.
   </div>`;
 }
 
@@ -976,10 +983,10 @@ function moduloPromocoes() {
     </tr>`).join('');
 
   return teste + blocoAlavancagemPorLoja() + blocoMecanicas() + blocoFreteGratis() + `
-  <div class="section-label">Quanto e onde investimos em promoção (relatório mensal)</div>
+  <div class="section-label">Quanto e onde investimos em promoção (relatório de promoções)</div>
   <div class="caption-label" style="text-align:center;">
-    Recortes usados: <b>${mesesTexto}</b>. O relatório de promoções vem por período fechado — este bloco ignora o recorte por dia,
-    semana ou turno e usa os meses inteiros que caem no período escolhido.
+    Recortes usados: <b>${mesesTexto}</b>. O relatório de promoções vem por período fechado (semana de segunda a domingo; até julho, mês) — este bloco
+    ignora o recorte por dia ou turno e usa só os recortes que cabem inteiros no período escolhido.
   </div>
   <div class="cards">
     <div class="card neutral"><div class="card-lbl">Investido pela loja</div><div class="card-val">R$ ${fmt(r.totalInv)}</div></div>
@@ -2622,7 +2629,8 @@ async function entrarContestacoes() {
 
 function renderModuloContestacoes() {
   const alvo = document.getElementById('view-contestacoes');
-  const linhas = CONTESTACOES.linhas.map(r => ({ ...r, valor: Number(r.valor) || 0 }));
+  // 07/11/2026 (auditoria lote 2, canal-25): segue a loja do seletor; Rede = as 3 (o Boqueirão saiu do painel em 24/10).
+  const linhas = CONTESTACOES.linhas.filter(r => contestUnidadeOk(r.unidade)).map(r => ({ ...r, valor: Number(r.valor) || 0 }));
 
   const hojeISO = new Date().toISOString().slice(0, 10);
   const diasAte = (d) => d ? Math.ceil((new Date(d + 'T23:59:59') - Date.now()) / 864e5) : null;
@@ -2693,9 +2701,10 @@ function renderModuloContestacoes() {
 
   alvo.innerHTML = `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contestações de cancelamento</div>
-  <div class="caption-label" style="text-align:center;" title="Esta tela é a fila de trabalho da contestação: mostra tudo o que ainda dá para recuperar, inclusive o Boqueirão, que a rotina também contesta — por isso ela não segue o filtro de unidades nem o período do topo, que ficam escondidos aqui. A coluna Loja diz de quem é cada pedido. Tudo vem da própria planilha de pedidos (o export traz prazo, se houve contestação e o resultado) e atualiza a cada importação da manhã; o status do iFood leva até 48h, então contestação de ontem costuma aparecer em aguardando.">
-    <b>Rede inteira, últimos 60 dias</b> — esta tela não segue o filtro de unidades nem o período do topo.
+  <div class="caption-label" style="text-align:center;" title="Esta tela é a fila de trabalho da contestação: segue a loja escolhida no topo (Rede = Água Verde, Ahú e São Braz), mas não o período. A coluna Loja diz de quem é cada pedido. Os dados vêm da planilha de pedidos do portal, que parou de chegar depois de 28/10; a rotina contesta pelos pedidos da API. O status do iFood leva até 48h, então contestação de ontem costuma aparecer em aguardando.">
+    <b>${contestEscopoTxt()}, últimos 60 dias</b> — esta tela não segue o período do topo.
   </div>
+  <div class="contexto" style="border-color:var(--farol-perto);">Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não aparecem aqui; a rotina segue contestando normalmente.</div>
   <div class="cards">
     <div class="card ${aContestarVoce.length ? 'neg' : 'pos'}"><div class="card-lbl">Você precisa contestar</div><div class="card-val">${aContestarVoce.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarVoce))}</div></div>
     <div class="card neutral"><div class="card-lbl">A rotina contesta</div><div class="card-val">${aContestarRotina.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarRotina))}</div></div>
@@ -2712,7 +2721,7 @@ function renderModuloContestacoes() {
 
   <div class="section-label">A rotina contesta sozinha</div>
   ${aContestarRotina.length ? `<div id="tabelaContestRotina">${grade(aContestarRotina, colPrazo)}</div>
-  <div class="caption-label" style="text-align:center;">Entram na próxima execução da rotina das 10:30.</div>`
+  <div class="caption-label" style="text-align:center;">Entram na próxima execução da rotina (11:36; reservas às 14:36 e 16:36).</div>`
   : '<div class="contexto" style="border-color:var(--farol-ok);">Nada na fila da rotina. ✔</div>'}
 
   <div class="section-label">Aguardando resposta do iFood</div>
@@ -4350,7 +4359,7 @@ function renderModuloAtrasos() {
   const rowsF = rows.filter(r => passaF(r));
   const ddmm = (v) => v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '—';
   if (!rows.length) {
-    alvo.innerHTML = `<div class="contexto">Sem entregas do Foody entre ${ddmm(ATRASOS.ini)} e ${ddmm(ATRASOS.fim)} — confira se o importador (import_foody.py) já cobriu esse período.</div>`;
+    alvo.innerHTML = `<div class="contexto">Sem entregas próprias entre ${ddmm(ATRASOS.ini)} e ${ddmm(ATRASOS.fim)} — os dados do TrackEat ainda não chegaram para esse período.</div>`;
     return;
   }
 
@@ -4483,7 +4492,7 @@ function renderModuloAtrasos() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Atrasos e turnos — entregas próprias${ATRASOS_UNIDADE !== 'TODAS' ? ' · ' + ATRASOS_UNIDADE : ''}, ${ddmm(ATRASOS.ini)} a ${ddmm(ATRASOS.fim)}</div>
   ${chips}
   ${foodyCobertura(ATRASOS.rows)}
-  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz) e Foody (Boqueirão) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora. ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b> e tem tabela de corrida e fretes próprios.' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b>; para vê-lo, troque para Rede completa lá em cima.'}</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora.</div>
 
   ${(ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador) ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -4713,7 +4722,7 @@ function renderModuloLogfin() {
   const chips = chipsUnidadeFoody(base, LOGFIN_UNIDADE, 'logfinUnidade');
   const ddmm = (v) => v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '—';
   if (!rows.length) {
-    alvo.innerHTML = `<div class="contexto">Sem entregas do Foody entre ${ddmm(LOGFIN.ini)} e ${ddmm(LOGFIN.fim)} — confira se o importador (import_foody.py) já cobriu esse período.</div>`;
+    alvo.innerHTML = `<div class="contexto">Sem entregas próprias entre ${ddmm(LOGFIN.ini)} e ${ddmm(LOGFIN.fim)} — os dados do TrackEat ainda não chegaram para esse período.</div>`;
     return;
   }
 
@@ -4877,7 +4886,7 @@ function renderModuloLogfin() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Financeiro da logística — entregas próprias${LOGFIN_UNIDADE !== 'TODAS' ? ' · ' + LOGFIN_UNIDADE : ''}, ${ddmm(LOGFIN.ini)} a ${ddmm(LOGFIN.fim)}</div>
   ${chips}
   ${foodyCobertura(LOGFIN.rows)}
-  <div class="contexto" style="border-color:var(--farol-perto);" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: Foody Delivery (logística própria). ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b>, com tabela de corrida mais cara (7,50/9,00) e fretes próprios no iFood (quase sem abate).' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b> dos totais e do simulador; para vê-lo, troque para Rede completa lá em cima.'}</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: TrackEat (Água Verde, Ahú e São Braz) — só entrega com motoboy próprio.</div>
 
   <div class="cards">
     <div class="card"><div class="card-lbl">Entregas no período</div><div class="card-val">${entregas.toLocaleString('pt-BR')}</div><div class="card-pct">média de ${n1(dias ? entregas / dias : null)} por dia, em ${dias} dia(s) com entrega</div></div>
