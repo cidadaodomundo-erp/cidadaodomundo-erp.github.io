@@ -13,237 +13,142 @@
 // banco decidem quem pode o que (o status de nascimento e do gatilho,
 // nao do navegador). anon segue so leitura. Pre-requisito: os 4 usuarios
 // criados no Supabase e rmb_pessoas.email preenchido (REEMBOLSOS-PAINEL.md).
+// 07/11/2026: virou PEDIR REEMBOLSO (dono: "sem histórico, somente pras pessoas pedirem daqui pra frente"; proposta do Financeiro
+// 2026-11-07-pedir-reembolso.md). A tela só grava o pedido; status, título e baixa são do banco e do robô.
 let REEMBOLSOS = null;
-const RMB_SUBTIPOS = ['TAXAS COZINHA', 'MOTOBOY', 'TAXAS SALAO', 'SISTEMA DE GESTAO',
-                      'USO E CONSUMO', 'MANUTENCAO', 'DESPESAS ADMINISTRATIVAS'];
-// 26/10/2026: EMAIL_DONO, carregarEmailDono e souODono moram no nucleo.js (o Caixa usa, o painel também).
-
-
-
-function rmbSair() { localStorage.removeItem('rmbSessao'); renderModuloReembolsos(REEMBOLSOS); }
-
-// Cada modulo trata o pos-login do seu jeito. A funcao compartilhada so
-// autentica e devolve true/false.
-async function reembolsosLogin() {
-  if (!(await rmbFazerLogin())) return;   // o erro ja esta escrito na tela
-  await entrarReembolsos();
-}
-
-
-
-
-
-async function rmbEnviarGasto() {
-  const msg = document.getElementById('rmbFormMsg');
-  const pessoa = document.getElementById('rmbPessoa').value;
-  const data = document.getElementById('rmbData').value;
-  const valor = Number(String(document.getElementById('rmbValor').value).replace(',', '.'));
-  const descricao = document.getElementById('rmbDesc').value.trim();
-  const subtipo = document.getElementById('rmbSubtipo').value || null;
-  const arquivo = document.getElementById('rmbNota').files[0] || null;
-  if (!pessoa || !data || !valor || !descricao) {
-    msg.textContent = 'Preencha quem, quando, quanto e o que foi.'; msg.style.display = 'block'; return;
-  }
-  msg.textContent = 'Enviando...'; msg.style.display = 'block';
-  try {
-    let caminho = null;
-    if (arquivo) {
-      caminho = `${pessoa}/${Date.now()}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-      let up = await fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` },
-        body: arquivo,
-      });
-      if (await rmbRenovarSeExpirado(up)) {
-        up = await fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, {
-          method: 'POST',
-          headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` },
-          body: arquivo,
-        });
-      }
-      if (!up.ok) throw new Error('a foto da nota não subiu (' + up.status + ')');
-    }
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos`, {
-      method: 'POST',
-      headers: rmbHeaders({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ pessoa, data_gasto: data, valor, descricao, subtipo,
-                             unidade: 'AGUA VERDE', comprovante_url: caminho, origem: 'PAINEL' }),
-    });
-    if (await rmbRenovarSeExpirado(r)) {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos`, {
-        method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }),
-        body: JSON.stringify({ pessoa, data_gasto: data, valor, descricao, subtipo,
-                               unidade: 'AGUA VERDE', comprovante_url: caminho, origem: 'PAINEL' }),
-      });
-    }
-    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
-    REEMBOLSOS = null;
-    await entrarReembolsos();
-  } catch (e) {
-    msg.textContent = 'Não gravou: ' + e.message + ' — o banco recusa gasto lançado em nome de outra pessoa (só o Neto pode).';
-    msg.style.display = 'block';
-  }
-}
-
-async function rmbDecidir(id, status) {
-  let r = await fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos?id=eq.${id}`, {
-    method: 'PATCH',
-    headers: rmbHeaders({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ status, aprovado_por: 'NETO', aprovado_em: new Date().toISOString() }),
-  });
-  if (await rmbRenovarSeExpirado(r)) {
-    r = await fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos?id=eq.${id}`, {
-      method: 'PATCH', headers: rmbHeaders({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ status, aprovado_por: 'NETO', aprovado_em: new Date().toISOString() }),
-    });
-  }
-  if (!r.ok) { alert('Não gravou a decisão — só o dono aprova (policy do banco).'); return; }
-  REEMBOLSOS = null;
-  await entrarReembolsos();
-}
-
-async function rmbVerNota(caminho) {
-  const s = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/comprovantes/${caminho}`, {
-    method: 'POST', headers: rmbHeaders(), body: JSON.stringify({ expiresIn: 3600 }),
-  });
-  const d = await s.json();
-  if (d.signedURL) window.open(`${SUPABASE_URL}/storage/v1${d.signedURL}`, '_blank');
-  else alert('Não consegui abrir a nota (o bucket é privado — precisa estar logado).');
-}
-
+const RMB_DESDE = '2026-11-07';
+// "o que foi" → subtipo do plano de contas (nunca "REEMBOLSO": a despesa é a do que foi comprado)
+const RMB_OQUE = [['taxa cozinha', 'TAXAS COZINHA'], ['taxa salão', 'TAXAS SALAO'], ['motoboy', 'MOTOBOY'], ['mercado / insumo', 'MATERIA PRIMA'],
+  ['manutenção', 'MANUTENCAO'], ['sistema / assinatura', 'SISTEMA DE GESTAO'], ['outro', 'DESPESAS ADMINISTRATIVAS']];
+const RMB_STATUS_TXT = { ARQUIVADO: 'arquivado' };
+function rmbSair() { localStorage.removeItem('rmbSessao'); entrarReembolsos(); }
+async function reembolsosLogin() { if (!(await rmbFazerLogin())) return; await entrarReembolsos(); }
+function rmbEuEmail() { return String((rmbSessao() || {}).email || '').toLowerCase(); }
+function rmbSouGestor() { return souODono() || rmbEuEmail() === 'hellen@cidadaodomundo.com.br'; }
 async function carregarReembolsos() {
-  const [saldo, fila, orfaos] = await Promise.all([
-    consultarTudo('vw_rmb_saldo_pessoa?select=*&order=a_receber.desc'),
-    consultarTudo('vw_rmb_fila?select=*&order=data_gasto.asc'),
-    consultarTudo('vw_rmb_sem_registro?select=debito'),
-  ]);
-  return { saldo, fila, orfaos };
+  const pess = await consultarTudo('rmb_pessoas?select=pessoa,nome_completo,email,chave_pix&order=pessoa')
+    .catch(() => consultarTudo('rmb_pessoas?select=pessoa,nome_completo,email&order=pessoa'));
+  const [gastos, cfg] = await Promise.all([
+    consultarTudo(`rmb_gastos?select=id,pessoa,data_gasto,valor,descricao,subtipo,unidade,comprovante_url,status,aprovado_por,aprovado_em,pago_em,motivo_recusa,criado_em&criado_em=gte.${RMB_DESDE}&status=neq.ARQUIVADO&order=criado_em.desc,id.desc`),
+    consultarTudo('rmb_config?select=*').catch(() => [])]);
+  const lim = Number(((cfg || [])[0] || {}).limite_aprovacao) || 300;
+  return { pess: pess || [], gastos: gastos || [], limite: lim };
 }
-
-// ------------------------------------------------------------------
-// Cartao & maquininha (Rede, adquirente do Itau). Fonte: API da Rede em
-// producao, lida pela nossa conciliadora VICENTE E IKOMA. Ligado ao painel em
-// 18/08/2026 — o que a rede paga de MDR e de aluguel de maquininha, por loja e
-// por bandeira, direto da fonte. Views: vw_rede_taxas_efetivas (venda x MDR) e
-// vw_rede_aluguel (cobranca de aluguel por loja/mes). Ambas ja medidas seguras
-// no timeout de 3s do anon (rede_vendas ~15k linhas, nada perto de fato_pedidos).
-// 26/10/2026: o mergulho do dia do Fechamento de Caixas (conciliação de cartão) mora em docs/caixa/caixa.js.
-
-
 async function entrarReembolsos() {
   const alvo = document.getElementById('view-reembolsos');
   if (!alvo) return;
-  await carregarEmailDono();   // decide se aparecem os botoes de aprovar
-  if (REEMBOLSOS === null) {
-    alvo.innerHTML = '<div class="contexto">Carregando os reembolsos...</div>';
-    REEMBOLSOS = await carregarReembolsos();
-  }
+  await carregarEmailDono();
+  alvo.innerHTML = '<div class="contexto">Carregando os reembolsos…</div>';
+  try { REEMBOLSOS = await carregarReembolsos(); }
+  catch (e) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os reembolsos: ${cgEsc(e.message)} <button class="preset-btn" onclick="entrarReembolsos()">Tentar de novo</button></div>`; return; }
   renderModuloReembolsos(REEMBOLSOS);
 }
-
+// a próxima sexta (o dia de pagar reembolso)
+function rmbProxSexta() { const d = new Date(cgHojeIso() + 'T12:00:00'); do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5); return d.toLocaleDateString('en-CA'); }
+function rmbStatusTxt(g, lim) {
+  const s = g.status;
+  if (s === 'PEDIDO' || s === 'REVISAR') return Number(g.valor) > lim ? 'esperando o dono' : 'esperando a Hellen';
+  if (s === 'APROVADO') return 'aprovado: vai ser lançado';
+  if (s === 'LANCADO' || s === 'LANÇADO') return `vai ser pago sexta, ${cgDiaMes(rmbProxSexta())}`;
+  if (s === 'PAGO') return `✓ pago${g.pago_em ? ' em ' + cgDiaMes(String(g.pago_em)) : ''}`;
+  if (s === 'RECUSADO') return `recusado${g.motivo_recusa ? ': ' + g.motivo_recusa : ''}`;
+  return RMB_STATUS_TXT[s] || String(s || '').toLowerCase();
+}
 function renderModuloReembolsos(dados) {
-  const { saldo, fila, orfaos } = dados || {};   // aceita nulo: ver bug do login de 21/08
-  const alvo  = document.getElementById('view-reembolsos');
-  if (!alvo) return;
-  const reais = (v) => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
-  const ddmm  = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
-  const sessao = rmbSessao();
-  const souDono = souODono();
-
-  const totalAberto = saldo.reduce((a, p) => a + Number(p.a_receber), 0);
-  const orfaoValor  = orfaos.reduce((a, l) => a + Number(l.debito), 0);
-
-  // Um card por pessoa: quanto devemos e ha quantos dias espera.
-  const cards = saldo.map(p => {
-    const dias = p.espera_mais_antiga_dias;
-    // a cor e fato (esta esperando ha muito), nao julgamento
-    const cor = dias == null ? '#8a897e' : dias > 30 ? '#ff6b6b' : dias > 15 ? '#f5a623' : '#3fb950';
-    return `<div class="card" style="border:1px solid ${cor};">
-      <div style="font-size:12px; color:#a5a49a; text-transform:uppercase;">${p.pessoa}</div>
-      <div style="font-size:26px; font-weight:700;">${reais(p.a_receber)}</div>
-      <div style="font-size:12px; color:#a5a49a;">${
-        Number(p.a_receber) === 0 ? 'nada em aberto'
-        : `${p.gastos_em_aberto} gasto${p.gastos_em_aberto > 1 ? 's' : ''} · o mais antigo espera <b style="color:${cor};">${dias} dias</b>`
-      }</div>
-      <div style="font-size:11px; color:#8a897e; margin-top:4px;">já devolvido: ${reais(p.ja_reembolsado_total)}</div>
-    </div>`;
-  }).join('');
-
-  const linhas = fila.map(g => {
-    const badge  = { PENDENTE:'#f5a623', APROVADO:'#3fb950', REVISAR:'#ff6b6b' }[g.status] || '#8a897e';
-    const rotulo = { PENDENTE:'esperando você', APROVADO:'pode pagar', REVISAR:'revisar' }[g.status] || g.status;
-    // Aprovar/recusar saiu em 21/08/2026 junto com as regras do banco: o modulo
-    // volta ao assunto mais para a frente, com o desenho refeito. Deixar o botao
-    // sem a policy por tras so entregaria erro a quem clicasse. (souDono segue
-    // calculado porque o resto da tela usa.)
-    const acoes = '';
-    return `<tr>
-      <td style="padding:5px 8px; color:#a5a49a;">${ddmm(g.data_gasto)}</td>
-      <td style="padding:5px 8px;">${g.pessoa}</td>
-      <td style="padding:5px 8px;">${g.descricao}</td>
-      <td style="padding:5px 8px; color:#a5a49a;">${g.subtipo || 'sem classificação'}</td>
-      <td style="padding:5px 8px; text-align:right; font-weight:600;">${reais(g.valor)}</td>
-      <td style="padding:5px 8px; text-align:right; color:#a5a49a;">${g.dias_esperando} d</td>
-      <td style="padding:5px 8px;"><span style="color:${badge}; border:1px solid ${badge}; border-radius:12px; padding:2px 8px; font-size:11px;">${rotulo}</span>${acoes}</td>
-      <td style="padding:5px 8px;">${g.comprovante_url
-        ? (sessao ? `<a href="javascript:void(0)" onclick="rmbVerNota('${g.comprovante_url}')" style="color:#a5a49a;">nota</a>`
-                  : '<span style="color:#8a897e;" title="entre para ver">nota 🔒</span>')
-        : '<span style="color:#8a897e;">sem nota</span>'}</td>
-    </tr>`;
-  }).join('');
-
-  const hoje = new Date().toISOString().slice(0, 10);
-  const blocoEntrar = sessao
-    ? `<div class="contexto" style="text-align:left;">
-        logado como <b>${sessao.email}</b> · <a href="javascript:void(0)" onclick="rmbSair()" style="color:#a5a49a;">sair</a>
-        <div class="contexto" style="border-color:#e8b04b; margin-top:10px;">
-          <b>Lançamento pausado.</b> As regras de quem lança e de quem aprova saíram do banco
-          em 21/08/2026, a pedido do dono — elas foram desenhadas antes de o painel ter login
-          por pessoa. O módulo segue mostrando a fila e o histórico; lançar volta quando o
-          assunto for retomado. Enquanto isso, gasto novo entra pelo importador, como sempre
-          entrou.</div>
-      </div>`
-    : `<div class="contexto" style="text-align:left;">
-        <a href="javascript:void(0)" onclick="document.getElementById('rmbLoginBox').style.display='block'; this.style.display='none';" style="color:#a5a49a;">Entrar para lançar um gasto ou ver as notas →</a>
-        <div id="rmbLoginBox" style="display:none; margin-top:8px;">
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input id="rmbEmail" type="email" placeholder="e-mail" style="flex:1; min-width:180px; background:#232321; border:1px solid #34332f; color:#fff; border-radius:8px; padding:8px;">
-            <input id="rmbSenha" type="password" placeholder="senha" style="flex:1; min-width:140px; background:#232321; border:1px solid #34332f; color:#fff; border-radius:8px; padding:8px;">
-            <button onclick="reembolsosLogin()" style="background:#c8102e; border:none; color:#fff; font-weight:700; border-radius:8px; padding:8px 18px; cursor:pointer;">Entrar</button>
-          </div>
-          <div id="rmbLoginErro" style="display:none; color:#ff6b6b; font-size:12px; margin-top:6px;"></div>
-        </div>
-      </div>`;
-
-  alvo.innerHTML = `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Reembolsos</div>
-    <div class="caption-label" style="text-align:center;">
-      Quanto a empresa deve para quem gastou do próprio bolso, e há quanto tempo essa pessoa espera.
-    </div>
-    ${blocoEntrar}
-    <div class="cards">${cards}</div>
-    ${totalAberto > 0
-      ? `<div class="caption-label" style="text-align:center;">Em aberto agora: <b>${reais(totalAberto)}</b>.</div>`
-      : `<div class="caption-label" style="text-align:center;">Nada em aberto — todo reembolso registrado já foi devolvido.</div>`}
-    ${linhas ? `
-      <div class="section-label">A fila</div>
-      <table style="width:100%; font-size:13px;">
-        <tr style="color:#8a897e; font-size:11px; text-transform:uppercase;">
-          <td style="padding:5px 8px;">gasto em</td><td style="padding:5px 8px;">quem</td>
-          <td style="padding:5px 8px;">o que foi</td><td style="padding:5px 8px;">categoria</td>
-          <td style="padding:5px 8px; text-align:right;">valor</td>
-          <td style="padding:5px 8px; text-align:right;">esperando</td>
-          <td style="padding:5px 8px;">situação</td><td style="padding:5px 8px;">comprovante</td>
-        </tr>${linhas}
-      </table>` : ''}
-    ${orfaoValor > 0 ? `
-      <div class="contexto" style="border-color:#f5a623;">
-        <b>${orfaos.length} pagamentos de reembolso (${reais(orfaoValor)}) apareceram no financeiro sem passar pela fila.</b>
-        Ou é uma pessoa ainda não cadastrada, ou alguém foi pago por fora do combinado —
-        conferir antes de concluir. Cadastrar é um INSERT em <code>rmb_pessoas</code>.
-      </div>` : ''}
-    <div class="caption-label">A <b>Jane</b> também tem crédito no módulo <a href="javascript:void(0)" onclick="mostrarModulo('rh')" style="color:#a5a49a;">Descontos em folha</a>
-    (dinheiro que ela emprestou a funcionários) — são dívidas de origens diferentes e não estão somadas aqui.</div>`;
+  const alvo = document.getElementById('view-reembolsos');
+  if (!alvo || !dados) return;
+  const { pess, gastos, limite } = dados, eu = rmbEuEmail(), gestor = rmbSouGestor();
+  const minha = pess.find((p) => String(p.email || '').toLowerCase() === eu) || null;
+  const nomeDe = (k) => { const p = pess.find((x) => x.pessoa === k); return cgNome((p && (p.nome_completo || p.pessoa)) || k || ''); };
+  const vis = gestor ? gastos : gastos.filter((g) => minha && g.pessoa === minha.pessoa);
+  const R = (v) => cgR(Number(v) || 0);
+  const corSt = (g) => g.status === 'PAGO' ? 'var(--farol-ok)' : g.status === 'RECUSADO' ? 'var(--farol-fora)' : (g.status === 'PEDIDO' ? 'var(--farol-perto)' : 'var(--tx-3)');
+  const podeDecidir = (g) => gestor && g.status === 'PEDIDO' && !(minha && g.pessoa === minha.pessoa) && (Number(g.valor) <= limite || souODono());
+  const deve = (lst) => lst.filter((g) => ['APROVADO', 'LANCADO', 'LANÇADO'].includes(g.status)).reduce((a, g) => a + Number(g.valor || 0), 0);
+  const F = RMB_FORM;
+  let h = `<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;">Pedir reembolso</div>`;
+  if (!eu) return void (alvo.innerHTML = h + '<div class="contexto">Entre com o seu login para pedir reembolso.</div>');
+  if (!minha && !gestor) h += `<div class="contexto" style="border-color:var(--farol-perto);text-align:left;">O seu login (${cgEsc(eu)}) ainda não está cadastrado para reembolso. Peça à Hellen para incluir.</div>`;
+  h += `<div style="margin:0 0 10px;">${F.aberto ? '' : `<button type="button" class="preset-btn active" onclick="RMB_FORM.aberto=true;renderModuloReembolsos(REEMBOLSOS)" ${!minha && !gestor ? 'disabled' : ''}>+ Pedir reembolso</button>`}</div>`;
+  if (F.aberto) {
+    const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
+    const st = 'padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;width:100%;';
+    const quem = gestor ? `<select id="rmbPessoa" style="${st}">${pess.map((p) => `<option value="${cgEsc(p.pessoa)}" ${minha && p.pessoa === minha.pessoa ? 'selected' : ''}>${cgEsc(cgNome(p.nome_completo || p.pessoa))}</option>`).join('')}</select>`
+      : `<input id="rmbPessoa" type="hidden" value="${cgEsc(minha ? minha.pessoa : '')}"><div style="padding:6px 0;color:var(--tx-1);font-size:13px;">${cgEsc(minha ? cgNome(minha.nome_completo || minha.pessoa) : '')}</div>`;
+    const lojaPad = (typeof pesLojaVista === 'function' && pesLojaVista()) || 'AGUA VERDE';
+    const pix = minha && minha.chave_pix ? `<div style="font-size:12px;color:var(--tx-4);margin-top:6px;">Recebe no PIX: <b>${cgEsc(minha.chave_pix)}</b></div>`
+      : (minha ? campo('Sua chave PIX (uma vez só) *', `<input id="rmbPix" placeholder="CPF, celular, e-mail ou chave aleatória" style="${st}">`) : '');
+    h += `<div class="contexto" style="text-align:left;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
+        ${campo('Quem', quem)}
+        ${campo('Valor (R$) *', `<input id="rmbValor" type="number" step="0.01" min="0" style="${st}">`)}
+        ${campo('Data do gasto *', `<input id="rmbData" type="date" value="${cgHojeIso()}" style="${st}">`)}
+        ${campo('Loja', `<select id="rmbLoja" style="${st}">${['AGUA VERDE', 'AHU', 'SÃO BRAZ'].map((u) => `<option ${u === lojaPad ? 'selected' : ''}>${u}</option>`).join('')}</select>`)}
+        ${campo('O que foi *', `<select id="rmbOque" style="${st}"><option value=""></option>${RMB_OQUE.map(([r, sub]) => `<option value="${sub}">${r}</option>`).join('')}</select>`)}
+        ${campo('O que comprou *', `<input id="rmbDesc" placeholder="ex.: gás da cozinha" style="${st}">`)}
+        ${campo('Comprovante (foto ou PDF) *', `<input id="rmbNota" type="file" accept="image/*,application/pdf" style="font-size:12px;">`)}
+        ${pix}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">${cgBotaoPasso('Enviar pedido', 'rmbEnviarGasto()')}<button type="button" class="preset-btn" onclick="RMB_FORM.aberto=false;renderModuloReembolsos(REEMBOLSOS)">Cancelar</button></div></div>`;
+  }
+  if (!vis.length) h += `<div class="contexto">${gestor ? 'Nenhum pedido desde 07/11.' : 'Você ainda não pediu nenhum reembolso.'}</div>`;
+  else {
+    h += `<div id="tabelaRmb" style="overflow-x:auto;"><table><thead><tr><th>Pedido em</th>${gestor ? '<th>Quem</th>' : ''}<th>O que foi</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
+      ${vis.map((g) => `<tr><td>${cgData(g.data_gasto)}</td>${gestor ? `<td>${cgEsc(nomeDe(g.pessoa))} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(g.unidade || '')}</span></td>` : ''}
+        <td style="white-space:normal;">${cgEsc(g.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(String(g.subtipo || '').toLowerCase())}</span></td>
+        <td>${R(g.valor)}</td><td style="color:${corSt(g)};font-weight:700;">${cgEsc(rmbStatusTxt(g, limite))}</td>
+        <td style="white-space:nowrap;">${g.comprovante_url ? `<button type="button" class="preset-btn" onclick='rmbVerNota(${JSON.stringify(g.comprovante_url)})'>comprovante</button>` : ''}
+          ${podeDecidir(g) ? ` ${cgBotaoPasso('Aprovar', `rmbDecidir(${g.id},true)`)} ${cgBotaoPasso('Recusar', `rmbDecidir(${g.id},false)`, true)}` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (gestor) {
+    const porP = [...new Set(gastos.map((g) => g.pessoa))].map((p) => [p, deve(gastos.filter((g) => g.pessoa === p))]).filter(([, v]) => v > 0);
+    if (porP.length) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve: ${porP.map(([p, v]) => `<b>${cgEsc(nomeDe(p))}</b> ${R(v)}`).join(' · ')}</div>`;
+  } else if (minha) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve <b>${R(deve(vis))}</b> a você${deve(vis) ? ' (aprovado e ainda não pago)' : ''}.</div>`;
+  h += `<div class="caption-label" style="text-align:left;margin-top:8px;">Até ${R(limite)} a Hellen aprova; acima, o dono. Pago na sexta, por PIX.</div>`;
+  alvo.innerHTML = h;
+}
+let RMB_FORM = { aberto: false };
+async function rmbEnviarGasto() {
+  const g = (id) => document.getElementById(id);
+  const pessoa = g('rmbPessoa').value, data = g('rmbData').value, valor = Number(String(g('rmbValor').value).replace(',', '.'));
+  const subtipo = g('rmbOque').value, desc = g('rmbDesc').value.trim(), unidade = g('rmbLoja').value, arquivo = g('rmbNota').files[0] || null;
+  const pix = g('rmbPix') ? g('rmbPix').value.trim() : null;
+  const falta = [!pessoa && 'quem', !(valor > 0) && 'valor', !data && 'data', !subtipo && 'o que foi', !desc && 'o que comprou', !arquivo && 'comprovante', g('rmbPix') && !pix && 'chave PIX'].filter(Boolean);
+  if (falta.length) return avisoAcao('atencao', '! Falta preencher: ' + falta.join(', ') + '.');
+  if (arquivo.size > 15000000) return avisoAcao('atencao', '! Comprovante maior que 15 MB: use uma foto menor.');
+  avisoAcao('enviando', '… enviando o pedido');
+  try {
+    await rmbGarantirTokenValido();
+    if (pix) { const rp = await trRpcSeguro('rmb_pix_salvar', { p_chave: pix }); if (!rp.ok) throw new Error('a chave PIX não gravou: ' + await trErroDe(rp)); }
+    const caminho = `${pessoa}/${cgHojeIso()}-${Math.round(performance.now())}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
+    const sobe = () => fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` }, body: arquivo });
+    let up = await sobe(); if (await rmbRenovarSeExpirado(up)) up = await sobe();
+    if (!up.ok) throw new Error('o comprovante não subiu (' + up.status + ')');
+    const corpo = JSON.stringify({ pessoa, data_gasto: data, valor, descricao: desc, subtipo, unidade, comprovante_url: caminho, origem: 'PAINEL' });
+    const grava = () => fetch(`${SUPABASE_URL}/rest/v1/rmb_gastos`, { method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }), body: corpo });
+    let r = await grava(); if (await rmbRenovarSeExpirado(r)) r = await grava();
+    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    RMB_FORM.aberto = false;
+    await entrarReembolsos();
+    avisoAcao('ok', `✓ Pedido enviado às ${avisoHora()} — ${valor > (REEMBOLSOS ? REEMBOLSOS.limite : 300) ? 'o dono aprova' : 'a Hellen aprova'}; o pagamento é na sexta.`);
+  } catch (e) { avisoAcao('erro', '✗ Não enviou o pedido: ' + e.message, rmbEnviarGasto); }
+}
+async function rmbDecidir(id, aprova) {
+  let motivo = null;
+  if (!aprova) { motivo = prompt('Motivo da recusa (a pessoa vai ver):'); if (motivo === null) return; motivo = motivo.trim(); if (!motivo) return avisoAcao('atencao', '! Escreva o motivo da recusa.'); }
+  avisoAcao('enviando', aprova ? '… aprovando' : '… recusando');
+  const r = await trRpcSeguro('rmb_decidir', { p_id: id, p_aprova: aprova, p_motivo: motivo });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => rmbDecidir(id, aprova));
+  await entrarReembolsos();
+  avisoAcao('ok', aprova ? `✓ Aprovado às ${avisoHora()}: o robô lança no Saipos e o pagamento é na sexta.` : `✓ Recusado às ${avisoHora()}.`);
+}
+async function rmbVerNota(caminho) {
+  try {
+    const s = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/comprovantes/${caminho}`, { method: 'POST', headers: rmbHeaders(), body: JSON.stringify({ expiresIn: 3600 }) });
+    const d = await s.json();
+    if (!d.signedURL) throw new Error('sem permissão');
+    window.open(`${SUPABASE_URL}/storage/v1${d.signedURL}`, '_blank');
+  } catch (e) { avisoAcao('erro', '✗ Não consegui abrir o comprovante: ' + e.message); }
 }
 
 // ------------------------------------------------------------------
