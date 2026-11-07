@@ -81,21 +81,18 @@ async function entrarRateio() {
     try {
       const U = encodeURIComponent(RATEIO_UNIDADE);
       const pct = await consultarTudo(`vw_rateio_pct_canal_precificacao?select=*&unidade=eq.${U}`);
-      const [resumo, preco, semCriterio, nomes] = await Promise.all([
+      const [resumo, preco, semCriterio] = await Promise.all([
         consultarTudo(`vw_rateio_resumo_canal?select=*&unidade=eq.${U}&order=mes`),
         // 07/11/2026 (proposta Cardapio, auditoria lote 2): a regua oficial e a
         // vw_margem_produto (§C16) — pro-labore da DRE e mao de obra por tipo de produto
         // (mercadoria e chope nao levam a da cozinha). A tela so le; nada de conta aqui.
-        consultarTudo(`vw_margem_produto?select=produto,classe,categoria,canal,custo_ficha,preco_atual,qtd_vendida,preco_instavel,preco_min,preco_max,ingredientes_sem_custo,pct_ficha,pct_embalagem,pct_mo_aplicada,pct_mo_canal,pct_adm,pct_venda,pct_uso_consumo,pct_outros,pct_beneficio_ifood,pct_pro_labore,pct_despesa_real,pct_despesa_cheia,margem_alvo,de,ate,lucro_final_real,lucro_final_cheio,lucro_final_reais,preco_alvo_final&unidade=eq.${U}&preco_atual=not.is.null&order=lucro_final_cheio`),
+        consultarTudo(`vw_margem_produto?select=produto,nome_base,grupo,fora_da_base,classe,categoria,canal,custo_ficha,preco_atual,qtd_vendida,preco_instavel,preco_min,preco_max,ingredientes_sem_custo,pct_ficha,pct_embalagem,pct_mo_aplicada,pct_mo_canal,pct_adm,pct_venda,pct_uso_consumo,pct_outros,pct_beneficio_ifood,pct_pro_labore,pct_despesa_real,pct_despesa_cheia,margem_alvo,de,ate,lucro_final_real,lucro_final_cheio,lucro_final_reais,preco_alvo_final&unidade=eq.${U}&preco_atual=not.is.null&order=lucro_final_cheio`),
         // Conta de despesa que apareceu no dinheiro sem criterio decidido — cairia em
         // "por vendas" em silencio (foi assim que a Agencia Oito passou despercebida).
         consultarTudo('vw_rateio_sem_criterio?select=*').catch(() => []),
-        // a vw_margem_produto ainda nao expoe o nome da base: o mapa vem da view antiga
-        consultarTudo(`vw_rateio_preco_alvo?select=produto,canal,nome_base,fora_da_base&unidade=eq.${U}`).catch(() => []),
       ]);
-      const nb = {};
-      (nomes || []).forEach(n => { nb[n.canal + '|' + n.produto] = n; });
-      preco.forEach(r => { const n = nb[r.canal + '|' + r.produto] || {}; r.nome_base = n.nome_base || null; r.fora_da_base = n.fora_da_base === true; });
+      // 07/11/2026 (Cardápio, 60627ca): o nome da base vem da própria vw_margem_produto (nome_base, grupo, fora_da_base)
+      preco.forEach(r => { r.fora_da_base = r.fora_da_base === true; });
       RATEIO = { pct, resumo, preco, semCriterio };
     } catch (e) {
       alvo.innerHTML = `<div class="contexto" style="border-color:#c8102e;">Não consegui ler o rateio: ${e.message || e}</div>`;
