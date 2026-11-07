@@ -179,9 +179,14 @@
   /* numeros a ESQUERDA (dono, 15/10/2026: "prefiro pra esquerda"); era text-align:right */
   div[id^="tabela"] th, div[id^="tabela"] td { border:1px solid var(--line); padding:6px 10px; text-align:left; white-space:nowrap; }
   #view-hoje div[id^="tabela"] th { white-space:normal; vertical-align:bottom; }
-  /* Contas a pagar e a receber (16/10/2026): numeros a esquerda tambem nas tabelas que trazem alinhamento escrito */
-  #view-contaspagar div[id^="tabela"] th, #view-contaspagar div[id^="tabela"] td,
-  #view-contasreceber div[id^="tabela"] th, #view-contasreceber div[id^="tabela"] td { text-align:left !important; }
+  /* PADRÃO DE GRADE G3 (07/11/2026; dono 15/10: "prefiro [os números] pra esquerda"): tudo à esquerda em TODA grade,
+     inclusive onde o JS escreveu text-align:right (eram 341). Exceção: ✓ ou caixinha centralizada, com class="centro". */
+  div[id^="tabela"] th, div[id^="tabela"] td { text-align:left !important; }
+  div[id^="tabela"] th.centro, div[id^="tabela"] td.centro { text-align:center !important; }
+  /* G8: grade simples com mais de 10 linhas ordena pelo título (o núcleo liga sozinho; ▲▼ mostra a ordem) */
+  div[id^="tabela"] th.ordenavel { cursor:pointer; user-select:none; }
+  div[id^="tabela"] th.ordenavel:hover { color:var(--tx-1); }
+  div[id^="tabela"] th .ord-seta { margin-left:4px; font-size:10px; color:var(--tx-4); }
   /* no celular, a coluna de explicacao sai: a tabela cabe sem rolar de lado */
   @media (max-width: 600px) { #tabelaCrOrigem th:last-child, #tabelaCrOrigem td:last-child { display:none; } }
   /* lista de titulos em grupos (16/10/2026) */

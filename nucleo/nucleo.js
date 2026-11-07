@@ -287,7 +287,56 @@ function fxSomaDias(dataStr, n) { const d = new Date(dataStr + 'T12:00:00'); d.s
 // 29/10/2026 (dono): "a barra de rolagem no topo faz sentido? assim não precisaria ir até o fim da tabela pra rolar".
 // Toda tabela do painel (div id="tabela…") mais larga que a tela ganha uma barra EM CIMA, ligada à de baixo.
 const CEL_FICA_TABELA = new Set(['tabelaDRE', 'tabelaDFC', 'tabelaPonte', 'tabelaPonteLucro', 'tabelaEvolMatriz', 'tabelaAtrasosMatriz', 'tabelaFreteMatriz', 'tabelaTrMensal']);
+// PADRÃO DE GRADE (07/11/2026, dono: "as tabelas e grades não estão todas tabuladas"; padrão em
+// contexto/propostas-telas/2026-11-07-usabilidade-padrao-unico.md). O núcleo arruma sozinho o que dá para arrumar em
+// toda grade (div id="tabela…"), sem mexer tela a tela:
+//  G2 — a 1ª linha só de títulos vira <thead> (o cabeçalho fica preso ao rolar e o celular vira cartão);
+//  G8 — grade simples com mais de 10 linhas ordena ao clicar no título (▲▼). Não liga onde a tela já ordena por conta
+//       própria (th com onclick), onde há linha de grupo/subtotal ou detalhe aberto (colspan) — ordenar quebraria.
+function gradeNumero(t) {
+  const s = String(t || '').replace(/[R$%\s]/g, '').replace(/−/g, '-');
+  if (!/^-?[\d.]*,?\d+$/.test(s)) return null;
+  const n = Number(s.replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function gradeOrdenar(th) {
+  const t = th.closest('table'), tb = t && t.tBodies[0];
+  if (!tb) return;
+  const i = th.cellIndex, dir = th.dataset.ord === 'asc' ? 'desc' : 'asc';
+  t.tHead.querySelectorAll('th').forEach((x) => { delete x.dataset.ord; const s = x.querySelector('.ord-seta'); if (s) s.textContent = ''; });
+  th.dataset.ord = dir;
+  const seta = th.querySelector('.ord-seta') || th.appendChild(Object.assign(document.createElement('span'), { className: 'ord-seta' }));
+  seta.textContent = dir === 'asc' ? '▲' : '▼';
+  const txt = (r) => (r.cells[i] ? r.cells[i].textContent.trim() : '');
+  const linhas = [...tb.rows];
+  linhas.sort((a, b) => {
+    const x = txt(a), y = txt(b), nx = gradeNumero(x), ny = gradeNumero(y);
+    const c = nx !== null && ny !== null ? nx - ny : x.localeCompare(y, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    return dir === 'asc' ? c : -c;
+  });
+  linhas.forEach((r) => tb.appendChild(r));
+}
+function gradesArrumar() {
+  document.querySelectorAll('div[id^="tabela"] > table, div[id^="tabela"] > div > table').forEach((t) => {
+    // G2: cabeçalho no <thead>
+    if (!t.tHead && t.rows.length > 1) {
+      const r0 = t.rows[0];
+      if (r0 && r0.cells.length && [...r0.cells].every((c) => c.tagName === 'TH') && ![...r0.cells].some((c) => c.rowSpan > 1)) {
+        const th = t.createTHead(); th.appendChild(r0);
+      }
+    }
+    // G8: ordenação
+    if (t.dataset.ordenavel || !t.tHead || t.tHead.rows.length !== 1 || !t.tBodies[0]) return;
+    const cab = t.tHead.rows[0], linhas = [...t.tBodies[0].rows];
+    if (linhas.length <= 10 || [...cab.cells].some((c) => c.colSpan > 1 || c.hasAttribute('onclick') || c.dataset.ordemPropria !== undefined)) return;
+    if (linhas.some((r) => r.cells.length !== cab.cells.length || r.classList.contains('sub') || r.classList.contains('liq') || [...r.cells].some((c) => c.colSpan > 1))) return;
+    t.dataset.ordenavel = '1';
+    [...cab.cells].forEach((c) => { if (c.textContent.trim()) { c.classList.add('ordenavel'); c.title = c.title || 'clique para ordenar'; } });
+    cab.addEventListener('click', (e) => { const th = e.target.closest('th.ordenavel'); if (th) gradeOrdenar(th); });
+  });
+}
 function barrasTopoTabelas() {
+  try { gradesArrumar(); } catch (e) {}
   // 01/11/2026: no celular, tabela mais larga que a tela vira cartão por linha (.cel-cartao, nucleo.css). Ficam como tabela,
   // com a primeira coluna fixa, as matrizes em que comparar colunas é o objetivo e as listas longas demais para cartão.
   if (matchMedia('(max-width:760px)').matches) {
