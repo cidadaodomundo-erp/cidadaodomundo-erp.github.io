@@ -22,12 +22,12 @@ window.CASCA_MODULOS_CFG = {
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'plano', 'estasemana', 'vendasagora', 'atividades'] },
+    lancar: [], acompanhar: ['hoje', 'agenda', 'plano', 'vendasagora', 'atividades'] },   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
-    lancar: [], acompanhar: ['placar', 'fechamento', 'semana', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
+    lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',

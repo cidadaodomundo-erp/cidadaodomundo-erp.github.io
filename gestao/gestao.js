@@ -126,7 +126,7 @@ function computeKpisSemana(ini, fim) {
     neg_sem_resposta_pct: negResp ? negSem / negResp * 100 : null,
     neg_atraso_pct: negs.length ? negAtraso / negs.length * 100 : null,
     mkt_por_pedido: m.custoMktPorPedido,
-    // investPlataforma = incentivo do iFood; promoLoja = o que saiu do nosso bolso.
+    // investPlataforma = incentivo do iFood; promoLoja = o que saiu do nosso bolso (loja + rede, desde 07/11: auditoria canal-24).
     alavancagem: m.promoLoja > 0.005 ? m.investPlataforma / m.promoLoja : null,
     roa_promo: m.promoLoja > 0.005 ? m.bruto / m.promoLoja : null,
     _negs: negs, _avs: avs,
@@ -2879,7 +2879,8 @@ async function carregarAlertas() {
   if (AVALIACOES === null) await entrarAvaliacoesSoDados();
   if (HOME_PEND === null) {
     const [pend, rot, concFresh] = await Promise.all([
-      consultarTudo('vw_contestacoes_status?select=id_curto,nome_loja,valor,contestavel_ate,automatizavel&bloco=eq.A_CONTESTAR'),
+      // 07/11/2026 (auditoria canal-13): a mesma fila da API que a tela Contestações e a rotina leem
+      consultarTudo('vw_contestacoes_fila_api?select=id_curto,nome_loja,unidade,valor,contestavel_ate,vence_aprox,descarte,descarte_escopo&bloco=eq.A_CONTESTAR'),
       consultarTudo('vw_rotinas_status?select=rotina,status,inicio,resumo'),
       consultarTudo('mv_conciliacao_agregado?select=data&order=data.desc&limit=1'),
     ]);
@@ -2891,9 +2892,11 @@ function alertasAgora() {
   if (!HOME_PEND || AVALIACOES === null || NEGOCIACOES === null) return null;
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const ddmm = (v) => v ? String(v).slice(8, 10) + '/' + String(v).slice(5, 7) : '—';
-  const pendManual = HOME_PEND.pend.filter(r => !r.automatizavel);
+  // à mão = o que a rotina devolveu (SEM_FATO_VERDADEIRO), fora o que o portal não deixa (escopo TODOS); só as lojas da Rede
+  const pendManual = HOME_PEND.pend.filter(r => r.descarte === 'SEM_FATO_VERDADEIRO' && r.descarte_escopo !== 'TODOS'
+    && (typeof contestUnidadeOk !== 'function' || contestUnidadeOk(r)));
   const pendValor = pendManual.reduce((s, r) => s + Number(r.valor || 0), 0);
-  const prazoMin = pendManual.map(r => r.contestavel_ate).filter(Boolean).sort()[0] || null;
+  const prazoMin = pendManual.map(r => r.vence_aprox || r.contestavel_ate).filter(Boolean).sort()[0] || null;
   const rotinasRuins = HOME_PEND.rot.filter(r => r.status === 'FALHOU' || r.status === 'TRAVADA');
   const maxAv = AVALIACOES.length ? AVALIACOES.reduce((m, r) => r[1] > m ? r[1] : m, '') : null;
   const maxNeg = NEGOCIACOES.length ? NEGOCIACOES.reduce((m, r) => r[1] > m ? r[1] : m, '') : null;

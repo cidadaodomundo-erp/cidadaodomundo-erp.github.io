@@ -70,10 +70,10 @@
 
 <script src="../nucleo/nucleo.js?v=20261107t"></script>
 <script src="../nucleo/graficos.js?v=20261105a"></script>
-<script src="../nucleo/vendas.js?v=20261105c"></script>
+<script src="../nucleo/vendas.js?v=20261107a"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="../canal/canal.js?v=20261105a"></script>
-<script src="gestao.js?v=20261107h"></script>
+<script src="../canal/canal.js?v=20261107e"></script>
+<script src="gestao.js?v=20261107i"></script>
 <script>
 // O que é desta página: qual tela abrir, a carga de vendas antes dela e a troca de tela por dentro.
 const TELAS_GESTAO = ['estasemana', 'hoje', 'placar', 'indicadores', 'semana', 'fechamento', 'evolucao', 'dre', 'fluxo',
@@ -91,8 +91,8 @@ function telaDe(nome) {
 const TELA_PEDIDA = TELAS_GESTAO.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'hoje';
 const TELA = telaDe(TELA_PEDIDA);
 // as mesmas listas do painel antigo
-const MODULOS_COM_RODAPE = new Set(['estasemana', 'resumo', 'cancelamentos',
-  'promocoes', 'negociacoes', 'avaliacoes', 'relatorios', 'contestacoes']);
+// 07/11/2026 (auditoria canal-15): o rodapé do Líquido só onde há Líquido
+const MODULOS_COM_RODAPE = new Set(['estasemana', 'resumo', 'cancelamentos', 'promocoes', 'relatorios']);
 const MODULOS_COM_FILTRO_TOPO = new Set(['estasemana', 'resumo', 'cancelamentos',
   'promocoes', 'qualidade', 'site', 'evolucao']);
 let VENDAS_CARREGADAS = false;

@@ -245,9 +245,9 @@
 </div>
 
 <script src="casca/menu.js?v=20261107a"></script>
-<script src="casca/paginas.js?v=20261107a"></script>
-<script src="casca/modulos.js?v=20261107c"></script>
-<script src="casca/busca.js?v=20261107b"></script>
+<script src="casca/paginas.js?v=20261107b"></script>
+<script src="casca/modulos.js?v=20261107d"></script>
+<script src="casca/busca.js?v=20261107c"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -267,7 +267,9 @@ const SO_NA_CASCA = [{ chave: 'hoje', rotulo: 'Hoje na rede', icone: '📍' }];
 SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i); });
 // 03/11/2026 (dono 14:48 e 14:54, junção com o Fabio: "a parte financeira no nosso, operacional no dele"): Avaliações,
 // Qualidade & Super e Negociações saem do menu e viram um atalho para o portal da operação; o endereço antigo ainda abre
-const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes']);
+// 07/11/2026 (junções aprovadas no artefato do menu): Esta semana virou a "Semana em curso" da Hoje e o Fechamento, aba do
+// Placar — os endereços antigos ainda abrem o lugar novo (gestao/index.html), mas não são mais item de menu
+const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento']);
 ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
 // MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51: "gostei do menu, pode aplicar"): nomes e telas extras do menu novo vêm de
 // casca/modulos.js (CASCA_MODULOS_CFG). O ?menu=proposta da simulação continua abrindo, com este mesmo menu (alias).
