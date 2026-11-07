@@ -1,47 +1,48 @@
-// OS MÓDULOS DA CASCA — formato A (dono, 22/10/2026: "gostei do formato A"; proposta
-// contexto/propostas-telas/2026-10-22-formato-a-modulos.md). O Início mostra um cartão por módulo e, dentro dele, duas
-// abas: LANÇAR (onde se registra alguma coisa) e ACOMPANHAR (onde se lê). Nome de tela NÃO muda — só o grupo.
-// Cada chave é a do menu do painel (casca/menu.js, gerado). Tela do menu que não estiver aqui aparece em "Outras telas"
-// (nada some) e o script/gerar_menu_casca.py avisa. Tela nova no painel = uma linha aqui, no módulo dela.
+// OS MÓDULOS DA CASCA — MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51, no Organizador: "gostei do menu, pode aplicar, pode
+// tirar o equipe da frente dos módulos"). Veio da simulação ?menu=proposta (casca/modulos-proposta.js, 07/11 02:11), que
+// partiu do artefato "Reorganização do Menu" (05/11). Cada módulo abre UMA lista (semAbas): a separação Lançar/Acompanhar
+// saiu (dono 07/11: "será que essa separação de lançar e acompanhar é necessária?"); os campos lancar/acompanhar só dão a
+// ordem. A "Hoje na rede" mora dentro de "Agora". As junções de telas e os consertos de número seguem depois, tela a tela.
+// Cada chave é a do menu do painel (casca/menu.js). Tela do menu que não estiver aqui aparece em "Outras telas" (nada some)
+// e o script/gerar_menu_casca.py avisa. Tela nova no painel = uma linha aqui, no módulo dela, e as palavras dela em casca/busca.js.
+window.CASCA_MODULOS_CFG = {
+  semAbas: true,          // o módulo abre uma lista só, na ordem abaixo
+  hojeNoModulo: true,     // "Hoje na rede" fica dentro de "Agora", não solta no alto do menu
+  // nome de tela que muda só no menu novo
+  rotulos: {
+    resumo: 'Resumo do iFood',
+    cardapio: 'Desempenho do cardápio',
+    logfin: 'Motoboys · Financeiro da logística',
+    macertos: 'Motoboys · Acertos',
+    reembolsos: 'Pedir reembolso',
+  },
+  // telas que não estão no menu.js e entram no menu novo
+  extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' } },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
+};
 window.CASCA_MODULOS = [
-  { id: 'hoje', nome: 'Hoje na rede', icone: '📍',
-    lancar: [],
-    acompanhar: ['hoje', 'agenda', 'estasemana', 'placar', 'indicadores', 'semana', 'fechamento'] },
-  { id: 'estoque', nome: 'Estoque', icone: '📦',
-    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'],
-    acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒',
-    lancar: [], acompanhar: ['comprateto'] },
-  { id: 'producao', nome: 'Produção', icone: '🍳',
-    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'],   // o ciclo, na ordem (dono, 27/10/2026)
-    acompanhar: ['prodhist'] },
-  { id: 'listas', nome: 'Listas', icone: '🧺',
-    lancar: ['listas'],
-    acompanhar: ['listasfin'] },
-  { id: 'caixa', nome: 'Caixa', icone: '🗃️',
-    lancar: ['caixa'],
-    acompanhar: ['rede'] },
-  { id: 'financeiro', nome: 'Financeiro', icone: '💰',
-    lancar: ['concbanco', 'contaspagar', 'contasreceber'],
-    acompanhar: ['projecao', 'dre', 'fluxo', 'despesas', 'lucrouni', 'evolucao', 'pacertos'] },
-  { id: 'pessoas', nome: 'Pessoas', icone: '👥',
-    // 29/10/2026 13:51 (dono): os passos da folha, cada um uma tela, na ordem
-    lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos'],   // 06/11/2026: ordem do dono; Reembolsos fora (abortado por ora)
-    acompanhar: [] },   // 06/11/2026: Custo da folha entrou em Cargos, salários e custo (o link #pcusto cai na aba Custo do mês)
-  // 29/10/2026 15:35 (dono): módulo Atacado, tela Orçamentos
-  { id: 'atacado', nome: 'Atacado', icone: '🚚',
-    lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
-  { id: 'cardapio', nome: 'Cardápio', icone: '📋',
-    lancar: ['fichas'],
-    acompanhar: ['engcard', 'rateio', 'cardapio', 'promocoes'] },
+  { id: 'agora', nome: 'Agora', icone: '📍',
+    lancar: [], acompanhar: ['hoje', 'agenda', 'estasemana', 'vendasagora', 'atividades'] },
+  { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
+    lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
+    acompanhar: ['projecao', 'fluxo', 'rede'] },
+  { id: 'resultado', nome: 'Resultado', icone: '📊',
+    lancar: [], acompanhar: ['placar', 'fechamento', 'semana', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
-    lancar: ['contestacoes', 'macertos'],
-    // Atendimento ao cliente fica aqui até ir para o portal do Fabio (05/10); 03/11/2026: avaliações, qualidade e negociações já foram (atalho)
-    acompanhar: ['vendasagora', 'resumo', 'cancelamentos', 'link:portal-qualidade', 'clientes', 'site', 'atrasos',
-                 'frete', 'logfin', 'atendimento'] },
+    lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
+  { id: 'estoque', nome: 'Estoque', icone: '📦',
+    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto'] },
+  { id: 'producao', nome: 'Produção', icone: '🍳',
+    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
+  { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
+  { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio'] },
+  { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
+  { id: 'pessoas', nome: 'Pessoas', icone: '👥',
+    lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
+  { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
+    lancar: [], acompanhar: ['atrasos', 'atendimento', 'link:portal-qualidade'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: [],
-    acompanhar: ['plano', 'atividades', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
+    lancar: [], acompanhar: ['plano', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];

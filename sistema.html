@@ -213,9 +213,9 @@
 
 <script src="casca/menu.js?v=20261107a"></script>
 <script src="casca/paginas.js?v=20261107a"></script>
-<script src="casca/modulos.js?v=20261107a"></script>
+<script src="casca/modulos.js?v=20261107b"></script>
 <script src="casca/busca.js?v=20261107a"></script>
-<script src="casca/modulos-proposta.js?v=20261107e"></script>
+<script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -236,16 +236,15 @@ SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i);
 // Qualidade & Super e Negociações saem do menu e viram um atalho para o portal da operação; o endereço antigo ainda abre
 const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes']);
 ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
-// SIMULAÇÃO DO MENU NOVO (dono 07/11/2026): só com ?menu=proposta (casca/modulos-proposta.js); sem ele, nada muda
-const PROPOSTA = window.CASCA_PROPOSTA || null;
-if (PROPOSTA) {
-  Object.entries(PROPOSTA.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
-  Object.entries(PROPOSTA.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
-}
+// MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51: "gostei do menu, pode aplicar"): nomes e telas extras do menu novo vêm de
+// casca/modulos.js (CASCA_MODULOS_CFG). O ?menu=proposta da simulação continua abrindo, com este mesmo menu (alias).
+const MOD_CFG = window.CASCA_MODULOS_CFG || {};
+Object.entries(MOD_CFG.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
+Object.entries(MOD_CFG.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
 
 // FORMATO A (22/10/2026): os módulos de casca/modulos.js. Tela do menu que não está em nenhum módulo cai em "Outras
 // telas" — nada some por esquecimento.
-const MODULOS = (PROPOSTA ? PROPOSTA.modulos : Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []).map((m) => Object.assign({}, m));
+const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []).map((m) => Object.assign({}, m));
 (function outrasTelas() {
   const usadas = new Set(MODULOS.flatMap((m) => [...(m.lancar || []), ...(m.acompanhar || [])]));
   const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k) && !FORA_DO_MENU.has(k));
@@ -408,13 +407,13 @@ try { GRUPOS_ABERTOS = JSON.parse(localStorage.getItem('cascaGrupos') || '{}') |
 const SINAIS = {};
 function sinalHtml(n) { return n > 0 ? `<span class="sinal" title="${n} sem resolver">${n}</span>` : ''; }
 function desenharMenu() {
-  // na simulação, a Hoje mora dentro de "Agora" (não fica solta no alto) e uma faixa avisa que é simulação
-  let h = PROPOSTA ? `<div style="margin:4px 8px 8px;padding:6px 8px;border:1px solid var(--marca-amarelo);border-radius:8px;font-size:11.5px;line-height:1.4;color:var(--tx-2);"><b style="color:var(--marca-amarelo);">Simulação do menu novo</b><br>as telas são as de hoje; só o menu muda. <a href="sistema.html${location.hash}" style="color:var(--tx-3);">voltar ao menu de hoje</a></div>` : '';
-  if (!PROPOSTA) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
+  // menu novo (07/11/2026): a Hoje mora dentro de "Agora" (não fica solta no alto)
+  let h = '';
+  if (!MOD_CFG.hojeNoModulo) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
     `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${sinalHtml(SINAIS[i.chave])}</button>`).join('');
   // 22/10/2026: o menu segue os MÓDULOS do formato A (o mesmo agrupamento dos cartões do Início)
   MODULOS.forEach((g) => {
-    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => PROPOSTA || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
+    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => MOD_CFG.hojeNoModulo || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
     if (!itens.length) return;
     const tem = itens.some((i) => i.chave === ATUAL);
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
@@ -448,7 +447,7 @@ const BUSCA_SIN = window.CASCA_BUSCA || {};
 const buscaNorm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
 const BUSCA_PARADAS = new Set(['a', 'o', 'as', 'os', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'para', 'pra', 'por', 'com', 'que', 'tela', 'ver', 'onde', 'como', 'qual', 'meu', 'minha']);
 let BUSCA_SEL = 0, BUSCA_ACHOU = [];
-function buscaGrupoNome(it) { const g = MENU.find((x) => x.id === it.grupo); return g ? g.nome : ''; }
+function buscaGrupoNome(it) { const k = Object.keys(ITENS).find((c) => ITENS[c] === it); const m = MODULOS.find((x) => [...(x.lancar || []), ...(x.acompanhar || [])].includes(k)); return m ? m.nome : ''; }
 function buscaPontos(k, q, palavras) {
   const it = ITENS[k], rot = buscaNorm(it.rotulo), sin = (BUSCA_SIN[k] || []).map(buscaNorm);
   const desc = buscaNorm((typeof DESC === 'object' && DESC && DESC[k]) || ''), grupo = buscaNorm(buscaGrupoNome(it));
@@ -647,7 +646,7 @@ function inicio() {
     if (!nl && !na && !m.emConstrucao) return;           // acesso restrito: só os módulos com tela dele
     if (!nl && !na && PODE) return;
     const n = m.emConstrucao && !nl && !na ? 'em construção'
-      : PROPOSTA && PROPOSTA.semAbas ? `${nl + na} ${nl + na === 1 ? 'tela' : 'telas'}`
+      : MOD_CFG.semAbas ? `${nl + na} ${nl + na === 1 ? 'tela' : 'telas'}`
       : [nl ? `${nl} para lançar` : '', na ? `${na} para acompanhar` : ''].filter(Boolean).join(' · ');
     h += `<button class="card${!nl && !na ? ' vazio' : ''}" type="button" data-modulo="${esc(m.id)}"><span class="t"><span>${esc(m.icone)}</span>${esc(m.nome)}</span><span class="n">${n}</span></button>`;
   });
@@ -672,7 +671,7 @@ function abrirModulo(id, aba) {
   ABA_ATUAL = aba || (nl ? 'lancar' : 'acompanhar');
   $('titulo').textContent = m.icone + ' ' + m.nome;
   const casa = $('vista').querySelector('.home');
-  const semAbas = PROPOSTA && PROPOSTA.semAbas;   // simulação: uma lista só, na ordem do menu
+  const semAbas = !!MOD_CFG.semAbas;   // menu novo (07/11/2026): uma lista só, na ordem do menu
   const lista = semAbas ? [...telasDo(m, 'lancar'), ...telasDo(m, 'acompanhar')] : telasDo(m, ABA_ATUAL);
   let h = `<div class="home-cab"><button class="voltar" type="button" data-inicio="1">← Início</button><h1>${esc(m.icone)} ${esc(m.nome)}</h1></div>
     <div class="abas"${semAbas ? ' style="display:none;"' : ''}>${['lancar', 'acompanhar'].map((a) => `<button class="aba${a === ABA_ATUAL ? ' on' : ''}" type="button" data-aba="${a}">${a === 'lancar' ? 'Lançar' : 'Acompanhar'} (${telasDo(m, a).length})</button>`).join('')}</div>
