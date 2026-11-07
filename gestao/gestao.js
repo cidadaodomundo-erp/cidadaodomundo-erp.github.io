@@ -62,6 +62,33 @@ let DFC_CONTAS = null;   // fin_contas: conta, saldo_inicial, ordem
 
 let DFC_MOV = null;      // vw_fin_saldo_conta_mensal: mes, conta, movimento
 
+// TRAVA DO CORTE (dono, 21/10/2026; tela em 07/11, auditoria dinheiro-1). Conta com linha CORTE% em
+// fin_saldo_informado (os cofres) parte do saldo do corte: o Saipos regravou caixas de ANTES do corte
+// depois dele, e somar saldo_inicial + todo o movimento contava esse passado de novo (COFRE SB dava
+// 479,03 em vez de 163,54). O saldo certo e' vw_fin_saldo_conta.saldo; a diferenca para a soma vira o
+// "ajuste da trava do corte", lancado no mes do corte. Filial nao le vw_fin_saldo_conta: fica a soma.
+let FIN_CORTE = null;    // { conta: { mes: 'AAAA-MM-01', saldo } }
+async function carregarFinCorte() {
+  if (FIN_CORTE !== null) return FIN_CORTE;
+  const [sal, cortes] = await Promise.all([
+    consultarTudo('vw_fin_saldo_conta?select=conta,saldo').catch(() => []),
+    consultarTudo('fin_saldo_informado?select=conta,data&origem=like.CORTE*&order=data').catch(() => []),
+  ]);
+  const saldo = {};
+  (sal || []).forEach(r => { saldo[r.conta] = Number(r.saldo); });
+  FIN_CORTE = {};
+  (cortes || []).forEach(r => {   // ordenado por data: fica o ultimo corte de cada conta (o que a view usa)
+    if (saldo[r.conta] !== undefined) FIN_CORTE[r.conta] = { mes: r.data.slice(0, 7) + '-01', saldo: saldo[r.conta] };
+  });
+  return FIN_CORTE;
+}
+// ajuste = saldo do corte − (saldo_inicial + todo o movimento da conta); null se a conta nao tem corte
+function ajusteCorte(conta, saldoInicial, movTotal) {
+  const k = (FIN_CORTE || {})[conta];
+  if (!k) return null;
+  return { mes: k.mes, ajuste: k.saldo - (Number(saldoInicial) + (Number(movTotal) || 0)) };
+}
+
 // dfcModo aposentado em 13/08/2026: o % da receita agora aparece junto do
 // valor em cada celula de fluxo (proposta do financeiro), sem botao de troca.
 const dfcAberto = new Set();
@@ -2497,6 +2524,7 @@ async function entrarLucroUni() {
       // de caixa e a diferenca que sobra parece erro quando e' so a janela.
       consultarTudo('vw_fin_saldo_conta_mensal?select=mes,conta,movimento'),
       consultarTudo('vw_fin_dfc_mensal?select=mes,unidade,natureza,subtipo,credito,debito'),
+      carregarFinCorte(),   // trava do corte dos cofres (07/11/2026)
     ]);
     LUCROUNI = { res, contas, saldos, dfc };
   }
@@ -2579,12 +2607,18 @@ function renderLucroUni() {
     if (s.mes > fechados[fechados.length - 1]) return;
     movAte[s.conta] = (movAte[s.conta] || 0) + nu(s.movimento);
   });
+  // trava do corte (07/11/2026): cofre parte do saldo do corte; o ajuste entra no mes do corte
+  const movTot = {};
+  saldos.forEach(s => { movTot[s.conta] = (movTot[s.conta] || 0) + nu(s.movimento); });
   const caixaU = {};
   contas.filter(c => !ehCartao(c.conta) && (!ctxLoja || c.unidade === ctxLoja)).forEach(c => {
     const a = caixaU[c.unidade] || (caixaU[c.unidade] = { ini: 0, fim: 0 });
-    const abre = nu(c.saldo_inicial) + (movAntes[c.conta] || 0);
+    const k = ajusteCorte(c.conta, c.saldo_inicial, movTot[c.conta]);
+    const ajIni = k && k.mes < fechados[0] ? k.ajuste : 0;
+    const ajFim = k && k.mes <= fechados[fechados.length - 1] ? k.ajuste : 0;
+    const abre = nu(c.saldo_inicial) + (movAntes[c.conta] || 0) + ajIni;
     a.ini += abre;
-    a.fim += abre + (movAte[c.conta] || 0);
+    a.fim += abre + (movAte[c.conta] || 0) + (ajFim - ajIni);
   });
   // A XP e' reserva DA REDE e nao tem dono por loja: ela fica fora do corte de loja,
   // e o cartao diz isso quando a tela esta recortada numa unidade so.
@@ -4876,6 +4910,7 @@ async function garantirDadosFin() {
     consultarTudo("fin_contas?select=conta,unidade,saldo_inicial,ordem,apelido&ativa=is.true&order=ordem"),
     consultarTudo("vw_fin_saldo_conta_mensal?select=mes,conta,movimento&order=mes,conta"),
     consultarTudo("vw_fin_fechamento_saldo_mensal?select=conta,conta_exibida,ordem,mes,situacao,diferenca,diferenca_aceita,diferenca_explicada,explicacao,ref_fim,ref_fim_data,ref_origem,ancora_antes_do_fim&order=mes,ordem"),
+    carregarFinCorte(),   // trava do corte dos cofres (07/11/2026)
   ]);
   aplicarLojaFin();   // converte os números lá dentro: trocar de loja refaz as listas
 }
@@ -5001,9 +5036,21 @@ function renderModuloDFC() {
   const movPorConta = {};
   contas.forEach(c => { movPorConta[c.conta] = Array(nM).fill(0); });
   DFC_MOV.forEach(r => { if (movPorConta[r.conta] && idxMes[r.mes] !== undefined) movPorConta[r.conta][idxMes[r.mes]] += r.movimento; });
+  // trava do corte (07/11/2026): o ajuste entra no mes do corte (antes da janela = ja no saldo inicial)
+  const movTotConta = {};
+  DFC_MOV.forEach(r => { movTotConta[r.conta] = (movTotConta[r.conta] || 0) + r.movimento; });
+  const ajusteCorteMes = Array(nM).fill(0);
+  let ajusteAntes = 0;
+  contas.forEach(c => {
+    const k = ajusteCorte(c.conta, c.saldo_inicial, movTotConta[c.conta]);
+    if (!k || Math.abs(k.ajuste) < 0.005) return;
+    if (idxMes[k.mes] !== undefined) { movPorConta[c.conta][idxMes[k.mes]] += k.ajuste; ajusteCorteMes[idxMes[k.mes]] += k.ajuste; }
+    else if (nM && k.mes < meses[0]) { c._ajusteAntes = k.ajuste; ajusteAntes += k.ajuste; }
+  });
   const saldoIniConta = {}, saldoFimConta = {};
   contas.forEach(c => {
-    let acum = c.saldo_inicial;
+    let acum = c.saldo_inicial + (c._ajusteAntes || 0);
+    delete c._ajusteAntes;
     saldoIniConta[c.conta] = []; saldoFimConta[c.conta] = [];
     for (let i = 0; i < nM; i++) {
       saldoIniConta[c.conta].push(acum);
@@ -5116,6 +5163,9 @@ function renderModuloDFC() {
   }
 
   corpo += linha('dfc-resultado', '(=) RESULTADO FINAL', resultFim);
+  // a ponte do saldo: fim do mes = inicio + resultado final + ajuste do corte (cofres, 07/11/2026)
+  if (ajusteCorteMes.some(v => Math.abs(v) > 0.005))
+    corpo += `<tr class="dfc-conta" title="Caixa do Saipos regravado antes do corte de 21/10: não muda o saldo de hoje (trava do corte)"><td>Ajuste da trava do corte</td>${ajusteCorteMes.map(v => celRS(v)).join('')}${celRS(ajusteCorteMes.reduce((s, x) => s + x, 0))}</tr>`;
 
   // 28/09/2026: o saldo final soma a XP (regra do dono: fora do Fluxo projetado, pode entrar
   // nos demais calculos) — o rotulo diz, e as linhas logo abaixo separam em conta x aplicado.
@@ -8118,7 +8168,8 @@ function projCalc(unidade) {
   const partida = [];   // de que contas sai o caixa de partida (o bloco Saldo dia a dia mostra)
   (DFC_CONTAS_RAW || []).forEach(c => {
     const a = ancoraPorConta[c.conta];
-    const s = a ? Number(a.saldo_banco) : Number(c.saldo_inicial) + (movTotal[c.conta] || 0);
+    const k = a ? null : ajusteCorte(c.conta, c.saldo_inicial, movTotal[c.conta]);   // sem OFX: cofre pela trava do corte (07/11/2026)
+    const s = a ? Number(a.saldo_banco) : Number(c.saldo_inicial) + (movTotal[c.conta] || 0) + (k ? k.ajuste : 0);
     if (c.conta.startsWith('CREDITO')) return;   // cartao nao e caixa; a fatura a vencer ja vem em PROJ_PAGAR
     if (unidade && c.unidade !== unidade) return;   // por loja: so as contas dela
     if (PROJ_FORA_CAIXA.includes(c.conta)) investido += s;
