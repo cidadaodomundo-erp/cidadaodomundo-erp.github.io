@@ -1,7 +1,7 @@
 // SIMULAÇÃO DO MENU NOVO (dono, sáb 07/11/2026 02:11: "sim, pede a simulação pro Telas"; 02:13: "eu vou aprovando vendo as telas").
 // Vale SÓ com sistema.html?menu=proposta — sem o parâmetro, todo mundo segue com o menu de hoje (casca/modulos.js).
 // Base: artefato "Reorganização do Menu" (05/11). Nesta etapa só muda grupo, ordem e nome; as JUNÇÕES aparecem como itens
-// vizinhos (↳) no grupo certo, sem refazer tela. "Sai do menu" fica num grupo no fim, para ver o que some.
+// vizinhos ("· junta …") no grupo certo, sem refazer tela. "Sai do menu" fica num grupo no fim, para ver o que some.
 // Só vira oficial com o "pode" do dono: aí este arquivo passa a ser o casca/modulos.js.
 (function () {
   let pedido = '';
@@ -10,13 +10,13 @@
   window.CASCA_PROPOSTA = {
     // nome novo de tela (só na simulação)
     rotulos: {
-      estasemana: '↳ Esta semana (vai para dentro da Hoje)',
-      fechamento: '↳ Fechamento do mês (vira aba do Placar)',
-      contestacoes: '↳ Contestações (vira aba de Cancelamentos)',
+      estasemana: 'Esta semana · junta na Hoje',
+      fechamento: 'Fechamento do mês · junta no Placar',
+      contestacoes: 'Contestações · junta em Cancelamentos',
       resumo: 'Resumo do iFood',
       cardapio: 'Desempenho do cardápio',
       logfin: 'Motoboys · Financeiro da logística',
-      macertos: '↳ Motoboys · Acertos (junta com o de cima)',
+      macertos: 'Motoboys · Acertos (junta com o de cima)',
       reembolsos: 'Reembolsos (sai do menu)',
     },
     // telas que hoje não estão no menu e entram na simulação
