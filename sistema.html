@@ -408,6 +408,8 @@ const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
 // 07/11/2026: a Minha agenda também (até a agenda de cada pessoa ir ao ar, com o "manda" do dono)
 const SO_DONO = new Set(['atividades', 'agenda']);
+// 07/11/2026 (dono 03:59): a Minha agenda também abre para quem vê a agenda da equipe (agenda_quem_ve_equipe: o Fabio)
+let VE_EQUIPE = null;
 const EMAIL_DONO = 'neto@cidadaodomundo.com.br';
 function ehDono() { return String((sessao() || {}).email || '').toLowerCase() === EMAIL_DONO; }
 let VE_GESTAO = null;
@@ -416,7 +418,7 @@ function visivel(chave) {
   if (!it) return false;
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
-  if (SO_DONO.has(chave) && !ehDono()) return false;
+  if (SO_DONO.has(chave) && !ehDono() && !(chave === 'agenda' && VE_EQUIPE === true)) return false;
   if (!PODE) return true;
   if (it.link) return false;                     // atalhos também somem para acesso restrito (igual ao painel)
   return PODE.includes(chave);
@@ -740,6 +742,13 @@ async function carregarVePessoal() {
     return r.ok ? (await r.json()) === true : null;
   } catch (e) { return null; }
 }
+async function carregarVeEquipe() {
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/agenda_ve_equipe', {
+      method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: '{}' });
+    return r.ok ? (await r.json()) === true : null;
+  } catch (e) { return null; }
+}
 async function carregarVeGestao() {
   try {
     const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/tr_meu_papel', {
@@ -786,7 +795,7 @@ async function carregarSinalAgenda() {
 
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
-  [PODE, DESC, , VE_PESSOAL, VE_GESTAO] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao()]);
+  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');

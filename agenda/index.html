@@ -75,8 +75,12 @@ async function entrarAgenda() {
   // 07/11/2026 (dono 03:11): cada login tem a sua agenda (minha_agenda). Fica escondida da equipe até o "manda" do dono na
   // mensagem do Avisos (AGENDA_TODOS); até lá o dono confere a de cada um pelo "ver como".
   if (!souODono()) {
-    if (!AGENDA_TODOS) { alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">A sua agenda chega em breve.</div>'; return; }
-    return agPessoaEntrar(null);
+    // 07/11/2026 (dono 03:59): o Fabio vê a agenda da equipe (só leitura), nunca o "Depende de você" do dono
+    if (AGP.veEquipe === null) { const r = await trRpcSeguro('agenda_ve_equipe', {}); AGP.veEquipe = r.ok ? (await r.json()) === true : false; }
+    if (AGENDA_TODOS) await agPessoaEntrar(null);
+    else alvo.innerHTML = '<h2>Minha agenda</h2>' + (AGP.veEquipe ? '' : '<div class="contexto">A sua agenda chega em breve.</div>');
+    if (AGP.veEquipe) agEquipeMontar();
+    return;
   }
   alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
@@ -199,7 +203,7 @@ async function agFeito(id) {
 // "abrir" leva à tela da atividade e registra que a pessoa abriu. O dono vê a de cada um pelo "ver como" (só leitura).
 // =====================================================================================================================
 const AGENDA_TODOS = false;   // liga com o "manda" do dono na mensagem do Avisos (aí também sai do SO_DONO da casca)
-const AGP = { linhas: [], verComo: null, form: null, pessoas: null };
+const AGP = { linhas: [], verComo: null, form: null, pessoas: null, veEquipe: null };
 const AG_ESTADO = { 'A fazer': '', 'Atrasada': 'atraso', 'Travada': 'atraso', 'Mais tempo': '', 'Pediu ajuda': 'alerta', 'Concluí': 'feito' };
 const AG_ORDEM = ['Travada', 'Atrasada', 'Pediu ajuda', 'A fazer', 'Mais tempo', 'Concluí'];
 const agHm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
@@ -295,25 +299,34 @@ function agPessoaAjuda(id) {
 // a parte do dono: a agenda de cada pessoa da equipe, como ela vai ver (só leitura)
 async function agEquipeMontar() {
   const alvo = document.getElementById('view-agenda');
-  if (!souODono() || !alvo) return;
+  if (!alvo || !(souODono() || AGP.veEquipe)) return;
   let box = document.getElementById('agEquipe');
   if (!box) { box = document.createElement('div'); box.id = 'agEquipe'; box.className = 'ag-eq'; alvo.appendChild(box); }
   if (!AGP.pessoas) { const r = await trRpcSeguro('agenda_pessoas', {}); AGP.pessoas = r.ok ? await r.json() : []; }
   const P = AGP.pessoas || [];
-  box.innerHTML = `<div class="ag-dia" style="margin-top:0;">Agenda da equipe · ver como <span class="f" style="font-weight:400;font-size:11px;color:var(--tx-4);">ainda escondida da equipe; liga com o seu "manda" na mensagem do Avisos</span></div>
-    <select id="agVerComo" onchange="agEquipeVer(this.value)"><option value="">escolha a pessoa (${P.length})</option>${P.map((p) =>
-      `<option value="${agE(p.email)}"${p.email === AGP.verComo ? ' selected' : ''}>${agE(p.pessoa || p.email)} · ${p.abertas} ${p.abertas === 1 ? 'atividade' : 'atividades'}${p.atrasadas ? ` · ${p.atrasadas} atrasada${p.atrasadas === 1 ? '' : 's'}` : ''}</option>`).join('')}</select>
+  // 07/11/2026 (dono 03:59): o quadro da equipe — uma linha por pessoa; clicar abre a agenda dela como ela vê
+  const n = (v, cor) => Number(v) ? `<b style="color:${cor};">${Number(v)}</b>` : '<span style="color:var(--tx-5);">–</span>';
+  box.innerHTML = `<div class="ag-bloco" style="margin-top:0;">Agenda da equipe <span class="f">· clique na pessoa para ver a agenda dela, como ela vê${AGENDA_TODOS ? '' : ' (ainda escondida da equipe)'}</span></div>
+    ${P.length ? `<div id="tabelaAgEquipe"><table><thead><tr><th>Pessoa</th><th>Atividades</th><th>Atrasadas</th><th>Para hoje</th><th>Pediu mais tempo</th><th>Pediu ajuda</th><th>Travadas</th><th>Concluiu</th></tr></thead><tbody>
+      ${P.map((p) => `<tr style="cursor:pointer;${p.email === AGP.verComo ? 'background:var(--surface-2);' : ''}" onclick="agEquipeVer('${agE(p.email)}')">
+        <td><b>${agE(p.pessoa || p.email)}</b></td><td>${Number(p.abertas)}</td><td>${n(p.atrasadas, 'var(--farol-fora)')}</td><td>${n(p.hoje, 'var(--tx-1)')}</td>
+        <td>${n(p.mais_tempo, 'var(--farol-perto)')}</td><td>${n(p.pediu_ajuda, 'var(--farol-perto)')}</td><td>${n(p.travadas, 'var(--farol-fora)')}</td><td>${n(p.concluidas, 'var(--farol-ok)')}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="contexto">Ninguém da equipe tem atividade aberta nos próximos 7 dias.</div>'}
     <div id="agEquipeLista"></div>`;
-  if (AGP.verComo) agEquipeVer(AGP.verComo);
+  if (AGP.verComo) { const e = AGP.verComo; AGP.verComo = null; agEquipeVer(e); }   // redesenho: reabre a mesma pessoa
 }
 async function agEquipeVer(email) {
   const lista = document.getElementById('agEquipeLista'); if (!lista) return;
-  AGP.verComo = email || null;
-  if (!email) { lista.innerHTML = ''; return; }
+  AGP.verComo = AGP.verComo === email ? null : (email || null);   // clicar de novo fecha
+  document.querySelectorAll('#tabelaAgEquipe tbody tr').forEach((tr) => { tr.style.background = tr.getAttribute('onclick').includes(`'${AGP.verComo}'`) ? 'var(--surface-2)' : ''; });
+  if (!AGP.verComo) { lista.innerHTML = ''; return; }
+  email = AGP.verComo;
+  const pes = (AGP.pessoas || []).find((p) => p.email === email) || {};
   lista.innerHTML = '<div class="contexto">Carregando…</div>';
   try {
     const L = await agPessoaLer(email);
-    lista.innerHTML = L.length ? agPessoaHtml(L, true) : '<div class="contexto">Nenhuma atividade aberta para esta pessoa nos próximos 7 dias.</div>';
+    lista.innerHTML = `<div class="ag-bloco">Agenda de ${agE(pes.pessoa || email)} <span class="f">· só leitura: os botões são dela</span></div>`
+      + (L.length ? agPessoaHtml(L, true) : '<div class="contexto">Nenhuma atividade aberta para esta pessoa nos próximos 7 dias.</div>');
   } catch (e) { lista.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ ${agE(e.message)}</div>`; }
 }
 
