@@ -18,7 +18,7 @@
     position:sticky; top:0; align-self:flex-start; max-height:100vh; overflow-y:auto;
   }
   .sidebar-btn {
-    background:none; border:none; color:#c3c2b7; font-size:13.5px; font-weight:700;
+    background:none; border:none; color:var(--tx-2); font-size:13.5px; font-weight:700;
     text-align:left; padding:9px 12px; cursor:pointer; border-radius:10px;
     font-family:inherit; display:flex; align-items:center; gap:9px;
   }
@@ -77,30 +77,30 @@
   .header-row { display:flex; align-items:center; justify-content:center; gap:14px; margin:0 0 6px 0; }
   .header-logo { height:64px; width:64px; border-radius:14px; object-fit:cover; flex-shrink:0; }
   h1 { color:var(--tx-1); font-size:28px; font-weight:800; margin:0; }
-  .subtitle { color:#a5a49a; font-size:13px; margin-bottom:22px; }
+  .subtitle { color:var(--tx-3); font-size:13px; margin-bottom:22px; }
 
   .filters { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:12px; }
-  .filters label { font-size:12px; color:#a5a49a; display:flex; gap:6px; align-items:center; }
+  .filters label { font-size:12px; color:var(--tx-3); display:flex; gap:6px; align-items:center; }
   .filters input[type=date], .filters select {
     background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); border-radius:8px; padding:6px 8px; font-size:12.5px;
   }
   .filters button {
-    background:var(--surface-2); border:1px solid var(--line); color:#c3c2b7; font-size:12px; font-weight:700;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--tx-2); font-size:12px; font-weight:700;
     padding:7px 12px; border-radius:8px; cursor:pointer;
   }
   .filters button:hover { border-color:var(--brand); color:var(--tx-1); }
 
   details.lojadrop { margin-bottom:20px; border:1px solid var(--line); border-radius:10px; padding:8px 12px; max-width:360px; background:var(--surface); }
-  details.lojadrop summary { cursor:pointer; font-size:12.5px; color:#c3c2b7; }
+  details.lojadrop summary { cursor:pointer; font-size:12.5px; color:var(--tx-2); }
   .loja-options { margin-top:10px; display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
-  .loja-options label { font-size:12.5px; color:#c3c2b7; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .loja-options label { font-size:12.5px; color:var(--tx-2); display:flex; align-items:center; gap:6px; cursor:pointer; }
 
   details.filtro-dropdown { margin-bottom:0; max-width:220px; padding:6px 10px; }
   details.filtro-dropdown .loja-options { min-width:200px; }
 
   .topnav { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-bottom:20px; }
   .navbtn {
-    background:var(--surface-2); border:1px solid var(--line); color:#c3c2b7; font-size:12.5px; font-weight:700;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--tx-2); font-size:12.5px; font-weight:700;
     padding:8px 14px; border-radius:8px; cursor:pointer; transition: all .15s ease;
   }
   .navbtn:hover { border-color:var(--marca-laranja); color:var(--tx-1); }
@@ -109,7 +109,7 @@
   /* Titulos em BRANCO desde 16/08/2026 (pedido do dono: o vermelho pesava a
      leitura). O vermelho segue como acento em botoes ativos e no farol. */
   .section-label { color:var(--tx-1); font-size:17px; font-weight:700; margin-top:24px; margin-bottom:12px; padding-top:20px; border-top:1px solid var(--line); text-align:center; text-transform:uppercase; letter-spacing:.8px; }
-  .caption-label { color:#a5a49a; font-size:11px; margin:14px 0 12px 0; }
+  .caption-label { color:var(--tx-3); font-size:11px; margin:14px 0 12px 0; }
 
   .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:8px; }
   /* 6 cards em 2 linhas de 3 (fechamento da DRE): sem card orfao sozinho na 2a linha */
@@ -118,17 +118,17 @@
   .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; text-align:center; }
   .card-lbl { color:#8a897e; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
   .card-val { color:var(--tx-1); font-size:21px; font-weight:800; }
-  .card-pct { color:#a5a49a; font-size:15px; font-weight:600; margin-top:2px; }
+  .card-pct { color:var(--tx-3); font-size:15px; font-weight:600; margin-top:2px; }
   .card-delta { font-size:10.5px; font-weight:600; margin-top:6px; letter-spacing:.2px; }
 
   .periodo-presets { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-bottom:10px; }
-  .preset-btn { background:var(--surface-2); border:1px solid var(--line); color:#c3c2b7; font-size:12px; font-weight:700;
+  .preset-btn { background:var(--surface-2); border:1px solid var(--line); color:var(--tx-2); font-size:12px; font-weight:700;
                 padding:7px 12px; border-radius:8px; cursor:pointer; font-family:inherit; }
   .preset-btn:hover { border-color:var(--marca-laranja); color:var(--tx-1); }
   .preset-btn.active { background:var(--surface-2); color:var(--tx-1); border-color:var(--marca-amarelo); }
 
   .contexto { background:var(--zebra); border:1px solid var(--line); border-radius:10px; padding:10px 16px;
-              margin:16px 0 4px; text-align:center; color:#a5a49a; font-size:12.5px; line-height:1.7; }
+              margin:16px 0 4px; text-align:center; color:var(--tx-3); font-size:12.5px; line-height:1.7; }
   .contexto b { color:var(--tx-1); }
 
   .hero { background:var(--surface); border:1px solid #3fb950; border-radius:16px;
@@ -136,7 +136,7 @@
   .hero-lbl { color:#8a897e; font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
   .hero-val { color:var(--tx-1); font-size:46px; font-weight:bold; line-height:1.1; margin:6px 0 4px; }
   .hero-delta { font-size:14px; font-weight:bold; }
-  .hero-frase { color:#a5a49a; font-size:13px; line-height:1.6; margin-top:12px;
+  .hero-frase { color:var(--tx-3); font-size:13px; line-height:1.6; margin-top:12px;
                 border-top:1px solid var(--line); padding-top:12px; }
   @media (max-width: 640px) { .hero-val { font-size:34px; } }
   /* Borda COMPLETA de 1px, igual ao cardFarol — a borda so de um lado era da
@@ -153,12 +153,12 @@
 
   .footer { margin-top:30px; color:var(--tx-5); font-size:9.5px; line-height:1.6; border-top:1px solid var(--surface-2); padding-top:16px; }
 
-  #loadingMsg { color:#a5a49a; font-size:13px; padding:20px 0; }
+  #loadingMsg { color:var(--tx-3); font-size:13px; padding:20px 0; }
   #erroMsg { color:#ff6b6b; font-size:13px; padding:20px 0; }
 
   .chart-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap:16px; margin-bottom:8px; }
   .chart-box { position:relative; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px; height:280px; display:flex; flex-direction:column; }
-  .chart-title { color:#a5a49a; font-size:11px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .chart-title { color:var(--tx-3); font-size:11px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
   .chart-box .chart-canvas-wrap { position:relative; flex:1; }
 
   /* GRADE PADRAO DAS TABELAS — vale para qualquer <div id="tabelaAlgumaCoisa">.
@@ -202,7 +202,7 @@
   .hoje-fila-linha { font-size:13px; padding:5px 0; border-top:1px solid var(--line); color:var(--tx-2); }
   .hoje-fila-linha:hover { color:var(--tx-1); }
   div[id^="tabela"] th:first-child, div[id^="tabela"] td:first-child { text-align:left; white-space:normal; }
-  div[id^="tabela"] th { background:var(--surface-2); color:#a5a49a; font-weight:bold; font-size:11px; text-transform:uppercase; }
+  div[id^="tabela"] th { background:var(--surface-2); color:var(--tx-3); font-weight:bold; font-size:11px; text-transform:uppercase; }
   div[id^="tabela"] tr:nth-child(even) { background:var(--zebra); }
   /* quadro de pagar contas: linha baixa porque sao 15 contas e a Hellen
      precisa ver todas sem rolar antes de decidir o que pagar */
@@ -219,50 +219,50 @@
   #tabelaConfereFoto th:nth-child(2), #tabelaConfereFoto td:nth-child(2) { text-align:left; white-space:normal; }
   /* tabelas hierarquicas (blocos/grupos/linhas) pintam o fundo por conta propria */
   /* ===== Fechamento do mes / A semana (02/09/2026): em portugues, para leigo ===== */
-  .fx-rotulo { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#a5a49a; }
+  .fx-rotulo { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--tx-3); }
   .fx-cab-topo { display:flex; justify-content:space-between; align-items:flex-end; gap:14px; flex-wrap:wrap; margin:14px 0 6px; }
   .fx-h1 { font-size:26px; font-weight:800; letter-spacing:-.02em; margin:2px 0 0; color:var(--tx-1); }
-  .fx-sub { color:#a5a49a; font-size:14px; max-width:64ch; margin-top:4px; }
+  .fx-sub { color:var(--tx-3); font-size:14px; max-width:64ch; margin-top:4px; }
   .fx-seg { display:inline-flex; flex-wrap:wrap; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:3px; }
-  .fx-seg button { border:0; background:transparent; color:#a5a49a; font-weight:600; padding:6px 11px; border-radius:6px; cursor:pointer; font-size:12px; }
+  .fx-seg button { border:0; background:transparent; color:var(--tx-3); font-weight:600; padding:6px 11px; border-radius:6px; cursor:pointer; font-size:12px; }
   .fx-seg button.ativo { background:var(--surface-2); color:var(--tx-1); box-shadow:0 1px 2px rgba(0,0,0,.4); }
   .fx-secao { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; border-bottom:2px solid var(--brand); padding-bottom:5px; margin:30px 0 10px; }
-  .fx-secao h3 { font-size:18px; margin:0; color:var(--tx-1); } .fx-secao span { font-size:12.5px; color:#a5a49a; }
+  .fx-secao h3 { font-size:18px; margin:0; color:var(--tx-1); } .fx-secao span { font-size:12.5px; color:var(--tx-3); }
   .fx-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px; }
   .fx-tile, .fx-caixa, .fx-destaque, .fx-cem, .fx-frases, .fx-tabela { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
   .fx-valor { font-size:28px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:2px; line-height:1.1; color:var(--tx-1); }
   .fx-valor.neg, .fx-valor-g.neg { color:#ff6b6b; }
   .fx-valor-g { font-size:36px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.05; color:var(--tx-1); }
   .fx-var { font-size:14px; margin-top:6px; color:var(--tx-creme); } .fx-var b { font-weight:700; }
-  .fx-extra { font-size:12.5px; color:#a5a49a; margin-top:2px; }
-  .fx-lista { margin:8px 0 0; padding:0; list-style:none; font-size:13px; color:#a5a49a; }
+  .fx-extra { font-size:12.5px; color:var(--tx-3); margin-top:2px; }
+  .fx-lista { margin:8px 0 0; padding:0; list-style:none; font-size:13px; color:var(--tx-3); }
   .fx-lista li { display:flex; justify-content:space-between; gap:8px; border-top:1px dashed var(--line); padding:3px 0; }
   .fx-spark { margin-top:10px; } .fx-spark svg { display:block; width:100%; height:52px; overflow:visible; }
-  .fx-eixo { display:flex; justify-content:space-between; font-size:10.5px; color:#a5a49a; letter-spacing:.04em; margin-top:2px; }
+  .fx-eixo { display:flex; justify-content:space-between; font-size:10.5px; color:var(--tx-3); letter-spacing:.04em; margin-top:2px; }
   .fx-pill { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.05em; padding:2px 9px; border-radius:99px; text-transform:uppercase; }
-  .fx-pill.ok { background:#1f3a22; color:#3fb950; } .fx-pill.atencao { background:#3a2f16; color:#f5a623; } .fx-pill.fora { background:#42221f; color:#ff6b6b; } .fx-pill.neutro { background:var(--surface-2); color:#a5a49a; }
+  .fx-pill.ok { background:#1f3a22; color:#3fb950; } .fx-pill.atencao { background:#3a2f16; color:#f5a623; } .fx-pill.fora { background:#42221f; color:#ff6b6b; } .fx-pill.neutro { background:var(--surface-2); color:var(--tx-3); }
   .fx-destaque { border-left:6px solid var(--brand); } .fx-destaque p { margin:8px 0 0; max-width:52ch; color:var(--tx-creme); }
   .fx-duas { display:grid; grid-template-columns:1fr; gap:10px; } @media (min-width:900px) { .fx-duas { grid-template-columns:1.1fr 1fr; } }
   .fx-cem .fx-linha { display:grid; grid-template-columns:minmax(150px,1.2fr) 64px 3fr 150px; gap:10px; align-items:center; padding:7px 0; border-bottom:1px dashed var(--line); }
   .fx-cem .fx-linha:last-child { border-bottom:0; }
-  .fx-nome { font-weight:600; color:var(--tx-1); } .fx-nome small { display:block; font-weight:400; color:#a5a49a; font-size:12px; }
+  .fx-nome { font-weight:600; color:var(--tx-1); } .fx-nome small { display:block; font-weight:400; color:var(--tx-3); font-size:12px; }
   .fx-num { font-weight:800; font-size:20px; text-align:right; font-variant-numeric:tabular-nums; color:var(--tx-1); }
   .fx-barra { height:12px; background:var(--surface-2); border-radius:4px; overflow:hidden; } .fx-barra i { display:block; height:100%; background:var(--brand); opacity:.85; border-radius:4px; }
   .fx-linha.sobrou .fx-barra i { background:#3fb950; } .fx-linha.sobrou.atencao .fx-barra i { background:#f5a623; } .fx-linha.sobrou.fora .fx-barra i { background:#ff6b6b; }
-  .fx-jul { font-size:12px; color:#a5a49a; text-align:right; white-space:nowrap; }
+  .fx-jul { font-size:12px; color:var(--tx-3); text-align:right; white-space:nowrap; }
   @media (max-width:640px) { .fx-cem .fx-linha { grid-template-columns:1fr 56px; } .fx-barra, .fx-jul { grid-column:1 / -1; } .fx-jul { text-align:left; } }
   .fx-caixa h4 { margin:0 0 6px; font-size:15px; color:var(--tx-1); } .fx-caixa ul { margin:6px 0 0; padding:0; list-style:none; }
   .fx-caixa li { display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-bottom:1px dashed var(--line); font-size:13.5px; color:var(--tx-creme); }
-  .fx-caixa li b { font-variant-numeric:tabular-nums; white-space:nowrap; } .fx-caixa li span small { display:block; color:#a5a49a; font-size:11.5px; }
+  .fx-caixa li b { font-variant-numeric:tabular-nums; white-space:nowrap; } .fx-caixa li span small { display:block; color:var(--tx-3); font-size:11.5px; }
   .fx-caixa li.res { border-bottom:0; font-weight:800; font-size:16px; padding-top:8px; } .fx-caixa li.res.neg b { color:#ff6b6b; } .fx-caixa li.res.pos b { color:#3fb950; }
   .fx-mandar { margin-top:10px; padding:8px 10px; border-radius:6px; background:var(--surface-2); font-size:13.5px; color:var(--tx-creme); }
   .fx-frases { padding:4px 16px; } .fx-frases p { margin:0; padding:10px 0; border-bottom:1px dashed var(--line); font-size:15.5px; max-width:72ch; color:var(--tx-creme); } .fx-frases p:last-child { border-bottom:0; }
   .fx-tabela { overflow-x:auto; padding:6px 10px; } .fx-tabela table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  .fx-tabela th { font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:#a5a49a; text-align:right; padding:7px 9px; border-bottom:1px solid var(--line); }
+  .fx-tabela th { font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--tx-3); text-align:right; padding:7px 9px; border-bottom:1px solid var(--line); }
   .fx-tabela th:first-child, .fx-tabela th.esq { text-align:left; }
   .fx-tabela td { padding:6px 9px; border-bottom:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--tx-creme); }
-  .fx-tabela td:first-child { text-align:left; } .fx-tabela td.esq { text-align:left; white-space:normal; color:#a5a49a; } .fx-tabela tr.tot td { font-weight:700; border-top:2px solid var(--line-2); }
-  .fx-nota { font-size:12.5px; color:#a5a49a; margin-top:8px; max-width:80ch; }
+  .fx-tabela td:first-child { text-align:left; } .fx-tabela td.esq { text-align:left; white-space:normal; color:var(--tx-3); } .fx-tabela tr.tot td { font-weight:700; border-top:2px solid var(--line-2); }
+  .fx-nota { font-size:12.5px; color:var(--tx-3); margin-top:8px; max-width:80ch; }
   .fx-rodape { margin-top:26px; font-size:12px; color:#8a897e; border-top:1px solid var(--line); padding-top:10px; max-width:85ch; }
   #tabelaDFC tr, #tabelaDRE tr, #tabelaDespesas tr { background:transparent; --linha-fundo:var(--fundo-tabela, var(--bg)); }
 
@@ -444,7 +444,7 @@
   .telas-tab td:first-child { color:#f2f0e9; font-weight:600; white-space:nowrap; }
   .telas-grupo td { background:var(--zebra); color:#8a897e; font-size:10px; font-weight:700;
     letter-spacing:.8px; text-transform:uppercase; padding:7px 8px; }
-  .telas-campo { width:100%; box-sizing:border-box; background:transparent; color:#c3c2b7;
+  .telas-campo { width:100%; box-sizing:border-box; background:transparent; color:var(--tx-2);
     border:1px solid transparent; border-radius:5px; padding:3px 5px; font:inherit;
     font-size:11.5px; line-height:1.4; resize:vertical; }
   .telas-campo:hover { border-color:var(--line); }
@@ -468,7 +468,7 @@
   .dre-canal td:nth-child(2), .dre-canal td:nth-child(3),
   .dre-canal th:nth-child(2), .dre-canal th:nth-child(3) { text-align:right; white-space:nowrap; }
   .dre-canal .dre-tipo td { color:#f2f0e9; font-weight:600; padding-top:10px; }
-  .dre-canal .dre-item td { color:#a5a49a; font-size:12.5px; padding-top:2px; padding-bottom:2px; }
+  .dre-canal .dre-item td { color:var(--tx-3); font-size:12.5px; padding-top:2px; padding-bottom:2px; }
   .dre-canal .dre-item td:first-child { padding-left:22px; }
   .dre-canal .dre-soma td { color:var(--tx-1); font-weight:700; border-top:1px solid var(--line); }
   .dre-canal .dre-forte td { color:var(--tx-1); font-weight:700; border-top:1px solid var(--tx-5);
@@ -559,7 +559,7 @@
   #tabelaVendasCanal th:first-child, #tabelaVendasCanal td:first-child, #tabelaVendasLojas th:first-child, #tabelaVendasLojas td:first-child,
   #tabelaFunil th:first-child, #tabelaFunil td:first-child, #tabelaItens th:first-child, #tabelaItens td:first-child,
   #tabelaCompl th:first-child, #tabelaCompl td:first-child, #tabelaClientesLojas th:first-child, #tabelaClientesLojas td:first-child { text-align:left; white-space:normal; }
-  #tabelaVendasCanal th, #tabelaVendasLojas th, #tabelaFunil th, #tabelaItens th, #tabelaCompl th, #tabelaClientesLojas th { background:var(--surface-2); color:#a5a49a; font-weight:bold; font-size:11px; text-transform:uppercase; }
+  #tabelaVendasCanal th, #tabelaVendasLojas th, #tabelaFunil th, #tabelaItens th, #tabelaCompl th, #tabelaClientesLojas th { background:var(--surface-2); color:var(--tx-3); font-weight:bold; font-size:11px; text-transform:uppercase; }
   #tabelaVendasCanal tr:nth-child(even), #tabelaVendasLojas tr:nth-child(even), #tabelaFunil tr:nth-child(even),
   #tabelaItens tr:nth-child(even), #tabelaCompl tr:nth-child(even), #tabelaClientesLojas tr:nth-child(even) { background:var(--zebra); }
 
@@ -567,7 +567,7 @@
   #extratoFin table { border-collapse:collapse; width:100%; font-size:13px; }
   #extratoFin th, #extratoFin td { border:1px solid var(--line); padding:7px 12px; text-align:right; white-space:nowrap; }
   #extratoFin th:first-child, #extratoFin td:first-child { text-align:left; white-space:normal; }
-  #extratoFin th { background:var(--surface-2); color:#a5a49a; font-weight:bold; font-size:11px; text-transform:uppercase; }
+  #extratoFin th { background:var(--surface-2); color:var(--tx-3); font-weight:bold; font-size:11px; text-transform:uppercase; }
   #extratoFin tr.sub td { background:var(--surface-2); border-top:2px solid var(--line-2); }
   /* linha final no contorno dourado, mesmo padrao de DFC/DRE (16/08 a noite) */
   #extratoFin tr.liq { --linha-fundo:#111110; }
@@ -576,14 +576,14 @@
   #extratoFin tr.liq td:last-child { border-right:2px solid var(--marca-laranja); }
 
   details.detalhes-extra { margin-top:22px; border:1px solid var(--line); border-radius:10px; padding:14px 18px; background:var(--zebra); }
-  details.detalhes-extra summary { cursor:pointer; color:#a5a49a; font-size:12.5px; font-weight:bold; }
+  details.detalhes-extra summary { cursor:pointer; color:var(--tx-3); font-size:12.5px; font-weight:bold; }
   details.detalhes-extra summary:hover { color:var(--brand); }
 
   #tabelaLojasResumo { overflow-x:auto; max-width:100%; }
   #tabelaLojasResumo table { border-collapse:collapse; width:100%; font-size:12.5px; }
   #tabelaLojasResumo th, #tabelaLojasResumo td { border:1px solid var(--line); padding:6px 10px; text-align:right; white-space:nowrap; }
   #tabelaLojasResumo th:first-child, #tabelaLojasResumo td:first-child { text-align:left; white-space:normal; }
-  #tabelaLojasResumo th { background:var(--surface-2); color:#a5a49a; font-weight:bold; font-size:11px; text-transform:uppercase; }
+  #tabelaLojasResumo th { background:var(--surface-2); color:var(--tx-3); font-weight:bold; font-size:11px; text-transform:uppercase; }
   #tabelaLojasResumo tr:nth-child(even) { background:var(--zebra); }
 
   /* modulo Fluxo de Caixa (DFC) — tabela com blocos expansiveis */
@@ -594,7 +594,7 @@
   #tabelaDFC table td { vertical-align:top; }
   #tabelaDFC th, #tabelaDFC td { border:1px solid var(--line); padding:5px 10px; text-align:right; white-space:nowrap; }
   #tabelaDFC th:first-child, #tabelaDFC td:first-child { text-align:left; }
-  #tabelaDFC th { background:var(--surface-2); color:#a5a49a; font-weight:bold; font-size:11px; text-transform:uppercase; }
+  #tabelaDFC th { background:var(--surface-2); color:var(--tx-3); font-weight:bold; font-size:11px; text-transform:uppercase; }
   /* 1ª coluna FIXA: o nome da linha acompanha a rolagem horizontal (DFC e DRE).
      O fundo precisa ser opaco para o numero nao passar por baixo; linhas que
      pintam o proprio fundo (bloco/grupo/resultado/saldo) vencem por
@@ -610,9 +610,9 @@
   /* negativo em soma tambem fica branco (pedido do dono, 16/08 a noite):
      o sinal de menos ja informa — cor nenhuma no DFC/DRE e' semaforo */
   #tabelaDFC tr.dfc-bloco td { background:var(--surface-2); font-weight:bold; border-top:2px solid var(--line-2); color:var(--tx-1); }
-  #tabelaDFC tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:#c3c2b7; }
+  #tabelaDFC tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:var(--tx-2); }
   #tabelaDFC tr.dfc-grupo td:first-child { padding-left:22px; }
-  #tabelaDFC tr.dfc-linha td { color:#a5a49a; }
+  #tabelaDFC tr.dfc-linha td { color:var(--tx-3); }
   #tabelaDFC tr.dfc-linha td:first-child { padding-left:40px; }
   /* somas do DFC no mesmo contorno dourado da DRE (16/08 a noite) */
   #tabelaDFC tr.dfc-resultado td { background:var(--bg); color:var(--tx-1); font-weight:bold; border-top:2px solid var(--marca-amarelo); border-bottom:2px solid var(--marca-laranja); }
@@ -620,7 +620,7 @@
   #tabelaDFC tr.dfc-resultado td:last-child { border-right:2px solid var(--marca-laranja); }
   #tabelaDFC tr.dfc-saldo td { background:#0f1a2b; font-weight:bold; border-top:2px solid var(--info); }
   #tabelaDFC tr.dfc-saldo td:first-child { color:var(--info); }
-  #tabelaDFC tr.dfc-conta td { color:#a5a49a; }
+  #tabelaDFC tr.dfc-conta td { color:var(--tx-3); }
   #tabelaDFC tr.dfc-conta td:first-child { padding-left:40px; }
   /* conferência de saldo com o extrato (03/09/2026) */
   #tabelaDFC .dfc-conf { font-size:11px; margin-left:6px; white-space:nowrap; }
@@ -635,9 +635,9 @@
   /* DRE: mesma familia visual do DFC, com linhas de separacao e a sub-linha AV/AH */
   #tabelaDRE table td { border-bottom:1px solid var(--surface-2); vertical-align:top; }
   #tabelaDRE tr.dfc-bloco td { background:var(--surface-2); font-weight:bold; border-top:2px solid var(--line-2); color:var(--tx-1); }
-  #tabelaDRE tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:#c3c2b7; }
+  #tabelaDRE tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:var(--tx-2); }
   #tabelaDRE tr.dfc-grupo td:first-child { padding-left:22px; }
-  #tabelaDRE tr.dfc-linha td { color:#a5a49a; }
+  #tabelaDRE tr.dfc-linha td { color:var(--tx-3); }
   #tabelaDRE tr.dfc-linha td:first-child { padding-left:40px; }
   /* linhas de SOMA "(=)": CONTORNO na cor do letreiro (teste do dono, 16/08 a
      noite — a versao preenchida pesava). Fundo escuro, texto claro, moldura
@@ -651,7 +651,7 @@
   #tabelaDRE td:first-child { text-transform:uppercase; }
   #tabelaDRE td:first-child .dre-sub, #tabelaDRE td:first-child .meta-pill { text-transform:none; }
   /* linha COM meta ganha um selo visivel — sem ele, meta passava despercebida */
-  .meta-pill { display:inline-block; font-size:10px; font-weight:600; color:#c3c2b7; background:var(--bg);
+  .meta-pill { display:inline-block; font-size:10px; font-weight:600; color:var(--tx-2); background:var(--bg);
                border:1px solid var(--tx-6); border-radius:20px; padding:1px 8px; margin-top:4px; white-space:nowrap; }
   #tabelaDRE tr.dfc-saldo td { background:#0f1a2b; font-weight:bold; border-top:2px solid var(--info); }
   #tabelaDRE tr.dfc-saldo td:first-child { color:var(--info); }
@@ -660,7 +660,7 @@
   .dre-sub { font-size:10px; color:#8a897e; white-space:nowrap; margin-top:2px; font-weight:normal; }
   /* selo do mes corrente no cabecalho (DFC/DRE): numeros ainda em formacao */
   .th-emcurso { font-size:9px; color:#8a897e; font-weight:normal; text-transform:none; letter-spacing:0; }
-  .preset-sel { background:var(--surface-2); color:#c3c2b7; border:1px solid var(--line); border-radius:8px;
+  .preset-sel { background:var(--surface-2); color:var(--tx-2); border:1px solid var(--line); border-radius:8px;
                 padding:6px 8px; font-family:inherit; font-size:12.5px; cursor:pointer; }
   .dre-sub b { font-weight:600; }
   .dre-farol { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:3px; vertical-align:middle; }
@@ -713,7 +713,7 @@
      parâmetro nada muda. Mesmo jeito do .papel: só redefine os tokens, com as cores do .papel já aprovadas (DRE, Fechamento). */
   html.tema-proposta { --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --zebra:#f6f5f1;
     --line:#ebe9e3; --line-2:#dcdad3;
-    --tx-1:#1e2226; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c; --tx-5:#7d858c; --tx-6:#a5a49a; --tx-creme:#1e2226;
+    --tx-1:#1e2226; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c; --tx-5:#7d858c; --tx-6:var(--tx-3); --tx-creme:#1e2226;
     --farol-ok:#1f6d3f; --farol-perto:#b26a00; --farol-fora:#b3261e; --info:#345a86; --amber-2:#b26a00;
     --th-claro:#efede6; --th-claro-tx:#1e2226; --brand-wine:#efede6; }
   /* menos peso (proposta 07/11): cartão quase da cor da página, borda fina, sem sombra, menos negrito, mais respiro */
@@ -798,9 +798,9 @@
 
   /* Analise de despesas e Conferencia da base (a grade vem do bloco padrao acima) */
   #tabelaDespesas tr.dfc-bloco td { background:var(--surface-2); font-weight:bold; border-top:2px solid var(--line-2); color:var(--tx-1); }
-  #tabelaDespesas tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:#c3c2b7; }
+  #tabelaDespesas tr.dfc-grupo td { background:var(--surface); font-weight:bold; color:var(--tx-2); }
   #tabelaDespesas tr.dfc-grupo td:first-child { padding-left:22px; }
-  #tabelaDespesas tr.dfc-linha td { color:#a5a49a; }
+  #tabelaDespesas tr.dfc-linha td { color:var(--tx-3); }
   #tabelaDespesas tr.dfc-linha td:first-child { padding-left:40px; }
   /* mesmo padrao de DFC/DRE (16/08 a noite): soma com contorno dourado */
   #tabelaDespesas tr.dfc-resultado td { background:var(--bg); color:var(--tx-1); font-weight:bold; border-top:2px solid var(--marca-amarelo); border-bottom:2px solid var(--marca-laranja); }
@@ -817,7 +817,7 @@
   .relatorio-corpo h3 { color:var(--tx-1); font-size:15px; margin:16px 0 8px; }
   .relatorio-corpo table { border-collapse:collapse; margin:10px 0; font-size:12.5px; }
   .relatorio-corpo th, .relatorio-corpo td { border:1px solid var(--line); padding:5px 10px; }
-  .relatorio-corpo th { background:var(--surface-2); color:#a5a49a; }
+  .relatorio-corpo th { background:var(--surface-2); color:var(--tx-3); }
   .relatorio-corpo ul { padding-left:22px; }
   .relatorio-corpo b { color:var(--tx-1); }
 

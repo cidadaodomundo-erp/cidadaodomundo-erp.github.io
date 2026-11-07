@@ -6427,7 +6427,9 @@ async function cpCarregar() {
     consultarTudo('vw_fin_contas_pagar?select=vencimento,conta_exibida,unidade,situacao,dias_vencida,subtipo,tipo,descricao,credito,debito,origem,id_titulo,titulo,fornecedor&order=vencimento'),
     consultarTudo('vw_fin_vencidas_status?select=vencimento,descricao,debito,data_debito_banco,achou_no_banco,aguarda_extrato').catch(() => []),
     consultarTudo('vw_fin_ultima_importacao?select=fonte,importado_em').catch(() => []),
-    projCarregar().then(() => true).catch(() => false),
+    // 07/11/2026: a projeção do fluxo (~20 consultas) NÃO segura mais a lista. Com o servidor cheio ela passava de 30 s e a
+    // tela ficava em "Carregando contas a pagar..."; agora a lista sai já, e os quadros que dependem dela entram quando ela chega
+    false,
   ]);
   const saiu = {};
   (venc || []).filter(v => v.achou_no_banco).forEach(v => { saiu[`${v.vencimento}|${Number(v.debito)}|${v.descricao || ''}`] = v.data_debito_banco; });
@@ -6445,6 +6447,12 @@ async function cpCarregar() {
          abertos: CP ? CP.abertos : new Set(),                       // grupos que a pessoa abriu
          loja: CP ? CP.loja : '',                                    // '' = Rede; vale para a tela inteira (16/10/2026)
          lidoEm: new Date(), saiposEm: impSaipos ? new Date(impSaipos.importado_em) : null, temMotor: motor };
+  const cpAgora = CP;
+  projCarregar().then(() => true).catch(() => false).then((ok) => {
+    if (!ok || CP !== cpAgora) return;
+    CP.temMotor = true;
+    if (['contaspagar', 'contasreceber'].includes(MODULO_ATUAL)) cpRender();
+  });
 }
 
 async function entrarContasPagar() {
