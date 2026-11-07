@@ -3870,7 +3870,10 @@ function fxMesCalc(mes) {
 // aqui ("o caixa das filiais entrou no Saipos em 01/08") era FALSA — o jan-jul das filiais
 // existe desde 18/08 (SAIPOS_HIST) e o saldo bate com o extrato. Quem estava errada era a
 // vw_fin_ponte_mensal, que lia a planilha (so AV). Corrigida; jan-jul agora tem as tres.
-function fxPonte(mes) { const L = fxLojas(); const rows = FX_M.ponte.filter(r => r.mes === mes && L.includes(r.unidade)); if (!rows.length || L.some(u => !rows.some(r => r.unidade === u))) return null; const s = c => rows.reduce((a, r) => a + fxN(r[c]), 0); return { res: s('resultado_apurado'), comp: s('ajuste_competencia'), inv: s('investimentos'), ret: s('retiradas'), emp: s('emprestimos'), apo: s('aportes'), rend: s('aplicacoes'), xp: s('transferencias_liquidas'), sem: s('sem_classificacao'), v: s('variacao_caixa'), rendXp: s('rendimento_ficou_na_aplicacao'), pagoXp: s('pago_direto_pela_aplicacao') }; }
+function fxPonte(mes) { const L = fxLojas(); const rows = FX_M.ponte.filter(r => r.mes === mes && L.includes(r.unidade)); if (!rows.length || L.some(u => !rows.some(r => r.unidade === u))) return null; const s = c => rows.reduce((a, r) => a + fxN(r[c]), 0); return { res: s('resultado_apurado'), comp: s('ajuste_competencia'), inv: s('investimentos'), ret: s('retiradas'), emp: s('emprestimos'), apo: s('aportes'), rend: s('aplicacoes'), xp: s('transferencias_liquidas'), sem: s('sem_classificacao'), v: s('variacao_caixa'), rendXp: s('rendimento_ficou_na_aplicacao'), pagoXp: s('pago_direto_pela_aplicacao'),
+  // 07/11/2026 (Financeiro, dinheiro-1): o ajuste da trava do corte dos cofres entra na variação no mês do corte. Enquanto a
+  // coluna não existe na view, fxN(undefined) = 0 e nada muda
+  trava: s('ajuste_trava_corte') }; }
 
 // ==================================================================
 // O PLACAR — a camada 1 da revisão dos módulos (12/09/2026)
@@ -4535,7 +4538,7 @@ function renderFechamento() {
         ? ['Transferência sem contrapartida — conferir', p.xp, 'entrou como transferência e não saiu de nenhuma outra conta: costuma ser lançamento com categoria errada']
         : ['Lucro enviado para a XP', p.xp, 'o que sobra nas lojas vai para o Itaú AV, daí para a Participações e para a XP'],
       ['Rendimento aplicações que ficou na XP', p.rendXp, 'rendeu lá dentro e não passou pelas contas do dia a dia'],
-      ['Pago direto pela XP', p.pagoXp, 'imposto, retirada ou compra paga da XP — já está nas linhas de cima'], ['Empréstimos', p.emp, ''], ['Sem classificação', p.sem, 'lançamento sem conta — deveria ser zero']].filter(([, x]) => Math.abs(x) > 0.5);
+      ['Pago direto pela XP', p.pagoXp, 'imposto, retirada ou compra paga da XP — já está nas linhas de cima'], ['Empréstimos', p.emp, ''], ['Ajuste da trava do corte', p.trava, 'cofres: o Saipos regravou caixas de antes do corte de 21/10'], ['Sem classificação', p.sem, 'lançamento sem conta — deveria ser zero']].filter(([, x]) => Math.abs(x) > 0.5);
     h += `<div class="fx-caixa"><div class="fx-rotulo">O caixa do dia a dia em ${fxMesLongo(mes)}</div><div class="fx-valor${p.v < 0 ? ' neg' : ''}">${p.v >= 0 ? 'cresceu' : 'encolheu'} ${fxMil(Math.abs(p.v))}</div><ul>${itens.map(([n, x, s2]) => `<li><span>${n}${s2 ? `<small>${s2}</small>` : ''}</span><b>${x >= 0 ? '+ ' : '− '}${fxMil(Math.abs(x))}</b></li>`).join('')}<li class="res"><span><b>= caixa do dia a dia</b><small>bancos, cofres e cartões; XP e Participações ficam de fora</small></span><b>${p.v >= 0 ? '+ ' : '− '}${fxMil(Math.abs(p.v))}</b></li></ul></div>`;
     if (!bateSecao3) h += `<div class="fx-nota"><b>Por que a primeira linha não é o número da seção 3.</b>
       A seção 3 diz que sobraram <b>${fxMil(a.resultado)}</b> e esta conta começa em <b>${fxMil(p.res)}</b>.
