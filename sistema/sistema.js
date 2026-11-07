@@ -79,15 +79,15 @@ function renderModuloRotinas(status, historico, batimento = []) {
   const rodaramHoje = situacoes.filter(x => diaLocal(x.inicio) === hojeLocal).length;
   const pedemAtencao = situacoes.filter(x => ['FALHOU', 'TRAVADA', 'PARCIAL', 'PULADA'].includes(x.status)).length;
   const badge = (st) => ({
-    RODANDO:  '<span style="color:#f5a623; font-weight:bold;">● rodando agora</span>',
-    OK:       '<span style="color:#3fb950; font-weight:bold;">✔ concluída</span>',
-    FALHOU:   '<span style="color:#ff6b6b; font-weight:bold;">✖ falhou</span>',
+    RODANDO:  '<span style="color:var(--farol-perto); font-weight:bold;">● rodando agora</span>',
+    OK:       '<span style="color:var(--farol-ok); font-weight:bold;">✔ concluída</span>',
+    FALHOU:   '<span style="color:var(--farol-fora); font-weight:bold;">✖ falhou</span>',
     PULADA:   '<span style="color:#8a897e; font-weight:bold;">— pulada</span>',
     // PARCIAL (01/09/2026): fez o trabalho mas não deixou a prova no banco —
     // rastro, aviso ou conferência faltando. Quem grava é fechar_execucao.py,
     // que rebaixa o OK em vez de aceitar a palavra da rotina.
-    PARCIAL:  '<span style="color:#f5a623; font-weight:bold;">◐ sem prova completa</span>',
-    TRAVADA:  '<span style="color:#ff6b6b; font-weight:bold;">✖ não finalizou</span>',
+    PARCIAL:  '<span style="color:var(--farol-perto); font-weight:bold;">◐ sem prova completa</span>',
+    TRAVADA:  '<span style="color:var(--farol-fora); font-weight:bold;">✖ não finalizou</span>',
   }[st] || `<span style="color:#8a897e;">${st}</span>`);
 
   // Coluna "o que fazer" (12/09/2026): situacao ruim sem a acao ao lado obriga a
@@ -140,7 +140,7 @@ function renderModuloRotinas(status, historico, batimento = []) {
       <div class="card-pct" title="Última execução em FALHOU, TRAVADA (não finalizou), PARCIAL (sem prova completa) ou PULADA.">${pedemAtencao ? 'na tabela abaixo' : 'nada pendente'}</div></div>
   </div>
 
-  ${rodando.length ? `<div class="contexto" style="border-color:#f5a623;">
+  ${rodando.length ? `<div class="contexto" style="border-color:var(--farol-perto);">
     <b>Acontecendo agora:</b> ${rodando.map(r => r.nome).join(', ')} —
     começou ${dtHora(porId[rodando[0].id].inicio)}, já faz ${dur(porId[rodando[0].id].duracao_seg)}.
   </div>` : ''}
@@ -156,7 +156,7 @@ function renderModuloRotinas(status, historico, batimento = []) {
     <ul style="margin:6px 0 0 0;">
       ${batimento.map(b => `<li style="font-size:12px;">
         <b>${b.rotina}</b> — ${b.situacao} em ${dtHora(b.acordou_em)}
-        <span style="color:${Number(b.ha_seg) > 86400 ? '#ff6b6b' : '#8a897e'};">
+        <span style="color:${Number(b.ha_seg) > 86400 ? 'var(--farol-fora)' : '#8a897e'};">
           (há ${dur(Number(b.ha_seg))})</span>
         ${b.motivo ? `<br><span style="color:#8a897e;">${b.motivo}</span>` : ''}
       </li>`).join('')}
@@ -174,7 +174,7 @@ function renderModuloRotinas(status, historico, batimento = []) {
       return `<tr>
         <td>${r.nome}</td>
         <td style="font-size:11.5px;">${r.quando}</td>
-        <td>${badge(s.status)}${Number(s.falhas_30d) ? ` <span style="font-size:10px; color:#ff6b6b;">(${s.falhas_30d} falha(s) em 30d)</span>` : ''}</td>
+        <td>${badge(s.status)}${Number(s.falhas_30d) ? ` <span style="font-size:10px; color:var(--farol-fora);">(${s.falhas_30d} falha(s) em 30d)</span>` : ''}</td>
         <td>${dtHora(s.inicio)}</td>
         <td>${dur(s.duracao_seg)}</td>
         <td style="font-size:11.5px;">${s.resumo || '—'}${s.detalhe ? `<br><span style="font-size:10.5px; color:#8a897e;">${s.detalhe}</span>` : ''}</td>
@@ -254,7 +254,7 @@ function planoDetalheAlternar(id) {
 
 const PLANO_ESTADOS = [
   ['andando', 'andando',      '#f6c63e'],
-  ['feito',   'feito',        '#3fb950'],
+  ['feito',   'feito',        'var(--farol-ok)'],
   ['na',      'não se aplica','#8a897e'],
 ];
 
@@ -268,7 +268,7 @@ async function entrarPlano() {
                           { headers: rmbHeaders() });
     if (!r.ok) {
       if (r.status === 401) { localStorage.removeItem('rmbSessao'); renderPlanoLogin(); return; }
-      alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">Não consegui carregar (${r.status}).</div>`;
+      alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui carregar (${r.status}).</div>`;
       return;
     }
     PLANO = await r.json();
@@ -532,8 +532,8 @@ let TELAS_FILTRO = null;
 let TELAS_CAMADA_FILTRO = null;   // segundo recorte, ao lado do destino: a camada
 
 const TELAS_DESTINOS = [
-  ['equipe',      'passa',       '#3fb950'],
-  ['consultoria', 'consultoria', '#58a6ff'],
+  ['equipe',      'passa',       'var(--farol-ok)'],
+  ['consultoria', 'consultoria', 'var(--info)'],
   ['morre',       'morre',       '#8a897e'],
   ['a definir',   'a definir',   ''],
 ];
@@ -562,7 +562,7 @@ async function entrarTelas() {
     const r = await fetch(SUPABASE_URL + '/rest/v1/painel_telas?select=*&order=ordem',
                           { headers: rmbHeaders() });
     if (!r.ok) {
-      alvo.innerHTML = '<div class="contexto" style="border-color:#ff6b6b;">Nao consegui carregar (' + r.status + ').</div>';
+      alvo.innerHTML = '<div class="contexto" style="border-color:var(--farol-fora);">Nao consegui carregar (' + r.status + ').</div>';
       return;
     }
     TELAS = await r.json();
@@ -725,7 +725,7 @@ function renderPlanoSemAcesso() {
       <p style="margin:0 0 10px;"><b>Este módulo é restrito.</b> Você está logado
          normalmente${quem ? ' como ' + esc(quem) : ''} e o resto do painel funciona — só o Plano
          que não abre para a sua conta.</p>
-      <p style="margin:0; color:#a5a49a;">Se você precisa acompanhar o plano, fale com o Neto:
+      <p style="margin:0; color:var(--tx-3);">Se você precisa acompanhar o plano, fale com o Neto:
          é uma linha de configuração, resolve em um minuto.</p>
     </div>`;
 }
@@ -744,7 +744,7 @@ function renderPlanoLogin() {
         onkeydown="if(event.key==='Enter')planoLogin()"
         style="width:100%; padding:8px 10px; background:#171716; color:#f2f0e9; border:1px solid #45443f; border-radius:6px;"></div>
       <button class="preset-btn active" onclick="planoLogin()">Entrar</button>
-      <div id="planoLoginErro" class="contexto" style="display:none; border-color:#ff6b6b; margin-top:10px;"></div>
+      <div id="planoLoginErro" class="contexto" style="display:none; border-color:var(--farol-fora); margin-top:10px;"></div>
     </div>`;
 }
 

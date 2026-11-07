@@ -246,7 +246,7 @@ function renderModuloRateio() {
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Preço alvo por produto · ${mesNome(de)} a ${mesNome(ate)}</div>
     ${rateioBarraUnidades()}
-    <div class="contexto">Aqui é <b>preço</b>: o custo de operar cada canal vira um <b>markup</b> sobre o custo da ficha, e o markup × CMV dá o preço alvo de cada produto. Os cartões mostram quanto de cada R$ 100 vendidos vai para operar o canal — <b>sem a matéria-prima</b> (ela entra pela ficha) — na leitura <b>cheia</b> (comissão de 9,5% do iFood que o benefício zera até dez/26–jan/27; é por ela que se precifica). Clique no canal para ver o preço alvo dele. Para ler <b>venda</b> por canal, faixa de horário e dia, use a <b>Evolução de vendas</b> aqui do menu.${canais.some(c => porCanal[c].provisorio) ? ' <span style="color:#a5a49a;">Parte da folha ainda cai na proporção geral (nomes sem setor).</span>' : ''}</div>
+    <div class="contexto">Aqui é <b>preço</b>: o custo de operar cada canal vira um <b>markup</b> sobre o custo da ficha, e o markup × CMV dá o preço alvo de cada produto. Os cartões mostram quanto de cada R$ 100 vendidos vai para operar o canal — <b>sem a matéria-prima</b> (ela entra pela ficha) — na leitura <b>cheia</b> (comissão de 9,5% do iFood que o benefício zera até dez/26–jan/27; é por ela que se precifica). Clique no canal para ver o preço alvo dele. Para ler <b>venda</b> por canal, faixa de horário e dia, use a <b>Evolução de vendas</b> aqui do menu.${canais.some(c => porCanal[c].provisorio) ? ' <span style="color:var(--tx-3);">Parte da folha ainda cai na proporção geral (nomes sem setor).</span>' : ''}</div>
     ${(RATEIO.semCriterio || []).length ? `<div class="contexto" style="border-color:#c8102e;"><b>Conta nova sem critério de rateio</b> — está caindo em "por vendas" sem ninguém ter decidido: ${RATEIO.semCriterio.map(r => `${String(r.subtipo).toLowerCase()} (${reais(r.valor_3m)} em 3 meses)`).join(' · ')}. Decidir em rateio_criterios.</div>` : ''}
     <div class="cards">${cards}</div>
     ${precoBloco}`;
@@ -394,10 +394,10 @@ function renderModuloEngcard() {
   const unMedio = vendidos.reduce((s,a) => s + a.un, 0) / vendidos.length;
   const mgUnMedio = vendidos.reduce((s,a) => s + a.mg, 0) / vendidos.reduce((s,a) => s + a.un, 0);
   const GRUPOS = {
-    CAMPEAO:   { nome: 'Campeões',   cor: '#3fb950', o: 'Vende muito e sobra muito', faz: 'Proteger: não mexer no preço nem na receita' },
+    CAMPEAO:   { nome: 'Campeões',   cor: 'var(--farol-ok)', o: 'Vende muito e sobra muito', faz: 'Proteger: não mexer no preço nem na receita' },
     POPULAR:   { nome: 'Populares',  cor: '#f6c63e', o: 'Vende muito e sobra pouco', faz: 'Puxa gente. Cada centavo ganho aqui vale muito' },
-    ESCONDIDO: { nome: 'Escondidos', cor: '#58a6ff', o: 'Vende pouco e sobra muito', faz: 'Dar destaque, foto e sugestão de venda' },
-    'PESO MORTO': { nome: 'Peso morto', cor: '#ff6b6b', o: 'Vende pouco e sobra pouco', faz: 'Repensar a receita, o preço, ou tirar do cardápio' },
+    ESCONDIDO: { nome: 'Escondidos', cor: 'var(--info)', o: 'Vende pouco e sobra muito', faz: 'Dar destaque, foto e sugestão de venda' },
+    'PESO MORTO': { nome: 'Peso morto', cor: 'var(--farol-fora)', o: 'Vende pouco e sobra pouco', faz: 'Repensar a receita, o preço, ou tirar do cardápio' },
   };
   vendidos.forEach(a => {
     a.mgUn = a.mg / a.un;
@@ -701,7 +701,7 @@ async function fichaSalvar() {
   const aviso = document.getElementById('fichaAviso');
   const diz = (txt, cor) => { aviso.style.display = 'block'; aviso.style.borderColor = cor; aviso.innerHTML = txt; };
   const nome = (FICHA_EDIT.nome || '').trim().toUpperCase();
-  if (!nome) return diz('Dê um nome à ficha.', '#ff6b6b');
+  if (!nome) return diz('Dê um nome à ficha.', 'var(--farol-fora)');
 
   const { porItem } = FICHAS;
   const linhas = [];
@@ -711,20 +711,20 @@ async function fichaSalvar() {
     if (!mp && !l.qtd) continue;                       // linha em branco: ignora
     const o = porItem[mp];
     if (!o) return diz(`<b>${mp || '(sem nome)'}</b> não existe no cadastro de insumos nem como ficha.
-      Só dá para usar matéria-prima que já tem preço — senão a ficha nasce sem custo.`, '#ff6b6b');
-    if (!qtd || qtd <= 0) return diz(`Falta a quantidade de <b>${mp}</b>.`, '#ff6b6b');
+      Só dá para usar matéria-prima que já tem preço — senão a ficha nasce sem custo.`, 'var(--farol-fora)');
+    if (!qtd || qtd <= 0) return diz(`Falta a quantidade de <b>${mp}</b>.`, 'var(--farol-fora)');
     const preco = Number(o.preco_un_uso) || 0;
     linhas.push({ nome, materia_prima: mp, un_uso: o.un_uso || (o.tipo === 'FICHA' ? 'KG' : null),
                   qtd_ft: qtd, rendimento: 1, preco_custo: preco,
                   valor_total: Math.round(qtd * preco * 10000) / 10000 });
   }
-  if (!linhas.length) return diz('Coloque pelo menos um ingrediente.', '#ff6b6b');
+  if (!linhas.length) return diz('Coloque pelo menos um ingrediente.', 'var(--farol-fora)');
 
   // Nome que já existe na planilha não pode: ela manda, e a manual seria ignorada.
   const naPlanilha = FICHAS.lista.find(f => f.ficha === nome && f.fonte === 'PLANILHA');
   if (naPlanilha && nome !== FICHA_EDIT.original) {
     return diz(`Já existe <b>${nome}</b> na planilha. A planilha manda, então esta ficha
-      seria ignorada. Use outro nome, ou corrija direto na planilha.`, '#ff6b6b');
+      seria ignorada. Use outro nome, ou corrija direto na planilha.`, 'var(--farol-fora)');
   }
 
   diz('Salvando...', '#f6c63e');
@@ -755,7 +755,7 @@ async function fichaSalvar() {
               title="Devolve a ficha exatamente como estava antes deste salvamento. Vale só enquanto esta mensagem estiver na tela.">desfazer</button>`;
     await entrarFichas();
   } catch (e) {
-    diz('Não deu para salvar: ' + e.message, '#ff6b6b');
+    diz('Não deu para salvar: ' + e.message, 'var(--farol-fora)');
   }
 }
 
@@ -840,7 +840,7 @@ function fichaFormulario() {
       <td><input id="fichaQtd${i}" value="${esc(l.qtd)}" placeholder="0,000" inputmode="decimal"
                  oninput="fichaLerForm(); fichaAtualizarPrevia()" class="ficha-inp" style="width:90px; text-align:right;"></td>
       <td>${o ? esc(o.un_uso || (o.tipo === 'FICHA' ? 'KG' : '—')) : '—'}</td>
-      <td>${preco === null ? '<span style="color:#ff6b6b;">sem cadastro</span>' : 'R$ ' + fmt(preco)}</td>
+      <td>${preco === null ? '<span style="color:var(--farol-fora);">sem cadastro</span>' : 'R$ ' + fmt(preco)}</td>
       <td>${preco === null ? '—' : '<b>R$ ' + fmt(qtd * preco) + '</b>'}</td>
       <td><button class="preset-btn" onclick="fichaTirarLinha(${i})">tirar</button></td>
     </tr>`;
@@ -888,7 +888,7 @@ function fichaAtualizarPrevia() {
     if (tr && tr.closest('tr')) {
       const c = tr.closest('tr').cells;
       c[2].textContent = o ? (o.un_uso || (o.tipo === 'FICHA' ? 'KG' : '—')) : '—';
-      c[3].innerHTML = o ? 'R$ ' + fmt(preco) : '<span style="color:#ff6b6b;">sem cadastro</span>';
+      c[3].innerHTML = o ? 'R$ ' + fmt(preco) : '<span style="color:var(--farol-fora);">sem cadastro</span>';
       c[4].innerHTML = o ? '<b>R$ ' + fmt(qtd * preco) + '</b>' : '—';
     }
   });
@@ -991,7 +991,7 @@ function renderModuloFichas() {
       const semPreco = l.origem_do_preco === 'SEM CADASTRO';
       return `<tr class="ficha-linha${aberto ? ' sub' : ''}" onclick="abrirOrigemCusto('${esc(l.materia_prima)}')">
         <td>${aberto ? '▾' : '▸'} ${esc(l.materia_prima)}${
-          semPreco ? ' <span style="color:#ff6b6b;">sem cadastro</span>' : ''}</td>
+          semPreco ? ' <span style="color:var(--farol-fora);">sem cadastro</span>' : ''}</td>
         <td>${nu(l.qtd_ft).toFixed(3)}</td>
         <td>${esc(l.un_uso)}</td>
         <td>R$ ${fmt(nu(l.preco_custo))}</td>
@@ -1026,7 +1026,7 @@ function renderModuloFichas() {
 
   function origemDoCusto(item) {
     const o = porItem[item];
-    if (!o) return `<div class="contexto" style="border-color:#ff6b6b;">
+    if (!o) return `<div class="contexto" style="border-color:var(--farol-fora);">
       <b>${esc(item)}</b> não está cadastrado nem como insumo nem como ficha — por isso a
       linha fica sem preço. Corrigir na planilha (Base Insumos e Produtos).</div>`;
     if (o.tipo === 'FICHA') {
@@ -1043,7 +1043,7 @@ function renderModuloFichas() {
     const daNota = o.custo_fonte === 'NF';
     const bate = daNota || !esperado || Math.abs(esperado - usado) < 0.01;
     const dataNf = o.custo_data ? o.custo_data.split('-').reverse().join('/') : '';
-    return `<div class="contexto" style="text-align:left; ${bate ? '' : 'border-color:#ff6b6b;'}">
+    return `<div class="contexto" style="text-align:left; ${bate ? '' : 'border-color:var(--farol-fora);'}">
       <b>${esc(item)}</b> é insumo comprado.
       ${daNota ? (String(o.base_custo || '').startsWith('MEDIANA')
         ? `<b>Custo pelas notas:</b> R$ ${fmt(usado)} por ${esc(o.un_uso)} — <b>mediana das ${nu(o.n_60d)}
@@ -1061,7 +1061,7 @@ function renderModuloFichas() {
         (o.marca && o.marca !== o.fornecedor) ? ' (marca ' + esc(o.marca) + ')' : ''}.` : ''}
       ${daNota || o.custo_fonte === 'AJUSTE' ? '' : `<b>Uso na ficha:</b> R$ ${fmt(usado)} por ${esc(o.un_uso)}
         (custo da planilha — sem nota fiscal nos últimos 90 dias).`}
-      ${bate ? '' : `<br><b style="color:#ff6b6b;">A conversão não fecha:</b> pelo preço de compra
+      ${bate ? '' : `<br><b style="color:var(--farol-fora);">A conversão não fecha:</b> pelo preço de compra
         deveria ser R$ ${fmt(esperado)} por ${esc(o.un_uso)}, e a planilha usa R$ ${fmt(usado)}.
         Corrigir na planilha — o importador reclama a cada carga até lá.`}</div>`;
   }
@@ -1071,10 +1071,10 @@ function renderModuloFichas() {
     <div class="caption-label" style="text-align:center;" title="Ficha criada aqui fica numa tabela própria (ft_fichas_manual) e é reaplicada depois de cada carga da planilha; se o mesmo nome existir nos dois lugares, vale o da planilha.">
       ${emLinha.length} fichas — ${emLinha.filter(f=>!f.e_preparacao).length} vendáveis e
       ${emLinha.filter(f=>f.e_preparacao).length} de preparação (base que outra ficha consome).
-      ${semCusto ? `<button class="preset-btn ${FICHA_SO_SEM_CUSTO ? 'active' : ''}" onclick="fichaSoSemCusto()" title="${FICHA_SO_SEM_CUSTO ? 'voltar para a lista completa' : 'trocar a lista de escolha por essas fichas'}"><b style="color:#ff6b6b;">${semCusto} sem custo calculado</b>${FICHA_SO_SEM_CUSTO ? ' ✕' : ' ›'}</button>` : ''}
+      ${semCusto ? `<button class="preset-btn ${FICHA_SO_SEM_CUSTO ? 'active' : ''}" onclick="fichaSoSemCusto()" title="${FICHA_SO_SEM_CUSTO ? 'voltar para a lista completa' : 'trocar a lista de escolha por essas fichas'}"><b style="color:var(--farol-fora);">${semCusto} sem custo calculado</b>${FICHA_SO_SEM_CUSTO ? ' ✕' : ' ›'}</button>` : ''}
       ${foraLinha.length ? `<button class="preset-btn ${FICHA_VER_FORA ? 'active' : ''}" onclick="fichaVerFora()" title="${FICHA_VER_FORA ? 'esconder de novo as fichas fora de linha' : 'produto que saiu de linha: a ficha continua guardada, só não aparece na busca. Clique para ver.'}">${foraLinha.length} fora de linha ${FICHA_VER_FORA ? 'na lista ✕' : (foraLinha.length > 1 ? 'não aparecem ›' : 'não aparece ›')}</button>` : ''}
       Pode criar e editar ficha aqui — reimportar a planilha não apaga o que você criar.</div>
-    ${FICHA_MSG ? '<div class="contexto" style="border-color:#3fb950; text-align:left;">' + FICHA_MSG + '</div>' : ''}
+    ${FICHA_MSG ? '<div class="contexto" style="border-color:var(--farol-ok); text-align:left;">' + FICHA_MSG + '</div>' : ''}
     <div class="ficha-busca-linha">
       <label class="ficha-check"><input type="checkbox" id="fichaSoVendaveis" ${esconderPrep ? 'checked' : ''}
              onchange="renderModuloFichas()"> esconder preparações</label>

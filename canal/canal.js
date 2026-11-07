@@ -63,7 +63,7 @@ function tabelaLiquidoPorLoja(ant) {
       if (prev && Math.abs(prev.liq) > 0.005) {
         const v = (o.liq - prev.liq) / Math.abs(prev.liq) * 100;
         const palavra = v > 0.05 ? 'subiu' : v < -0.05 ? 'caiu' : 'estável';
-        const cor = palavra === 'estável' ? '#8a897e' : (v > 0 ? '#3fb950' : '#ff6b6b');
+        const cor = palavra === 'estável' ? '#8a897e' : (v > 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
         varTxt = `<span style="color:${cor}; font-weight:bold;">${palavra}${palavra !== 'estável' ? ' ' + pct(Math.abs(v)) + '%' : ''}</span>`;
       }
       return { nome: LOJAS[i], idx: i, ...o, varTxt };
@@ -102,8 +102,8 @@ function variacaoSpan(atual, anterior, tipo = 'maiorMelhor') {
   if (Math.abs(v) < 0.05) return '<span style="color:#8a897e;">estável</span>';
   const subiu = v > 0;
   let cor = '#8a897e';
-  if (tipo === 'maiorMelhor') cor = subiu ? '#3fb950' : '#ff6b6b';
-  else if (tipo === 'menorMelhor') cor = subiu ? '#ff6b6b' : '#3fb950';
+  if (tipo === 'maiorMelhor') cor = subiu ? 'var(--farol-ok)' : 'var(--farol-fora)';
+  else if (tipo === 'menorMelhor') cor = subiu ? 'var(--farol-fora)' : 'var(--farol-ok)';
   return `<span style="color:${cor}; font-weight:bold;">${subiu ? '▲' : '▼'} ${subiu ? 'subiu' : 'caiu'} ${pct(Math.abs(v))}%</span>`;
 }
 
@@ -214,8 +214,8 @@ function blocoSinais(m, a) {
     <div class="cards" style="margin-top:12px;">
       <div class="card blue"><div class="card-lbl">Pago pelo app do iFood</div><div class="card-val">R$ ${fmt(m.vendasOnline)}</div><div class="card-pct">${pct(m.vendasOnlinePct)}%</div></div>
       <div class="card blue"><div class="card-lbl">Pago na entrega (cartão/vale)</div><div class="card-val">R$ ${fmt(m.vendasCartao)}</div><div class="card-pct">${pct(m.vendasCartaoPct)}%</div></div>
-      <div class="card neg"><div class="card-lbl">Promoção bancada pela loja</div><div class="card-val">R$ ${fmt(m.investLoja)}</div><div class="card-pct" style="color:#ff6b6b;">${pct(m.investLojaPct)}% do total</div></div>
-      <div class="card pos"><div class="card-lbl">Promoção bancada pelo iFood</div><div class="card-val">R$ ${fmt(m.investPlataforma)}</div><div class="card-pct" style="color:#3fb950;">${pct(m.investPlataformaPct)}% do total</div></div>
+      <div class="card neg"><div class="card-lbl">Promoção bancada pela loja</div><div class="card-val">R$ ${fmt(m.investLoja)}</div><div class="card-pct" style="color:var(--farol-fora);">${pct(m.investLojaPct)}% do total</div></div>
+      <div class="card pos"><div class="card-lbl">Promoção bancada pelo iFood</div><div class="card-val">R$ ${fmt(m.investPlataforma)}</div><div class="card-pct" style="color:var(--farol-ok);">${pct(m.investPlataformaPct)}% do total</div></div>
     </div>
     <div class="caption-label" style="text-align:center;">Quanto mais o iFood banca das promoções, menos sai do seu caixa para gerar a mesma venda.</div>
   </details>`;
@@ -253,7 +253,7 @@ function linhaContexto(ant) {
   // e, no mesmo dia, a consolidada foi aposentada — a Evolucao de vendas mostra o iFood ao
   // lado do salao, do site e do balcao com os mesmos numeros, e e para la que o link leva.
   const canais = `<div style="margin-top:6px; color:#8a897e; font-size:11.5px;">
-    Canal iFood. <a href="javascript:void(0)" onclick="mostrarModulo('evolucao')" style="color:#a5a49a;">Ver ao lado do salão, site e balcão &rsaquo;</a>
+    Canal iFood. <a href="javascript:void(0)" onclick="mostrarModulo('evolucao')" style="color:var(--tx-3);">Ver ao lado do salão, site e balcão &rsaquo;</a>
   </div>`;
 
   return `<div class="contexto contexto-filtro">
@@ -262,8 +262,8 @@ function linhaContexto(ant) {
     <details style="margin-top:8px; padding-top:8px; border-top:1px solid #34332f; font-size:11.5px; color:#8a897e;">
       <summary style="cursor:pointer;">O que a cor quer dizer</summary>
       A palavra diz o que aconteceu (<b>subiu</b> / <b>caiu</b>) e a cor diz se é bom ou ruim:
-      <span style="color:#3fb950; font-weight:bold;">verde</span> melhora o resultado,
-      <span style="color:#ff6b6b; font-weight:bold;">vermelho</span> piora.
+      <span style="color:var(--farol-ok); font-weight:bold;">verde</span> melhora o resultado,
+      <span style="color:var(--farol-fora); font-weight:bold;">vermelho</span> piora.
       Em custos, cair é verde. Investimento em marketing fica em
       <span style="color:#8a897e; font-weight:bold;">cinza</span> — gastar mais não é bom nem ruim por si só, depende do retorno.
     </details>
@@ -272,7 +272,7 @@ function linhaContexto(ant) {
 
 function blocoAbertura(m, a, ant) {
   const variacao = (a && Math.abs(a.liquido) > 0.005) ? (m.liquido - a.liquido) / Math.abs(a.liquido) * 100 : null;
-  const cor = variacao === null ? '#8a897e' : (variacao >= 0 ? '#3fb950' : '#ff6b6b');
+  const cor = variacao === null ? '#8a897e' : (variacao >= 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
   const seta = variacao === null ? '' : (variacao >= 0 ? '▲' : '▼');
   const deltaTexto = variacao === null
     ? 'Sem período anterior para comparar'
@@ -713,7 +713,7 @@ function blocoFreteGratis() {
   const emp = por.get('Frete grátis empilhado em outro desconto');
   const avulso = por.get('Frete grátis avulso');
   const alerta = (emp && avulso && avulso.ped)
-    ? `<div class="contexto" style="border-color:#ff6b6b; margin-top:10px;">
+    ? `<div class="contexto" style="border-color:var(--farol-fora); margin-top:10px;">
         <b>Empilhamento:</b> ${emp.ped.toLocaleString('pt-BR')} pedidos receberam frete grátis
         <b>em cima de outro desconto nosso</b> (Campanha Inteligente, Cupom ou Clube). Só a parte do frete
         nesses pedidos custou cerca de <b>R$ ${fmt(avulso.invL / avulso.ped * emp.ped)}</b> — e é a faixa com
@@ -897,7 +897,7 @@ function blocoTestePromos() {
       <td>R$ ${fmt(o.nosso)}</td><td>R$ ${fmt(o.ifood)}</td>
       <td>${alavTxt(alav(o))}</td>
       <td>${o.ped ? 'R$ ' + fmt(o.nosso / o.ped) : '—'}</td>
-      <td>${usoPct === null ? '—' : `<span${usoPct > 100 ? ' style="color:#ff6b6b; font-weight:bold;"' : ''}>${pct(usoPct)}%</span>`}</td>
+      <td>${usoPct === null ? '—' : `<span${usoPct > 100 ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${pct(usoPct)}%</span>`}</td>
       <td>${variacaoSpan(o.nosso, prev ? prev.nosso : (antR ? 0 : null), 'neutro')}</td>
     </tr>`;
   }).join('');
@@ -937,7 +937,7 @@ function moduloPromocoes() {
   if (!r.lista.length) {
     const disp = periodosPromoDisponiveis();
     return teste + blocoAlavancagemPorLoja() + `
-    <div class="contexto" style="border-color:#f5a623; margin-top:16px;">
+    <div class="contexto" style="border-color:var(--farol-perto); margin-top:16px;">
       <b>Detalhe por tipo de promoção indisponível neste período.</b><br>
       A quebra por mecânica (Hits, Campanha Inteligente, Clube, Frete grátis) vem do
       <b>relatório de promoções</b> do portal, que chega em recortes fechados. Os blocos acima
@@ -1012,8 +1012,8 @@ function moduloPromocoes() {
       ${linhasTabela}
     </table>
   </div>
-  <div class="contexto" style="border-color:#ff6b6b; margin-top:14px;">
-    <b style="color:#ff6b6b;">"Retorno atribuído" é o número do portal e serve para conferir com o iFood, não para decidir onde investir.</b>
+  <div class="contexto" style="border-color:var(--farol-fora); margin-top:14px;">
+    <b style="color:var(--farol-fora);">"Retorno atribuído" é o número do portal e serve para conferir com o iFood, não para decidir onde investir.</b>
   </div>
 
   <div class="section-label">Mesma estratégia, lojas diferentes</div>
@@ -2037,7 +2037,7 @@ function renderModuloNegociacoes() {
     <table>
       <tr><th>Loja</th><th>Negociações</th><th>Para responder</th><th>Sem resposta</th><th>% sem resposta</th><th>Valor cancelado</th><th title="Compara o número de negociações sem resposta com a janela imediatamente anterior, do mesmo tamanho do período filtrado.">vs período anterior</th></tr>
       ${lojas.map(x => `<tr><td>${x.nome}</td><td>${x.n}</td><td>${x.resp}</td>
-        <td${x.sem ? ' style="color:#ff6b6b; font-weight:bold;"' : ''}>${x.sem}</td>
+        <td${x.sem ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${x.sem}</td>
         <td>${pct(x.pctSem)}%</td><td>R$ ${fmt(x.valor)}</td>
         <td>${variacaoSpan(x.sem, x.semAnt, 'menorMelhor')}</td></tr>`).join('')}
       <tr class="liq"><td>TOTAL${NEG_MOTIVO ? ' DO RECORTE' : ''}</td><td>${totalRec.toLocaleString('pt-BR')}</td><td>${respondiveisRec}</td><td>${semRespostaRec}</td>
@@ -2439,9 +2439,9 @@ function renderModuloRelatorios(idSelecionado, abaIdx = 0) {
     unidade/marca atuais. <span style="color:#8a897e;">(A análise interpretada e as ações recomendadas
     continuam vindo do resumo automático de segunda-feira.)</span>
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px;">
-      <label style="font-size:12px; color:#a5a49a;">De <input type="date" id="relIni" value="${isoD(segPassada)}"
+      <label style="font-size:12px; color:var(--tx-3);">De <input type="date" id="relIni" value="${isoD(segPassada)}"
         style="background:#111110; border:1px solid #34332f; color:#fff; border-radius:6px; padding:5px 8px;"></label>
-      <label style="font-size:12px; color:#a5a49a;">Até <input type="date" id="relFim" value="${isoD(domPassado)}"
+      <label style="font-size:12px; color:var(--tx-3);">Até <input type="date" id="relFim" value="${isoD(domPassado)}"
         style="background:#111110; border:1px solid #34332f; color:#fff; border-radius:6px; padding:5px 8px;"></label>
       <button class="preset-btn" onclick="gerarRelatorioAdHoc()">Gerar relatório</button>
     </div>
@@ -2497,7 +2497,7 @@ async function gerarRelatorioAdHoc() {
   const ini = document.getElementById('relIni').value;
   const fim = document.getElementById('relFim').value;
   if (!ini || !fim || fim < ini) {
-    alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">Período inválido.</div>`;
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Período inválido.</div>`;
     return;
   }
   alvo.innerHTML = `<div class="contexto">Calculando...</div>`;
@@ -2538,7 +2538,7 @@ async function gerarRelatorioAdHoc() {
       const v = (atual - anterior) / Math.abs(anterior) * 100;
       const palavra = v > 0.05 ? 'subiu' : v < -0.05 ? 'caiu' : 'estável';
       const bom = tipo === 'neutro' ? null : (tipo === 'maiorMelhor' ? v > 0 : v < 0);
-      const cor = palavra === 'estável' || bom === null ? '#8a897e' : (bom ? '#3fb950' : '#ff6b6b');
+      const cor = palavra === 'estável' || bom === null ? '#8a897e' : (bom ? 'var(--farol-ok)' : 'var(--farol-fora)');
       varTxt = `<span style="color:${cor};">${palavra}${palavra !== 'estável' ? ' ' + pct(Math.abs(v)) + '%' : ''}</span>`;
     }
     return `<tr><td>${nome}</td><td>${f(atual)}</td><td>${anterior !== null ? f(anterior) : '—'}</td><td>${varTxt}</td></tr>`;
@@ -2549,13 +2549,13 @@ async function gerarRelatorioAdHoc() {
   const alerta = (txt, modulo, tela) => `<li style="cursor:pointer;" onclick="mostrarModulo('${modulo}')"
     title="Abre ${tela}. A tela usa a janela de datas padrão dela, não o período deste relatório.">${txt}
     <span style="font-size:11px; color:var(--tx-5);">abrir ${tela} (na janela padrão da tela) →</span></li>`;
-  if (negSem > 0) alertas.push(alerta(`<b style="color:#ff6b6b;">${negSem} negociações sem resposta</b> (${pct(negResp ? negSem / negResp * 100 : 0)}% das ${negResp} que dependem da loja) — resposta evita cancelamento automático.`, 'negociacoes', 'Negociações'));
-  if (negs.length && negAtraso / negs.length > 0.4) alertas.push(alerta(`<b style="color:#ff6b6b;">${pct(negAtraso / negs.length * 100)}% das negociações por atraso</b> — olhar preparo/despacho no pico.`, 'negociacoes', 'Negociações'));
-  if (notaMedia !== null && notaMedia < 4.6) alertas.push(alerta(`<b style="color:#ff6b6b;">Nota média ${notaMedia.toFixed(2).replace('.', ',')}</b> abaixo do padrão da rede (4,6+).`, 'avaliacoes', 'Avaliações'));
+  if (negSem > 0) alertas.push(alerta(`<b style="color:var(--farol-fora);">${negSem} negociações sem resposta</b> (${pct(negResp ? negSem / negResp * 100 : 0)}% das ${negResp} que dependem da loja) — resposta evita cancelamento automático.`, 'negociacoes', 'Negociações'));
+  if (negs.length && negAtraso / negs.length > 0.4) alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(negAtraso / negs.length * 100)}% das negociações por atraso</b> — olhar preparo/despacho no pico.`, 'negociacoes', 'Negociações'));
+  if (notaMedia !== null && notaMedia < 4.6) alertas.push(alerta(`<b style="color:var(--farol-fora);">Nota média ${notaMedia.toFixed(2).replace('.', ',')}</b> abaixo do padrão da rede (4,6+).`, 'avaliacoes', 'Avaliações'));
   // Notas ruins: quem decide e' o farol do indicador (metas_kpi), o mesmo do card e do Placar.
   // Aqui nao ha numero solto (ate 06/10/2026 era um "mais de 5%" escrito a mao).
-  if (avs.length && kRuins && farolKpi(kRuins, pctRuins)[1] === 'fora') alertas.push(alerta(`<b style="color:#ff6b6b;">${pct(pctRuins)}% de ${NOTA_RUIM_ROT}</b> no período (${ruinsRel.n.toLocaleString('pt-BR')} de ${avs.length.toLocaleString('pt-BR')} avaliações) — meta: até ${fmtKpi(kRuins.unidade, Number(kRuins.meta))}.`, 'avaliacoes', 'Avaliações'));
-  if (m.valorCanceladoPct > 1.2) alertas.push(alerta(`<b style="color:#ff6b6b;">Cancelamentos em ${pct(m.valorCanceladoPct)}% do bruto</b> — acima do normal (~0,9%).`, 'cancelamentos', 'Cancelamentos'));
+  if (avs.length && kRuins && farolKpi(kRuins, pctRuins)[1] === 'fora') alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(pctRuins)}% de ${NOTA_RUIM_ROT}</b> no período (${ruinsRel.n.toLocaleString('pt-BR')} de ${avs.length.toLocaleString('pt-BR')} avaliações) — meta: até ${fmtKpi(kRuins.unidade, Number(kRuins.meta))}.`, 'avaliacoes', 'Avaliações'));
+  if (m.valorCanceladoPct > 1.2) alertas.push(alerta(`<b style="color:var(--farol-fora);">Cancelamentos em ${pct(m.valorCanceladoPct)}% do bruto</b> — acima do normal (~0,9%).`, 'cancelamentos', 'Cancelamentos'));
   if (!alertas.length) alertas.push('<li>Nenhum alerta pelas regras automáticas — período dentro dos padrões.</li>');
 
   alvo.innerHTML = `<div class="relatorio-corpo" style="margin-top:12px;">
@@ -2657,7 +2657,7 @@ function renderModuloContestacoes() {
   const dt = (v) => v ? formatarDataCurta(String(v).slice(0, 10)) : '—';
   const parcial = (r) => r.status === 'CANCELAMENTO PARCIAL' ? ' <span style="color:#8a897e; font-size:10px;">(parcial)</span>' : '';
   const quem = (r) => r.origem_contestacao === 'ROTINA'
-    ? '<span style="color:#3fb950;">rotina</span>' : '<span style="color:#8a897e;">manual</span>';
+    ? '<span style="color:var(--farol-ok);">rotina</span>' : '<span style="color:#8a897e;">manual</span>';
 
   // Grade padrao dos blocos: hora e turno entram porque identificam a equipe
   // que estava na operacao quando o problema aconteceu.
@@ -2708,12 +2708,12 @@ function renderModuloContestacoes() {
   ${aContestarVoce.length ? `<div id="tabelaContestVoce">${grade(aContestarVoce, colPrazo)}</div>
   <div class="caption-label" style="text-align:center;" title="A ordem é por faixa de prazo (até 2 dias, 3 a 5 dias, 6 dias ou mais, e por último os sem prazo no export) e, dentro da faixa, do maior valor para o menor. São motivos que dependem de avaliar evidência — item faltando, itens errados, pedido violado. Os textos sugeridos estão em rotinas/textos-contestacao.md; quando um motivo ganhar texto aprovado, ele passa para o bloco de baixo.">
   Na ordem de fazer: quem vence antes primeiro e, no mesmo prazo, o de maior valor.</div>`
-  : '<div class="contexto" style="border-color:#3fb950;">Nada esperando você. ✔</div>'}
+  : '<div class="contexto" style="border-color:var(--farol-ok);">Nada esperando você. ✔</div>'}
 
   <div class="section-label">A rotina contesta sozinha</div>
   ${aContestarRotina.length ? `<div id="tabelaContestRotina">${grade(aContestarRotina, colPrazo)}</div>
   <div class="caption-label" style="text-align:center;">Entram na próxima execução da rotina das 10:30.</div>`
-  : '<div class="contexto" style="border-color:#3fb950;">Nada na fila da rotina. ✔</div>'}
+  : '<div class="contexto" style="border-color:var(--farol-ok);">Nada na fila da rotina. ✔</div>'}
 
   <div class="section-label">Aguardando resposta do iFood</div>
   ${aguardando.length ? `<div id="tabelaContestAguard">${grade(aguardando, colQuem)}</div>
@@ -2727,7 +2727,7 @@ function renderModuloContestacoes() {
   <div class="section-label">Reprovadas</div>
   ${reprovadas.length ? `<div id="tabelaContestReprov">${grade(reprovadas, colRetorno)}</div>
   <div class="caption-label" style="text-align:center;">A justificativa do iFood ajuda a ajustar o texto da próxima contestação.</div>`
-  : '<div class="contexto" style="border-color:#3fb950;">Nenhuma reprovada no período. ✔</div>'}
+  : '<div class="contexto" style="border-color:var(--farol-ok);">Nenhuma reprovada no período. ✔</div>'}
 
   ${perdidas.length ? `<div class="section-label">Prazo encerrado sem contestação</div>
   <div id="tabelaContestPerd">${grade(perdidas, colQuem)}</div>
@@ -3515,7 +3515,7 @@ function renderModuloFrete(linhas) {
       const r = l.entregas ? l.res / l.entregas : 0;
       // a cor diz se a loja banca (vermelho) ou o frete se paga (verde) —
       // fato separado da interpretacao, regra da casa
-      const cor = r < 0 ? '#ff6b6b' : '#3fb950';
+      const cor = r < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)';
       // faixa com pouca entrega oscila muito: avisa em vez de deixar o leitor concluir
       const poucas = l.entregas < 30;
       return `<tr>
@@ -3540,7 +3540,7 @@ function renderModuloFrete(linhas) {
         <tr class="liq"><td>TOTAL</td><td>${totalEntregas.toLocaleString('pt-BR')}</td>
           <td>${reais(pond('custo'))}</td><td>${reais(pond('frete'))}</td>
           <td>${reais(pond('ticket'))}</td>
-          <td style="color:${resultado < 0 ? '#ff6b6b' : '#3fb950'}; font-weight:700;">${reais(resultado)}<span class="dre-av">no período</span></td></tr>
+          <td style="color:${resultado < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)'}; font-weight:700;">${reais(resultado)}<span class="dre-av">no período</span></td></tr>
       </table></div>`;
   };
 
@@ -3587,13 +3587,13 @@ function renderModuloFrete(linhas) {
     <div class="caption-label" style="text-align:center;">
       Quanto cada entrega custa de verdade, quanto foi cobrado do cliente e qual o ticket daquela faixa.
       <b>Vermelho = a loja está bancando; verde = o frete se paga.</b>
-      ${unsComDado.length ? `<span style="font-size:11.5px; color:#a5a49a; border:1px solid #34332f; border-radius:12px; padding:3px 10px; margin-left:6px;">${unsComDado.map(u => UN_ROT[u] || u).join(', ')}</span>` : ''}
+      ${unsComDado.length ? `<span style="font-size:11.5px; color:var(--tx-3); border:1px solid #34332f; border-radius:12px; padding:3px 10px; margin-left:6px;">${unsComDado.map(u => UN_ROT[u] || u).join(', ')}</span>` : ''}
     </div>
     ${seletor}
     ${agregado.length ? cardsFrete : ''}
     ${agregado.length ? matrizFrete : ''}
     ${agregado.length ? canais.map((c, i) => tabela(c, i)).join('')
-      : '<div class="contexto" style="border-color:#f5a623;">Sem entrega nesta janela e nestas unidades.</div>'}
+      : '<div class="contexto" style="border-color:var(--farol-perto);">Sem entrega nesta janela e nestas unidades.</div>'}
     <div class="caption-label" title="Faixa com menos de 30 entregas fica em cinza: o número existe, mas oscila demais para decidir em cima dele. Desde 14/10 as entregas do TrackEat (Água Verde, Ahú e São Braz) entram junto com as do Foody (Boqueirão) — a etiqueta no topo da tela lista as unidades com dado.">
       A coluna do ticket é a que decide: quem está acima de 3 km costuma levar o carrinho maior e já paga o frete, enquanto o subsídio vai para quem está perto e gasta menos.
     </div>`;
@@ -3710,7 +3710,7 @@ function siteIfoodNoPeriodo(iniISO, fimISO, lojaF) {
 function siteBarraPeriodo() {
   const op = [[30, '30 dias'], [90, '90 dias'], [180, '6 meses'], [365, '12 meses']];
   return `<div class="periodo-presets">
-    <span style="font-size:12px; color:#a5a49a; margin-right:4px;">Período do site:</span>
+    <span style="font-size:12px; color:var(--tx-3); margin-right:4px;">Período do site:</span>
     ${op.map(([d, r]) => `<button class="preset-btn ${SITE_JANELA === d ? 'active' : ''}" onclick="siteJanela(${d})">${r}</button>`).join('')}
   </div>`;
 }
@@ -3764,7 +3764,7 @@ function renderModuloSite() {
     <div class="contexto" style="border-color:#c8102e; margin-bottom:10px;">
       <b>A importação da venda está atrasada — não mande relatório antes de conferir.</b><br>
       ${vendaAtrasada.map(a => `${a.loja}: até <b>${ddmm(a.ate)}</b> (${siteDias(a.ate, fimISO)} dias atrás, fonte ${a.fonte})`).join(' · ')}<br>
-      <span style="font-size:12px; color:#a5a49a;">Onde a fonte é o Saipos, o problema é a importação diária das APIs (08:00). Onde é a Accon, é o cookie do portal.</span>
+      <span style="font-size:12px; color:var(--tx-3);">Onde a fonte é o Saipos, o problema é a importação diária das APIs (08:00). Onde é a Accon, é o cookie do portal.</span>
     </div>` : '';
   // Loja que esta em dia na importacao mas passou dias sem pedido pelo site: e
   // fato do negocio, nao falha de fonte. Fica como nota, nao como alerta.
@@ -3776,14 +3776,14 @@ function renderModuloSite() {
     <div class="contexto" style="margin-bottom:10px;">
       <b>Importação em dia; o que faltou foi pedido.</b>
       ${semPedido.map(a => `${a.loja}: último pedido pelo site em <b>${ddmm(a.ultima_venda_canal)}</b>, com o Saipos já trazido até ${ddmm(a.ate)}`).join(' · ')}.<br>
-      <span style="font-size:12px; color:#a5a49a;">Nenhuma venda foi perdida — a loja vendeu nos outros canais nesses dias e no site não entrou pedido.</span>
+      <span style="font-size:12px; color:var(--tx-3);">Nenhuma venda foi perdida — a loja vendeu nos outros canais nesses dias e no site não entrou pedido.</span>
     </div>` : '';
   const avisoCliente = clienteAtrasado.length ? `
-    <div class="contexto" style="border-color:#f5a623; margin-bottom:10px;">
+    <div class="contexto" style="border-color:var(--farol-perto); margin-bottom:10px;">
       <b>O dado de cliente envelheceu.</b>
       Novos, quem voltou e recência vão até <b>${ddmm(corteCliente)}</b> —
       ${clienteAtrasado.map(a => `${a.loja} ${ddmm(a.ate)} (${a.fonte === 'saipos' ? 'Saipos' : 'Accon'})`).join(' · ')}.<br>
-      <span style="font-size:12px; color:#a5a49a;">${clienteAtrasado.some(a => a.fonte === 'accon')
+      <span style="font-size:12px; color:var(--tx-3);">${clienteAtrasado.some(a => a.fonte === 'accon')
         ? 'No Boqueirão o cliente ainda vem do portal da Accon: é o cookie dele, que o dono renova (o login tem CAPTCHA). '
         : ''}${clienteAtrasado.some(a => a.fonte === 'saipos')
         ? 'Nas lojas do Saipos o cliente chega junto com a venda, pela importação diária das APIs (08:00) — atraso aqui é falha dela.'
@@ -4047,7 +4047,7 @@ function renderModuloSite() {
       const p = Number(c.novos) ? Number(c.voltaram) / Number(c.novos) * 100 : 0;
       const [ano, mes] = c.mes.split('-');
       return `<tr><td>${MESES_ABREV[Number(mes) - 1]}/${ano}</td><td>${num(c.novos)}</td><td>${num(c.voltaram)}</td>
-        <td style="color:${p >= 25 ? '#3fb950' : '#ff6b6b'}; font-weight:600;">${pct(p)}%</td>
+        <td style="color:${p >= 25 ? 'var(--farol-ok)' : 'var(--farol-fora)'}; font-weight:600;">${pct(p)}%</td>
         <td>${num(c.tres_ou_mais)}</td><td>${Number(c.pedidos_por_cliente || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td>${reais(c.receita_total)}</td></tr>`;
     }).join('')}
@@ -4270,7 +4270,7 @@ function foodyCobertura(rows) {
   if (!faltando.length || !presentes.length) return '';
   const UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz', 'BOQUEIRAO': 'Boqueirão' };
   const nome = u => UN[u] || u;
-  return `<div class="contexto" style="border-color:#ff6b6b;">
+  return `<div class="contexto" style="border-color:var(--farol-fora);">
     <b>Este número é só de ${presentes.map(nome).join(' e ')}.</b>
     Sem entrega registrada no período: ${faltando.map(nome).join(', ')}.
     Pode ser loja fechada no período ou fonte parada — confira em Sistema › Rotinas.
@@ -4483,7 +4483,7 @@ function renderModuloAtrasos() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Atrasos e turnos — entregas próprias${ATRASOS_UNIDADE !== 'TODAS' ? ' · ' + ATRASOS_UNIDADE : ''}, ${ddmm(ATRASOS.ini)} a ${ddmm(ATRASOS.fim)}</div>
   ${chips}
   ${foodyCobertura(ATRASOS.rows)}
-  <div class="contexto" style="border-color:#f5a623;" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz) e Foody (Boqueirão) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora. ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b> e tem tabela de corrida e fretes próprios.' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b>; para vê-lo, troque para Rede completa lá em cima.'}</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz) e Foody (Boqueirão) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora. ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b> e tem tabela de corrida e fretes próprios.' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b>; para vê-lo, troque para Rede completa lá em cima.'}</div>
 
   ${(ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador) ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -4877,7 +4877,7 @@ function renderModuloLogfin() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Financeiro da logística — entregas próprias${LOGFIN_UNIDADE !== 'TODAS' ? ' · ' + LOGFIN_UNIDADE : ''}, ${ddmm(LOGFIN.ini)} a ${ddmm(LOGFIN.fim)}</div>
   ${chips}
   ${foodyCobertura(LOGFIN.rows)}
-  <div class="contexto" style="border-color:#f5a623;" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: Foody Delivery (logística própria). ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b>, com tabela de corrida mais cara (7,50/9,00) e fretes próprios no iFood (quase sem abate).' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b> dos totais e do simulador; para vê-lo, troque para Rede completa lá em cima.'}</div>
+  <div class="contexto" style="border-color:var(--farol-perto);" title="Regra combinada de pagamento: o motoboy recebe o maior entre as corridas e o garantido por hora, turno a turno — R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no sábado e no domingo. A tarde parada entre almoço e jantar não conta como trabalhada. A hora é estimada da primeira à última entrega do turno, não é ponto batido: o complemento é a estimativa do painel para vigiar a conta, não o acerto real.">Fonte: Foody Delivery (logística própria). ${PERIMETRO === 'rede' ? 'Visão Rede completa — <b>inclui Boqueirão, que é gestão separada</b>, com tabela de corrida mais cara (7,50/9,00) e fretes próprios no iFood (quase sem abate).' : 'Visão Minha gestão — <b>Boqueirão (gestão separada) fica fora</b> dos totais e do simulador; para vê-lo, troque para Rede completa lá em cima.'}</div>
 
   <div class="cards">
     <div class="card"><div class="card-lbl">Entregas no período</div><div class="card-val">${entregas.toLocaleString('pt-BR')}</div><div class="card-pct">média de ${n1(dias ? entregas / dias : null)} por dia, em ${dias} dia(s) com entrega</div></div>
@@ -5098,8 +5098,8 @@ function renderModuloQualidade() {
     <div class="card neutral"><div class="card-lbl">Nível 4</div><div class="card-val">${n4}</div><div class="card-pct">loja(s)</div></div>
     <div class="card ${baixo ? 'neg' : 'pos'}"><div class="card-lbl">Nível 3 ou abaixo</div><div class="card-val">${baixo}</div><div class="card-pct">inclui "Não elegível"</div></div>
   </div>
-  ${caiu.length ? `<div class="contexto" style="border-color:#ff6b6b;"><b>Caíram de nível:</b> ${caiu.map(m => '<span' + (m.pior ? ' title="' + m.pior.detalhe + '"' : '') + '>' + m.loja + ' (' + m.de + ' → ' + m.para + ')' + (m.pior ? ' — piorou em ' + m.pior.rotulo : '') + '</span>').join(' · ')}</div>` : ''}
-  ${subiu.length ? `<div class="contexto" style="border-color:#3fb950;"><b>Subiram de nível:</b> ${subiu.map(m => `${m.loja} (${m.de} → ${m.para})`).join(' · ')}</div>` : ''}
+  ${caiu.length ? `<div class="contexto" style="border-color:var(--farol-fora);"><b>Caíram de nível:</b> ${caiu.map(m => '<span' + (m.pior ? ' title="' + m.pior.detalhe + '"' : '') + '>' + m.loja + ' (' + m.de + ' → ' + m.para + ')' + (m.pior ? ' — piorou em ' + m.pior.rotulo : '') + '</span>').join(' · ')}</div>` : ''}
+  ${subiu.length ? `<div class="contexto" style="border-color:var(--farol-ok);"><b>Subiram de nível:</b> ${subiu.map(m => `${m.loja} (${m.de} → ${m.para})`).join(' · ')}</div>` : ''}
   ${!caiu.length && !subiu.length && antIni ? '<div class="contexto">Nenhuma mudança de nível vs a semana anterior.</div>' : ''}
 
   <div class="section-label">Loja a loja — piores primeiro</div>
@@ -5109,8 +5109,8 @@ function renderModuloQualidade() {
       const sel = QUAL_LOJA === r.nome_loja;
       const a = antPor[r.nome_loja];
       const d = a ? rankNivel(r.nivel_super) - rankNivel(a.nivel_super) : null;
-      const seta = d === null ? '—' : d > 0 ? '<span style="color:#3fb950;">▲ subiu</span>' : d < 0 ? '<span style="color:#ff6b6b;">▼ caiu</span>' : '=';
-      const nivelCor = rankNivel(r.nivel_super) >= 5 ? '#3fb950' : rankNivel(r.nivel_super) === 4 ? '#c3c2b7' : '#ff6b6b';
+      const seta = d === null ? '—' : d > 0 ? '<span style="color:var(--farol-ok);">▲ subiu</span>' : d < 0 ? '<span style="color:var(--farol-fora);">▼ caiu</span>' : '=';
+      const nivelCor = rankNivel(r.nivel_super) >= 5 ? 'var(--farol-ok)' : rankNivel(r.nivel_super) === 4 ? 'var(--tx-2)' : 'var(--farol-fora)';
       return `<tr onclick="qualAbrirLoja(${iL})" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'A série desta loja está aberta logo abaixo — clique para fechar.' : 'Clique para ver as 8 últimas semanas desta loja.'}">
         <td>${sel ? '<b>' : ''}${r.nome_loja}${sel ? '</b> ✕' : ''}</td>
         <td style="color:${nivelCor}; font-weight:bold;">${r.nivel_super}</td>
