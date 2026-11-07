@@ -58,7 +58,7 @@ async function entrarOrcamentos() {
   }
   if (!orcAdmin()) { ORC.aba = 'equipe'; orcRender(); orcEquipe(); return; }
   try {
-    if (!ORC.base) ORC.base = await consultarTudo('vw_orc_item_escolha?select=item,un,custo_un,custo_fonte,custo_data,grupo&order=item');
+    if (!ORC.base) ORC.base = await consultarTudo('vw_orc_item_escolha?select=item,nome_base,un,custo_un,custo_fonte,custo_data,grupo&order=item');
     // 04/11/2026 11:15 (dono): a aba Itens usa os produtos do atacado (costelinha 1 kg, 500 g...), a mesma lista do ePadoca e da lojinha.
     // Preço sugerido do pacote = o mais alto entre as tabelas modelo do atacado (dono, 30/10 18:59: "a tabela mais alta do atacado").
     if (!ORC.produtos) {
@@ -143,7 +143,7 @@ function orcBuscar(i, el) {
   const r = el.getBoundingClientRect(), s = document.createElement('div');
   s.id = 'orcSug';
   s.style.cssText = `position:fixed;left:${r.left}px;top:${r.bottom + 2}px;width:${Math.max(r.width, 320)}px;max-height:300px;overflow:auto;z-index:10060;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.45);`;
-  s.innerHTML = ORC.sug.map((b, k) => `<div onmousedown="event.preventDefault();orcEscolher(${i}, ${k})" style="padding:7px 10px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);"><span>${trEscH(b.item)}</span><span style="color:var(--tx-4);">${trEscH(b.un || '')}</span></div>`).join('');
+  s.innerHTML = ORC.sug.map((b, k) => `<div onmousedown="event.preventDefault();orcEscolher(${i}, ${k})" style="padding:7px 10px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);"><span>${trEscH(b.nome_base || b.item)}</span><span style="color:var(--tx-4);">${trEscH(b.un || '')}</span></div>`).join('');
   document.body.appendChild(s);
 }
 function orcEscolher(i, k) {
@@ -368,8 +368,13 @@ async function orcHistorico() {
   if (ORC.aberto && !ORC.itens[ORC.aberto]) await orcLerItens(ORC.aberto);
   if (ORC.aba === 'historico') orcRender();
 }
+// 07/11/2026 (frente Atacado): item na tela = nome da base (vw_orc_orcamento_item.nome_base); sem nome na base, o nome gravado
+// aparece marcado "fora da base" (ex.: pedido da lojinha com o nome da ficha do atacado)
+function orcNomeBase(x) {
+  return x.nome_base ? trEscH(x.nome_base) : `${trEscH(x.item)} <span style="font-size:11px;color:var(--farol-perto);white-space:nowrap;">fora da base</span>`;
+}
 async function orcLerItens(id) {
-  ORC.itens[id] = await consultarTudo(`orc_orcamento_item?select=ordem,item,un,qtd_informada,por,qtd_total,preco_un,custo_un,custo_fonte,custo_data,custo_linha,produto_nome,produto_qtd,produto_preco&orcamento_id=eq.${Number(id)}&order=ordem`).catch(() => []);
+  ORC.itens[id] = await consultarTudo(`vw_orc_orcamento_item?select=ordem,item,nome_base,un,qtd_informada,por,qtd_total,preco_un,custo_un,custo_fonte,custo_data,custo_linha,produto_nome,produto_qtd,produto_preco&orcamento_id=eq.${Number(id)}&order=ordem`).catch(() => []);
 }
 async function orcAbrir(id) {
   ORC.aberto = ORC.aberto === id ? null : id;
@@ -403,7 +408,7 @@ function orcSeparacaoHtml(o) {
   const L = ORC.itens[o.id] || [];
   return `<h3 style="margin:0 0 8px;font-size:15px;">Lista de separação · orçamento nº ${o.id}${o.cliente ? ' · ' + trEscH(o.cliente) : ''}</h3>
     ${orcEntregaHtml(o)}<table><thead><tr><th>Item</th><th style="text-align:right;">Quantidade</th><th>Un</th></tr></thead>
-    <tbody>${L.map((x) => `<tr><td>${x.produto_nome ? `${orcQ(x.produto_qtd)} × ${trEscH(x.produto_nome)}` : trEscH(x.item)}</td><td style="text-align:right;">${orcQ(x.qtd_total)}</td><td>${trEscH(x.un)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${L.map((x) => `<tr><td>${x.produto_nome ? `${orcQ(x.produto_qtd)} × ${trEscH(x.produto_nome)}` : orcNomeBase(x)}</td><td style="text-align:right;">${orcQ(x.qtd_total)}</td><td>${trEscH(x.un)}</td></tr>`).join('')}</tbody></table>`;
 }
 // pedido do link: a linha tem o preço de venda (preco_un); no kit ele é por pessoa
 function orcLinhasPreco(o, lin) {
@@ -431,7 +436,7 @@ function orcDetalheHtml(o) {
       <div>${orcSeparacaoHtml(o)}<div style="margin-top:8px;"><button type="button" class="preset-btn" onclick="orcImprimir(${o.id},'separacao')">🖨 Imprimir a lista</button></div></div>
       <div>${orcClienteHtml(o)}<div style="margin-top:8px;"><button type="button" class="preset-btn" onclick="orcImprimir(${o.id},'cliente')">🖨 Imprimir o orçamento</button></div></div>
       <div><h3 style="margin:0 0 8px;font-size:15px;">Custo do dia</h3><table><thead><tr><th>Item</th><th style="text-align:right;">Custo do item</th><th>Origem</th><th style="text-align:right;">Custo</th></tr></thead>
-        <tbody>${L.map((x) => `<tr><td>${trEscH(x.item)}</td><td style="text-align:right;">${orcR(x.custo_un)}/${trEscH(x.un)}</td><td style="font-size:12px;">${orcFonte(x)}</td><td style="text-align:right;">${orcR(x.custo_linha)}</td></tr>`).join('')}</tbody>
+        <tbody>${L.map((x) => `<tr><td>${orcNomeBase(x)}</td><td style="text-align:right;">${orcR(x.custo_un)}/${trEscH(x.un)}</td><td style="font-size:12px;">${orcFonte(x)}</td><td style="text-align:right;">${orcR(x.custo_linha)}</td></tr>`).join('')}</tbody>
         <tfoot><tr class="sub"><td colspan="3">Custo</td><td style="text-align:right;">${orcR(o.custo_total)}</td></tr></tfoot></table></div>
     </div>`;
 }
