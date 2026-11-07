@@ -1289,8 +1289,8 @@ function renderConcbanco() {
         saldoTxt = '<span style="color:#b8860b">extrato parado'
           + (semExtratoDe === 'nunca' ? '' : ' em ' + semExtratoDe) + '</span>';
       } else if (parcialDia && parcialDia === diaAlvo) {
-        saldoTxt = '<span style="color:#b8860b">extrato parcial de ' + ddmm(parcialDia) + '</span>';
-        if (marca === '✗' || !c.temOntem) { marca = '?'; cor = '#b8860b'; }
+        saldoTxt = '<span style="color:var(--farol-perto)">extrato parcial de ' + ddmm(parcialDia) + '</span>';
+        if (marca === '✗' || !c.temOntem) { marca = '?'; cor = 'var(--farol-perto)'; }
         contaParcial.add(conta);
       } else {
         // O QUE VALE É O QUE SOBRA, não a diferença. Diferença explicada por data
@@ -1393,7 +1393,7 @@ function renderConcbanco() {
       + (ruins.length === 1 ? ' conta não fechou ' : ' contas não fecharam ')
       + quando + '.</b> Confira as linhas abaixo.'
     : contaParcial.size
-      ? '<b style="color:#b8860b">Extrato parcial ' + quando + '.</b> O saldo fecha quando chegar o extrato do dia inteiro.'
+      ? '<b style="color:var(--farol-perto)">Extrato parcial ' + quando + '.</b> O saldo fecha quando chegar o extrato do dia inteiro.'
     : '<b style="color:#2e7d32">Tudo certo ' + quando + '.</b> Nada a fazer nesta loja.';
 
   // O quadro "O QUE CORRIGIR NO SAIPOS" (25/09) saiu em 29/09 a pedido do dono:
@@ -1944,12 +1944,15 @@ function renderModuloEvolucao() {
   // 07/11/2026 (auditoria resultado-21, §C3): nas janelas de dias inteiros de semana (7 dias, 4 semanas),
   // a comparacao so usa os dias em que a loja abriu NOS DOIS periodos (o mesmo dia da semana).
   // Nas janelas longas a folga se dilui e o dia da semana nao casa: ficam como eram.
-  const parear = !ITEM && temBase && tamanho % 7 === 0;
+  // A venda mostrada (cards, grafico, quebras) e' a REAL; o pareamento so entra na variacao (atualPar x anterior).
+  const parear = !ITEM && temBase && (dias === 7 || dias === 28);
   const parOk = (r, desloc) => !parear || (lojaAbriu(r.unidade, r.data) && lojaAbriu(r.unidade, fxSomaDias(r.data, desloc)));
-  const foraPar = {};
-  const atual = (ITEM ? comoEvol(EVOL_ITENS.atual) : EVOL).filter(r => naJanela(r, janIni, janFim))
+  const foraPar = {}, foraParAnt = {};
+  const atual = (ITEM ? comoEvol(EVOL_ITENS.atual) : EVOL).filter(r => naJanela(r, janIni, janFim));
+  const atualPar = !parear ? atual : atual
     .filter(r => { if (parOk(r, -tamanho)) return true; const k = r.unidade + '|' + r.data; foraPar[k] = (foraPar[k] || 0) + Number(r.total || 0); return false; });
-  const anterior = temBase ? (ITEM ? comoEvol(EVOL_ITENS.anterior) : EVOL).filter(r => naJanela(r, janAntIni, janAntFim) && parOk(r, tamanho)) : [];
+  const anterior = temBase ? (ITEM ? comoEvol(EVOL_ITENS.anterior) : EVOL).filter(r => naJanela(r, janAntIni, janAntFim))
+    .filter(r => { if (parOk(r, tamanho)) return true; const k = r.unidade + '|' + r.data; foraParAnt[k] = (foraParAnt[k] || 0) + Number(r.total || 0); return false; }) : [];
 
   // `ignora` deixa a propria dimensao passar inteira — e o que mantem as outras
   // categorias clicaveis depois de escolher uma.
@@ -1958,6 +1961,7 @@ function renderModuloEvolucao() {
   const atualF = atual.filter(r => passaF(r)), anteriorF = anterior.filter(r => passaF(r));
   const atualC = atual.filter(r => passaF(r, 'canal')), antC = anterior.filter(r => passaF(r, 'canal'));
   const atualX = atual.filter(r => passaF(r, 'faixa')), antX = anterior.filter(r => passaF(r, 'faixa'));
+  const parF = atualPar.filter(r => passaF(r)), parC = atualPar.filter(r => passaF(r, 'canal')), parX = atualPar.filter(r => passaF(r, 'faixa'));
 
   const soma = (rows, campo) => rows.reduce((s, r) => s + Number(r[campo] || 0), 0);
   const tot = soma(atualF, 'total'), ped = soma(atualF, 'pedidos');
@@ -1969,6 +1973,8 @@ function renderModuloEvolucao() {
   const piorCanc = Object.entries(cancPorCanal).sort((a, b) => b[1] - a[1])[0];
   const totA = soma(anteriorF, 'total'), pedA = soma(anteriorF, 'pedidos');
   const tk = ped ? tot / ped : 0, tkA = pedA ? totA / pedA : 0;
+  // base da variacao: o atual so com os dias pareados (igual ao atual quando nao pareia)
+  const totP = soma(parF, 'total'), pedP = soma(parF, 'pedidos'), tkP = pedP ? totP / pedP : 0;
   const nDias = new Set(atualF.map(r => r.data)).size || 1;
 
   // palavra do fato separada do juizo — regra da casa
@@ -2030,11 +2036,12 @@ function renderModuloEvolucao() {
   const ultimoParcial = !fimDoGrao;
 
   // ---------- quebra generica ----------
-  const quebra = (campo, rows, rowsAnt) => {
-    const m = {}, mA = {};
+  const quebra = (campo, rows, rowsAnt, rowsPar) => {
+    const m = {}, mA = {}, mP = {};
     rows.forEach(r => { const o = m[r[campo]] || (m[r[campo]] = { total: 0, pedidos: 0 }); o.total += Number(r.total || 0); o.pedidos += Number(r.pedidos || 0); });
     rowsAnt.forEach(r => { const o = mA[r[campo]] || (mA[r[campo]] = { total: 0, pedidos: 0 }); o.total += Number(r.total || 0); o.pedidos += Number(r.pedidos || 0); });
-    return Object.entries(m).map(([k, o]) => ({ k, ...o, ant: mA[k] || null }))
+    (rowsPar || rows).forEach(r => { mP[r[campo]] = (mP[r[campo]] || 0) + Number(r.total || 0); });
+    return Object.entries(m).map(([k, o]) => ({ k, ...o, par: mP[k] || 0, ant: mA[k] || null }))
       .sort((a, b) => b.total - a.total);
   };
   const linhaQuebra = (x, totalGeral, tipo) => {
@@ -2046,7 +2053,7 @@ function renderModuloEvolucao() {
       <td>R$ ${fmt(x.total)}<span class="dre-av">${pct(share)}%</span></td>
       <td>${x.pedidos.toLocaleString('pt-BR')}</td>
       <td>R$ ${fmt(tkx)}</td>
-      <td>${varTxt(x.total, x.ant && x.ant.total)}</td></tr>`;
+      <td>${varTxt(x.par, x.ant && x.ant.total)}</td></tr>`;
   };
   // Cada quebra vira GRAFICO DE BARRA (o controle) + tabela (os numeros). Barra por
   // entidade usa UMA cor so: a identidade vem do rotulo do eixo, regra da skill
@@ -2061,14 +2068,14 @@ function renderModuloEvolucao() {
     <div id="${id}"><table>
       <tr><th>${titulo.split('—')[0].trim()}</th><th>Venda · % do total</th><th>Pedidos</th><th>Valor médio</th><th>vs período anterior</th></tr>
       ${itens.map(x => linhaQuebra(x, totD, tipo)).join('')}
-      <tr class="liq"><td>TOTAL</td><td>R$ ${fmt(totD)}</td><td>${somaPed.toLocaleString('pt-BR')}</td><td>R$ ${fmt(somaPed ? totD / somaPed : 0)}</td><td>${varTxt(totD, itens.reduce((t, x) => t + (x.ant ? x.ant.total : 0), 0))}</td></tr>
+      <tr class="liq"><td>TOTAL</td><td>R$ ${fmt(totD)}</td><td>${somaPed.toLocaleString('pt-BR')}</td><td>R$ ${fmt(somaPed ? totD / somaPed : 0)}</td><td>${varTxt(itens.reduce((t, x) => t + x.par, 0), itens.reduce((t, x) => t + (x.ant ? x.ant.total : 0), 0))}</td></tr>
     </table></div>`;
   };
 
   const FAIXA_ROT = { '1 MADRUGADA': 'Madrugada (0h–4h)', '2 MANHÃ': 'Manhã (5h–10h)', '3 ALMOÇO': 'Almoço (11h–14h)', '4 TARDE': 'Tarde (15h–17h)', '5 NOITE': 'Noite (18h–23h)' };
-  const porCanal = quebra('canal', atualC, antC).map(x => ({ ...x, rot: nomeCanal(x.k) }));
-  const porFaixa = quebra('faixa', atualX, antX).sort((a, b) => a.k < b.k ? -1 : 1).map(x => ({ ...x, rot: FAIXA_ROT[x.k] || x.k }));
-  const porLoja = quebra('unidade', atualF, anteriorF).map(x => ({ ...x, rot: UN_ROT[x.k] || x.k }));
+  const porCanal = quebra('canal', atualC, antC, parC).map(x => ({ ...x, rot: nomeCanal(x.k) }));
+  const porFaixa = quebra('faixa', atualX, antX, parX).sort((a, b) => a.k < b.k ? -1 : 1).map(x => ({ ...x, rot: FAIXA_ROT[x.k] || x.k }));
+  const porLoja = quebra('unidade', atualF, anteriorF, parF).map(x => ({ ...x, rot: UN_ROT[x.k] || x.k }));
   const totCanal = porCanal.reduce((t, x) => t + x.total, 0);
   const totFaixa = porFaixa.reduce((t, x) => t + x.total, 0);
 
@@ -2077,6 +2084,8 @@ function renderModuloEvolucao() {
   const faixas = Object.keys(FAIXA_ROT);
   const cel = {};
   atual.forEach(r => { const k = r.canal + '|' + r.faixa; cel[k] = (cel[k] || 0) + Number(r.total || 0); });
+  const celPar = {};
+  atualPar.forEach(r => { const k = r.canal + '|' + r.faixa; celPar[k] = (celPar[k] || 0) + Number(r.total || 0); });
   const celAnt = {};
   anterior.forEach(r => { const k = r.canal + '|' + r.faixa; celAnt[k] = (celAnt[k] || 0) + Number(r.total || 0); });
   const matriz = `
@@ -2088,13 +2097,14 @@ function renderModuloEvolucao() {
       ${faixas.filter(f => canais.some(c => cel[c + '|' + f])).map(f => {
         const linhaTot = canais.reduce((s, c) => s + (cel[c + '|' + f] || 0), 0);
         const linhaAnt = canais.reduce((s, c) => s + (celAnt[c + '|' + f] || 0), 0);
+        const linhaPar = canais.reduce((s, c) => s + (celPar[c + '|' + f] || 0), 0);
         return `<tr><td>${FAIXA_ROT[f]}</td>${canais.map(c => {
           const v = cel[c + '|' + f] || 0, a = celAnt[c + '|' + f];
           // clicar na celula fixa os DOIS filtros de uma vez — e o atalho do cruzamento
           const selC = EVOL_F.canal === c && EVOL_F.faixa === f;
           const cl = v ? ` onclick="evolMatriz('${c}','${f}')" style="cursor:pointer;${selC ? 'background:var(--brand-wine);' : ''}" title="${selC ? 'clique para soltar' : 'clique para ver só ' + nomeCanal(c) + ' na ' + FAIXA_ROT[f]}"` : '';
-          return `<td${cl}>${v ? 'R$ ' + fmt(v) : '—'}${v ? `<span class="dre-av">${varTxt(v, a)}</span>` : ''}</td>`;
-        }).join('')}<td><b>R$ ${fmt(linhaTot)}</b><span class="dre-av">${varTxt(linhaTot, linhaAnt)}</span></td></tr>`;
+          return `<td${cl}>${v ? 'R$ ' + fmt(v) : '—'}${v ? `<span class="dre-av">${varTxt(celPar[c + '|' + f] || 0, a)}</span>` : ''}</td>`;
+        }).join('')}<td><b>R$ ${fmt(linhaTot)}</b><span class="dre-av">${varTxt(linhaPar, linhaAnt)}</span></td></tr>`;
       }).join('')}
       <tr class="liq"><td>TOTAL</td>${canais.map(c => {
         const v = porCanal.find(x => x.k === c);
@@ -2239,8 +2249,9 @@ function renderModuloEvolucao() {
       A venda registrada no caixa das lojas (Saipos), por canal e por faixa de horário.
       ${unsComDado.length ? `<b>${unsComDado.map(u => UN_ROT[u] || u).join(', ')}</b>.` : ''}
       ${temBase ? `Comparando com ${ddmm(antIni)} a ${ddmm(antFim)}, do mesmo tamanho.` : 'Não há período anterior do mesmo tamanho na base para comparar.'}
-      ${(() => { const f = Object.entries(foraPar).filter(([, v]) => v > 0.005).sort();
-        return f.length ? `Fora da conta (loja fechada no mesmo dia do outro período): ${f.map(([k, v]) => { const [u, d] = k.split('|'); return (UN_ROT[u] || u) + ' ' + evolRotulo(d, 'dia') + ' R$ ' + fmt(v); }).join(' · ')}.` : ''; })()}
+      ${(() => { const lista = (o, suf) => Object.entries(o).filter(([, v]) => v > 0.005).sort().map(([k, v]) => { const [u, d] = k.split('|'); return (UN_ROT[u] || u) + ' ' + evolRotulo(d, 'dia') + ' R$ ' + fmt(v) + suf; });
+        const f = [...lista(foraPar, ''), ...lista(foraParAnt, ', no período anterior')];
+        return f.length ? `Fora da variação (loja fechada no mesmo dia do outro período; a venda continua nos totais): ${f.join(' · ')}.` : ''; })()}
     </div>
     ${seletor(EVOL_JANELAS, EVOL_JANELA, 'evolJanela')}
     ${(EVOL_F.canal || EVOL_F.faixa || ITEM) ? `<div class="contexto" style="border-color:var(--brand);">
@@ -2260,11 +2271,11 @@ function renderModuloEvolucao() {
 
     <div class="cards">
       <div class="card blue"><div class="card-lbl">${ITEM ? 'Receita do item no período' : 'Venda no período'}</div>
-        <div class="card-val">R$ ${fmt(tot)}</div><div class="card-pct">${varTxt(tot, totA)}</div></div>
+        <div class="card-val">R$ ${fmt(tot)}</div><div class="card-pct">${varTxt(totP, totA)}</div></div>
       <div class="card neutral"><div class="card-lbl">${ITEM ? 'Pedidos com o item' : 'Pedidos'}</div>
-        <div class="card-val">${ped.toLocaleString('pt-BR')}</div><div class="card-pct">${varTxt(ped, pedA)}</div></div>
+        <div class="card-val">${ped.toLocaleString('pt-BR')}</div><div class="card-pct">${varTxt(pedP, pedA)}</div></div>
       <div class="card neutral"><div class="card-lbl">${ITEM ? 'Do item por pedido' : 'Valor médio por pedido'}</div>
-        <div class="card-val">R$ ${fmt(tk)}</div><div class="card-pct">${varTxt(tk, tkA)}</div></div>
+        <div class="card-val">R$ ${fmt(tk)}</div><div class="card-pct">${varTxt(tkP, tkA)}</div></div>
       <div class="card neutral"><div class="card-lbl">${ITEM ? 'Receita por semana' : 'Venda por dia'}</div>
         <div class="card-val">R$ ${fmt(tot / nDias)}</div><div class="card-pct">média de ${nDias} ${ITEM ? 'semana(s)' : 'dia(s)'} com venda</div></div>
       ${ITEM ? '' : `<div class="card ${tot && canc / tot * 100 > 1.2 ? 'neg' : 'neutral'}"><div class="card-lbl">Cancelados</div>
@@ -2320,7 +2331,7 @@ function renderModuloEvolucao() {
             afterLabel: (c) => {
               const x = itens[c.dataIndex];
               return (EVOL_F[tipo] === x.k ? 'clique para soltar' : 'clique para filtrar a tela')
-                + (x.ant ? ' · ' + varTxt(x.total, x.ant.total).replace(/<[^>]+>/g, '') : '');
+                + (x.ant ? ' · ' + varTxt(x.par, x.ant.total).replace(/<[^>]+>/g, '') : '');
             },
           } },
         },
@@ -3331,9 +3342,9 @@ function renderHoje() {
 
     // ---- tabela 1: o mes em andamento ----
     const mPess = plcMeta('PESSOAL', [ult]);
-    const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ontem e previsão até o fim do mês</div>' +
+    const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ' + ddmm(ontemIso) + ' e previsão até o fim do mês</div>' +
       '<div id="tabelaHojeRumoMes" class="cel-cartao"><table><tr><th>Loja</th>' +
-      '<th>Vendido até ontem' + sub('caixa das lojas · ' + um(corrido) + '% do mês já passou') + '</th>' +
+      '<th>Vendido até ' + ddmm(ontemIso) + sub('caixa das lojas · ' + um(corrido) + '% do mês já passou') + '</th>' +
       '<th>Previsto no mês' + sub('no ritmo das últimas 4 semanas') + '</th>' +
       '<th>Meta do mês' + sub('a receita que dá 10% de resultado') + '</th>' +
       '<th>CMO estimado' + sub('meta até ' + (mPess ? um(mPess.meta) : '—') + '% · escala e horas') + '</th>' +
@@ -3448,7 +3459,7 @@ function renderEstaSemana() {
       cardHome('Marketing por pedido no iFood', 'R$ ' + fmt(atual.custoMktPorPedido), vs(atual.custoMktPorPedido, antes.custoMktPorPedido),
         corMeta('mkt_por_pedido', atual.custoMktPorPedido)) +
       '</div>' +
-      '<div class="caption-label" style="text-align:center;">Fonte: pedidos importados toda manhã (dados até ' + ddmm(iso(ontem)) + ', o último dia completo).' +
+      '<div class="caption-label" style="text-align:center;">Fonte: pedidos importados toda manhã (dados até ' + ddmm(iso(ontem)) + ', o último dia completo). ' +
       'Cores nos cards = farol da meta correspondente; cinza = sem meta para este número.</div>';
   } else {
     blocoEmCurso = '<div class="contexto">Ainda não há dia completo nesta semana — os números entram depois da importação da manhã (até 10:00).</div>';
@@ -8382,7 +8393,8 @@ function fxlMontar(par, tit, det) {
   let dataPartida = null;
   (par || []).filter((p) => !fxlConta(p.conta)).forEach((p) => {
     inicial[p.unidade] = (inicial[p.unidade] || 0) + Number(p.saldo_partida || 0);
-    if (!dataPartida || p.data_partida > dataPartida) dataPartida = p.data_partida;
+    // a data do saldo e' a do extrato do banco; o cofre vem do Saipos com a data de hoje-1 e nao conta
+    if (!/^COFRE/.test(p.conta) && (!dataPartida || p.data_partida > dataPartida)) dataPartida = p.data_partida;
   });
   const lin = (r, dia) => ({ unidade: r.unidade, conta: r.conta, lado: (r.sentido === 'PAGAR' || Number(r.efeito) < 0) ? 'PAGAR' : 'RECEBER',
     origem: r.origem, entre_lojas: r.entre_lojas === true || (r.entre_lojas == null && (r.origem === 'LISTAS' || projEntreLojas(r))), situacao: r.situacao || 'PREVISTO', descricao: String(r.descricao_tela || r.descricao || r.subtipo || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),   // dono 05/11: "(parc. …)" é da nossa carga, não está no Saipos
