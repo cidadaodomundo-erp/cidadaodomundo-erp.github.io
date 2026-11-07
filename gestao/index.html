@@ -73,13 +73,23 @@
 <script src="../nucleo/vendas.js?v=20261105c"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="../canal/canal.js?v=20261105a"></script>
-<script src="gestao.js?v=20261107f"></script>
+<script src="gestao.js?v=20261107g"></script>
 <script>
 // O que é desta página: qual tela abrir, a carga de vendas antes dela e a troca de tela por dentro.
 const TELAS_GESTAO = ['estasemana', 'hoje', 'placar', 'indicadores', 'semana', 'fechamento', 'evolucao', 'dre', 'fluxo',
   'despesas', 'lucrouni', 'concbanco', 'conciliacao', 'contaspagar', 'contasreceber', 'projecao', 'rede'];
 const TELAS_DAQUI = new Set([...TELAS_GESTAO, 'resumo', 'cancelamentos', 'promocoes']);
-const TELA = TELAS_GESTAO.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'estasemana';
+// 07/11/2026 (dono, Reorganizacao do menu): a Esta semana entrou na Hoje (semana em curso) e o Fechamento do mês
+// virou a aba "O mês em uma página" do Placar. Os endereços antigos continuam abrindo o lugar certo.
+const TELA_JUNTADA = { estasemana: 'hoje', fechamento: 'placar' };
+function telaDe(nome) {
+  if (nome === 'estasemana') HOJE_IR_SEMANA = true;
+  if (nome === 'fechamento') PLC_ABA = 'fech';
+  if (nome === 'placar') PLC_ABA = 'oito';
+  return TELA_JUNTADA[nome] || nome;
+}
+const TELA_PEDIDA = TELAS_GESTAO.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'hoje';
+const TELA = telaDe(TELA_PEDIDA);
 // as mesmas listas do painel antigo
 const MODULOS_COM_RODAPE = new Set(['estasemana', 'resumo', 'cancelamentos',
   'promocoes', 'negociacoes', 'avaliacoes', 'relatorios', 'contestacoes']);
@@ -92,7 +102,7 @@ function moduloAtivo() { return MODULO_ATUAL; }
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
   if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
-  location.href = '../sistema.html#' + TELA;   // aberta solta (botão "abrir"): a porta é a da casca
+  location.href = '../sistema.html#' + TELA_PEDIDA;   // aberta solta (botão "abrir"): a porta é a da casca
 }
 
 function renderAll() {
@@ -108,6 +118,7 @@ function renderAll() {
 
 // Tela daqui: troca por dentro (o recorte do Placar vai junto). Outra tela: a casca abre.
 function mostrarModulo(nome) {
+  nome = telaDe(nome);
   if (!TELAS_DAQUI.has(nome)) {
     if (NA_CASCA) { TROCA_DENTRO = false; avisarCasca({ tipo: 'casca-modulo', nome }); return; }
     location.href = '../sistema.html#' + nome; return;
@@ -131,7 +142,7 @@ async function abrirTela() {
     VENDAS_CARREGADAS = true;
     document.getElementById('loadingMsg').style.display = 'none';
     document.getElementById('painel').style.display = 'block';
-    mostrarModulo(TELA);
+    mostrarModulo(TELA_PEDIDA);
     avisarCasca({ tipo: 'casca-pronto', modulo: TELA });
   } catch (e) {
     document.getElementById('loadingMsg').style.display = 'none';
@@ -140,7 +151,7 @@ async function abrirTela() {
   }
 }
 // a casca reabre a tela: volta para a tela desta moldura e recarrega os dados dela
-window.reentrarTela = () => { try { TROCA_DENTRO = false; mostrarModulo(TELA); } catch (e) {} };
+window.reentrarTela = () => { try { TROCA_DENTRO = false; mostrarModulo(TELA_PEDIDA); } catch (e) {} };
 window.addEventListener('hashchange', () => location.reload());
 abrirTela();
 

@@ -2868,9 +2868,8 @@ function acaoLinha(chave) {
 }
 
 // ---------------- A FAIXA DE ALERTAS, compartilhada (12/09/2026) ----------------
-// Era o bloco A da tela "Esta semana" e, na revisão dos módulos, a decisão foi que
-// ela vira a barra de alertas do PLACAR. Em vez de copiar, virou função: as duas
-// telas chamam a MESMA. Regra da casa — alerta duplicado é alerta que um dia diverge.
+// Era o bloco A da tela "Esta semana" e foi também a barra do Placar. Desde 07/11/2026
+// (dono, Reorganizacao do menu) ela aparece só na Hoje na rede. Regra da casa — alerta duplicado é alerta que um dia diverge.
 // Ela é a única coisa do painel que diz "faça isto agora", não "isto aconteceu".
 async function carregarAlertas() {
   if (NEGOCIACOES === null) await entrarNegociacoesSoDados();
@@ -2921,91 +2920,37 @@ function alertasAgora() {
   return agora;
 }
 
-function blocoAlertas(semLink) {
-  const todos = alertasAgora();
-  const agora = (todos && semLink) ? todos.filter(a => a.link !== semLink) : todos;
-  if (agora === null) return '';
-  return agora.length
-    ? agora.map(a => '<div class="contexto" style="border-color:' + a.cor + '; margin-bottom:8px;' + (a.link ? ' cursor:pointer;' : '') + '"' +
-        (a.link ? ' onclick="mostrarModulo(\'' + a.link + '\')"' : '') + '>' + a.txt + '</div>').join('')
-    : '<div class="contexto" style="border-color:#3fb950;">Nada esperando ação sua neste momento. ✔</div>';
-}
+// (07/11/2026) blocoAlertas saiu: a faixa mora so na Hoje, que desenha alertasAgora() direto.
 
-// A FAIXA C da Esta semana virou funcao em 15/10/2026: a Hoje na rede mostra a MESMA
-// tabela de metas (regra da casa: o mesmo numero se calcula num lugar so). `titulo(ini, fim)`,
-// quando vem, troca so o titulo. Texto movido sem mudar uma conta.
-function blocoMetasSemanaFechada(titulo) {
-  const iso = (d) => d.toISOString().slice(0, 10);
+// A FAIXA C da Esta semana virou funcao em 15/10/2026. 07/11/2026 (dono, Reorganizacao do menu:
+// "Indicadores e metas fica: unico lugar da tabela de metas"; a Esta semana entrou na Hoje): a tabela
+// mora so nos Indicadores; aqui sobra o FAROL da semana fechada (quantas no verde, perto e fora) com o
+// atalho para la. A conta e' a mesma (computeKpisSemana + farolKpi). `titulo(ini, fim)` troca o titulo.
+function farolMetasSemanaFechada(titulo) {
   const ddmm = (v) => v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '—';
-  // ---------- FAIXA C: placar da ultima semana fechada ----------
   const sem = ultimaSemanaCompleta();
-  const antFim = new Date(sem.ini + 'T00:00:00'); antFim.setDate(antFim.getDate() - 1);
-  const antIni = new Date(antFim); antIni.setDate(antIni.getDate() - 6);
   const atualK = computeKpisSemana(sem.ini, sem.fim);
-  const antK = computeKpisSemana(iso(antIni), iso(antFim));
-
   const chips = (METAS_KPI || []).map(k => {
     const v = atualK[k.chave];
     const [cor, rotulo] = farolKpi(k, v);
-    return { k, v, cor, rotulo, ant: antK[k.chave] };
+    return { k, v, cor, rotulo };
   });
   const verdes = chips.filter(c => c.cor === '#3fb950').length;
   const atencao = chips.filter(c => c.cor !== '#3fb950');
   const nContam = chips.filter(c => !metaSoRede(c.k)).length;
 
-  const concIncompleta = HOME_PEND.concAte && HOME_PEND.concAte < sem.fim;
-  const avisoConc = concIncompleta
-    ? '<div class="contexto" style="border-color:#f5a623;">Conciliação só até <b>' + ddmm(HOME_PEND.concAte) +
-      '</b> — líquido, margem e marketing da semana fechada estão PROVISÓRIOS até o iFood liberar o ciclo (baixar o zip de agosto na sexta).</div>'
-    : '';
-
-  // A coluna "vs anterior" diz o FATO (subiu/caiu). Quem diz se isso e' bom ou ruim e' o
-  // SENTIDO da meta, nunca o sinal da variacao: em meta "abaixo" (cancelamento, marketing
-  // por pedido) subir e' piorar; em "acima" (nota, alavancagem) e' o contrario; em "faixa"
-  // o que vale e' ter chegado mais perto ou mais longe dela. Por isso a marca compara
-  // DISTANCIAS ate a meta, e nao os dois valores.
-  const distDaMeta = (k, v) => {
-    if (v === null || v === undefined) return null;
-    const m = Number(k.meta);
-    const m2 = (k.meta2 === null || k.meta2 === undefined || k.meta2 === '') ? null : Number(k.meta2);
-    if (k.sentido === 'abaixo') return Math.max(0, v - m);
-    if (k.sentido === 'acima') return Math.max(0, m - v);
-    return Math.max(0, m - v, m2 === null ? 0 : v - m2);   // faixa: o quanto ficou fora dela
-  };
-  const marcaRumo = (c) => {
-    // na visao Rede as metas nao valem (mesma regra de farolKpi) — sem regua, sem rumo
-    if ((typeof PERIMETRO !== 'undefined' && PERIMETRO === 'rede') || metaSoRede(c.k)) return '';
-    const da = distDaMeta(c.k, c.v), db = distDaMeta(c.k, c.ant);
-    if (da === null || db === null) return '';
-    const dif = da - db;
-    if (Math.abs(dif) < Math.abs(Number(c.k.meta) || 1) * 0.005) return '';   // meio por cento da meta e' ruido
-    const piorou = dif > 0;
-    return ' <b style="color:var(--farol-' + (piorou ? 'fora' : 'ok') + ');"'
-      + ' title="Comparado com a distância da meta na semana anterior.">'
-      + (piorou ? 'piorou' : 'melhorou') + '</b>';
-  };
-  const linhasAtencao = atencao.length
-    ? atencao.map(c =>
-        '<tr><td><span class="dre-farol" style="background:' + c.cor + ';"></span>' + nomeMeta(c.k) + '</td>' +
-        '<td>' + fmtKpi(c.k.unidade, c.v) + '</td>' +
-        '<td>' + (metaSoRede(c.k) ? 'só da Rede' : fmtKpi(c.k.unidade, Number(c.k.meta)) + (c.k.meta2 !== null && c.k.meta2 !== undefined && c.k.meta2 !== '' ? ' a ' + fmtKpi(c.k.unidade, Number(c.k.meta2)) : '')) + '</td>' +
-        '<td style="font-size:11.5px;">' + (c.ant === null || c.ant === undefined || c.v === null || c.v === undefined || !c.ant
-          ? '—' : ((c.v - c.ant) / Math.abs(c.ant) * 100 >= 0 ? 'subiu' : 'caiu') + ' ' + Math.abs((c.v - c.ant) / Math.abs(c.ant) * 100).toFixed(1).replace('.', ',') + '%' + marcaRumo(c)) + '</td>' +
-        '<td style="font-size:11.5px; color:#c3c2b7;">' + (acaoBotao(c.k.chave) || acaoTexto(c.k.chave)) + '</td></tr>'
-      ).join('')
-    : '';
-
-  const blocoPlacar =
-    '<div class="section-label">' + (titulo ? titulo(sem.ini, sem.fim) : 'Semana fechada ' + ddmm(sem.ini) + ' a ' + ddmm(sem.fim) + ' — o que pede atenção') + '</div>' +
-    avisoConc +
-    '<div class="contexto" style="border-color:#3fb950;"><b>' + verdes + ' de ' + nContam + ' metas no verde.</b> ' +
-    (atencao.length ? 'As que não estão:' : 'Semana limpa — nada fora da meta.') + '</div>' +
-    (atencao.length
-      ? '<div id="tabelaHomeAtencao" class="cel-cartao"><table><tr><th>Meta</th><th>Semana</th><th>Alvo</th><th>vs anterior</th><th>O que fazer</th></tr>' + linhasAtencao + '</table></div>'
-      : '') +
-    '<div style="text-align:center; margin-top:10px;"><button class="navbtn" onclick="mostrarModulo(\'indicadores\')">placar completo de metas</button> ' +
-    '<button class="navbtn" onclick="mostrarModulo(\'relatorios\')">resumo semanal</button></div>';
-  return blocoPlacar;
+  const concIncompleta = HOME_PEND && HOME_PEND.concAte && HOME_PEND.concAte < sem.fim;
+  // o farol: verde, perto e fora (cinza = meta so da Rede ou sem dado, fica fora da conta)
+  const perto = atencao.filter(c => c.cor === '#f5a623'), fora = atencao.filter(c => c.cor === '#ff6b6b');
+  const nomes = (l) => l.map(c => nomeMeta(c.k)).join(', ');
+  const borda = fora.length ? 'var(--farol-fora)' : perto.length ? 'var(--farol-perto)' : 'var(--farol-ok)';
+  return '<div class="section-label">' + (titulo ? titulo(sem.ini, sem.fim) : 'Metas da semana fechada ' + ddmm(sem.ini) + ' a ' + ddmm(sem.fim)) + '</div>' +
+    '<div class="contexto" style="border-color:' + borda + '; cursor:pointer;" onclick="mostrarModulo(\'indicadores\')" title="Abrir os Indicadores e metas">' +
+    '<b>' + verdes + ' de ' + nContam + ' metas no verde</b>' +
+    (perto.length ? ' · <span style="color:var(--farol-perto); font-weight:700;">● ' + perto.length + ' perto</span> (' + nomes(perto) + ')' : '') +
+    (fora.length ? ' · <span style="color:var(--farol-fora); font-weight:700;">● ' + fora.length + ' fora</span> (' + nomes(fora) + ')' : '') +
+    (concIncompleta ? ' · provisório: conciliação do iFood só até ' + ddmm(HOME_PEND.concAte) : '') +
+    ' · <b>Indicadores e metas →</b></div>';
 }
 
 // ==================================================================
@@ -3017,11 +2962,13 @@ function blocoMetasSemanaFechada(titulo) {
 //  o que pede gente agora, a venda da semana de TODOS os canais, o caixa e as metas.
 //
 //  NAO TEM CONTA PROPRIA. Cada bloco le o que outra tela ja calcula:
-//    alertas  -> blocoAlertas('rotinas')   (a faixa da Esta semana e do Placar, sem o de rotina)
+//    alertas  -> alertasAgora()           (07/11: a faixa de alertas mora so aqui; saiu da Esta semana e do Placar)
 //    venda    -> EVOL / vw_venda_evolucao  (a base da Evolucao de vendas, campo total)
 //    caixa    -> projCalc('')              (os cartoes do Fluxo projetado, mesmos nomes)
 //    rumo     -> plcAgrega / plcMeta       (o Placar = a DRE, por loja e Rede) + fin_meta_venda_loja
-//    metas    -> blocoMetasSemanaFechada() (a tabela da Esta semana, so iFood)
+//    metas    -> farolMetasSemanaFechada() (so o farol; a tabela mora nos Indicadores, dono 07/11)
+//  07/11/2026 (dono, Reorganizacao do menu): a Esta semana entrou aqui como "semana em curso" (o
+//  bloco da venda da semana). O endereco antigo #estasemana abre esta tela ja na semana.
 //  Numero que precise mudar muda LA; esta tela acompanha sozinha.
 //
 //  So abre pela casca (docs/sistema.html) ate o dono validar: nao ha botao no menu deste
@@ -3230,14 +3177,15 @@ function renderHoje() {
       '<td>' + fxInt(a.p) + '</td><td>' + (a.p ? 'R$ ' + fmt(a.t / a.p) : '—') + '</td></tr>';
     // O QUE E' REDE E O QUE E' SO iFOOD VAI NO TITULO (dono, 15/10: a letra miuda ao lado "as
     // vezes passa batido por quem está lendo").
-    b2 = '<div class="section-label">Venda ' + (V.emCurso ? 'da semana' : 'da semana passada') + ' · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + ' · todos os canais · ' +
+    // 07/11/2026 (dono): a Esta semana entrou aqui — este bloco e' a "semana em curso"; o detalhe do iFood fica no Resumo do canal
+    b2 = '<div class="section-label" id="hojeSemana">' + (V.emCurso ? 'Semana em curso' : 'Semana passada') + ' · venda · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + ' · todos os canais · ' +
       diaRot(V.iniIso) + ' a ' + diaRot(V.fimIso) + '</div>' +
       '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th><th>Valor médio</th></tr>' +
       V.linhas.filter(l => !finVazio() || l.u === finVazio()).map(l => linha(l.nome, l.a, l.ca, l.cb,
         [l.atrasada ? 'dados até ' + ddmm(l.ate) : '', l.fora.length ? 'variação sem ' + l.fora.map(diaRot).join(', ') + ' (fechada numa das semanas)' : ''].filter(Boolean).join(' · '))).join('') +
       (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.ca, V.rede.cb, '', true)) + '</table></div>' +
       hojeFeriadoNota(V) +
-      '<div style="text-align:center; margin-top:8px;">' + botao('evolucao', 'Evolução de vendas') + '</div>';
+      '<div style="text-align:center; margin-top:8px;">' + botao('evolucao', 'Evolução de vendas') + ' ' + botao('resumo', 'iFood por dentro') + '</div>';
   }
 
   // ---------- 3. caixa da rede ----------
@@ -3407,106 +3355,36 @@ function renderHoje() {
     b4s = '<div class="section-label">Indicadores de rumo</div>' + aviso('Não consegui montar os indicadores: ' + e.message);
   }
 
-  // ---------- 5. metas do iFood da semana fechada ----------
-  // As metas seguem o filtro de loja do topo (como na Esta semana). Esta tela nao mostra o
-  // filtro, entao avisa quando alguem o mudou em outra tela.
+  // ---------- 5. farol das metas do iFood da semana fechada (a tabela mora nos Indicadores) ----------
+  // As metas seguem o filtro de loja do topo. Esta tela nao mostra o filtro, entao avisa quando
+  // alguem o mudou em outra tela.
   const filtroMudou = !canalComSeletor() && typeof unidadesVisiveis === 'function' && activeUnidades.size !== unidadesVisiveis().length;
   let b4;
   try {
     b4 = (filtroMudou ? aviso('As metas abaixo estão filtradas por loja (filtro mudado em outra tela).') : '') +
-      blocoMetasSemanaFechada((ini, fim) => 'Metas do iFood · só o iFood · ' + (finVazio() ? lojaNome(finVazio()) : 'lojas das três unidades') + ' · ' + ddmm(ini) + ' a ' + ddmm(fim));
+      farolMetasSemanaFechada((ini, fim) => 'Metas do iFood · só o iFood · ' + (finVazio() ? lojaNome(finVazio()) : 'lojas das três unidades') + ' · ' + ddmm(ini) + ' a ' + ddmm(fim));
   } catch (e) { b4 = '<div class="section-label">Metas da semana fechada</div>' + aviso('Não consegui montar as metas: ' + e.message); }
 
   alvo.innerHTML =
     '<div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px;">' +
     '<h2 style="margin:0; font-size:20px;">Hoje na rede</h2>' +
     '<span style="color:var(--tx-5); font-size:13px;">' + diaRot(hojeIso) + ' · ' + (finVazio() ? lojaNome(finVazio()) : 'Água Verde, Ahú e São Braz') + '</span></div>' +
-    // no celular a venda vem antes das filas, que ocupam quase uma tela inteira
-    (matchMedia('(max-width:760px)').matches ? b2 + b1 : b1 + b2) + b3 + b4s + b4;
-}
-
-async function entrarEstaSemana() {
-  const alvo = document.getElementById('view-estasemana');
-  if (!alvo) return;
-  alvo.innerHTML = '<div class="contexto">Montando a leitura da semana...</div>';
-  try {
-    if (METAS_KPI === null) {
-      METAS_KPI = await consultarTudo('metas_kpi?select=chave,nome,bloco,sentido,meta,meta2,unidade,descricao,ordem&ativo=eq.true&order=ordem');
-    }
-    await Promise.all([carregarAlertas(), cargaDiaLer()]);
-    renderEstaSemana();
-  } catch (e) {
-    alvo.innerHTML = '<div class="contexto" style="border-color:#ff6b6b;">Não consegui montar a home: ' + e.message + '</div>';
+    // 07/11/2026 (dono): o dia em cima (filas e caixa), a semana em curso logo abaixo, o farol das
+    // metas da semana e o mes por ultimo. No celular a venda vem antes das filas, que ocupam quase uma tela.
+    (matchMedia('(max-width:760px)').matches ? b2 + b1 + b3 : b1 + b3 + b2) + b4 + b4s;
+  // o endereco antigo da Esta semana (#estasemana) abre aqui, ja na semana em curso
+  if (HOJE_IR_SEMANA) {
+    HOJE_IR_SEMANA = false;
+    const s = document.getElementById('hojeSemana');
+    if (s) s.scrollIntoView({ block: 'start' });
   }
 }
 
-function renderEstaSemana() {
-  const alvo = document.getElementById('view-estasemana');
-  const iso = (d) => d.toISOString().slice(0, 10);
-  const ddmm = (v) => v ? v.slice(8, 10) + '/' + v.slice(5, 7) : '—';
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const dow = (hoje.getDay() + 6) % 7; // 0 = segunda
-  const segAtual = new Date(hoje); segAtual.setDate(segAtual.getDate() - dow);
-  // 07/11/2026 (auditoria resultado-20): "ontem" = o ultimo dia COMPLETO da importacao do iFood (09:00).
-  // De madrugada o ontem tinha so os pedidos ate 01:30 e o cartao dizia "caiu 13,9%".
-  const ontem = new Date(cargaUltimoDia('ifood') + 'T00:00:00');
-  const temSemanaEmCurso = ontem >= segAtual;
+let HOJE_IR_SEMANA = false;
 
-  // FAIXA A: precisa de gente agora. A conta mora em alertasAgora(), fora daqui,
-  // porque o Placar mostra a MESMA faixa (decisao da revisao, 12/09/2026).
-  const blocoAgora = blocoAlertas();
-
-  // ---------- FAIXA B: semana em curso vs mesmos dias da anterior ----------
-  let blocoEmCurso = '';
-  if (temSemanaEmCurso) {
-    const atual = computeMetrics(iso(segAtual), iso(ontem));
-    const pIni = new Date(segAtual); pIni.setDate(pIni.getDate() - 7);
-    const pFim = new Date(ontem); pFim.setDate(pFim.getDate() - 7);
-    const antes = computeMetrics(iso(pIni), iso(pFim));
-
-    const vs = (a, b, casas = 1) => {
-      if (!b) return '<span style="color:#8a897e;">sem base</span>';
-      const v = (a - b) / b * 100;
-      return (v >= 0 ? 'subiu ' : 'caiu ') + Math.abs(v).toFixed(casas).replace('.', ',') + '%';
-    };
-    const metaDe = (chave) => (METAS_KPI || []).find(k => k.chave === chave) || null;
-    const corMeta = (chave, v) => { const k = metaDe(chave); return k ? farolKpi(k, v)[0] : '#34332f'; };
-
-    const cardHome = (lbl, valor, sub, cor) =>
-      '<div class="card neutral" style="border:1px solid ' + (cor || '#34332f') + ';">' +
-      '<div class="card-lbl">' + lbl + '</div><div class="card-val">' + valor + '</div>' +
-      '<div class="card-pct">' + sub + '</div></div>';
-
-    const ticketA = atual.totalPedidos ? atual.bruto / atual.totalPedidos : 0;
-    const ticketB = antes.totalPedidos ? antes.bruto / antes.totalPedidos : 0;
-
-    blocoEmCurso =
-      '<div class="section-label">Semana em curso — seg ' + ddmm(iso(segAtual)) + ' a ' + ddmm(iso(ontem)) +
-      ' <span style="text-transform:none; font-weight:normal; font-size:12px; color:#8a897e;">(vs os mesmos dias da semana passada)</span></div>' +
-      '<div class="cards">' +
-      cardHome('Pedidos no iFood', atual.totalPedidos, vs(atual.totalPedidos, antes.totalPedidos)) +
-      cardHome('Bruto no iFood', 'R$ ' + fmt(atual.bruto), vs(atual.bruto, antes.bruto)) +
-      cardHome('Ticket médio no iFood', 'R$ ' + fmt(ticketA), vs(ticketA, ticketB)) +
-      cardHome('Cancelamento no iFood', pct(atual.nFullPct) + '%', vs(atual.nFullPct, antes.nFullPct) + ' · meta ' +
-        (metaDe('taxa_cancelamento') ? fmtKpi('pct', Number(metaDe('taxa_cancelamento').meta)) : '—'),
-        corMeta('taxa_cancelamento', atual.nFullPct)) +
-      cardHome('Marketing por pedido no iFood', 'R$ ' + fmt(atual.custoMktPorPedido), vs(atual.custoMktPorPedido, antes.custoMktPorPedido),
-        corMeta('mkt_por_pedido', atual.custoMktPorPedido)) +
-      '</div>' +
-      '<div class="caption-label" style="text-align:center;">Fonte: pedidos importados toda manhã (dados até ' + ddmm(iso(ontem)) + ', o último dia completo). ' +
-      'Cores nos cards = farol da meta correspondente; cinza = sem meta para este número.</div>';
-  } else {
-    blocoEmCurso = '<div class="contexto">Ainda não há dia completo nesta semana — os números entram depois da importação da manhã (até 10:00).</div>';
-  }
-
-  const blocoPlacar = blocoMetasSemanaFechada();
-
-  alvo.innerHTML =
-    '<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Precisa de você agora</div>' +
-    blocoAgora + blocoEmCurso + blocoPlacar +
-    '<div class="caption-label" style="text-align:center; margin-top:14px;">Esta página segue os filtros de loja do topo. ' +
-    'Regra da casa: subiu/caiu é o fato; bom ou ruim depende da meta — o farol decide.</div>';
-}
+// 07/11/2026 (dono, Reorganizacao do menu: "Esta semana junta: entra na Hoje, como a parte semana em curso"):
+// a tela saiu. Os cartoes do iFood ficam no Resumo do canal, a tabela de metas nos Indicadores e a faixa de
+// alertas na Hoje. O endereco #estasemana abre a Hoje na semana em curso (gestao/index.html).
 
 // Recorte desta tela (12/09/2026): "só o que não está no verde". Mesmo mecanismo
 // de chip do resto do painel — o botao aceso diz onde voce esta, e o outro desfaz.
@@ -4029,7 +3907,7 @@ const PLC_TILES = [
     def: 'Margem de contribuição = receita líquida − mercadoria, a mesma da DRE. A receita líquida já vem sem o custo dos canais (anúncios dentro), sem comissão de vendedor e sem ICMS. ',
     telas: [['dre', 'DRE'], ['rateio', 'Preço alvo por produto']] },
   { id: 'res',   rot: 'Resultado',              un: 'R$', meta: 'RESULTADO',   v: a => a.resultado,
-    telas: [['fechamento', 'Fechamento do mês'], ['dre', 'DRE'], ['lucrouni', 'Lucro por unidade']] },
+    telas: [['fechamento', 'O mês em uma página'], ['dre', 'DRE'], ['lucrouni', 'Lucro por unidade']] },
   { id: 'caixa', rot: 'Caixa',                  un: 'R$', meta: null,          v: a => a.caixa,
     def: 'Caixa = quanto subiu ou caiu na conta, pela ponte que fecha contra o banco. ',
     // lucrouni entra aqui tambem porque ele e' o caixa POR LOJA — a revisao pediu a
@@ -4063,6 +3941,14 @@ let PLC_VISTA = null;    // o recorte que o Placar esta mostrando agora (preench
 let PLC_UNID_ANTES = null;
 
 function plcAbrirTela(modulo, tileId) {
+  // 07/11/2026: o Fechamento do mês é aba do Placar — troca de aba, no último mês do período que está na tela
+  if (modulo === 'fechamento') {
+    const ult = PLC_VISTA && PLC_VISTA.meses.length ? String(PLC_VISTA.meses[PLC_VISTA.meses.length - 1]).slice(0, 7) : null;
+    const m = ult && FX_M ? FX_M.dre.map(r => r.mes).find(x => String(x).slice(0, 7) === ult) : null;
+    if (m) FX_MES_SEL = m;
+    plcAba('fech');
+    return;
+  }
   const t = PLC_TILES.find(x => x.id === tileId);
   if (PLC_VISTA) PLC_CTX[modulo] = {
     tile: tileId, rotTile: t ? t.rot : '',
@@ -4273,14 +4159,37 @@ async function entrarPlacar() {
     await fxCarregarM();
   }
   renderPlacar();
-  // A faixa de alertas chega depois, sem segurar os numeros: ela vem de outras
-  // quatro fontes e o Placar nao pode esperar por elas para aparecer.
-  carregarAlertas().then(renderPlacar).catch(() => {});
+  // 07/11/2026 (dono, Reorganizacao do menu): a faixa de alertas saiu do Placar — ela mora so na Hoje.
+  if (PLC_ABA === 'fech' && DFC_MENSAL === null) garantirDadosFin().then(() => { if (MODULO_ATUAL === 'placar' && PLC_ABA === 'fech') renderPlacar(); }).catch(() => {});
+}
+
+// AS DUAS ABAS DO PLACAR (07/11/2026, dono: "Fechamento do mês junta: vira uma aba do Placar"). As duas leem a
+// mesma carga (FX_M). 'oito' = os oito números; 'fech' = o mês em uma página (o antigo Fechamento do mês,
+// desenhado pela mesma renderFechamento, dentro do Placar). O endereço antigo #fechamento abre o Placar nesta aba.
+let PLC_ABA = 'oito';
+
+function plcAba(a) {
+  PLC_ABA = a === 'fech' ? 'fech' : 'oito';
+  renderPlacar();
+  // "As contas batem com o banco?" (seção do mês) lê DFC_CONF, que só carrega por garantirDadosFin
+  if (PLC_ABA === 'fech' && DFC_MENSAL === null) garantirDadosFin().then(() => { if (MODULO_ATUAL === 'placar' && PLC_ABA === 'fech') renderPlacar(); }).catch(() => {});
+  window.scrollTo(0, 0);
+}
+
+function plcAbasHtml() {
+  return `<div class="periodo-presets" style="margin:0 0 10px;">
+    <button class="preset-btn ${PLC_ABA === 'oito' ? 'active' : ''}" onclick="plcAba('oito')">Os oito números</button>
+    <button class="preset-btn ${PLC_ABA === 'fech' ? 'active' : ''}" onclick="plcAba('fech')">O mês em uma página</button></div>`;
 }
 
 function renderPlacar() {
   const alvo = document.getElementById('view-placar');
   if (!alvo || !FX_M) return;
+  if (PLC_ABA === 'fech') {
+    alvo.innerHTML = plcAbasHtml() + '<div id="view-placar-fech"></div>';
+    renderFechamento();
+    return;
+  }
   const periodos = plcPeriodos();
   if (!periodos.length) { alvo.innerHTML = '<div class="contexto">Ainda não há mês fechado para montar o placar.</div>'; return; }
   if (!periodos.some(p => p.chave === PLC_SEL)) PLC_SEL = periodos[periodos.length - 1].chave;
@@ -4425,11 +4334,10 @@ function renderPlacar() {
   const segPer = periodos.slice(-14).map(p =>
     `<button class="preset-btn ${PLC_SEL === p.chave ? 'active' : ''}" onclick="plcPeriodo('${p.chave}')">${p.rot}</button>`).join('');
 
-  // no celular os avisos e a explicação vêm depois dos números
+  // no celular o seletor de loja vem depois dos números. 07/11/2026: a faixa de alertas saiu (mora na Hoje).
   const plcCel = matchMedia('(max-width:760px)').matches;
-  const plcAvisos = (() => { const b = blocoAlertas(); return b ? `<div class="section-label">O que precisa de você agora</div>
-      <div class="caption-label" style="text-align:center;">A mesma faixa da tela "Esta semana" — aqui e lá ela é a mesma conta, não uma cópia. Clique no aviso para ir direto na tela dele.</div>${b}` : ''; })() + seletorLojaFin();
-  alvo.innerHTML = `
+  const plcAvisos = seletorLojaFin();
+  alvo.innerHTML = plcAbasHtml() + `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">O Placar — ${nomeLojaFin()} · ${atual.rot}</div>
     <div class="caption-label cel-esconde" style="text-align:center;">Contra o período anterior e contra a meta. <b>Clique num número para abrir.</b></div>
     ${plcCel ? '' : plcAvisos}
@@ -4450,14 +4358,16 @@ function renderPlacar() {
       <tr class="liq"><td>${lojaNome('REDE')}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, A))}</td>`).join('')}</tr></table></div>` : ''}
     ${quebra}
     <div class="caption-label" title="Sem comparação com 2025: a venda começa em 02/01/2026.">
-      Só meses fechados — o último é ${fxMesLongo(plcMesesFechados()[plcMesesFechados().length - 1])}, na mesma conta do Fechamento do mês.
+      Só meses fechados — o último é ${fxMesLongo(plcMesesFechados()[plcMesesFechados().length - 1])}, na mesma conta da aba "O mês em uma página".
     </div>`;
   const plcPerAtivo = alvo.querySelector('.plc-per .active');   // no celular a fila de meses rola de lado: abre no escolhido
   if (plcPerAtivo) plcPerAtivo.parentElement.scrollLeft = plcPerAtivo.offsetLeft - plcPerAtivo.parentElement.offsetLeft - 40;
 }
 
 function renderFechamento() {
-  const alvo = document.getElementById('view-fechamento');
+  // 07/11/2026: o Fechamento do mês é a aba "O mês em uma página" do Placar — desenha dentro dele
+  const alvo = document.getElementById(MODULO_ATUAL === 'placar' ? 'view-placar-fech' : 'view-fechamento');
+  if (!alvo || !FX_M) return;
   const meses = [...new Set(FX_M.dre.map(r => r.mes))].sort().filter(m => m.slice(0, 7) < mesCorrenteSP());
   if (!meses.includes(FX_MES_SEL)) FX_MES_SEL = meses[meses.length - 1];
   const mes = FX_MES_SEL, iM = meses.indexOf(mes), ant = meses[iM - 1];
@@ -6028,7 +5938,7 @@ function renderModuloDRE() {
         <div class="caption-label" style="text-align:center;">
           "Pra onde foi o dinheiro" — do resultado do mês até o que sobrou nos bancos e cofres —
           é a mesma conta, na mesma view, da seção <b>4. E no caixa?</b> do
-          <a href="javascript:void(0)" onclick="mostrarModulo('fechamento')" style="color:var(--info);">Fechamento do mês</a>.
+          <a href="javascript:void(0)" onclick="mostrarModulo('fechamento')" style="color:var(--info);">Placar · O mês em uma página</a>.
           Um cálculo, um dono: mora lá.
         </div>`;
       }
@@ -6969,27 +6879,16 @@ const CP_GRUPOS = [
 const cpFxlLoja = () => CP.loja || 'REDE';
 
 function cpHojeLimpo() {
+  // 07/11/2026 (auditoria dinheiro-11): a tabela "Hoje — pela conta do Fluxo projetado" repetia o Fluxo
+  // projetado número a número. Fica uma linha com o saldo final de hoje da loja escolhida e o atalho para lá.
   if (!FXL || !FXL.dias.length) return '';
-  const mil = (v) => (Math.abs(v) < 0.5 ? '0' : (v < 0 ? '−' : '') + fmt(Math.abs(v)).replace(/,\d\d$/, ''));
   const d0 = FXL.dias[0];
-  const lojas = finLinhas();
-  const lk = (k, v) => `<a href="javascript:void(0)" data-fxl="1" onclick="cpHojeAbrir('${k}')" style="color:inherit; text-decoration:underline dotted;" title="ver o que compõe">${mil(v)}</a>`;
-  let h = `<div class="section-label">Hoje — ${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}, pela conta do Fluxo projetado</div>
-    <div id="tabelaCpHoje" class="cel-cartao" style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Saldo inicial</th><th>A receber</th><th>A pagar</th><th>Saldo final</th></tr></thead><tbody>`;
-  lojas.forEach(([u, nome]) => {
-    const x = d0.unidades[u];
-    h += `<tr${u === 'REDE' ? ' class="liq"' : ''}><td>${nome}</td><td>${mil(x.saldo_inicial)}</td>
-      <td>${lk(`${u}|RECEBER`, x.a_receber)}</td><td>${lk(`${u}|PAGAR`, x.a_pagar)}</td>
-      <td style="font-weight:700; color:${x.saldo_final < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(x.saldo_final)}</td></tr>`;
-  });
-  h += `</tbody></table></div>
-    <div class="caption-label" style="text-align:left;">Em R$. O mesmo número do Fluxo projetado: saldo do fim de ontem (extrato); a pagar e a receber = os títulos que vencem até hoje (em aberto ou já pagos hoje no Saipos) + o previsto do dia que ainda não tem título. Clique num valor para ver o que o compõe.</div>`;
-  if (CP.fxlAberto) {
-    const [u, lado] = CP.fxlAberto.split('|');
-    const nome = lojaNome(u);
-    h += fxlComposicao(d0.unidades[u].composicao.filter((c) => c.lado === lado), `${lado === 'PAGAR' ? 'A pagar' : 'A receber'} · ${nome} · hoje`);
-  }
-  return h;
+  const x = d0.unidades[cpFxlLoja()];
+  if (!x) return '';
+  const v = x.saldo_final;
+  const mil = (n) => (n < 0 ? '−' : '') + 'R$ ' + (Math.abs(n) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' mil';
+  return `<div class="contexto" style="border-color:${v < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)'}; cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado">
+    Saldo final de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b> · <b>ver no Fluxo projetado →</b></div>`;
 }
 
 function cpHojeAbrir(k) { CP.fxlAberto = CP.fxlAberto === k ? null : k; const a = document.getElementById('cpHojeWrap'); if (a) a.innerHTML = cpHojeLimpo(); }
@@ -7218,8 +7117,7 @@ function renderContasReceber() {
     const rotJ = JAN.map(([de, ate]) => de === 0 ? `Hoje a ${ffDdmm(ds[Math.min(ate, ds.length - 1)].dia)}` : `${ffDdmm(ds[Math.min(de, ds.length - 1)].dia)} a ${ffDdmm(ds[Math.min(ate, ds.length - 1)].dia)}`);
     const cel = (k, v) => Math.abs(v) < 0.5 ? '<td>—</td>' : `<td><a href="javascript:void(0)" data-fxl="1" onclick="crFxlAbrir('${k}')" style="color:inherit; text-decoration:underline dotted;">${cpMil(v)}</a></td>`;
     topo = `<div class="cards cards-3">
-      <div class="card pos" style="cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado"><div class="card-lbl">A receber até ${ffDdmm(ate7)}</div><div class="card-val">${reais(entra7)}</div>
-        <div class="card-pct">títulos + previsto: o mesmo do Fluxo projetado</div></div>
+      <div class="card pos" style="cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado"><div class="card-lbl">A receber até ${ffDdmm(ate7)}</div><div class="card-val">${reais(entra7)}</div></div>
       <div class="card ${totAtr > 0.005 ? 'neg' : 'pos'}" style="cursor:pointer;" onclick="cpFiltro('situacao','VENCIDA')"><div class="card-lbl">Atrasado</div><div class="card-val">${reais(totAtr)}</div>
         <div class="card-pct">${atrasados.length ? `${atrasados.length} título(s)${atrFilial > 0.005 ? ` · ${reais(atrFilial)} das filiais` : ''}` : 'ninguém atrasado'}</div></div>
       ${SUB_FILIAL[CP.loja]
@@ -9336,7 +9234,7 @@ function renderModuloConciliacao() {
     { nome: 'Categorias genéricas no mês', n: valorGenerico > 0.005 ? 1 : 0, valor: valorGenerico },
     { nome: 'Lançamentos sem classificação', n: CONF_SEMCLASS.length, valor: CONF_SEMCLASS.reduce((t, x) => t + Number(x.debito) - Number(x.credito), 0) },
   ].filter(x => x.n > 0);
-  const saldoTotal = ativas.filter(c => !c.conta.startsWith('CREDITO')).reduce((s, c) => s + c.saldo, 0);
+  // 07/11/2026 (auditoria dinheiro-20): o saldo conta a conta e o total saíram — moram na Conciliação bancária (banco ao lado).
 
   let blocos = '';
 
@@ -9501,8 +9399,6 @@ function renderModuloConciliacao() {
   <div class="cards">
     <div class="card ${alertas === 0 ? 'pos' : 'neg'}"><div class="card-lbl">Pontos de atenção</div>
       <div class="card-val">${alertas}</div><div class="card-pct">${alertas === 0 ? 'base consistente' : 'detalhes abaixo'}</div></div>
-    <div class="card blue"><div class="card-lbl">Saldo em conta (painel)</div>
-      <div class="card-val">R$ ${fmt(saldoTotal)}</div><div class="card-pct">bancos, cofre e investimentos</div></div>
     <div class="card"><div class="card-lbl">Contas ativas</div><div class="card-val">${ativas.length}</div>
       <div class="card-pct">com lançamentos no ano</div></div>
     <div class="card ${CONF_SEMCLASS.length ? 'neg' : 'pos'}"><div class="card-lbl">Sem classificação</div>
@@ -9521,20 +9417,7 @@ function renderModuloConciliacao() {
     </div>
   </div>` : ''}
   ${alertas === 0 ? '<div class="contexto" style="border-color:#3fb950;">Nenhuma inconsistência encontrada na base. 🎉</div>' : blocos}
-  <div class="section-label">Saldo por conta (para bater com o extrato)</div>
-  <div id="tabelaSaldos"><table>
-    <tr><th>Conta</th><th>Saldo no Saipos</th><th>Último lançamento</th><th>Lançamentos</th></tr>
-    ${CONF_SALDOS.map(c => `<tr class="${c.lancamentos ? '' : 'dfc-linha'}">
-      <td>${nomeConta(c.conta)}</td>
-      <td class="${c.saldo < -0.005 ? 'negativo' : ''}">R$ ${fmt(c.saldo)}</td>
-      <td>${fmtData(c.ultimo_lancamento)}</td>
-      <td>${c.lancamentos || '—'}</td></tr>`).join('')}
-    <tr class="liq"><td>TOTAL<div style="font-size:11px; font-weight:400; opacity:.75;">inclui a XP e a Participações: R$ ${fmt(CONF_SALDOS.filter(c => PROJ_FORA_CAIXA.includes(c.conta)).reduce((s, c) => s + Number(c.saldo || 0), 0))}</div></td>
-      <td>R$ ${fmt(CONF_SALDOS.reduce((s, c) => s + Number(c.saldo || 0), 0))}</td>
-      <td></td><td>${CONF_SALDOS.reduce((s, c) => s + Number(c.lancamentos || 0), 0).toLocaleString('pt-BR')}</td></tr>
-  </table></div>
-  <div class="caption-label" title="O painel não vê o extrato do banco: se um recebimento nunca foi lançado no Saipos, aqui ele só aparece indiretamente (saldo negativo ou conta parada) — a confirmação vem da conciliação bancária.">Saldo = saldo inicial de 01/01 + todos os lançamentos de caixa (planilha até jul, Saipos depois).
-  Cartões aparecem com saldo negativo enquanto a fatura não é paga — é o normal.</div>`;
+  <div class="contexto" style="cursor:pointer;" onclick="mostrarModulo('concbanco')" title="abrir a Conciliação bancária">O saldo conta a conta, com o banco ao lado, fica na <b>Conciliação bancária →</b></div>`;
 }
 
 // O MIOLO DO mostrarModulo (05/11/2026): MOVIDO do painel, igual. O painel antigo e a página da Gestão chamam o mesmo.
@@ -9678,7 +9561,6 @@ function prepararTela(nome) {
 
 // O PEDAÇO DO mostrarModulo QUE É DA GESTÃO (05/11/2026): o que cada tela faz ao entrar.
 function entrarTelaGestao(nome) {
-  if (nome === 'estasemana') entrarEstaSemana();
   if (nome === 'hoje') entrarHoje();
   if (nome === 'evolucao') entrarEvolucao();
   if (nome === 'placar') entrarPlacar();
@@ -9699,7 +9581,5 @@ function entrarTelaGestao(nome) {
 
 // O PEDAÇO DO renderAll QUE É DA GESTÃO (05/11/2026): só redesenha se as fontes da tela já carregaram.
 function renderAllGestao(ativo) {
-  if (ativo === 'estasemana' && HOME_PEND !== null && METAS_KPI !== null
-      && NEGOCIACOES !== null && AVALIACOES !== null) renderEstaSemana();
   if (ativo === 'evolucao' && EVOL !== null) renderModuloEvolucao();
 }
