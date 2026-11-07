@@ -45,9 +45,10 @@ async function entrarReembolsos() {
 }
 // a próxima sexta (o dia de pagar reembolso)
 function rmbProxSexta() { const d = new Date(cgHojeIso() + 'T12:00:00'); do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5); return d.toLocaleDateString('en-CA'); }
-function rmbStatusTxt(g, lim) {
+// 07/11/2026 (dono: "pode ser acima de 300 a Hellen"): a Hellen aprova todos; o pedido dela vai ao dono
+function rmbStatusTxt(g, hellen) {
   const s = g.status;
-  if (s === 'PEDIDO' || s === 'REVISAR') return Number(g.valor) > lim ? 'esperando o dono' : 'esperando a Hellen';
+  if (s === 'PEDIDO' || s === 'REVISAR') return hellen && g.pessoa === hellen ? 'esperando o dono' : 'esperando a Hellen';
   if (s === 'APROVADO') return 'aprovado: vai ser lançado';
   if (s === 'LANCADO' || s === 'LANÇADO') return `vai ser pago sexta, ${cgDiaMes(rmbProxSexta())}`;
   if (s === 'PAGO') return `✓ pago${g.pago_em ? ' em ' + cgDiaMes(String(g.pago_em)) : ''}`;
@@ -63,7 +64,8 @@ function renderModuloReembolsos(dados) {
   const vis = gestor ? gastos : gastos.filter((g) => minha && g.pessoa === minha.pessoa);
   const R = (v) => cgR(Number(v) || 0);
   const corSt = (g) => g.status === 'PAGO' ? 'var(--farol-ok)' : g.status === 'RECUSADO' ? 'var(--farol-fora)' : (g.status === 'PEDIDO' ? 'var(--farol-perto)' : 'var(--tx-3)');
-  const podeDecidir = (g) => gestor && g.status === 'PEDIDO' && !(minha && g.pessoa === minha.pessoa) && (Number(g.valor) <= limite || souODono());
+  const hellen = (pess.find((p) => String(p.email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br') || {}).pessoa || null;
+  const podeDecidir = (g) => gestor && g.status === 'PEDIDO' && !(minha && g.pessoa === minha.pessoa);
   const deve = (lst) => lst.filter((g) => ['APROVADO', 'LANCADO', 'LANÇADO'].includes(g.status)).reduce((a, g) => a + Number(g.valor || 0), 0);
   const F = RMB_FORM;
   let h = `<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;">Pedir reembolso</div>`;
@@ -96,7 +98,7 @@ function renderModuloReembolsos(dados) {
     h += `<div id="tabelaRmb" style="overflow-x:auto;"><table><thead><tr><th>Pedido em</th>${gestor ? '<th>Quem</th>' : ''}<th>O que foi</th><th>Valor</th><th>Situação</th><th></th></tr></thead><tbody>
       ${vis.map((g) => `<tr><td>${cgData(g.data_gasto)}</td>${gestor ? `<td>${cgEsc(nomeDe(g.pessoa))} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(g.unidade || '')}</span></td>` : ''}
         <td style="white-space:normal;">${cgEsc(g.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgEsc(String(g.subtipo || '').toLowerCase())}</span></td>
-        <td>${R(g.valor)}</td><td style="color:${corSt(g)};font-weight:700;">${cgEsc(rmbStatusTxt(g, limite))}</td>
+        <td>${R(g.valor)}</td><td style="color:${corSt(g)};font-weight:700;">${cgEsc(rmbStatusTxt(g, hellen))}</td>
         <td style="white-space:nowrap;">${g.comprovante_url ? `<button type="button" class="preset-btn" onclick='rmbVerNota(${JSON.stringify(g.comprovante_url)})'>comprovante</button>` : ''}
           ${podeDecidir(g) ? ` ${cgBotaoPasso('Aprovar', `rmbDecidir(${g.id},true)`)} ${cgBotaoPasso('Recusar', `rmbDecidir(${g.id},false)`, true)}` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   }
@@ -104,7 +106,7 @@ function renderModuloReembolsos(dados) {
     const porP = [...new Set(gastos.map((g) => g.pessoa))].map((p) => [p, deve(gastos.filter((g) => g.pessoa === p))]).filter(([, v]) => v > 0);
     if (porP.length) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve: ${porP.map(([p, v]) => `<b>${cgEsc(nomeDe(p))}</b> ${R(v)}`).join(' · ')}</div>`;
   } else if (minha) h += `<div class="contexto" style="text-align:left;margin-top:10px;">A empresa deve <b>${R(deve(vis))}</b> a você${deve(vis) ? ' (aprovado e ainda não pago)' : ''}.</div>`;
-  h += `<div class="caption-label" style="text-align:left;margin-top:8px;">Até ${R(limite)} a Hellen aprova; acima, o dono. Pago na sexta, por PIX.</div>`;
+  h += `<div class="caption-label" style="text-align:left;margin-top:8px;">A Hellen aprova (o pedido dela, o dono). Pago na sexta, por PIX.</div>`;
   alvo.innerHTML = h;
 }
 let RMB_FORM = { aberto: false };
@@ -130,7 +132,7 @@ async function rmbEnviarGasto() {
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     RMB_FORM.aberto = false;
     await entrarReembolsos();
-    avisoAcao('ok', `✓ Pedido enviado às ${avisoHora()} — ${valor > (REEMBOLSOS ? REEMBOLSOS.limite : 300) ? 'o dono aprova' : 'a Hellen aprova'}; o pagamento é na sexta.`);
+    avisoAcao('ok', `✓ Pedido enviado às ${avisoHora()} — a Hellen aprova; o pagamento é na sexta.`);
   } catch (e) { avisoAcao('erro', '✗ Não enviou o pedido: ' + e.message, rmbEnviarGasto); }
 }
 async function rmbDecidir(id, aprova) {
