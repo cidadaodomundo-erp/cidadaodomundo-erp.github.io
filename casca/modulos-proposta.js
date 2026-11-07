@@ -17,15 +17,17 @@
       cardapio: 'Desempenho do cardápio',
       logfin: 'Motoboys · Financeiro da logística',
       macertos: 'Motoboys · Acertos (junta com o de cima)',
-      reembolsos: 'Reembolsos (sai do menu)',
+      reembolsos: 'Pedir reembolso',
     },
     // telas que hoje não estão no menu e entram na simulação
-    extras: { reembolsos: { rotulo: 'Reembolsos (sai do menu)', icone: '💸' } },
+    extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' } },   // 07/11 (dono): fica, sem histórico, só para pedir daqui pra frente
+    // 07/11 (dono: "será que essa separação de lançar e acompanhar é necessária?"): na simulação o módulo abre UMA lista
+    semAbas: true,
     modulos: [
       { id: 'p-agora', nome: 'Agora', icone: '📍',
         lancar: [], acompanhar: ['hoje', 'estasemana', 'vendasagora', 'atividades'] },
       { id: 'p-dinheiro', nome: 'Dinheiro', icone: '💰',
-        lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa'],
+        lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
         acompanhar: ['projecao', 'fluxo', 'rede'] },
       { id: 'p-resultado', nome: 'Resultado', icone: '📊',
         lancar: [], acompanhar: ['placar', 'fechamento', 'semana', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
@@ -46,7 +48,6 @@
         lancar: [], acompanhar: ['atrasos', 'atendimento', 'link:portal-qualidade'] },
       { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
       { id: 'p-sistema', nome: 'Sistema', icone: '⚙️', lancar: [], acompanhar: ['plano', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
-      { id: 'p-sai', nome: 'Sai do menu', icone: '🗑️', lancar: [], acompanhar: ['reembolsos'] },
     ],
   };
 })();

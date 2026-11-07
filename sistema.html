@@ -198,7 +198,7 @@
 <script src="casca/menu.js?v=20261106d"></script>
 <script src="casca/paginas.js?v=20261106a"></script>
 <script src="casca/modulos.js?v=20261106d"></script>
-<script src="casca/modulos-proposta.js?v=20261107c"></script>
+<script src="casca/modulos-proposta.js?v=20261107d"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
 const SUPABASE_URL = 'https://rtmgzsikwglsvpopbfbw.supabase.co';
@@ -553,6 +553,7 @@ function inicio() {
     if (!nl && !na && !m.emConstrucao) return;           // acesso restrito: só os módulos com tela dele
     if (!nl && !na && PODE) return;
     const n = m.emConstrucao && !nl && !na ? 'em construção'
+      : PROPOSTA && PROPOSTA.semAbas ? `${nl + na} ${nl + na === 1 ? 'tela' : 'telas'}`
       : [nl ? `${nl} para lançar` : '', na ? `${na} para acompanhar` : ''].filter(Boolean).join(' · ');
     h += `<button class="card${!nl && !na ? ' vazio' : ''}" type="button" data-modulo="${esc(m.id)}"><span class="t"><span>${esc(m.icone)}</span>${esc(m.nome)}</span><span class="n">${n}</span></button>`;
   });
@@ -577,14 +578,15 @@ function abrirModulo(id, aba) {
   ABA_ATUAL = aba || (nl ? 'lancar' : 'acompanhar');
   $('titulo').textContent = m.icone + ' ' + m.nome;
   const casa = $('vista').querySelector('.home');
-  const lista = telasDo(m, ABA_ATUAL);
+  const semAbas = PROPOSTA && PROPOSTA.semAbas;   // simulação: uma lista só, na ordem do menu
+  const lista = semAbas ? [...telasDo(m, 'lancar'), ...telasDo(m, 'acompanhar')] : telasDo(m, ABA_ATUAL);
   let h = `<div class="home-cab"><button class="voltar" type="button" data-inicio="1">← Início</button><h1>${esc(m.icone)} ${esc(m.nome)}</h1></div>
-    <div class="abas">${['lancar', 'acompanhar'].map((a) => `<button class="aba${a === ABA_ATUAL ? ' on' : ''}" type="button" data-aba="${a}">${a === 'lancar' ? 'Lançar' : 'Acompanhar'} (${telasDo(m, a).length})</button>`).join('')}</div>
+    <div class="abas"${semAbas ? ' style="display:none;"' : ''}>${['lancar', 'acompanhar'].map((a) => `<button class="aba${a === ABA_ATUAL ? ' on' : ''}" type="button" data-aba="${a}">${a === 'lancar' ? 'Lançar' : 'Acompanhar'} (${telasDo(m, a).length})</button>`).join('')}</div>
     <div class="cards">`;
   h += lista.length ? lista.map((k) => { const i = ITENS[k];
     return `<button class="card" type="button" data-chave="${esc(k)}"><span class="t"><span>${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}</span>` +
       (DESC[k] ? `<span class="d">${esc(DESC[k])}</span>` : '') + '</button>'; }).join('')
-    : `<div class="gh" style="text-transform:none; letter-spacing:0;">${ABA_ATUAL === 'lancar' ? 'Nada para lançar neste módulo.' : 'Nada para acompanhar neste módulo.'}</div>`;
+    : `<div class="gh" style="text-transform:none; letter-spacing:0;">${semAbas ? 'Nenhuma tela neste módulo.' : ABA_ATUAL === 'lancar' ? 'Nada para lançar neste módulo.' : 'Nada para acompanhar neste módulo.'}</div>`;
   h += '</div>';
   casa.innerHTML = h;
   casa.onclick = (e) => {
