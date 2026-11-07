@@ -692,9 +692,7 @@ function formatarDataCurta(iso) {
   const lugar = document.getElementById('rodapeVendas');
   if (lugar) lugar.outerHTML = `
     <div class="footer">
-      Líquido usa o valor calculado pelo iFood (coluna Valor Liquido do relatorio). "Recebido direto" estima o valor que nao passa pelo repasse do iFood
-      (pagamento na entrega e vale-refeicao, liquidados direto pela operadora de cartao/beneficio). Cancelamentos totais sao excluidos do Bruto e do Liquido;
-      cancelamentos parciais entram pelo valor efetivamente realizado. Dados ao vivo, direto do banco Supabase.
+      Líquido = venda (itens + frete) menos taxas, comissões e entregas do iFood, promoções pagas por nós e anúncios, mais o que o iFood devolveu de cancelamento; cancelamento total fica fora, o parcial entra pelo que ficou.
     </div>
 `;
 })();
@@ -716,8 +714,10 @@ function computeMetrics(iniAlt = null, fimAlt = null) {
   const vendasOnline = fin.filter(r=>r[18]===idxOnline).reduce((s,r)=>s+(r[8]-r[9])+r[10],0);
   const vendasCartao = fin.filter(r=>r[18]===idxCartao).reduce((s,r)=>s+(r[8]-r[9])+r[10],0);
 
-  const promoIfoodRede = fin.reduce((s,r)=>s+r[11]+r[12],0);
-  const promoLoja = fin.reduce((s,r)=>s+r[13],0);
+  // 07/11/2026 (auditoria lote 2, canal-24): o incentivo da REDE sai do nosso bolso — entra com o da loja, nunca
+  // com o do iFood (mesma conta da tela Promocoes, canal.js "nosso = loja + rede"). Hoje e' R$ 0 em todo o historico.
+  const promoIfoodRede = fin.reduce((s,r)=>s+r[11],0);   // so o iFood (o nome ficou por compatibilidade)
+  const promoLoja = fin.reduce((s,r)=>s+r[13]+r[12],0);  // loja + rede
   const freteSobDemanda = fin.reduce((s,r)=>s+r[16],0);
   const ticketMedio = totalPedidosFin ? bruto/totalPedidosFin : 0;
 

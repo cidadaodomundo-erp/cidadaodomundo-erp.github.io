@@ -336,9 +336,12 @@ function cardsCancel(m, a) {
 // Placar — e' outra fonte e a tabela de motivos nao pode esperar por ela.
 // 07/11/2026 (auditoria dos numeros, lote 2, canal-14 e canal-25): a fila segue a loja do seletor (Rede = as 3, sem
 // Boqueirao). A view lida aqui vem da planilha de pedidos, que parou em 28/10 (a extracao pelo portal foi desligada em
-// 30/10): fila vazia NAO e' "nada a contestar" — o verde falso saiu. A troca para a fila da API
-// (proposta 2026-10-30-contestacoes-fila-api.md) espera a liberacao de leitura da vw_contestacoes_fila_api no banco.
-const CONTEST_SEM_DADO_DESDE = '29/10';
+// 30/10). 07/11/2026 (lote 2, canal-13/14): a fonte passou a ser vw_contestacoes_fila_api, a MESMA fila da rotina
+// (proposta 2026-10-30-contestacoes-fila-api.md; leitura liberada em
+// script/sql/contestacoes_fila_api_leitura_painel_2026_11_07.sql). Recuperavel = A_CONTESTAR menos o descarte de
+// escopo TODOS (o portal nao deixa contestar), o mesmo corte do Passo 1 da rotina.
+const CONTEST_FONTE = 'vw_contestacoes_fila_api';
+const contestPortalBloqueia = (r) => r.descarte_escopo === 'TODOS';
 function contestUnidadeOk(u) {
   const l = (typeof canalComSeletor === 'function' && canalComSeletor()) ? lojaAtual() : null;
   if (l && l !== 'REDE') return u === l;
@@ -356,15 +359,16 @@ async function carregarRecuperavelCancel() {
   if (!alvo) return;
   if (CANCEL_RECUP === null) {
     try {
-      CANCEL_RECUP = await consultarTudo('vw_contestacoes_status?select=id_curto,nome_loja,unidade,motivo_cancelamento,valor,contestavel_ate&bloco=eq.A_CONTESTAR');
+      CANCEL_RECUP = await consultarTudo(CONTEST_FONTE + '?select=id_curto,nome_loja,unidade,motivo_cancelamento,valor,contestavel_ate,descarte_escopo&bloco=eq.A_CONTESTAR');
     } catch (e) {
       alvo.innerHTML = '<div class="contexto">Não consegui consultar a fila de contestação agora.</div>';
       return;
     }
   }
-  const fila = CANCEL_RECUP.filter(r => contestUnidadeOk(r.unidade)).map(r => ({ ...r, valor: Number(r.valor) || 0 }));
+  const fila = CANCEL_RECUP.filter(r => contestUnidadeOk(r.unidade) && !contestPortalBloqueia(r))
+    .map(r => ({ ...r, valor: Number(r.valor) || 0 }));
   if (!fila.length) {
-    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: não dá para dizer quanto ainda se recupera. A rotina segue contestando.</div>`;
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-ok);">${contestEscopoTxt()}: nada dentro do prazo de contestação agora. ✔</div>`;
     return;
   }
   const totalRecup = fila.reduce((s, r) => s + r.valor, 0);
@@ -382,8 +386,8 @@ async function carregarRecuperavelCancel() {
     <b>R$ ${fmt(totalRecup)}</b> em <b>${fila.length}</b> pedido(s) cancelado(s) ainda estão dentro do prazo de contestação.
     O motivo que mais pesa nessa fila é <b>${pior.mt}</b>: custou R$ ${fmt(pior.valor)} em ${pior.n} pedido(s).
     ${curtos.length ? `<b style="color:var(--farol-fora);">${curtos.length} vence(m) em até 2 dias.</b>` : ''}
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="A fila de contestação segue a loja escolhida no topo e não o período: é tudo o que ainda está dentro do prazo — o mesmo recorte do módulo Contestações. Por isso ela não bate com a tabela de motivos acima. O motivo aqui é o texto cru do cancelamento, não a categoria do arquivo de classificação. Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não entram nesta conta.">
-      ${contestEscopoTxt()}, tudo o que está no prazo — este bloco não segue o período do topo. Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não entram.
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="A fila de contestação segue a loja escolhida no topo e não o período: é tudo o que ainda está dentro do prazo — o mesmo recorte do módulo Contestações. Por isso ela não bate com a tabela de motivos acima. O motivo aqui é o texto cru do cancelamento, não a categoria do arquivo de classificação. Ficam fora os pedidos que o portal do iFood não deixa contestar.">
+      ${contestEscopoTxt()}, tudo o que está no prazo — este bloco não segue o período do topo.
     </div>
     <div style="margin-top:8px;"><button class="preset-btn" onclick="mostrarModulo('contestacoes')">Abrir a fila de contestações →</button></div>
   </div>`;
@@ -2612,14 +2616,20 @@ async function entrarContestacoes() {
   const alvo = document.getElementById('view-contestacoes');
   if (CONTESTACOES === null) {
     alvo.innerHTML = '<div class="contexto">Carregando contestações...</div>';
-    // Fonte unica: a propria planilha de pedidos ja traz o ciclo completo da
-    // contestacao (houve / status / prazo). Nao dependemos mais do portal.
-    const janela = new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10);
-    const linhas = await consultarTudo(
-      "vw_contestacoes_status?select=id_curto,nome_loja,unidade,status,data_hora_pedido,hora,turno,dia_semana," +
-      "motivo_cancelamento,valor,contestavel_ate,houve_contestacao,status_contestacao,retorno_contestacao," +
-      `origem_contestacao,automatizavel,bloco&data_hora_pedido=gte.${janela}&order=data_hora_pedido.desc`
-    );
+    // 07/11/2026 (lote 2, canal-13): fonte = vw_contestacoes_fila_api, a fila que a rotina usa desde 30/10
+    // (pedidos e eventos financeiros da API; a view ja traz so os ultimos 45 dias). Ela nao tem turno (sai da
+    // hora, pela regra do painel), status (sai de cancelamento_tipo) nem origem (contestado_rotina).
+    let linhas;
+    try {
+      linhas = await consultarTudo(
+        CONTEST_FONTE + "?select=id_curto,id_curto_portal,nome_loja,unidade,data_hora_pedido,hora,cancelamento_tipo," +
+        "motivo_cancelamento,valor,contestavel_ate,vence_aprox,automatizavel,contestado_rotina,bloco," +
+        "descarte,descarte_escopo,descarte_detalhe&order=data_hora_pedido.desc"
+      );
+    } catch (e) {
+      alvo.innerHTML = '<div class="contexto">Não consegui consultar a fila de contestação agora. Recarregue a página.</div>';
+      return;
+    }
     CONTESTACOES = { linhas };
   }
   renderModuloContestacoes();
@@ -2645,25 +2655,32 @@ function renderModuloContestacoes() {
     return d <= 2 ? 0 : d <= 5 ? 1 : 2;
   };
   const PRAZO_ROT = ['vence em até 2 dias', 'vence em 3 a 5 dias',
-                     'vence em 6 dias ou mais', 'sem prazo no export'];
+                     'vence em 6 dias ou mais', 'sem prazo'];
   const porPrazoEValor = (a, b) => (faixaPrazo(a) - faixaPrazo(b)) || (b.valor - a.valor);
-  const aContestarVoce  = bloco('A_CONTESTAR').filter(r => !r.automatizavel)
+  // 07/11/2026: a divisao segue o Passo 1 da rotina (regra SEMPRE TENTAR, dono 05/11): a rotina contesta todo
+  // A_CONTESTAR, menos o descarte de escopo TODOS (o portal nao deixa — sai da conta) e o SEM_FATO_VERDADEIRO
+  // (nao ha fato verdadeiro para escrever — vai ao dono).
+  const aContestar = bloco('A_CONTESTAR');
+  const portalBloqueia = aContestar.filter(contestPortalBloqueia);
+  const aContestarVoce  = aContestar.filter(r => !contestPortalBloqueia(r) && r.descarte === 'SEM_FATO_VERDADEIRO')
                             .sort(porPrazoEValor);
-  const aContestarRotina = bloco('A_CONTESTAR').filter(r => r.automatizavel)
-                            .sort((a, b) => (a.contestavel_ate || '').localeCompare(b.contestavel_ate || ''));
+  const aContestarRotina = aContestar.filter(r => !contestPortalBloqueia(r) && r.descarte !== 'SEM_FATO_VERDADEIRO')
+                            .sort((a, b) => String(a.vence_aprox || a.contestavel_ate || '').localeCompare(String(b.vence_aprox || b.contestavel_ate || '')));
   const aguardando = bloco('AGUARDANDO');
   const aprovadas  = bloco('APROVADA');
   const reprovadas = bloco('REPROVADA');
-  const perdidas   = bloco('PRAZO_PERDIDO');
-  // Pedidos importados antes de 10/08/2026 nao trazem os campos de contestacao:
-  // ficam de fora dos blocos em vez de virar falso "prazo perdido".
+  const perdidas   = bloco('PRAZO_PASSOU').filter(r => !contestPortalBloqueia(r));
+  const naoContest = bloco('NAO_CONTESTAVEL');
+  // Cancelamento sem hora de cancelamento na API: fica fora dos blocos em vez de virar falso "prazo perdido".
   const semDado    = bloco('SEM_DADO');
 
   const soma = (l) => l.reduce((s, r) => s + r.valor, 0);
   const dt = (v) => v ? formatarDataCurta(String(v).slice(0, 10)) : '—';
-  const parcial = (r) => r.status === 'CANCELAMENTO PARCIAL' ? ' <span style="color:#8a897e; font-size:10px;">(parcial)</span>' : '';
-  const quem = (r) => r.origem_contestacao === 'ROTINA'
-    ? '<span style="color:var(--farol-ok);">rotina</span>' : '<span style="color:#8a897e;">manual</span>';
+  const parcial = (r) => r.cancelamento_tipo === 'PARCIAL' ? ' <span style="color:#8a897e; font-size:10px;">(parcial)</span>' : '';
+  const quem = (r) => r.contestado_rotina
+    ? '<span style="color:var(--farol-ok);">rotina</span>' : '<span style="color:var(--tx-3);" title="Sem registro na tabela da rotina">—</span>';
+  const turnoDe = (r) => { const h = /^(\d{2}):/.exec(r.hora || ''); return h ? (avalTurno(+h[1]) || '—') : '—'; };
+  const pedidoPortal = (r) => r.id_curto_portal || r.id_curto;
 
   // Grade padrao dos blocos: hora e turno entram porque identificam a equipe
   // que estava na operacao quando o problema aconteceu.
@@ -2671,10 +2688,10 @@ function renderModuloContestacoes() {
     <tr><th>Loja</th><th>Pedido</th><th>Data</th><th>Hora</th><th>Turno</th><th>Motivo</th><th>Valor</th>${extra.cabecalho}</tr>
     ${lista.map(r => `<tr>
       <td>${r.nome_loja}</td>
-      <td>${r.id_curto} <span onclick="copiarPedido(this, '${r.id_curto}')" title="copiar o nº ${r.id_curto} para colar no portal do iFood"
+      <td>${pedidoPortal(r)} <span onclick="copiarPedido(this, '${pedidoPortal(r)}')" title="copiar o nº ${pedidoPortal(r)} para colar no portal do iFood"
         style="cursor:pointer; color:var(--tx-5); margin-left:3px;">⧉</span></td>
       <td>${dt(r.data_hora_pedido)}</td>
-      <td>${r.hora || '—'}</td><td>${r.turno || '—'}</td>
+      <td>${r.hora || '—'}</td><td>${turnoDe(r)}</td>
       <td style="font-size:11.5px;">${r.motivo_cancelamento || '—'}${parcial(r)}</td>
       <td>R$ ${fmt(r.valor)}</td>${extra.celula(r)}</tr>`).join('')}
   </table>`;
@@ -2685,24 +2702,17 @@ function renderModuloContestacoes() {
       return `<td title="${PRAZO_ROT[faixaPrazo(r)]}"${d !== null && d <= 2 ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${dt(r.contestavel_ate)}${d !== null ? ` (${d}d)` : ''}</td>`; },
   };
   const colQuem = { cabecalho: '<th>Contestada por</th>', celula: (r) => `<td>${quem(r)}</td>` };
-  // O iFood devolve um texto padrão longo ("Analisando o cancelamento, não
-  // identificamos responsabilidade...") quando reprova por falta de evidência.
-  // Trocamos por um rótulo curto para caber na coluna e ficar direto ao ponto.
-  const justificativa = (r) => {
-    const t = (r.retorno_contestacao || '').trim();
-    return /^analisando/i.test(t) ? 'Sem evidências' : (t || '—').slice(0, 180);
-  };
-  const colRetorno = {
-    cabecalho: '<th>Contestada por</th><th>Justificativa do iFood</th>',
-    celula: (r) => `<td>${quem(r)}</td><td style="font-size:10.5px; color:#8a897e;">${justificativa(r)}</td>`,
+  // A fila da API nao traz a justificativa do iFood (era da planilha); no bloco do dono vai o porque a rotina devolveu.
+  const colPrazoMotivo = {
+    cabecalho: colPrazo.cabecalho + '<th>Por que a rotina devolveu</th>',
+    celula: (r) => colPrazo.celula(r) + `<td style="font-size:10.5px; color:var(--tx-3);">${atdEsc(String(r.descarte_detalhe || '—').slice(0, 180))}</td>`,
   };
 
   alvo.innerHTML = `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contestações de cancelamento</div>
-  <div class="caption-label" style="text-align:center;" title="Esta tela é a fila de trabalho da contestação: segue a loja escolhida no topo (Rede = Água Verde, Ahú e São Braz), mas não o período. A coluna Loja diz de quem é cada pedido. Os dados vêm da planilha de pedidos do portal, que parou de chegar depois de 28/10; a rotina contesta pelos pedidos da API. O status do iFood leva até 48h, então contestação de ontem costuma aparecer em aguardando.">
-    <b>${contestEscopoTxt()}, últimos 60 dias</b> — esta tela não segue o período do topo.
+  <div class="caption-label" style="text-align:center;" title="Esta tela é a fila de trabalho da contestação: segue a loja escolhida no topo (Rede = Água Verde, Ahú e São Braz), mas não o período. A coluna Loja diz de quem é cada pedido. Os dados vêm da mesma fila que a rotina usa (pedidos da API do iFood). O status do iFood leva até 48h, então contestação de ontem costuma aparecer em aguardando.">
+    <b>${contestEscopoTxt()}, últimos 45 dias</b> — esta tela não segue o período do topo.
   </div>
-  <div class="contexto" style="border-color:var(--farol-perto);">Cancelamentos desde ${CONTEST_SEM_DADO_DESDE} ainda não aparecem aqui; a rotina segue contestando normalmente.</div>
   <div class="cards">
     <div class="card ${aContestarVoce.length ? 'neg' : 'neutral'}"><div class="card-lbl">Você precisa contestar</div><div class="card-val">${aContestarVoce.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarVoce))}</div></div>
     <div class="card neutral"><div class="card-lbl">A rotina contesta</div><div class="card-val">${aContestarRotina.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarRotina))}</div></div>
@@ -2712,15 +2722,16 @@ function renderModuloContestacoes() {
   </div>
 
   <div class="section-label">Você precisa contestar</div>
-  ${aContestarVoce.length ? `<div id="tabelaContestVoce">${grade(aContestarVoce, colPrazo)}</div>
-  <div class="caption-label" style="text-align:center;" title="A ordem é por faixa de prazo (até 2 dias, 3 a 5 dias, 6 dias ou mais, e por último os sem prazo no export) e, dentro da faixa, do maior valor para o menor. São motivos que dependem de avaliar evidência — item faltando, itens errados, pedido violado. Os textos sugeridos estão em rotinas/textos-contestacao.md; quando um motivo ganhar texto aprovado, ele passa para o bloco de baixo.">
+  ${aContestarVoce.length ? `<div id="tabelaContestVoce">${grade(aContestarVoce, colPrazoMotivo)}</div>
+  <div class="caption-label" style="text-align:center;" title="A ordem é por faixa de prazo (até 2 dias, 3 a 5 dias, 6 dias ou mais, e por último os sem prazo) e, dentro da faixa, do maior valor para o menor. São os pedidos que a rotina abriu no portal e devolveu porque não achou um fato verdadeiro para escrever.">
   Na ordem de fazer: quem vence antes primeiro e, no mesmo prazo, o de maior valor.</div>`
-  : `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: a fila de hoje não aparece aqui.</div>`}
+  : '<div class="contexto" style="border-color:var(--farol-ok);">Nada esperando por você agora. ✔</div>'}
 
   <div class="section-label">A rotina contesta sozinha</div>
   ${aContestarRotina.length ? `<div id="tabelaContestRotina">${grade(aContestarRotina, colPrazo)}</div>
   <div class="caption-label" style="text-align:center;">Entram na próxima execução da rotina (11:36; reservas às 14:36 e 16:36).</div>`
-  : `<div class="contexto" style="border-color:var(--farol-perto);">Sem dado dos cancelamentos desde ${CONTEST_SEM_DADO_DESDE}: a fila de hoje não aparece aqui.</div>`}
+  : '<div class="contexto">Nenhum pedido na fila da rotina agora.</div>'}
+  ${portalBloqueia.length ? `<div class="caption-label" style="text-align:center;" title="A rotina abriu o pedido no portal e o iFood não mostrou a opção de contestar. Não entram na conta do recuperável.">${portalBloqueia.length} pedido(s) no prazo (R$ ${fmt(soma(portalBloqueia))}) o portal do iFood não deixa contestar.</div>` : ''}
 
   <div class="section-label">Aguardando resposta do iFood</div>
   ${aguardando.length ? `<div id="tabelaContestAguard">${grade(aguardando, colQuem)}</div>
@@ -2732,19 +2743,15 @@ function renderModuloContestacoes() {
   : '<div class="contexto">Nenhuma contestação aprovada no período.</div>'}
 
   <div class="section-label">Reprovadas</div>
-  ${reprovadas.length ? `<div id="tabelaContestReprov">${grade(reprovadas, colRetorno)}</div>
-  <div class="caption-label" style="text-align:center;">A justificativa do iFood ajuda a ajustar o texto da próxima contestação.</div>`
-  : '<div class="contexto" style="border-color:var(--farol-ok);">Nenhuma reprovada no período. ✔</div>'}
+  ${reprovadas.length ? `<div id="tabelaContestReprov">${grade(reprovadas, colQuem)}</div>`
+  :'<div class="contexto" style="border-color:var(--farol-ok);">Nenhuma reprovada no período. ✔</div>'}
 
   ${perdidas.length ? `<div class="section-label">Prazo encerrado sem contestação</div>
   <div id="tabelaContestPerd">${grade(perdidas, colQuem)}</div>
   <div class="caption-label" style="text-align:center;">Não dá mais para contestar: escaparam R$ ${fmt(soma(perdidas))}, contra R$ ${fmt(soma(aprovadas))} recuperados nas aprovadas.</div>` : ''}
 
-  <div class="caption-label" style="text-align:center; margin-top:14px;">Janela: últimos 60 dias.
-  “Cancelamento é contestável” no export indica o <i>tipo</i> do cancelamento e continua SIM mesmo depois de aprovado —
-  quem diz o estado real é “houve contestação” + “status da contestação”.
-  ${semDado.length ? `<br>${semDado.length} cancelamento(s) mais antigo(s) ficam fora dos blocos: foram importados antes
-  de passarmos a capturar esses campos, então não sabemos o desfecho — não são prazo perdido.` : ''}</div>`;
+  <div class="caption-label" style="text-align:center; margin-top:14px;">Janela: últimos 45 dias.${naoContest.length ? ` Outros ${naoContest.length} cancelamento(s) (R$ ${fmt(soma(naoContest))}) têm motivo que o iFood nunca deixou contestar.` : ''}
+  ${semDado.length ? `<br>${semDado.length} cancelamento(s) sem a hora do cancelamento ficam fora dos blocos — não são prazo perdido.` : ''}</div>`;
 }
 
 // ------------------------------------------------------------------
@@ -5324,7 +5331,7 @@ function computeEvolucaoCompleta(gran) {
     g.totalPedidos += r[7];
     g.itens += (r[8] - r[9]);
     g.frete += r[10];
-    g.promoLoja += r[13];
+    g.promoLoja += r[13] + r[12];  // loja + rede: os dois sao nossos (07/11/2026, lote 2 canal-24)
     g.freteSobDemanda += r[16];
   });
 
