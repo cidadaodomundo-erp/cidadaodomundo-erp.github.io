@@ -53,7 +53,7 @@ Base de referência para uso em relatórios e dashboards futuros. Campos organiz
 | TAXA DE ENTREGA PAGA PELO CLIENTE (R$) | Frete pago pelo cliente. | Compõe o Faturamento Bruto. |
 | INCENTIVO PROMOCIONAL DO IFOOD (R$) | Desconto custeado pelo iFood. | Card "iFood". |
 | INCENTIVO PROMOCIONAL DA LOJA (R$) | Desconto custeado pela loja. | Card "Promos" e desconto no cálculo do Líquido. |
-| INCENTIVO PROMOCIONAL DA REDE (R$) | Desconto custeado pela rede/franquia. | Compõe o card "iFood" junto ao incentivo do iFood. |
+| INCENTIVO PROMOCIONAL DA REDE (R$) | Desconto custeado pela rede/franquia. | Conta como dinheiro NOSSO, junto com o da loja (card "Promos" e desconto no Líquido) — corrigido em 07/11/2026, auditoria canal-24. |
 | TAXA DE SERVIÇO (R$) | Taxa de serviço cobrada no pedido. | Ainda não usada nas fórmulas atuais — avaliar se compõe algum card. |
 | TAXAS E COMISSOES (R$) | Comissão cobrada pelo iFood sobre o pedido. | Card "Taxas e comissões" e parte do cálculo do Líquido. |
 | VALOR LIQUIDO (R$) | Valor líquido calculado pelo iFood para o pedido. | Usamos nossa própria fórmula validada; útil como conferência cruzada. |
