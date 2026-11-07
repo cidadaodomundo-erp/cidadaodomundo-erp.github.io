@@ -349,18 +349,21 @@ function renderModuloEngcard() {
 
   // Agrupa pelo nome da base (07/11/2026). Venda sem nome na base fica fora dos 4
   // grupos e das medias, num bloco a parte com o nome do caixa.
-  const acc = {}, accFora = {};
+  // Preço zero (cortesia, funcionário, motoboy) sai linha a linha ANTES de agrupar:
+  // senão "X FUNCIONÁRIOS" entra no X pago e derruba a margem e as médias.
+  const acc = {}, accFora = {}, accCort = {};
   ENGCARD.filter(r => r.shift_date >= corte).forEach(r => {
     const fora = r.fora_da_base === true;
-    const k = fora ? r.item : (r.nome_base || r.item);
-    const dest = fora ? accFora : acc;
+    const cort = !fora && nu(r.receita) <= 0;
+    const k = (fora || cort) ? r.item : (r.nome_base || r.item);
+    const dest = fora ? accFora : (cort ? accCort : acc);
     const a = dest[k] || (dest[k] = { item: k, grupoBase: r.grupo || '', un: 0, rec: 0, cus: 0, mg: 0 });
     a.un += nu(r.unidades); a.rec += nu(r.receita); a.cus += nu(r.custo); a.mg += nu(r.margem);
   });
   const foraBase = Object.values(accFora).sort((a,b) => b.rec - a.rec);
   const todos = Object.values(acc);
   const vendidos = todos.filter(a => a.rec > 0);          // preço zero é cortesia
-  const cortesia = todos.filter(a => a.rec <= 0);
+  const cortesia = Object.values(accCort).concat(todos.filter(a => a.rec <= 0));
   if (!vendidos.length) { alvo.innerHTML = '<div class="contexto">Sem itens no período.</div>'; return; }
 
   // Os cortes são MÉDIA SIMPLES (regra do dono): média de unidades por item e
