@@ -59,18 +59,24 @@ async function entrarAgenda() {
   if (!souODono()) { alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Esta tela é só do dono.</div>'; return; }
   alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
-  const [pend, cp, fer, prev, calc, rmb] = await Promise.all([
+  const [pend, cp, fer, prev, calc, rmb, ext] = await Promise.all([
     ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
-    ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta_exibida&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
+    ler(`vw_fin_contas_pagar?select=vencimento,situacao,descricao,debito,credito,conta,conta_exibida&sentido=eq.PAGAR&situacao=neq.PAGO&vencimento=lte.${fim}&order=vencimento,descricao`),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
     ler(`vw_rh_calculos_mes?select=nome,calculo,data_limite,calculado_em,fechado_em,enviado_em,pessoas,total&data_limite=gte.${hoje}&data_limite=lte.${fim}&order=data_limite`),
-    ler('vw_rmb_pedidos?select=id,pessoa,valor,descricao,situacao,so_o_dono&situacao=eq.PEDIDO&so_o_dono=is.true&order=id')]);
-  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb };
+    ler('vw_rmb_pedidos?select=id,pessoa,valor,descricao,situacao,so_o_dono&situacao=eq.PEDIDO&so_o_dono=is.true&order=id'),
+    ler('vw_fin_extrato_ultimo_dia?select=conta,ultimo_dia&order=conta')]);
+  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext };
   agDesenhar();
 }
 function agDesenhar() {
-  const { hoje, fim, pend, cp, fer, prev, calc, rmb } = AG.dados;
+  const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext } = AG.dados;
+  // 07/11/2026 (dono: "sempre espere o tempo de conciliação nas baixas do a pagar do painel"): conta vencida só é "vencida"
+  // depois que o extrato daquela conta já cobre o dia do vencimento; antes disso, "aguardando conciliação"
+  const ult = {}; (Array.isArray(ext) ? ext : []).forEach((e) => { ult[e.conta] = String(e.ultimo_dia).slice(0, 10); });
+  const ultMin = Object.values(ult).sort()[0] || null;
+  const conciliou = (dia, conta) => { const u = (conta && ult[conta]) || ultMin; return !!u && String(dia).slice(0, 10) <= u; };
   const itens = [];   // { dia, txt, ir, chat, tipo: 'atraso'|'alerta'|'', id (pendência) }
   const add = (o) => itens.push(Object.assign({ tipo: '' }, o));
   const falhou = [];
@@ -87,8 +93,9 @@ function agDesenhar() {
   // 3) contas a pagar: vencidas hoje, e o total de cada dia
   if (ok(cp, 'contas a pagar')) {
     const val = (c) => Math.max(0, (Number(c.debito) || 0) - (Number(c.credito) || 0));
-    const venc = cp.filter((c) => c.vencimento < hoje);
+    const venc = cp.filter((c) => c.vencimento < hoje && conciliou(c.vencimento, c.conta)), agu = cp.filter((c) => c.vencimento < hoje && !conciliou(c.vencimento, c.conta));
     if (venc.length) add({ dia: hoje, txt: `<b>${venc.length}</b> contas vencidas, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
+    if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${agu.length} ${agu.length === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — o extrato ainda não chegou ao dia do vencimento</span>`, ir: 'contaspagar' });
     [...new Set(cp.filter((c) => c.vencimento >= hoje).map((c) => c.vencimento))].forEach((d) => {
       const L = cp.filter((c) => c.vencimento === d), m = L.slice().sort((a, b) => val(b) - val(a))[0];
       add({ dia: d, txt: `<b>${agR0(L.reduce((a, c) => a + val(c), 0))}</b> a pagar (${L.length} ${L.length === 1 ? 'conta' : 'contas'}; maior: ${agE(String(m.descricao || '').replace(/\s*\(parc\..*$/, '').slice(0, 60))} ${agR0(val(m))})`, ir: 'contaspagar' });
@@ -96,7 +103,11 @@ function agDesenhar() {
   }
   // 4) férias: pagar (até) e começar
   if (ok(fer, 'férias')) fer.forEach((x) => {
-    if (x.situacao === 'programada' && x.pagar_ate && x.pagar_ate <= fim) add({ dia: x.pagar_ate < hoje ? hoje : x.pagar_ate, txt: `${x.pagar_ate < hoje ? '✗ ' : ''}Pagar as férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}${x.pagar_ate < hoje ? ` <span class="f">vencia ${agDm(x.pagar_ate)}</span>` : ''}`, ir: 'pferias', tipo: x.pagar_ate < hoje ? 'atraso' : 'alerta' });
+    if (x.situacao === 'programada' && x.pagar_ate && x.pagar_ate <= fim) {
+      const passou = x.pagar_ate < hoje, espera = passou && !conciliou(x.pagar_ate, null);
+      add({ dia: passou ? hoje : x.pagar_ate, txt: espera ? `<span style="color:var(--tx-3);">Férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}: aguardando conciliação</span> <span class="f">pagar até ${agDm(x.pagar_ate)}</span>`
+        : `${passou ? '✗ ' : ''}Pagar as férias de <b>${agE(agNome(x.nome))}</b>${x.valor_estimado ? ' (' + agR(x.valor_estimado) + ')' : ''}${passou ? ` <span class="f">vencia ${agDm(x.pagar_ate)}</span>` : ''}`,
+        ir: 'pferias', tipo: espera ? '' : passou ? 'atraso' : 'alerta' }); }
     if (x.situacao === 'programada' && x.limite_gozo && x.limite_gozo >= hoje && x.limite_gozo <= fim) add({ dia: x.limite_gozo, txt: `${agE(agNome(x.nome))} começa as férias`, ir: 'pferias' });
   });
   // 5) folha: rescisões e o que vence de cálculo
