@@ -8,6 +8,9 @@
 // ------------------------------------------------------------------
 // Conexao com o Supabase (chave publica, somente leitura por RLS)
 // ------------------------------------------------------------------
+// SIMULAÇÃO DO VISUAL CLARO (07/11/2026): a casca marca a aba com ?tema=proposta; a página só acende a classe (nucleo.css)
+try { if (sessionStorage.getItem('temaProposta') === '1') document.documentElement.classList.add('tema-proposta'); } catch (e) {}
+
 const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
 
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";

@@ -19,7 +19,7 @@
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
-<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261106b">
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
 <style>
   .na-casca body::before { display:none !important; }
   .ag-dia { font-size:14px; font-weight:800; color:var(--tx-1); margin:16px 2px 4px; }
@@ -50,7 +50,7 @@
   </div>
 </div>
 
-<script src="../nucleo/nucleo.js?v=20261107a"></script>
+<script src="../nucleo/nucleo.js?v=20261107t"></script>
 <script>
 const AG = { dados: null };
 const agHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });

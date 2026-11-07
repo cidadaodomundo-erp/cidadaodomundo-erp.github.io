@@ -708,6 +708,25 @@
     /* Campo obrigatório ainda vazio (dono 06/11 17:37: "pintar os campos obrigatorios de amarelo claro") */
     --campo-obrigatorio:#fff1a8;
   }
+  /* SIMULAÇÃO DO VISUAL CLARO (dono, sáb 07/11/2026 04:01: "não sei se o fundo preto é o melhor ... algo deixa ele meio
+     pesado"). Só com sistema.html?tema=proposta (a casca guarda na aba e cada página liga a classe pelo nucleo.js); sem o
+     parâmetro nada muda. Mesmo jeito do .papel: só redefine os tokens, com as cores do .papel já aprovadas (DRE, Fechamento). */
+  html.tema-proposta { --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --zebra:#f6f5f1;
+    --line:#ebe9e3; --line-2:#dcdad3;
+    --tx-1:#1e2226; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c; --tx-5:#7d858c; --tx-6:#a5a49a; --tx-creme:#1e2226;
+    --farol-ok:#1f6d3f; --farol-perto:#b26a00; --farol-fora:#b3261e; --info:#345a86; --amber-2:#b26a00;
+    --th-claro:#efede6; --th-claro-tx:#1e2226; --brand-wine:#efede6; }
+  /* menos peso (proposta 07/11): cartão quase da cor da página, borda fina, sem sombra, menos negrito, mais respiro */
+  html.tema-proposta .card { box-shadow:none; border-color:var(--line); }
+  html.tema-proposta .card.neutral { border-color:var(--line); }
+  html.tema-proposta .card-val { font-weight:700; }
+  html.tema-proposta .card-lbl { font-weight:600; }
+  html.tema-proposta .cards { gap:14px; }
+  html.tema-proposta h2 { font-weight:700; }
+  html.tema-proposta .section-label { font-weight:700; margin-top:30px; }
+  html.tema-proposta .contexto { box-shadow:none; }
+  html.tema-proposta table th { font-weight:600; }
+  html.tema-proposta table td { border-color:var(--line); }
   .papel { --farol-ok:#1f6d3f; --farol-perto:#b26a00; --farol-fora:#b3261e; --tx-2:#4d545b; --tx-3:#5f666d; --tx-4:#7d858c;
     --p-bg:#f6f5f1; --p-paper:#fff; --p-ink:#1e2226; --p-line:#dcdad3; --p-line2:#ebe9e3; --p-head:#efede6; --p-zebra:#f1f0eb;
     background:var(--p-bg); color:var(--p-ink); margin:-28px -32px -60px; padding:28px 32px 60px; }
