@@ -3007,8 +3007,6 @@ async function entrarHoje() {
     (EVOL === null || evolVelho()
       ? consultarTudo('vw_venda_evolucao?select=data,unidade,canal,faixa,pedidos,total,canceladas,total_cancelado&order=data').then(r => { EVOL = r; EVOL_LIDO_EM = Date.now(); })
       : Promise.resolve()).catch(e => { erros.venda = e.message; }),
-    // o motor do Fluxo projetado (sem desenhar a tela dele); daqui so se le o projCalc
-    projCarregar().catch(e => { erros.caixa = e.message; }),
     // o mes da DRE (o mesmo do Placar e do Fechamento) e a meta de venda por loja
     (!FX_M ? fxCarregarM() : Promise.resolve()).catch(e => { erros.rumo = e.message; }),
     (HOJE_META_VENDA === null
@@ -3019,9 +3017,16 @@ async function entrarHoje() {
   ]);
   HOJE_ERROS = erros;
   HOJE_CONFERIDO = new Date();
+  // 07/11/2026: o caixa (motor do Fluxo projetado + o Fluxo limpo, ~15 s com o servidor cheio) NÃO segura mais a tela:
+  // ela sai já com "lendo o caixa…" e o bloco entra quando os dois chegam. O Fluxo limpo é lido aqui (antes a Hoje só
+  // tinha o número dele se outra tela o tivesse carregado — e voltava à conta antiga sem avisar)
+  HOJE_CAIXA_LENDO = true;
   renderHoje();
   hojeLigarRelogio();
+  Promise.all([projCarregar().catch(e => { HOJE_ERROS.caixa = e.message; }), fxlCarregar().catch(() => {})])
+    .finally(() => { HOJE_CAIXA_LENDO = false; if (MODULO_ATUAL === 'hoje') renderHoje(); });
 }
+let HOJE_CAIXA_LENDO = false;
 
 let HOJE_ERROS = {};
 
@@ -3202,7 +3207,8 @@ function renderHoje() {
 
   // ---------- 3. caixa da rede ----------
   let b3;
-  if (HOJE_ERROS.caixa || !PROJ_PAGAR || !PROJ_RECEB) b3 = '<div class="section-label">Caixa da rede</div>' + aviso('Não consegui ler o caixa' + (HOJE_ERROS.caixa ? ': ' + HOJE_ERROS.caixa : '.'));
+  if (HOJE_CAIXA_LENDO && (!PROJ_PAGAR || !PROJ_RECEB || !FXL)) b3 = '<div class="section-label">Caixa da rede</div><div class="contexto">Lendo o caixa…</div>';
+  else if (HOJE_ERROS.caixa || !PROJ_PAGAR || !PROJ_RECEB) b3 = '<div class="section-label">Caixa da rede</div>' + aviso('Não consegui ler o caixa' + (HOJE_ERROS.caixa ? ': ' + HOJE_ERROS.caixa : '.'));
   else {
     // 07/11/2026 (auditoria resultado-17, dinheiro-0, dinheiro-4): o caixa de hoje e o menor saldo vêm do
     // Fluxo projetado (fxlResumo, o mesmo numero do quadro e do grafico de la). O projCalc fica so para o
