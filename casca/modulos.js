@@ -15,13 +15,14 @@ window.CASCA_MODULOS_CFG = {
     logfin: 'Motoboys · Financeiro da logística',
     macertos: 'Motoboys · Acertos',
     reembolsos: 'Pedir reembolso',
+    plano: 'Em desenvolvimento',   // dono 07/11 03:59: o plano, com a evolução em cima (o Fabio acompanha)
   },
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' } },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'estasemana', 'vendasagora', 'atividades'] },
+    lancar: [], acompanhar: ['hoje', 'agenda', 'plano', 'estasemana', 'vendasagora', 'atividades'] },
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
@@ -44,5 +45,5 @@ window.CASCA_MODULOS = [
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: [], acompanhar: ['plano', 'rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
+    lancar: [], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];

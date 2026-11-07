@@ -910,6 +910,42 @@ function planoDetalhe(texto, esc, aprovacoes) {
   return saida.join('');
 }
 
+// EM DESENVOLVIMENTO (dono, sáb 07/11/2026 03:54 e 03:59: o Fabio acompanha "o que estou desenvolvendo com vc e a evolução";
+// "Plano: manter, alimentado automaticamente"). O plano já se atualiza sozinho (rotina atualizar-plano-saida, 20:00: commits,
+// decisões do livro, rotinas e, desde 07/11, o que o dono resolveu na agenda). Aqui, em cima: quanto de cada fase está
+// pronto e o que andou nos últimos 7 dias. Só título, fase e andamento — nunca nota do dono.
+function planoEmDesenvolvimento(ativos, esc) {
+  if (!ativos.length) return '';
+  const pronto = (i) => i.estado === 'feito' || i.estado === 'na';
+  const fases = {};
+  ativos.forEach((i) => { (fases[i.fase_ordem] = fases[i.fase_ordem] || { titulo: i.fase_titulo, quando: i.fase_quando, itens: [] }).itens.push(i); });
+  const cartoes = Object.keys(fases).sort((a, b) => a - b).map((k) => {
+    const f = fases[k], n = f.itens.length, ok = f.itens.filter(pronto).length, and = f.itens.filter((i) => i.estado === 'andando').length;
+    const pct = n ? Math.round(ok / n * 100) : 0;
+    return `<div class="card neutral" style="text-align:left;"><div class="card-lbl" style="white-space:normal;">${esc(f.titulo)}</div>
+      <div class="card-val">${pct}%</div><div class="plano-trilho" style="margin:4px 0 6px;"><div class="plano-preenche" style="width:${pct}%;"></div></div>
+      <div class="card-pct">${ok} de ${n} prontos${and ? ` · ${and} andando` : ''}${f.quando ? ` · ${esc(f.quando)}` : ''}</div></div>`;
+  }).join('');
+  const hoje = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + 'T12:00:00');
+  const corte = new Date(hoje); corte.setDate(corte.getDate() - 7);
+  const dataDe = (i) => String(i.andamento_em || '').slice(0, 10);
+  const semana = ativos.filter((i) => i.andamento && dataDe(i) && new Date(dataDe(i) + 'T12:00:00') >= corte)
+    .sort((a, b) => dataDe(b).localeCompare(dataDe(a)) || Number(a.fase_ordem) - Number(b.fase_ordem));
+  const dm = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
+  const linhas = semana.map((i) => {
+    const [feito, falta] = String(i.andamento).split(/EM CONSTRU[ÇC][ÃA]O:\s*/i);
+    return `<div style="padding:9px 0;border-top:1px solid var(--line);">
+      <div style="display:flex;gap:10px;justify-content:space-between;align-items:baseline;"><b>${esc(i.titulo)}</b><span style="font-size:11.5px;color:var(--tx-4);white-space:nowrap;">${dm(dataDe(i))}${pronto(i) ? ' · <span style="color:var(--farol-ok);">✓ pronto</span>' : ''}</span></div>
+      <div style="font-size:13px;color:var(--tx-2);margin-top:3px;">${esc(feito.trim())}</div>
+      ${falta ? `<div style="font-size:12.5px;color:var(--farol-perto);margin-top:3px;">Em construção: ${esc(falta.trim())}</div>` : ''}</div>`;
+  }).join('');
+  let aberto = true; try { aberto = sessionStorage.getItem('planoSemanaFechada') !== '1'; } catch (e) {}
+  return `<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:14px;">${cartoes}</div>
+    <details${aberto ? ' open' : ''} ontoggle="try{sessionStorage.setItem('planoSemanaFechada',this.open?'0':'1')}catch(e){}" style="text-align:left;margin:0 0 18px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);">
+      <summary style="cursor:pointer;font-weight:700;">Andou nos últimos 7 dias <span style="font-weight:400;color:var(--tx-4);font-size:12px;">· ${semana.length} ${semana.length === 1 ? 'frente' : 'frentes'}, atualizado todo dia às 20:00</span></summary>
+      ${linhas || '<div class="contexto" style="margin-top:8px;">Nada andou nos últimos 7 dias.</div>'}</details>`;
+}
+
 function renderModuloPlano() {
   const alvo = document.getElementById('view-plano');
   if (!alvo || PLANO === null) return;
@@ -1031,11 +1067,13 @@ function renderModuloPlano() {
   }).join(' ');
 
   alvo.innerHTML = `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Plano</div>
+    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Em desenvolvimento</div>
     <div class="caption-label" style="text-align:center;" title="Marcar aqui vale para todo mundo — não fica só no seu navegador.">
       Tudo que precisa acontecer, com dono e estado. Entrou como <b>${esc((sess && sess.email) || '')}</b>.
       <button class="preset-btn" onclick="planoSair()">sair</button></div>
     ${avisoRecados(esc)}
+    ${PLANO_VER_ARQ ? '' : planoEmDesenvolvimento(ativos, esc)}
+    <div class="section-label" style="margin-top:6px;">O plano, item a item</div>
     <div class="plano-barra">
       <div class="plano-contagem">${PLANO_VER_ARQ ? `<b>${feitos}</b> de ${lista.length} resolvidos` : `<b>${andando.length}</b> em andamento · <b>${aFazer.length}</b> a fazer · <b>${feitos}</b> ${feitos === 1 ? 'pronto' : 'prontos'} nesta fase${PLANO_DONO ? ' (' + esc(PLANO_DONO) + ')' : ` · ${arqFeitos.length} resolvidos antes de 22/10`}`}</div>
       <div class="plano-trilho"><div class="plano-preenche" style="width:${pct.toFixed(1)}%;"></div></div>

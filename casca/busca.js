@@ -4,7 +4,7 @@
 // em painel_telas.responde já entram sozinhos). Sem acento e sem maiúscula não importa: a casca normaliza.
 // Tela nova no menu: acrescentar uma linha aqui com o jeito que a equipe fala.
 window.CASCA_BUSCA = {
-  plano: ['plano de acao', 'prioridades', 'o que fazer na semana'],
+  plano: ['plano de acao', 'em desenvolvimento', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'plano de saida', 'prioridades'],
   estasemana: ['semana atual', 'como esta a semana', 'resumo da semana'],
   placar: ['faturamento', 'vendas do mes', 'resultado', 'quanto vendemos', 'meta do mes', 'receita'],
   indicadores: ['kpi', 'metas', 'farol', 'indicador'],
