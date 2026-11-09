@@ -2808,6 +2808,7 @@ async function cgRescConfCarregar() {
   catch (e) { RESCC.erro = e.message; }
   RESCC.lendo = false;
   cgRescConfPintar();
+  if (cgRescDaConferencia() && !RESC.editados.size) { RESC.a = null; RESC.res = null; cgRescParametros(); }
 }
 function cgRescConfPintar() {
   const el = document.getElementById('rescConf'); if (el) el.innerHTML = cgRescConfHtml();
@@ -2954,8 +2955,21 @@ function cgRescResultadoHtml() {
 }
 function cgRescEscolher(campo, valor) {
   RESC[campo] = valor;
-  if (campo === 'pessoa') { RESC.a = null; RESC.res = null; RESC.erro = null; RESC.editados = new Set(); RESC.fontes = {}; }
+  if (campo === 'pessoa') { RESC.a = null; RESC.res = null; RESC.erro = null; RESC.editados = new Set(); RESC.fontes = {}; RESC.daConf = null; RESC.avisoConf = null; cgRescDaConferencia(); }
   cgRescParametros();
+}
+// 09/11/2026 (RH, teste do Diego): com conferência da contabilidade, o simulador abre com o tipo, o aviso e as datas dela,
+// para os dois números saírem iguais (antes abria em "Sem justa causa" e saída hoje). Uma vez por pessoa; depois vale o que mexerem.
+function cgRescDaConferencia() {
+  if (!RESC.pessoa || RESC.daConf === RESC.pessoa) return false;
+  const at = (RESCC.L || []).find((r) => r.atual && String(r.pessoa_id) === String(RESC.pessoa));
+  if (!at) return false;
+  RESC.daConf = RESC.pessoa;
+  if (at.simulado_tipo && RESC_TIPOS.some(([k]) => k === at.simulado_tipo)) RESC.tipo = at.simulado_tipo;
+  if (at.simulado_aviso && RESC_AVISOS.some(([k]) => k === at.simulado_aviso)) RESC.aviso = at.simulado_aviso;
+  if (at.data_demissao) RESC.saida = String(at.data_demissao).slice(0, 10);
+  RESC.avisoConf = at.data_aviso ? String(at.data_aviso).slice(0, 10) : null;
+  return true;
 }
 async function cgRescParametros() {
   const seq = ++RESC.seq;
@@ -2967,6 +2981,7 @@ async function cgRescParametros() {
   const p = await r.json();
   const a = RESC.a || {};
   Object.keys(p).forEach((k) => { if (k !== 'fontes' && !RESC.editados.has(k)) a[k] = p[k]; });
+  if (RESC.avisoConf && !RESC.editados.has('data_aviso')) a.data_aviso = RESC.avisoConf;   // a data do aviso da conferência
   RESC.a = a; RESC.fontes = p.fontes || {};
   avisoAcao(null);
   renderModuloCargos();
