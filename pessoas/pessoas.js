@@ -2781,6 +2781,7 @@ function cgAbaResc() {
     const cump = Math.max(0, Math.round((new Date(RESC.a.ultimo_dia + 'T12:00:00') - new Date(RESC.a.data_aviso + 'T12:00:00')) / 864e5));
     h += `<div class="caption-label" style="text-align:left;margin:-6px 0 10px;">Cumpriu ${cump} ${cump === 1 ? 'dia' : 'dias'} do aviso (o aviso começa no dia seguinte à entrega); o resto é indenizado.</div>`;
   }
+  h += `<div id="rescConf">${cgRescConfHtml()}</div>`;   // 09/11/2026: a rescisão da contabilidade e a conferência
   if (!RESC.pessoa) return h;
   if (!RESC.a) return h + '<div class="contexto">Lendo os dados da pessoa…</div>';
   const nConf = [...RESC_CONFERIR].filter((k) => !RESC.editados.has(k)).length;
@@ -2794,6 +2795,120 @@ function cgAbaResc() {
       </div>
       <div id="rescResultado">${cgRescResultadoHtml()}</div></div>`;
   return h;
+}
+// ---------- RESCISÕES: CONFERÊNCIA COM A CONTABILIDADE (dono 09/11/2026 17:49: "um botão na tela de rescisões pra Hellen subir
+// direto pelo painel a rescisão para comparar com a simulação, vc analisa e mostra na tela as considerações"; proposta
+// contexto/propostas-telas/2026-11-09-rh-rescisao-conferencia.md). Sobe em rh-rescisao/<pessoa>/<arquivo>, grava por
+// rh_rescisao_conferencia_enviar; a rotina rh-admissao-leitura lê e analisa (até 10 min); a tela lê vw_rh_rescisao_conferencia.
+const RESCC = { L: null, erro: null, lendo: false, aberto: null, anteriores: false, timer: null };
+async function cgRescConfCarregar() {
+  if (RESCC.lendo) return;
+  RESCC.lendo = true;
+  try { RESCC.L = await consultarTudo('vw_rh_rescisao_conferencia?select=*&order=enviado_em.desc,id.desc'); RESCC.erro = null; }
+  catch (e) { RESCC.erro = e.message; }
+  RESCC.lendo = false;
+  cgRescConfPintar();
+}
+function cgRescConfPintar() {
+  const el = document.getElementById('rescConf'); if (el) el.innerHTML = cgRescConfHtml();
+  // enquanto a análise não terminou, relê de minuto em minuto (só com a aba aberta)
+  clearTimeout(RESCC.timer);
+  const at = (RESCC.L || []).find((r) => r.atual && String(r.pessoa_id) === String(RESC.pessoa));
+  if (at && ['ESPERANDO', 'COMPARADA'].includes(at.situacao))
+    RESCC.timer = setTimeout(() => { if (document.getElementById('rescConf') && document.visibilityState === 'visible') cgRescConfCarregar(); }, 60000);
+}
+function cgRescDia(d) {
+  if (!d) return '–';
+  const x = new Date(String(d).slice(0, 10) + 'T12:00:00');
+  return ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][x.getDay()] + ' ' + x.toLocaleDateString('pt-BR');
+}
+function cgRescConfHtml() {
+  if (RESCC.L === null && !RESCC.erro) cgRescConfCarregar();
+  if (RESCC.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler as conferências: ${cgEsc(RESCC.erro)} <button type="button" class="preset-btn" onclick="RESCC.erro=null;cgRescConfCarregar()">Tentar de novo</button></div>`;
+  const L = RESCC.L || [];
+  const tit = (t, sub) => `<h4 style="margin:8px 0 6px;font-size:13.5px;">${t}${sub ? ` <span style="font-weight:400;font-size:11.5px;color:var(--tx-4);">${sub}</span>` : ''}</h4>`;
+  const sit = (r) => r.veredito_texto || r.situacao_texto || r.situacao || '';
+  if (!RESC.pessoa) {
+    const at = L.filter((r) => r.atual && (!CARGOS_F.unidade || r.unidade === CARGOS_F.unidade));
+    if (!at.length) return '';
+    return tit('Rescisões enviadas', 'clique para abrir') + `<div id="tabelaRescEnviadas" style="overflow-x:auto;margin-bottom:12px;"><table><thead><tr><th>Pessoa</th><th>Enviada em</th><th>Situação</th><th>Líquido da contabilidade</th></tr></thead><tbody>
+      ${at.map((r) => `<tr style="cursor:pointer;" onclick="cgRescEscolher('pessoa','${r.pessoa_id}')"><td>${cgEsc(cgNome(r.nome || ''))}</td><td>${r.enviado_em ? cgEnvQuando(r.enviado_em) : '–'}</td><td style="white-space:normal;">${cgEsc(sit(r))}</td><td>${r.liquido_contabilidade == null ? '–' : cgR(r.liquido_contabilidade)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  const minhas = L.filter((r) => String(r.pessoa_id) === String(RESC.pessoa));
+  const at = minhas.find((r) => r.atual) || minhas[0];
+  let h = tit('Rescisão da contabilidade', 'analítico do cálculo, termo de rescisão e guia do FGTS')
+    + `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;"><label class="preset-btn active" style="cursor:pointer;">${at ? 'Subir mais arquivos' : 'Subir a rescisão da contabilidade'}<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="cgRescConfSubir(this)"></label>
+      ${at ? '<span class="caption-label" style="margin:0;">o envio novo é lido junto com os arquivos anteriores</span>' : ''}</div>`;
+  if (!at) return h;
+  const cor = { CONFERE: 'var(--farol-ok)', CONFERE_COM_RESSALVAS: 'var(--farol-perto)', CONFERIR_COM_A_CONTABILIDADE: 'var(--farol-fora)' }[at.veredito] || 'var(--line)';
+  if (at.situacao === 'ERRO') h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);"><b style="color:var(--farol-fora);">✗ A leitura não deu certo:</b> ${cgEsc(at.motivo_erro || 'sem motivo')} · suba de novo ou <a href="javascript:void(0)" onclick="cgRescConfReler(${at.id})">ler de novo</a></div>`;
+  else h += `<div class="contexto" style="text-align:left;border-color:${cor};"><b style="color:${at.veredito ? cor : 'var(--tx-2)'};">${cgEsc(sit(at))}</b>${at.resumo ? `<div style="margin-top:4px;">${cgEsc(at.resumo)}</div>` : ''}
+    <div style="font-size:11.5px;color:var(--tx-4);margin-top:4px;">enviada ${at.enviado_em ? cgEnvQuando(at.enviado_em) : ''}${at.enviado_por ? ' por ' + cgEsc(at.enviado_por) : ''}${['ESPERANDO', 'COMPARADA'].includes(at.situacao) ? ' · a tela se atualiza sozinha' : ''}</div></div>`;
+  const dif = at.liquido_diferenca == null ? null : cgN(at.liquido_diferenca);
+  const card = (lbl, val, pct, cls) => `<div class="card ${cls || 'neutral'}"><div class="card-lbl">${lbl}</div><div class="card-val">${val}</div>${pct ? `<div class="card-pct">${pct}</div>` : ''}</div>`;
+  if (at.liquido_contabilidade != null || at.liquido_simulado != null)
+    h += `<div class="cards">${card('Líquido da contabilidade', at.liquido_contabilidade == null ? '–' : cgR(at.liquido_contabilidade))}${card('Simulado', at.liquido_simulado == null ? '–' : cgR(at.liquido_simulado))}
+      ${card('Diferença', dif == null ? '–' : (dif > 0 ? '+' : '') + cgR(dif), 'contabilidade − simulado', dif == null || Math.abs(dif) < 0.01 ? 'neutral' : 'highlight')}
+      ${card('Guia do FGTS', at.guia_fgts == null ? '–' : cgR(at.guia_fgts), at.guia_fonte ? cgEsc(at.guia_fonte) : '')}${card('Pagamento', cgRescDia(at.data_pagamento))}</div>`;
+  const cons = Array.isArray(at.consideracoes) ? at.consideracoes : [];
+  if (cons.length) {
+    const marca = { ok: ['✓', 'var(--farol-ok)'], atencao: ['!', 'var(--farol-perto)'], conferir: ['✗', 'var(--farol-fora)'], regra: ['simulador', 'var(--info)'] };
+    h += tit('Considerações') + cons.map((c) => { const [m, k] = marca[c.nivel] || ['·', 'var(--tx-4)'];
+      return `<div style="display:flex;gap:8px;align-items:baseline;margin:3px 0;text-align:left;"><b style="color:${k};min-width:18px;font-size:12px;">${m}</b><span>${cgEsc(c.texto || '')}</span></div>`; }).join('');
+  }
+  const comp = Array.isArray(at.comparacao) ? at.comparacao : [];
+  if (comp.length) {
+    const v = (x) => x == null ? '–' : cgR(x);
+    const itens = (L2) => (L2 || []).map((i) => `<div>${cgEsc(i.nome || '')}${i.ref ? ` <span style="color:var(--tx-4);">(${cgEsc(String(i.ref))})</span>` : ''}: <b>${cgR(i.valor)}</b></div>`).join('') || '<div style="color:var(--tx-4);">—</div>';
+    h += tit('Comparação por grupo', 'clique no grupo para ver as verbas') + `<div id="tabelaRescConf" style="overflow-x:auto;"><table><thead><tr><th>Grupo</th><th>Contabilidade</th><th>Simulado</th><th>Diferença</th></tr></thead><tbody>
+      ${comp.map((g, i) => { const ruim = g.bate === false && g.diferenca != null; const ab = RESCC.aberto === i;
+        return `<tr style="cursor:pointer;" onclick="RESCC.aberto=RESCC.aberto===${i}?null:${i};cgRescConfPintar()"><td>${ab ? '▼' : '▶'} ${cgEsc(g.rotulo || g.grupo || '')}</td><td>${v(g.contabilidade)}</td><td>${v(g.simulado)}</td>
+          <td${ruim ? ' style="color:var(--farol-fora);font-weight:700;"' : ''}>${g.diferenca == null ? '' : (cgN(g.diferenca) > 0 ? '+' : '') + cgR(g.diferenca)}${ruim ? ' ✗' : g.bate ? ' <span style="color:var(--farol-ok);">✓</span>' : ''}</td></tr>`
+          + (ab ? `<tr><td colspan="4" style="white-space:normal;"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;font-size:12.5px;">
+            <div><b>Contabilidade</b>${itens(g.itens_contabilidade)}</div><div><b>Simulado</b>${itens(g.itens_simulado)}</div></div></td></tr>` : ''); }).join('')}</tbody></table></div>`;
+  }
+  const arqs = Array.isArray(at.arquivos) ? at.arquivos : [];
+  h += `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:10px 0;font-size:12.5px;">${arqs.map((a) => `<a href="${cgEsc(a.link || '#')}" target="_blank" rel="noopener">📄 ${cgEsc(a.nome || 'arquivo')}</a>`).join('')}
+    ${String(at.fluxo || '').startsWith('fluxo:') ? `<span style="color:var(--tx-3);">${cgEsc(at.fluxo)}</span>` : ''}
+    ${at.situacao !== 'ESPERANDO' ? `<button type="button" class="preset-btn" onclick="cgRescConfReler(${at.id})">Ler de novo</button>` : ''}</div>`;
+  const ant = minhas.filter((r) => r !== at);
+  if (ant.length) h += `<details${RESCC.anteriores ? ' open' : ''} ontoggle="RESCC.anteriores=this.open"><summary style="cursor:pointer;font-size:12.5px;color:var(--tx-3);">ver ${ant.length} ${ant.length === 1 ? 'envio anterior' : 'envios anteriores'}</summary>
+    ${ant.map((r) => `<div style="font-size:12.5px;margin:4px 0 4px 12px;">${r.enviado_em ? cgEnvQuando(r.enviado_em) : ''} · ${cgEsc(sit(r))}${r.liquido_contabilidade != null ? ' · ' + cgR(r.liquido_contabilidade) : ''}</div>`).join('')}</details>`;
+  return h;
+}
+async function cgRescConfSubir(inp) {
+  const fs = [...(inp.files || [])]; inp.value = '';
+  if (!fs.length || !RESC.pessoa) return;
+  if (fs.length > 10) return avisoAcao('atencao', '! Mande de 1 a 10 arquivos.');
+  const ruim = fs.find((f) => !/^(application\/pdf|image\/jpeg|image\/png)$/.test(f.type) || f.size > 15 * 1048576);
+  if (ruim) return avisoAcao('atencao', `! ${ruim.name}: precisa ser PDF, JPG ou PNG de até 15 MB.`);
+  avisoAcao('enviando', `Subindo ${fs.length} ${fs.length === 1 ? 'arquivo' : 'arquivos'}…`);
+  try {
+    await rmbGarantirTokenValido();
+    const pedir = (url, opt) => fetch(url, { ...opt, headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}`, ...opt.headers } });
+    const arquivos = [];
+    for (const f of fs) {
+      const limpo = f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').slice(-80);
+      const caminho = `${Number(RESC.pessoa)}/${Date.now()}-${limpo}`;
+      const up = await pedir(`${SUPABASE_URL}/storage/v1/object/rh-rescisao/${caminho}`, { method: 'POST', headers: { 'Content-Type': f.type }, body: f });
+      if (!up.ok) throw new Error(`${f.name} não subiu (${up.status})`);
+      const sg = await pedir(`${SUPABASE_URL}/storage/v1/object/sign/rh-rescisao/${caminho}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 2592000 }) });
+      const d = sg.ok ? await sg.json() : {};
+      if (!d.signedURL) throw new Error(`${f.name} não subiu (${sg.status})`);
+      arquivos.push({ nome: f.name, caminho, link: `${SUPABASE_URL}/storage/v1${d.signedURL}` });
+    }
+    const r = await trRpcSeguro('rh_rescisao_conferencia_enviar', { p_pessoa: Number(RESC.pessoa), p_arquivos: arquivos });
+    if (!r.ok) throw new Error(await trErroDe(r));
+  } catch (e) { avisoAcao('erro', `✗ Não subiu: ${e.message}. Escolha os arquivos de novo no botão "Subir".`); return; }
+  avisoAcao('ok', `✓ Recebido às ${avisoHora()}. A análise aparece aqui em até 10 min.`);
+  await cgRescConfCarregar();
+}
+async function cgRescConfReler(id) {
+  avisoAcao('enviando', 'Pedindo a leitura de novo…');
+  const r = await trRpcSeguro('rh_rescisao_conferencia_reler', { p_id: id });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => cgRescConfReler(id));
+  avisoAcao('ok', `✓ Pedido às ${avisoHora()}. A análise nova aparece aqui em até 10 min.`);
+  await cgRescConfCarregar();
 }
 function cgRescCampoHtml([k, rot, tipo, branco]) {
   const a = RESC.a, v = a[k] == null ? '' : a[k];
