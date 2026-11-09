@@ -2635,10 +2635,12 @@ function renderLucroUni() {
   const caixaIni = Object.values(caixaU).reduce((s, a) => s + a.ini, 0);
   const caixaFim = Object.values(caixaU).reduce((s, a) => s + a.fim, 0);
   // 07/11/2026 (auditoria lote 1, resultado-26): o "sem a XP" é o MESMO perímetro do Placar
-  // (vw_fin_ponte_mensal.variacao_caixa): bancos + cofres + cartões, sem a XP e sem as Participações
+  // (vw_fin_ponte_mensal.variacao_caixa): bancos + cofres, sem a XP e sem as Participações; cartão fora (dono 09/11)
   // (aplicação: ITAU AV → PARTICIPACOES → XP). Antes tirava só a XP e deixava o cartão de fora.
   const APLIC_LU = ['XP INVESTIMENTOS', 'PARTICIPACOES'];
-  const caixaSemXp = contas.filter(c => !APLIC_LU.includes(c.conta) && (!ctxLoja || c.unidade === ctxLoja))
+  // 09/11/2026 (dono, regime de caixa): o cartão saiu do caixa — quando o banco já trouxer a linha DIFERENCA FATURA CARTAO
+  const semCartaoLU = (dfc || []).some(r => r.subtipo === 'DIFERENCA FATURA CARTAO');
+  const caixaSemXp = contas.filter(c => !APLIC_LU.includes(c.conta) && !(semCartaoLU && ehCartao(c.conta)) && (!ctxLoja || c.unidade === ctxLoja))
     .reduce((s, c) => {
       // 09/11/2026: a ponte ganhou ajuste_trava_corte (out/26) e o Placar soma; aqui também, para os dois baterem
       const k = ajusteCorte(c.conta, c.saldo_inicial, movTot[c.conta]);
@@ -3875,7 +3877,7 @@ function fxMesCalc(mes) {
 // aqui ("o caixa das filiais entrou no Saipos em 01/08") era FALSA — o jan-jul das filiais
 // existe desde 18/08 (SAIPOS_HIST) e o saldo bate com o extrato. Quem estava errada era a
 // vw_fin_ponte_mensal, que lia a planilha (so AV). Corrigida; jan-jul agora tem as tres.
-function fxPonte(mes) { const L = fxLojas(); const rows = FX_M.ponte.filter(r => r.mes === mes && L.includes(r.unidade)); if (!rows.length || L.some(u => !rows.some(r => r.unidade === u))) return null; const s = c => rows.reduce((a, r) => a + fxN(r[c]), 0); return { res: s('resultado_apurado'), comp: s('ajuste_competencia'), inv: s('investimentos'), ret: s('retiradas'), emp: s('emprestimos'), apo: s('aportes'), rend: s('aplicacoes'), xp: s('transferencias_liquidas'), sem: s('sem_classificacao'), v: s('variacao_caixa'), rendXp: s('rendimento_ficou_na_aplicacao'), pagoXp: s('pago_direto_pela_aplicacao'),
+function fxPonte(mes) { const L = fxLojas(); const rows = FX_M.ponte.filter(r => r.mes === mes && L.includes(r.unidade)); if (!rows.length || L.some(u => !rows.some(r => r.unidade === u))) return null; const s = c => rows.reduce((a, r) => a + fxN(r[c]), 0); return { res: s('resultado_apurado'), comp: s('ajuste_competencia'), inv: s('investimentos'), ret: s('retiradas'), emp: s('emprestimos'), apo: s('aportes'), rend: s('aplicacoes'), xp: s('transferencias_liquidas'), sem: s('sem_classificacao'), v: s('variacao_caixa'), rendXp: s('rendimento_ficou_na_aplicacao'), pagoXp: s('pago_direto_pela_aplicacao'), cartao: s('cartao_saldo_mudou'),
   // 07/11/2026 (Financeiro, dinheiro-1): o ajuste da trava do corte dos cofres entra na variação no mês do corte. Enquanto a
   // coluna não existe na view, fxN(undefined) = 0 e nada muda
   trava: s('ajuste_trava_corte') }; }
@@ -4543,7 +4545,7 @@ function renderFechamento() {
         ? ['Transferência sem contrapartida — conferir', p.xp, 'entrou como transferência e não saiu de nenhuma outra conta: costuma ser lançamento com categoria errada']
         : ['Lucro enviado para a XP', p.xp, 'o que sobra nas lojas vai para o Itaú AV, daí para a Participações e para a XP'],
       ['Rendimento aplicações que ficou na XP', p.rendXp, 'rendeu lá dentro e não passou pelas contas do dia a dia'],
-      ['Pago direto pela XP', p.pagoXp, 'imposto, retirada ou compra paga da XP — já está nas linhas de cima'], ['Empréstimos', p.emp, ''], ['Ajuste da trava do corte', p.trava, 'cofres: o Saipos regravou caixas de antes do corte de 21/10'], ['Sem classificação', p.sem, 'lançamento sem conta — deveria ser zero']].filter(([, x]) => Math.abs(x) > 0.5);
+      ['Pago direto pela XP', p.pagoXp, 'imposto, retirada ou compra paga da XP — já está nas linhas de cima'], ['Empréstimos', p.emp, ''], ['Ajuste da trava do corte', p.trava, 'cofres: o Saipos regravou caixas de antes do corte de 21/10'], ['Cartão de crédito', p.cartao, 'fatura paga a mais (−) ou compra paga com crédito do cartão (+)'], ['Sem classificação', p.sem, 'lançamento sem conta — deveria ser zero']].filter(([, x]) => Math.abs(x) > 0.5);
     h += `<div class="fx-caixa"><div class="fx-rotulo">O caixa do dia a dia em ${fxMesLongo(mes)}</div><div class="fx-valor${p.v < 0 ? ' neg' : ''}">${p.v >= 0 ? 'cresceu' : 'encolheu'} ${fxMil(Math.abs(p.v))}</div><ul>${itens.map(([n, x, s2]) => `<li><span>${n}${s2 ? `<small>${s2}</small>` : ''}</span><b>${x >= 0 ? '+ ' : '− '}${fxMil(Math.abs(x))}</b></li>`).join('')}<li class="res"><span><b>= caixa do dia a dia</b><small>bancos, cofres e cartões; XP e Participações ficam de fora</small></span><b>${p.v >= 0 ? '+ ' : '− '}${fxMil(Math.abs(p.v))}</b></li></ul></div>`;
     if (!bateSecao3) h += `<div class="fx-nota"><b>Por que a primeira linha não é o número da seção 3.</b>
       A seção 3 diz que sobraram <b>${fxMil(a.resultado)}</b> e esta conta começa em <b>${fxMil(p.res)}</b>.
@@ -4654,7 +4656,7 @@ async function entrarSemana() {
       consultarTudo(`vw_sem_funil?select=*&semana=gte.${desde}`), consultarTudo(`vw_sem_compras?select=*&semana=gte.${desde}`),
       consultarTudo(`vw_tr_cmv_semanal?select=unidade,semana,valor&semana=gte.${desde}`), consultarTudo(`vw_sem_despesas?select=*&semana=gte.${desde}`),
       consultarTudo(`vw_sem_recebido?select=*&semana=gte.${desde}`), consultarTudo('vw_sem_caixa_hoje?select=*'),
-      consultarTudo(`vw_fin_contas_pagar?select=unidade,sentido,situacao,vencimento,credito,debito,subtipo,origem&ativa=eq.true&vencimento=lt.${fxSomaDias(segAtual, 14)}`),
+      consultarTudo(`vw_fin_contas_pagar?select=unidade,sentido,situacao,vencimento,dia_pagamento,credito,debito,subtipo,origem&ativa=eq.true&dia_pagamento=lt.${fxSomaDias(segAtual, 14)}`).then(L => (L.forEach(r => { r.vencTitulo = r.vencimento; if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
       consultarTudo('vw_mes_cmv_parcial?select=*'),
     ]);
     // Meta de mercadoria: DADO, nao constante. Ate 12/09/2026 esta tela tinha
@@ -4994,8 +4996,12 @@ function renderModuloDFC() {
       saldoFimConta[c.conta].push(acum);
     }
   });
-  const saldoIni = meses.map((_, i) => contas.reduce((s, c) => s + saldoIniConta[c.conta][i], 0));
-  const saldoFim = meses.map((_, i) => contas.reduce((s, c) => s + saldoFimConta[c.conta][i], 0));
+  // 09/11/2026 (dono, regime de caixa): com o cartão fora do caixa (o banco traz DIFERENCA FATURA CARTAO), o saldo é só
+  // bancos, cofres e aplicações; o cartão fica como informação abaixo
+  const DFC_SEM_CARTAO = DFC_MENSAL.some(r => r.subtipo === 'DIFERENCA FATURA CARTAO');
+  const noSaldo = (c) => !(DFC_SEM_CARTAO && c.conta.startsWith('CREDITO'));
+  const saldoIni = meses.map((_, i) => contas.filter(noSaldo).reduce((s, c) => s + saldoIniConta[c.conta][i], 0));
+  const saldoFim = meses.map((_, i) => contas.filter(noSaldo).reduce((s, c) => s + saldoFimConta[c.conta][i], 0));
 
   // ---- montagem do HTML ----
   const receitasTot = total(receitas);
@@ -5035,7 +5041,7 @@ function renderModuloDFC() {
 
   // SALDO INICIAL (abre por conta)
   corpo += linhaSaldo('dfc-saldo', 'SALDO INICIAL', saldoIni, 'SALDO_INI', saldoIni[0]);
-  if (dfcAberto.has('SALDO_INI')) contas.forEach(c => {
+  if (dfcAberto.has('SALDO_INI')) contas.filter(noSaldo).forEach(c => {
     corpo += linhaSaldo('dfc-conta', nomeConta(c.conta), saldoIniConta[c.conta], null, saldoIniConta[c.conta][0]);
   });
 
@@ -5095,7 +5101,8 @@ function renderModuloDFC() {
     corpo += linha('dfc-bloco', 'SEM CLASSIFICAÇÃO (revisar)', semClass);
   }
   if (transf.some(v => Math.abs(v) > 0.005)) {
-    corpo += linha('dfc-bloco', 'TRANSFERÊNCIAS (líquido)', transf);
+    corpo += linha('dfc-bloco', 'TRANSFERÊNCIAS (líquido)', transf, 'TRANSF');
+    corpo += blocoSubtipos('TRANSF', r => r.natureza === 'TRANSFERENCIAS', 1).replace('<td>DIFERENCA FATURA CARTAO</td>', '<td>Cartão: fatura paga a mais / crédito usado</td>');
   }
 
   corpo += linha('dfc-resultado', '(=) RESULTADO FINAL', resultFim);
@@ -5106,7 +5113,7 @@ function renderModuloDFC() {
   // 28/09/2026: o saldo final soma a XP (regra do dono: fora do Fluxo projetado, pode entrar
   // nos demais calculos) — o rotulo diz, e as linhas logo abaixo separam em conta x aplicado.
   const temAplic = contas.some(c => c.conta === 'XP INVESTIMENTOS' || c.conta === 'PARTICIPACOES');
-  const temCartaoSaldo = contas.some(c => c.conta.startsWith('CREDITO'));   // 07/11/2026 (auditoria dinheiro-23): o rótulo diz que o cartão soma
+  const temCartaoSaldo = !DFC_SEM_CARTAO && contas.some(c => c.conta.startsWith('CREDITO'));   // 07/11/2026 (auditoria dinheiro-23): o rótulo diz que o cartão soma
   const rotSaldoFim = temAplic && temCartaoSaldo ? 'SALDO FINAL (com a XP e o cartão)' : temAplic ? 'SALDO FINAL (com a XP)'
     : temCartaoSaldo ? 'SALDO FINAL (com o cartão)' : 'SALDO FINAL';
   corpo += linhaSaldo('dfc-saldo', rotSaldoFim, saldoFim, 'SALDO_FIM', saldoFim[nM - 1]);
@@ -5129,7 +5136,7 @@ function renderModuloDFC() {
     }
     return '<span class="dfc-conf sem" title="sem extrato nem saldo informado para conferir">·</span>';
   };
-  if (dfcAberto.has('SALDO_FIM')) contas.forEach(c => {
+  if (dfcAberto.has('SALDO_FIM')) contas.filter(noSaldo).forEach(c => {
     const vals = saldoFimConta[c.conta];
     corpo += `<tr class="dfc-conta"><td>${nomeConta(c.conta)}</td>${vals.map((v, i) => `<td class="${v < -0.005 ? 'negativo' : ''}">${fmt(v)}${marcaConf(confDe(c.conta, meses[i]))}</td>`).join('')}${celRS(vals[nM - 1])}</tr>`;
   });
@@ -5156,7 +5163,7 @@ function renderModuloDFC() {
   corpo += linhaSaldo('dfc-conta', 'em conta (paga as contas)', saldoEmConta, null, saldoEmConta[nM - 1]);
   corpo += linhaSaldo('dfc-conta', 'aplicado (XP e Participações)', saldoAplicado, null, saldoAplicado[nM - 1]);
   if (saldoCartao.some(v => Math.abs(v) > 0.005))
-    corpo += linhaSaldo('dfc-conta', 'no cartão de crédito', saldoCartao, null, saldoCartao[nM - 1]);   // 07/11/2026: soma no saldo total (auditoria dinheiro-23)
+    corpo += linhaSaldo('dfc-conta', DFC_SEM_CARTAO ? 'no cartão de crédito (fora do saldo)' : 'no cartão de crédito', saldoCartao, null, saldoCartao[nM - 1]);   // 09/11/2026: com o cartão fora do caixa, só informação
 
   // distribuição "de onde vem / pra onde vai" (proposta do financeiro, 13/08)
   const entradasPorSub = subtiposDe(r => r.natureza === 'RECEITAS')
@@ -6370,7 +6377,7 @@ async function projCarregar() {
   const corteLim = new Date(); corteLim.setDate(corteLim.getDate() - 62);
   const corteLimIso = corteLim.toISOString().slice(0, 10);
   const [pagar, receb, ancora, vencStatus, caixaDia, comAtacado, recebSub, benefSem, benefXp, benefCobr, _fin, atacadoReceber, recebConta, feriados, costumaSair, limiteCfg, limiteDias, limiteMeses, recebAtacado, foraExtrato] = await Promise.all([
-    consultarTudo('vw_fin_contas_pagar?select=vencimento,conta,conta_exibida,unidade,situacao,dias_vencida,sentido,subtipo,tipo,natureza,descricao,credito,debito,origem&order=vencimento'),
+    consultarTudo('vw_fin_contas_pagar?select=vencimento,dia_pagamento,conta,conta_exibida,unidade,situacao,dias_vencida,sentido,subtipo,tipo,natureza,descricao,credito,debito,origem&order=dia_pagamento,vencimento'),
     consultarTudo(`vw_fin_receitas_diarias?select=data,recebido&data=gte.${corteIso}&order=data`),
     consultarTudo('vw_fin_saldo_banco_atual?select=conta,data_saldo,saldo_banco,idade_dias,saldo_saipos,diferenca'),
     consultarTudo('vw_fin_vencidas_status?select=vencimento,conta,subtipo,tipo,descricao,debito,dias_vencida,data_debito_banco,achou_no_banco,aguarda_extrato'),
@@ -6488,7 +6495,9 @@ async function projCarregar() {
     ([k, v]) => [k, ['conta','conta_exibida','unidade'].includes(k) ? v : Number(v)])));
   PROJ_VENC.forEach(r => { r.debito = Number(r.debito); });
   PROJ_PAGAR = pagar;
-  PROJ_PAGAR.forEach(r => { r.credito = Number(r.credito); r.debito = Number(r.debito); });
+  // 09/11/2026 (dono, regime de caixa): o dia do fluxo é o dia_pagamento (vencimento no dia útil); o vencimento do título
+  // fica em vencTitulo, que casa com a vw_fin_vencidas_status
+  PROJ_PAGAR.forEach(r => { r.credito = Number(r.credito); r.debito = Number(r.debito); r.vencTitulo = r.vencimento; if (r.dia_pagamento) r.vencimento = r.dia_pagamento; });
   PROJ_RECEB = receb;
   PROJ_RECEB.forEach(r => { r.recebido = Number(r.recebido); });
 }
@@ -6537,7 +6546,7 @@ async function cpCarregar() {
   await carregarApelidos();
   try { await trRpc('rh_ff_baixa_automatica', {}); } catch (e) {}   // sem acesso a pessoal: ignora
   const [linhas, venc, imp, motor] = await Promise.all([
-    consultarTudo('vw_fin_contas_pagar?select=vencimento,conta_exibida,unidade,situacao,dias_vencida,subtipo,tipo,descricao,credito,debito,origem,id_titulo,titulo,fornecedor&order=vencimento'),
+    consultarTudo('vw_fin_contas_pagar?select=vencimento,dia_pagamento,conta_exibida,unidade,situacao,dias_vencida,subtipo,tipo,descricao,credito,debito,origem,id_titulo,titulo,fornecedor&order=dia_pagamento,vencimento'),
     consultarTudo('vw_fin_vencidas_status?select=vencimento,descricao,debito,data_debito_banco,achou_no_banco,aguarda_extrato').catch(() => []),
     consultarTudo('vw_fin_ultima_importacao?select=fonte,importado_em').catch(() => []),
     // 07/11/2026: a projeção do fluxo (~20 consultas) NÃO segura mais a lista. Com o servidor cheio ela passava de 30 s e a
@@ -6601,7 +6610,8 @@ function cpTitulos(linhas, saiu, aguarda) {
       // 07/11/2026 (dono: "sempre espere o tempo de conciliação"): o banco já diz 'AGUARDANDO CONCILIACAO' — mesma faixa do 'aguardando'
       t = { vencimento: r.vencimento, situacao: r.situacao === 'AGUARDANDO CONCILIACAO' ? 'AGUARDANDO EXTRATO' : r.situacao, dias_vencida: r.dias_vencida, origem: r.origem,
             unidade: r.unidade, conta_exibida: r.conta_exibida || '', descricao: String(r.titulo || r.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),
-            fornecedor: r.fornecedor || '', liquido: 0, partes: [], saiuTodas: true, saiuBanco: undefined, aguardaTodas: true };
+            fornecedor: r.fornecedor || '', liquido: 0, partes: [], saiuTodas: true, saiuBanco: undefined, aguardaTodas: true,
+            vencTitulo: r.vencimento, diaPag: r.dia_pagamento || r.vencimento };
       mapa.set(k, t);
     }
     if (!t.fornecedor && r.fornecedor) t.fornecedor = r.fornecedor;
@@ -6616,6 +6626,9 @@ function cpTitulos(linhas, saiu, aguarda) {
     t.sentido = t.liquido < 0 ? 'PAGAR' : 'RECEBER';
     t.valor = Math.abs(Math.round(t.liquido * 100) / 100);
     if (!t.saiuTodas) t.saiuBanco = undefined;
+    // 09/11/2026 (dono: "no regime de caixa, data do pagamento"): o dia da lista é o dia em que o dinheiro sai
+    // (vencimento levado ao dia útil, vw_fin_contas_pagar.dia_pagamento); o vencimento do título fica no texto
+    t.vencimento = t.diaPag;
     // vencida cujas partes todas ainda aguardam o extrato: nao e' vencida de verdade (16/10/2026)
     if (t.situacao === 'VENCIDA' && t.sentido === 'PAGAR' && !t.saiuBanco && t.aguardaTodas) t.situacao = 'AGUARDANDO EXTRATO';
     const cats = [...new Set(t.partes.map(p => p.subtipo))];
@@ -6841,7 +6854,7 @@ function cpTabela(sentido) {
   const linha = (r, comData) => {
     const og = CP_ORIGEM[r.origem] || { rot: r.origem || '—', baixa: '—' };
     const cor = r.situacao === 'VENCIDA' ? 'var(--farol-fora)' : r.situacao === 'VENCE HOJE' ? 'var(--amber-2)' : 'inherit';
-    const venc = `${ffDdmm(r.vencimento)}${r.situacao === 'VENCIDA' ? ` · ${r.dias_vencida}d` : ''}`;
+    const venc = `${r.vencTitulo && r.vencTitulo !== r.vencimento ? `vence ${ffDdmm(r.vencTitulo)} · paga em ` : ''}${ffDdmm(r.vencimento)}${r.situacao === 'VENCIDA' ? ` · ${r.dias_vencida}d` : ''}`;
     const nota = r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="a conciliação do banco deste dia ainda não terminou (regra de 09/11)">aguardando a conciliação</span>' : '';
     // "no Saipos" e' o caso comum: so aparece a baixa quando ela foge disso
     const baixa = r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
@@ -8185,7 +8198,7 @@ function projCalc(unidade) {
     // a media desta tela ainda leva o Boqueirao — ai a provisao dele nao entra, senao contaria duas vezes. So acontece se as
     // duas leituras falharem juntas (banco fora); a tela fica como era antes de 18/10.
     if (r.origem === 'PROVISAO' && !PROJ_RECEITA_PREV && !PROJ_FORA_MEDIA) { console.warn('Fluxo: provisao do Boqueirao fora da conta (sem a media do banco)'); return; }
-    if (r.vencimento < hojeIso && jaSaiuBanco.has(`${r.vencimento}|${r.debito}|${r.descricao || ''}`)) {
+    if (r.vencimento < hojeIso && jaSaiuBanco.has(`${r.vencTitulo || r.vencimento}|${r.debito}|${r.descricao || ''}`)) {
       jaPagasSemBaixa += r.debito - r.credito;
       return;
     }
@@ -8194,7 +8207,7 @@ function projCalc(unidade) {
     // 21/10/2026: entre lojas, a ponta que sai da filial anda junto com a que entra na Agua Verde (as duas para amanha)
     const receberVencido = r.vencimento < hojeIso && ((r.credito > 0 && !(r.debito > 0)) || projEntreLojas(r));
     const dia = receberVencido ? fxSomaDias(hojeIso, 1) : (r.vencimento < hojeIso ? hojeIso : r.vencimento);
-    if (r.vencimento < hojeIso && !receberVencido && !aguardaExtrato.has(`${r.vencimento}|${r.debito}|${r.descricao || ''}`)) vencidas += r.debito - r.credito;
+    if (r.vencimento < hojeIso && !receberVencido && !aguardaExtrato.has(`${r.vencTitulo || r.vencimento}|${r.debito}|${r.descricao || ''}`)) vencidas += r.debito - r.credito;
     pagarDia[dia] = (pagarDia[dia] || 0) + r.debito;
     receberDia[dia] = (receberDia[dia] || 0) + r.credito;
     (itensDia[dia] = itensDia[dia] || []).push(r);

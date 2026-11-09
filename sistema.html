@@ -790,7 +790,7 @@ async function carregarSinalAgenda() {
     const opc = (q) => ler(q).catch(() => []);
     const [pend, venc, rmb, fer, fUlt, fVal] = await Promise.all([
       ler('dono_pendencia?select=id,prazo&resolvido_em=is.null'),
-      ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&vencimento=lt.${hoje}`),
+      ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&dia_pagamento=lt.${hoje}`),
       opc('vw_rmb_pedidos?select=id&situacao=eq.PEDIDO&so_o_dono=is.true'),
       opc(`vw_rh_ferias_alertas?select=pagar_ate,pagamento&situacao=eq.programada&pagar_ate=lt.${hoje}`),
       opc('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
