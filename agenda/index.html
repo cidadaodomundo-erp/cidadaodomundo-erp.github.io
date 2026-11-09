@@ -64,8 +64,9 @@ const agNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => 
 // atalho para a tela onde o dono age (na casca abre a tela; solta, troca o endereço)
 function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome }); else location.href = '../sistema.html#' + nome; }
 
-async function entrarAgenda() {
+async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (sem "Carregando…", sem piscar)
   const alvo = document.getElementById('view-agenda');
+  AG_LIDO = Date.now();
   await rmbGarantirTokenValido().catch(() => {});
   await carregarEmailDono();
   if (EMAIL_DONO === null) {   // não deu para confirmar quem está logado: nunca concluir "não é o dono" por falha de leitura
@@ -77,12 +78,14 @@ async function entrarAgenda() {
   if (!souODono()) {
     // 07/11/2026 (dono 03:59): o Fabio vê a agenda da equipe (só leitura), nunca o "Depende de você" do dono
     if (AGP.veEquipe === null) { const r = await trRpcSeguro('agenda_ve_equipe', {}); AGP.veEquipe = r.ok ? (await r.json()) === true : false; }
-    if (AGENDA_TODOS) await agPessoaEntrar(null);
+    if (AGENDA_TODOS) await agPessoaEntrar(silencioso ? AGP.verComo || null : null);
     else alvo.innerHTML = '<h2>Minha agenda</h2>' + (AGP.veEquipe ? '' : '<div class="contexto">A sua agenda chega em breve.</div>');
     if (AGP.veEquipe) agEquipeMontar().then(agGuia);
     return;
   }
-  alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
+  if (!silencioso) alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
+  // 09/11/2026: o que o fato já resolveu (ex.: rotina logou depois do pedido) fecha antes de ler
+  await trRpcSeguro('dono_pendencia_conferir', {}).catch(() => {});
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal] = await Promise.all([
     ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
@@ -352,6 +355,20 @@ document.getElementById('modulo-agenda').style.display = '';
 registrarUso(TELA);
 avisarCasca({ tipo: 'casca-modulo', nome: TELA });
 window.reentrarTela = () => { entrarAgenda(); };
+// 09/11/2026 (proposta 2026-11-09-agenda-pendencia-se-fecha-sozinha; dono 13:04 "pode a agenda"): a agenda se relê sozinha —
+// ao voltar a ficar visível (se passou 1 min) e a cada 5 min aberta. Não relê com formulário aberto, campo em foco ou guia na tela.
+let AG_LIDO = Date.now();
+function agReler() {
+  if (document.visibilityState !== 'visible') return;
+  try { if (window.frameElement && window.frameElement.offsetParent === null) return; } catch (e) {}   // na casca, outra tela à frente
+  const v = document.getElementById('view-agenda');
+  if (!v || v.querySelector('.ag-form') || document.getElementById('guiaBalao')) return;
+  const f = document.activeElement; if (f && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName)) return;
+  const y = window.scrollY;
+  entrarAgenda(true).then(() => window.scrollTo(0, y)).catch(() => {});
+}
+setInterval(agReler, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - AG_LIDO > 60000) agReler(); });
 entrarAgenda();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
