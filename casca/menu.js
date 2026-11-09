@@ -162,6 +162,11 @@ window.CASCA_MENU = [
   "nome": "Entrega",
   "itens": [
    {
+    "chave": "delivery",
+    "rotulo": "Delivery do dia",
+    "icone": "🛵"
+   },
+   {
     "chave": "atrasos",
     "rotulo": "Atrasos e turnos",
     "icone": "⏱️"

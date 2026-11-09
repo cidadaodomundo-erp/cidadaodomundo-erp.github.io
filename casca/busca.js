@@ -31,6 +31,7 @@ window.CASCA_BUSCA = {
   cardapio: ['desempenho do cardapio', 'mais vendidos', 'itens vendidos', 'produtos vendidos'],
   clientes: ['crm', 'base de clientes', 'cliente novo', 'recorrencia'],
   site: ['site', 'pedido direto', 'canal proprio', 'accon'],
+  delivery: ['delivery do dia', 'placar do delivery', 'cancelamentos do dia', 'avaliacoes do dia', 'tempo de entrega do dia'],
   atrasos: ['atraso', 'tempo de entrega', 'demora', 'turnos'],
   frete: ['taxa de entrega', 'distancia', 'raio de entrega', 'frete'],
   logfin: ['motoboy', 'entregadores', 'logistica', 'corridas'],

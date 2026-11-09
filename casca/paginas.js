@@ -72,6 +72,7 @@ window.CASCA_PAGINAS = {
   cardapio: 'canal/index.html#cardapio',
   clientes: 'canal/index.html#clientes',
   site: 'canal/index.html#site',
+  delivery: 'delivery/index.html',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',

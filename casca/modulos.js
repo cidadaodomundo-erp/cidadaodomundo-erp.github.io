@@ -41,7 +41,7 @@ window.CASCA_MODULOS = [
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
     lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
   { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
-    lancar: [], acompanhar: ['atrasos', 'atendimento', 'link:portal-qualidade'] },
+    lancar: [], acompanhar: ['delivery', 'atrasos', 'atendimento', 'link:portal-qualidade'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
