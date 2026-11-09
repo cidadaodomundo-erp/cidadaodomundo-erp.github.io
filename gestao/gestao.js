@@ -9240,7 +9240,7 @@ function renderModuloConciliacao() {
 
   const alertas = negativas.length + paradas.length + transfRuins.length + CONF_SEMCLASS.length
                 + (importAtrasada ? 1 : 0) + (valorGenerico > 0.005 ? 1 : 0)
-                + divergentes.length + cartoesPositivos.length + faturasRuins.length;
+                + cartoesPositivos.length + faturasRuins.length;   // 09/11/2026 (dinheiro-34): planilha × Saipos virou histórico, fora da conta
 
   // A soma escondia a composicao (12/09/2026): "11 pontos de atencao" nao diz se
   // sao 11 lancamentos sem classificar ou 11 contas negativas — coisas de tamanho
@@ -9254,7 +9254,6 @@ function renderModuloConciliacao() {
     { nome: 'Contas com saldo negativo', n: negativas.length, valor: negativas.reduce((t, c) => t + c.saldo, 0) },
     { nome: 'Transferências que não fecham', n: transfRuins.length, valor: transfRuins.reduce((t, x) => t + x.diferenca, 0) },
     { nome: 'Contas sem movimento recente', n: paradas.length, valor: null },
-    { nome: 'Planilha × Saipos (jan–jul)', n: divergentes.length, valor: divergentes.reduce((t, d) => t + d.pendente, 0) },
     { nome: 'Cartão com saldo positivo', n: cartoesPositivos.length, valor: cartoesPositivos.reduce((t, c) => t + c.saldo, 0) },
     { nome: 'Faturas de cartão fora do lugar', n: faturasRuins.length, valor: faturasRuins.reduce((t, x) => t + Number(x.diferenca || 0), 0) },
     { nome: 'Categorias genéricas no mês', n: valorGenerico > 0.005 ? 1 : 0, valor: valorGenerico },
@@ -9318,8 +9317,8 @@ function renderModuloConciliacao() {
 
   if (divergentes.length) {
     blocos += `
-    <div class="section-label">Planilha × Saipos (jan–jul) — as duas contam a mesma história?</div>
-    <div class="contexto" style="border-color:#f5a623; text-align:left;">
+    <details style="margin-top:14px;"><summary class="section-label" style="cursor:pointer;">Histórico: planilha antiga × Saipos (jan–jul) — fora da contagem</summary>
+    <div class="contexto" style="border-color:var(--line); text-align:left;">
       <table style="width:100%; font-size:12.5px;">
         <tr><th style="text-align:left;">Conta</th><th>Planilha</th><th>Saipos</th><th>Falta resolver</th><th></th></tr>
         ${(() => {
@@ -9338,15 +9337,14 @@ function renderModuloConciliacao() {
           <td class="negativo"><b>${fmt(divergentes.reduce((s, d) => s + d.pendente, 0))}</b></td><td></td></tr>
       </table>
       <div style="font-size:12px; color:#a5a49a; margin-top:6px;">
-        Movimento de jan a jul nas duas fontes. Enquanto houver pendência, o DFC continua na planilha —
-        quando esta lista zerar, a base pode virar 100% Saipos. Nos cartões, a diferença é a medida do que
+        A planilha da Água Verde (jan–jul) não alimenta nenhum número desde 16/08; o Saipos é a base. Nos cartões, a diferença é a medida do que
         ainda falta lançar de compras no Saipos (a fatura foi paga, mas as saídas não foram conciliadas lá).
       </div>
       ${(CONF_ACEITAS || []).length ? `<div style="font-size:12px; color:#a5a49a; margin-top:8px; border-top:1px solid #34332f; padding-top:8px;">
         <b>Já conferidas</b> (fora da conta acima):<br>
         ${CONF_ACEITAS.map(a => `• ${nomeConta(a.conta)}: R$ ${fmt(Number(a.valor))} — ${a.motivo}`).join('<br>')}
       </div>` : ''}
-    </div>`;
+    </div></details>`;
   }
 
   if (cartoesPositivos.length) {
