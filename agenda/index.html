@@ -132,7 +132,7 @@ function agDesenhar() {
     const nTit = (L) => new Set(L.map((c, i) => c.id_titulo ? `${c.origem}|${c.id_titulo}|${c.vencimento}|${c.conta_exibida || ''}` : `l${i}`)).size;
     AG.sinal += nTit(venc);
     if (venc.length) add({ dep: true, dia: hoje, txt: `<b>${nTit(venc)}</b> ${nTit(venc) === 1 ? 'conta vencida' : 'contas vencidas'}, <b>${agR0(venc.reduce((a, c) => a + val(c), 0))}</b>`, ir: 'contaspagar', tipo: 'atraso' });
-    if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${nTit(agu)} ${nTit(agu) === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — o extrato ainda não chegou ao dia do vencimento</span>`, ir: 'contaspagar' });
+    if (agu.length) add({ dia: hoje, txt: `<span style="color:var(--tx-3);">${nTit(agu)} ${nTit(agu) === 1 ? 'conta' : 'contas'} aguardando conciliação (${agR0(agu.reduce((a, c) => a + val(c), 0))}) — a conciliação do banco desse dia ainda não terminou</span>`, ir: 'contaspagar' });
     [...new Set(cp.filter((c) => c.vencimento >= hoje).map((c) => c.vencimento))].forEach((d) => {
       const L = cp.filter((c) => c.vencimento === d), m = L.slice().sort((a, b) => val(b) - val(a))[0];
       add({ dia: d, txt: `<b>${agR0(L.reduce((a, c) => a + val(c), 0))}</b> a pagar (${nTit(L)} ${nTit(L) === 1 ? 'conta' : 'contas'}; maior: ${agE(String(m.descricao || '').replace(/\s*\(parc\..*$/, '').slice(0, 60))} ${agR0(val(m))})`, ir: 'contaspagar' });

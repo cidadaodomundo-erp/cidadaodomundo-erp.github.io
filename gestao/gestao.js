@@ -6842,7 +6842,7 @@ function cpTabela(sentido) {
     const og = CP_ORIGEM[r.origem] || { rot: r.origem || '—', baixa: '—' };
     const cor = r.situacao === 'VENCIDA' ? 'var(--farol-fora)' : r.situacao === 'VENCE HOJE' ? 'var(--amber-2)' : 'inherit';
     const venc = `${ffDdmm(r.vencimento)}${r.situacao === 'VENCIDA' ? ` · ${r.dias_vencida}d` : ''}`;
-    const nota = r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="o extrato do banco desta conta ainda não cobre o dia do vencimento">aguardando o extrato</span>' : '';
+    const nota = r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="a conciliação do banco deste dia ainda não terminou (regra de 09/11)">aguardando a conciliação</span>' : '';
     // "no Saipos" e' o caso comum: so aparece a baixa quando ela foge disso
     const baixa = r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
       ? `<span style="color:var(--amber-2);" title="o débito já apareceu no extrato do banco">saiu do banco em ${ffDdmm(r.saiuBanco)} — dar baixa no Saipos</span>`
