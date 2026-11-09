@@ -779,6 +779,37 @@ function renderModuloCargos() {
   else if (F.aba === 'resc') h += cgAbaResc();
   else if (F.aba === 'envio') h += cgAbaEnvio();
   alvo.innerHTML = h;
+  cgGuia();
+}
+// GUIA DE PRIMEIRO ACESSO (09/11/2026, dono: "pode sim, eu gostei do formato"; mecanismo no nucleo.js). Só nas telas Pessoas
+// (aba Pessoas) e Admissões; abre uma vez por login, e só no 1º desenho da tela nesta visita (o redesenho não volta ao passo 1).
+const CG_GUIA_JA = {};
+const CG_GUIAS = {
+  cargos: ['pessoas', [
+    { sel: '.card[onclick*="soConferir=true"]', texto: '<b>Com alerta</b>: toque para ver só quem tem diferença entre a Flash, o nosso cadastro e a tabela de cargos.' },
+    { sel: '#tabelaCgPessoas td.cg-seta', texto: '<b>Ver detalhes</b>: abre a pessoa — admissão, VT, VA, custo mês a mês — e o botão <b>Editar</b>.' },
+    { sel: 'button[onclick="mostrarModulo(\'padm\')"]', texto: 'Vai admitir alguém? <b>Nova admissão</b> leva à tela de Admissões.' },
+    { sel: 'button[onclick="cargosAba(\'custo\')"]', texto: 'Nas abas do alto: <b>Custo do mês</b>, <b>Por setor</b> e <b>Tabela de cargos</b>.' },
+    { sel: 'a[onclick^="CARGOS_F.desligados"]', texto: '<b>ver desligados</b> mostra quem já saiu da folha.' },
+  ]],
+  padm: ['adm', [
+    { sel: 'button[onclick="cgFormAbrir(0)"]', texto: '<b>+ Nova admissão</b>: preencha e anexe os documentos. Ao salvar, o robô envia à Flash e à contabilidade.' },
+    { sel: '#cgAdmAndamento', texto: '<b>Admissões em andamento</b>: fica aqui até a leitura dos documentos, a Flash e a contabilidade ficarem com ✓.' },
+    { sel: 'button[onclick^="cgAdmEditar"]', texto: '<b>Editar</b>: enquanto falta alguma etapa ou documento, a admissão ainda se corrige aqui.' },
+    { sel: 'button[onclick^="cgAdmTentar"]', texto: 'Deu erro no envio? <b>Tentar de novo</b> manda outra vez. Na contabilidade já enviada, <b>Reenviar</b> faz o mesmo.' },
+    { sel: '#tabelaCgAdm', texto: '<b>Últimas admissões</b>: as mais recentes, com a situação de cada etapa e o que falta anexar.' },
+  ]],
+};
+function cgGuia() {
+  if (typeof guiaRegistrar !== 'function') return;
+  const t = CARGOS_F.tela || 'cargos', g = CG_GUIAS[t];
+  if (!g || CARGOS_F.aba !== g[0]) {   // outra tela/aba de Pessoas: o "?" não mostra o guia que não é dela
+    const b = document.getElementById('guiaRever');
+    if (b && CG_GUIAS[b.dataset.tela]) b.style.display = 'none';
+    return;
+  }
+  guiaRegistrar(t, g[1]);
+  if (!CG_GUIA_JA[t]) { CG_GUIA_JA[t] = 1; guiaTalvez(t); }
 }
 
 // ---------- PESSOAS (o cadastro) ----------
@@ -1135,7 +1166,7 @@ function cgAdmAndamento() {
     || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA');
   if (!L.length) return '';
   const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
-  return `<div class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><b>${cgEsc(cgNome(nome(a)))}</b>${cgAdmBotaoEditar(a)}</div><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
+  return `<div id="cgAdmAndamento" class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><b>${cgEsc(cgNome(nome(a)))}</b>${cgAdmBotaoEditar(a)}</div><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
 }
 // 07/11/2026 (dono 11:54, chat RH; proposta 2026-11-07-rh-admissao-editar): a admissão se edita enquanto está em andamento
 // ou falta algum dos 4 documentos obrigatórios. Flash e contabilidade ✓ e os 4 anexados: o botão some.

@@ -2639,7 +2639,12 @@ function renderLucroUni() {
   // (aplicação: ITAU AV → PARTICIPACOES → XP). Antes tirava só a XP e deixava o cartão de fora.
   const APLIC_LU = ['XP INVESTIMENTOS', 'PARTICIPACOES'];
   const caixaSemXp = contas.filter(c => !APLIC_LU.includes(c.conta) && (!ctxLoja || c.unidade === ctxLoja))
-    .reduce((s, c) => s + (movAte[c.conta] || 0), 0);
+    .reduce((s, c) => {
+      // 09/11/2026: a ponte ganhou ajuste_trava_corte (out/26) e o Placar soma; aqui também, para os dois baterem
+      const k = ajusteCorte(c.conta, c.saldo_inicial, movTot[c.conta]);
+      const aj = k && k.mes >= fechados[0] && k.mes <= fechados[fechados.length - 1] ? k.ajuste : 0;
+      return s + (movAte[c.conta] || 0) + aj;
+    }, 0);
 
   // ---- a ponte: do lucro ate o caixa. Os mesmos meses fechados, lidos do DFC
   // (que e caixa por natureza) para nao comparar competencia com pagamento.

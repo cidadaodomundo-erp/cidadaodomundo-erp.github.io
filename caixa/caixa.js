@@ -1422,7 +1422,7 @@ const caixaHellenCorte = u => ((COFRE_DIA || []).find(r => r.unidade === u && r.
 const caixaHellenMais = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toLocaleDateString('en-CA'); };
 async function caixaHellenCarregar() {
   const lojas = caixaHellenLojas();
-  if (!lojas.length) { CAIXA_HELLEN = { lojas: [] }; return; }
+  if (!lojas.length) { CAIXA_HELLEN = { lojas: [] }; caixaGuia(); return; }
   const mais = caixaHellenMais;
   const hoje = new Date().toLocaleDateString('en-CA');
   const ate = mais(hoje, -1), des = lojas.map(caixaHellenCorte).sort()[0];
@@ -1573,9 +1573,9 @@ function caixaHellenHtml() {
   const cartoes = H.lojas.map((u) => {
     const dv = caixaDiaDaVez(u);
     const faz = todos.filter(x => x.u === u && ((dv && dv.dia && x.dia === dv.dia && !naoTrava(x)) || (x.bloco === 'quebra')));
-    if (!dv || !dv.dia) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${faz.length ? faz.map(linha).join('') : ''}</div>`;
+    if (!dv || !dv.dia) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${faz.length ? faz.map(linha).join('') : ''}</div>`;
     const n = faz.length;
-    return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);">
+    return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-perto);">
       <div><b>${nomeLoja(u)}</b> · dia da vez <b>${caixaDdm(dv.dia)}</b> · ${n} ${n === 1 ? 'coisa para fazer' : 'coisas para fazer'}${dv.fila.length ? ` · <span style="color:var(--tx-4);">${dv.fila.length} ${dv.fila.length === 1 ? 'dia' : 'dias'} na fila</span>` : ''}</div>
       ${faz.map(linha).join('')}</div>`;
   }).join('');
@@ -1794,8 +1794,8 @@ function renderModuloCaixa() {
     <div class="section-label">Fechamento de Caixas${visao ? ' · ' + (typeof lojaNome === 'function' ? lojaNome(visao) : visao) : ''}</div>
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
-    <details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
-    <details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">conferência do dia a dia (histórico)${pendTotal ? ` · ${pendTotal} dia(s) com pendência` : ''}</summary>
+    <details class="cx-cofre" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
+    <details class="cx-historico" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">conferência do dia a dia (histórico)${pendTotal ? ` · ${pendTotal} dia(s) com pendência` : ''}</summary>
     <div class="contexto" style="text-align:left;">
       <details style="margin-top:6px; font-size:12px; color:#9aa4af;"><summary style="cursor:pointer;">como ler</summary>
         <b>Turno não fechou</b> = o caixa que fez as vendas ainda está aberto no Saipos (o clique no dia diz qual). <b>Dinheiro</b>: venda em dinheiro no PDV × o que a contagem da gaveta registrou como enviado, caixa a caixa
@@ -1811,5 +1811,20 @@ function renderModuloCaixa() {
     ${blocos}
     </details>
     <div class="caption-label" style="text-align:left;margin-top:10px;">Resolva o dia da vez de cada loja; o próximo abre sozinho.</div>`;
+  if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
+}
+// GUIA DE PRIMEIRO ACESSO (09/11/2026, dono: "pode sim, eu gostei do formato"; mecanismo no nucleo.js): abre uma vez por
+// login; o "?" no canto revê. Registra uma vez por carga da página, para o redesenho não reabrir o guia no meio.
+let CAIXA_GUIA_OK = false;
+function caixaGuia() {
+  if (CAIXA_GUIA_OK || typeof guiaRegistrar !== 'function') return;
+  CAIXA_GUIA_OK = true;
+  guiaRegistrar('caixa', [
+    { sel: '.cx-cartao', texto: 'Cada loja tem um cartão com o <b>dia da vez</b> e o que falta fazer nele. Quando o dia fica ✓, o próximo abre sozinho.' },
+    { sel: '.cx-cartao .preset-btn', texto: 'Cada linha é uma tarefa. O botão (<b>Contar</b>, <b>Explicar</b>, <b>Abrir o dia</b>) leva direto onde se resolve; tocar na linha abre o dia.' },
+    { sel: 'details.cx-cofre > summary', texto: '<b>Dinheiro do São Braz para a Água Verde</b>: os envios do SB e se já entraram na AV. O robô lança a entrada sozinho.' },
+    { sel: 'details.cx-historico > summary', texto: '<b>Conferência do dia a dia</b>: o histórico de cada dia. Toque no dia para ver as transações; lá também fica o botão <b>✉ Avisar o Neto</b>.' },
+  ]);
+  guiaTalvez('caixa');
 }
 

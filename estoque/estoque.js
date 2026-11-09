@@ -213,12 +213,36 @@ function ctgRender() {
     h += `<div class="contexto">A contagem é toda quarta: a curva A na semana (<b>${CTG.escopo.filter((i) => i.curva === 'A').length} itens</b>,
       80% do dinheiro) e a geral uma vez por mês. Abra a folha e conte — o esperado só aparece depois de fechar.</div>`;
     alvo.innerHTML = h;
+    ctgGuia(false);
     return;
   }
 
   h += aberta ? ctgHtmlContar(f) : ctgHtmlConferencia(f);
   h += ctgNfDepoisHtml(true);
   alvo.innerHTML = h;
+  ctgGuia(aberta);
+}
+// GUIA DE PRIMEIRO ACESSO (09/11/2026, dono: "pode sim, eu gostei do formato"; mecanismo no nucleo.js). Os passos
+// dependem da folha (aberta = o trabalho de contar; fechada = o resultado). Abre sozinho uma vez por carga da página:
+// a tela redesenha a cada clique e o guia não pode recomeçar no meio. Registrar de novo só atualiza o "?".
+const EST_GUIA_TENTOU = {};
+function estGuia(tela, passos) {
+  if (typeof guiaRegistrar !== 'function') return;
+  guiaRegistrar(tela, passos);
+  if (!EST_GUIA_TENTOU[tela]) { EST_GUIA_TENTOU[tela] = true; guiaTalvez(tela); }
+}
+function ctgGuia(aberta) {
+  estGuia('contagem', aberta ? [
+    { sel: '#view-contagem button[onclick^="ctgMarcarHora"]', texto: 'Toque em <b>▶ Comecei</b> quando começar a contar e em <b>■ Terminei</b> quando acabar. O topo mostra quanto tempo levou.' },
+    { sel: '#view-contagem button[onclick^="ctgImprimir"]', texto: '<b>🖨️ Imprimir tudo</b>: cada grupo sai numa folha. Conte na prateleira e escreva o número no papel.' },
+    { sel: '#view-contagem button[onclick^="ctgAbrirCamera"]', texto: '<b>📷 Tirar foto da folha</b> preenchida. O painel lê os números e o quadro mostra quais páginas já chegaram.' },
+    { sel: '#ctgConferir', texto: '<b>3 · Conferir e corrigir</b>: compare com o papel, corrija o que veio errado e marque o que você conferiu.' },
+    { sel: '#view-contagem button[onclick^="ctgFechar"]', texto: '<b>🔒 Fechar a contagem</b> no fim. Sem fechar, a contagem não vale; depois aparece o esperado contra o contado.' },
+  ] : [
+    { sel: '#view-contagem button[onclick^="ctgAbrir("]', texto: 'Para começar uma contagem: <b>Contar só os de maior valor</b> (toda quarta) ou <b>Contar tudo</b> (uma vez por mês).' },
+    { sel: '#view-contagem .cards', texto: 'O resultado da última contagem: quanto <b>falta na prateleira</b>, quanto <b>sobra</b> e quantos itens esperam explicação.' },
+    { sel: '#tabelaConferencia', texto: '<b>Item a item</b>: diferença acima de R$ 500 precisa de motivo. Toque em <b>explicar</b> e escreva o que aconteceu.' },
+  ]);
 }
 
 // ---- A FOTO DA FOLHA (dono, 08/10/2026: "vamos tentar com o esquema do painel abrir a camera
@@ -3134,6 +3158,17 @@ function prdRender() {
     const b = document.getElementById('prdBusca');
     if (b) { b.focus(); try { b.setSelectionRange(foco, foco); } catch (e) {} }
   }
+  prdGuia();
+}
+// GUIA DE PRIMEIRO ACESSO da tela Apontar produção (09/11/2026; estGuia fica junto da contagem)
+function prdGuia() {
+  estGuia('producao', [
+    { sel: '#prdBusca', texto: '<b>Procurar receita</b>: digite parte do nome. Os botões logo abaixo filtram por grupo (Produção, Pratos, Lanches).' },
+    { sel: '#tabelaPrdGrade input[onkeydown]', texto: 'Na coluna <b>Produziu</b>, digite quanto saiu pronto. Se perdeu parte, ponha em <b>Perdeu</b> com o motivo.' },
+    { sel: '#tabelaPrdGrade button[onclick^="prdApontar"]', texto: '<b>Apontar</b> grava: a receita entra no estoque e os ingredientes da ficha saem. Toque no nome da receita para ver o que sai.' },
+    { sel: '#tabelaPrdLotes', texto: '<b>Já apontado neste dia</b>: errou? <b>corrigir</b> troca a linha (a antiga fica riscada); <b>desfazer</b> vale para o que você lançou nas últimas 12 h.' },
+    { sel: '#prdPerdaItem', texto: '<b>Perda fora da produção</b>: o que estragou, venceu, caiu ou voltou do salão. Escolha o item, quanto e o motivo, e toque em <b>Registrar perda</b>.' },
+  ]);
 }
 
 function prdOrdenar(col) {

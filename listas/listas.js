@@ -548,6 +548,25 @@ async function trTelaPedido(unidadeEscolhida) {
   trAvulsoN = 0;
   window._trPedidoPendente = null;   // tela nova: o que esta aberto no banco aparece no aviso do alto
   trPedidoSoma();
+  trGuia();
+}
+
+// GUIA DE PRIMEIRO ACESSO (09/11/2026, dono: "pode sim, eu gostei do formato"; mecanismo no nucleo.js). Chamado só
+// depois que a grade do pedido, a fila de separação ou a conferência desenham de verdade; abre uma vez por login
+// (o "?" no canto revê). Cada papel cai numa aba diferente: o passo cujo elemento não está na tela é pulado sozinho.
+function trGuia() {
+  if (typeof guiaRegistrar !== 'function') return;
+  guiaRegistrar('listas', [
+    { sel: '#trOperacao .periodo-presets', texto: 'Cada botão abre uma parte das listas: <b>Novo pedido</b>, <b>Fila de separação</b>, <b>Conferência</b> e <b>Tabela de preços</b>. Aparecem só as do seu acesso.' },
+    { sel: '#trPedidoBusca', texto: 'Digite parte do nome para achar o item. O que você já preencheu continua guardado.' },
+    { sel: '#trq_0', texto: 'Preencha só a quantidade do que precisa, na unidade escrita embaixo do campo. Item em branco fica fora do pedido.' },
+    { sel: 'button[onclick^="trAddAvulso"]', texto: '<b>+ item fora da grade</b>: para pedir algo que não está na lista. Entra sem preço até ser ligado à base.' },
+    { sel: 'button[onclick^="trRevisarPedido"]', texto: '<b>Conferir e enviar</b> mostra o resumo do pedido antes de mandar para a Água Verde.' },
+    { sel: '#tabelaTrOpFila button[onclick^="trListaAberta"]', texto: '<b>abrir</b> mostra os itens da lista para separar. A fila vem da mais antiga para a mais nova; <b>Parada há</b> se destaca a partir de 2 dias.' },
+    { sel: '#tabelaTrPesoFora', texto: '<b>Peso diferente do combinado</b>: itens que vêm saindo com peso diferente da embalagem combinada. Vale rever com o Neto.' },
+    { sel: '#trTelaConteudo span > button[onclick^="trListaAberta"][onclick$="trTelaConferencia();"]', texto: '<b>conferir</b> abre a lista que chegou: confira item a item o que recebeu.' },
+  ]);
+  guiaTalvez('listas');
 }
 
 // Como o item e pedido, escrito na linha: "vem em balde de 4,5 kg · R$ 52,02 o
@@ -1896,6 +1915,7 @@ async function trTelaSeparacao() {
     <div class="caption-label">Excluir é para pedido lançado errado — some para todo mundo, sem volta.
       De ENVIADA em diante não dá mais (já tem frete e conferência no meio): fale com o Neto.</div>` :
     '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>') + trPesoAlertaHtml(alerta);
+  trGuia();
 }
 
 // exclusao de lista lancada errada (dono, 04/09/2026): so ate SEPARADA — a
@@ -2204,6 +2224,7 @@ async function trTelaConferencia() {
       <span>Lista <b>#${l.id}</b> · ${l.unidade} · entrega ${l.data_entrega ? l.data_entrega.slice(8,10)+'/'+l.data_entrega.slice(5,7) : '—'}${dinheiro(valores[l.id], true)}</span>
       <span>${['DONO', 'SEPARACAO'].includes(TR_OP.papel) ? `<button class="preset-btn" onclick="trEditarPedido(${l.id})">✏️ corrigir</button> ` : ''}<button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaConferencia();">conferir</button></span></div>`).join('')}` :
     '<div class="contexto">Nenhuma lista aguardando conferência.</div>');
+  trGuia();
 }
 
 // lista finalizada, so leitura: o que foi separado x o que a loja confirmou
