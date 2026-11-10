@@ -1,0 +1,32 @@
+/* Consulta de ponto (rota pcartao). Tudo prefixado com pcart- : não afeta as outras rotas de Pessoas. Só variáveis do tema existente. */
+.pcart { color: var(--tx-1); max-width: 100%; }
+.pcart * { box-sizing: border-box; }
+.pcart-titulo { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+.pcart-aviso { background: var(--surface); border: 1px solid var(--line-2); border-left: 4px solid var(--farol-perto); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13px; color: var(--tx-2); line-height: 1.4; }
+.pcart-ctl { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 0 0 10px; }
+.pcart-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--tx-3); min-width: 0; }
+.pcart-campo input, .pcart-campo select { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 7px 8px; font: inherit; font-size: 14px; max-width: 100%; }
+.pcart-btn { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pcart-btn[disabled] { opacity: .5; cursor: default; }
+.pcart-status { border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 14px; border: 1px solid var(--line-2); background: var(--surface); }
+.pcart-status.pcart-erro { border-color: var(--farol-fora); color: var(--farol-fora); }
+.pcart-status.pcart-alerta { border-color: var(--farol-perto); }
+.pcart-meta { font-size: 12px; color: var(--tx-3); margin: 0 0 8px; line-height: 1.5; }
+.pcart-rolagem { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.pcart-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pcart-tab th { background: var(--th-claro); color: var(--th-claro-tx); text-align: left; padding: 8px; white-space: nowrap; border-bottom: 1px solid var(--line-2); }
+.pcart-tab td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--tx-1); overflow-wrap: anywhere; }
+.pcart-tab tr:nth-child(even) td { background: var(--zebra); }
+.pcart-conf { font-weight: 600; }
+.pcart-conf.pcart-conf-ok { color: var(--tx-1); }
+.pcart-conf.pcart-conf-ver { color: var(--farol-perto); }
+.pcart-conf.pcart-conf-ruim { color: var(--farol-fora); }
+@media (max-width: 640px) {
+  .pcart-ctl { flex-direction: column; align-items: stretch; }
+  .pcart-rolagem { overflow-x: visible; border: 0; }
+  .pcart-tab thead { display: none; }
+  .pcart-tab, .pcart-tab tbody, .pcart-tab tr, .pcart-tab td { display: block; width: 100%; }
+  .pcart-tab tr { border: 1px solid var(--line-2); border-radius: 8px; margin: 0 0 8px; background: var(--surface); }
+  .pcart-tab td { border: 0; padding: 4px 10px; background: transparent !important; }
+  .pcart-tab td::before { content: attr(data-rot) ": "; color: var(--tx-3); font-size: 12px; }
+}
