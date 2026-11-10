@@ -169,6 +169,18 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "reservas",
+    "rotulo": "Reservas (GetIn)",
+    "icone": "📖",
+    "origem": "fabio"
+   },
+   {
+    "chave": "pausados",
+    "rotulo": "Produtos pausados",
+    "icone": "⏸️",
+    "origem": "fabio"
+   },
+   {
     "chave": "atrasos",
     "rotulo": "Atrasos e turnos",
     "icone": "⏱️"

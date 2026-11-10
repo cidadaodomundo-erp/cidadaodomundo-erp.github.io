@@ -73,6 +73,9 @@ window.CASCA_PAGINAS = {
   clientes: 'canal/index.html#clientes',
   site: 'canal/index.html#site',
   delivery: 'delivery/index.html',
+  // 10/11/2026: Reservas (GetIn) e Produtos pausados, telas do Fábio incorporadas ao portal novo
+  reservas: 'reservas/index.html',
+  pausados: 'pausados/index.html',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -114,4 +117,6 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'phoje', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
-  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora'];
+  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
+  // 10/11/2026: Reservas e Produtos pausados seguem de verdade o seletor único (lojaCarregar/lojaAtual/aoMudarLoja)
+  'reservas', 'pausados'];
