@@ -16,6 +16,8 @@
 .pcart-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pcart-tab th { background: var(--th-claro); color: var(--th-claro-tx); text-align: left; padding: 8px; white-space: nowrap; border-bottom: 1px solid var(--line-2); }
 .pcart-tab td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--tx-1); overflow-wrap: anywhere; }
+/* colunas factuais (Loja, Dia, Entrada, Saída, Batidas, Lido em): nunca quebram no meio; rolagem só dentro de .pcart-rolagem */
+.pcart-tab td:nth-child(n+2):nth-child(-n+7) { white-space: nowrap; overflow-wrap: normal; }
 .pcart-tab tr:nth-child(even) td { background: var(--zebra); }
 .pcart-conf { font-weight: 600; }
 .pcart-conf.pcart-conf-ok { color: var(--tx-1); }
@@ -28,5 +30,6 @@
   .pcart-tab, .pcart-tab tbody, .pcart-tab tr, .pcart-tab td { display: block; width: 100%; }
   .pcart-tab tr { border: 1px solid var(--line-2); border-radius: 8px; margin: 0 0 8px; background: var(--surface); }
   .pcart-tab td { border: 0; padding: 4px 10px; background: transparent !important; }
+  .pcart-tab td:nth-child(n+2):nth-child(-n+7) { white-space: normal; overflow-wrap: anywhere; }   /* cartões: sem nowrap, não estoura 390px */
   .pcart-tab td::before { content: attr(data-rot) ": "; color: var(--tx-3); font-size: 12px; }
 }
