@@ -8929,7 +8929,8 @@ function renderModuloDespesas() {
   // cabeçalho — e é por isso que ela nunca batia com a DRE nem com o Placar. Conferido
   // depois da mudança: ago/26 na Água Verde dá mercadoria R$ 286.448,48 e pessoas
   // R$ 165.890,05, exatamente os dois números do Placar.
-  const DESP = fxSemListaNaRede(DESP_DET.filter(r => lojaFin() === 'REDE' || r.unidade === lojaFin()));
+  // 09/11/2026 (Financeiro, competência): a DRE traz meses de 2027 com pouco valor (licenciamento, seguro) — a análise vai até o mês corrente
+  const DESP = fxSemListaNaRede(DESP_DET.filter(r => (lojaFin() === 'REDE' || r.unidade === lojaFin()) && String(r.mes).slice(0, 7) <= mesCorrenteSP()));
   const ctx = plcCtx('despesas');
   const chaveCtx = ctx ? ctx.tile + '|' + ctx.meses.join(',') + '|' + ctx.loja : null;
   if (chaveCtx !== despCtxChave) { despCtxChave = chaveCtx; despAberto.clear(); }
