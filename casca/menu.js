@@ -2,6 +2,7 @@
 // Tela nova: uma linha aqui, a página dela em docs/casca/paginas.js e o módulo em docs/casca/modulos.js.
 // Conferir: python script/gerar_menu_casca.py (diz se alguma tela do menu ficou sem página).
 // Tirar, renomear ou mover tela do menu é item a item, com o sim do dono (13/09/2026).
+// Tela incorporada explicitamente pelo Fabio: marcar o item com "origem": "fabio" (nunca inferir autor automaticamente).
 window.CASCA_MENU = [
  {
   "id": "gComecar",
@@ -164,7 +165,8 @@ window.CASCA_MENU = [
    {
     "chave": "delivery",
     "rotulo": "Delivery do dia",
-    "icone": "🛵"
+    "icone": "🛵",
+    "origem": "fabio"
    },
    {
     "chave": "atrasos",
