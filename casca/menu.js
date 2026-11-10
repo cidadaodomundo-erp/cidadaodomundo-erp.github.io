@@ -253,6 +253,12 @@ window.CASCA_MENU = [
     "icone": "📌"
    },
    {
+    "chave": "pcartao",
+    "rotulo": "Consulta de ponto",
+    "icone": "🕒",
+    "origem": "fabio"
+   },
+   {
     "chave": "pcalc",
     "rotulo": "Cálculos da folha",
     "icone": "🧮"

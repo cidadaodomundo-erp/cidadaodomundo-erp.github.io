@@ -46,6 +46,7 @@ window.CASCA_BUSCA = {
   rede: ['taxa da maquininha', 'cartao', 'adquirente', 'stone', 'cielo', 'taxas'],
   pacertos: ['saipos folha', 'acerto da folha'],
   phoje: ['o que fazer hoje', 'rh hoje', 'pendencias do rh', 'tarefas do rh'],
+  pcartao: ['consulta de ponto', 'cartao de ponto', 'espelho de ponto', 'ponto', 'batidas', 'entrada e saida'],
   pcalc: ['calculos da folha', 'adiantamento', 'vale transporte', 'vt', 'va', 'vale alimentacao', 'gratificacao', 'bonificacao', '10%', 'dez por cento', 'por fora'],
   rh: ['desconto em folha', 'emprestimo', 'vale', 'divida', 'desconto'],
   penvio: ['enviar a contabilidade', 'contabilidade', 'envio da folha'],
