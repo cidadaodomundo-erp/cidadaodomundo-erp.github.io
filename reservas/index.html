@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Reservas (GetIn) · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- RESERVAS GETIN (10/11/2026, tela do Fábio incorporada ao portal novo; revisada 10/11/2026). Só leitura. Mostra o
+     que o GetIn já mandou para o ERP (tabela salao_reserva, preenchida por robô fora desta etapa). Sem criar, editar
+     ou cancelar reserva — nenhum botão de ação. Nome completo do cliente aparece só aqui (decisão combinada com o
+     Fábio); telefone, observação e pagamento não entram na tela nem são pedidos ao servidor. Lê pela RPC
+     erp_reservas_ler (sql/ativar-consultas-reservas-pausados.sql), que ainda não foi aplicada: até o clique do
+     Fábio, esta tela mostra "sem acesso". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .rv-topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 14px; }
+  .rv-topo h1 { font-size:20px; margin:0; }
+  .rv-filtros { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 12px; }
+  .rv-filtros label { font-size:12.5px; opacity:.85; display:flex; flex-direction:column; gap:3px; }
+  .rv-filtros select, .rv-filtros input { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+  .rv-filtros button { font:inherit; padding:7px 14px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; font-weight:700; }
+  .rv-filtros button:hover { border-color:var(--brand); }
+  .rv-fonte { font-size:12px; opacity:.9; margin:-2px 0 4px; display:flex; flex-direction:column; gap:2px; }
+  .rv-fonte-linha { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; }
+  .rv-fonte-rot { opacity:.85; }
+  .rv-fonte-sem { opacity:.7; font-style:italic; }
+  .rv-fonte-falha { color:var(--farol-fora, #ff6b6b); font-weight:700; }
+  .rv-consultado { font-size:11px; opacity:.6; margin:0 0 12px; }
+  .rv-nota { font-size:12px; opacity:.75; margin:8px 0 0; line-height:1.45; }
+  .rv-tab { width:100%; border-collapse:collapse; font-size:14px; }
+  .rv-tab th, .rv-tab td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
+  .rv-tab td.n, .rv-tab th.n { text-align:right; white-space:nowrap; }
+  .rv-vazio { padding:18px; opacity:.75; }
+  .rv-trunc { font-size:12px; color:var(--farol-perto, #e0a33a); margin:6px 0 0; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="rv-topo">
+      <h1>Reservas (GetIn)</h1>
+    </div>
+    <div class="rv-filtros">
+      <label>Unidade
+        <select id="fUnidade">
+          <option value="">Todas</option>
+          <option value="AGUA VERDE">Água Verde</option>
+          <option value="SÃO BRAZ">São Braz</option>
+          <option value="AHU">Ahú</option>
+        </select>
+      </label>
+      <label>De <input type="date" id="fInicio"></label>
+      <label>Até <input type="date" id="fFim"></label>
+      <button type="button" id="btnAtualizar">Atualizar</button>
+    </div>
+    <div class="rv-fonte" id="fonte"></div>
+    <div class="rv-consultado" id="consultado"></div>
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="conteudo"><div class="rv-vazio">Carregando…</div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../nucleo/telas-extra.js?v=20261106a"></script>
+<script>
+const TELA = 'reservas';
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' };
+const un = (u) => NOME_UN[u] || u || '—';
+const esc = trEscH;
+const MAX_DIFF_DIAS = 30;   // fim-início <= 30 => 31 dias corridos, inclusive
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+function hojeBR() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
+
+// datas de calendário em UTC: AAAA-MM-DD é lido e somado como componentes inteiros, nunca
+// via "new Date(str)" dependente do fuso local. O limite é CONTAGEM INCLUSIVA: até 30 de
+// diferença (= 31 dias corridos). Usar "> 31" em vez de "> 30" deixava passar um intervalo
+// de 32 dias corridos sem ser rejeitado.
+function partesData(s) { const [a, m, d] = String(s).split('-').map(Number); return { a, m, d }; }
+function somaDiasUTC(dataStr, n) {
+  const { a, m, d } = partesData(dataStr);
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+function diasEntreUTC(iniStr, fimStr) {
+  const i = partesData(iniStr), f = partesData(fimStr);
+  return Math.round((Date.UTC(f.a, f.m - 1, f.d) - Date.UTC(i.a, i.m - 1, i.d)) / 86400000);
+}
+
+function padraoFiltros() {
+  const h = hojeBR();
+  document.getElementById('fInicio').value = h;
+  document.getElementById('fFim').value = somaDiasUTC(h, 6);
+}
+
+let ULTIMA_REQ = 0;
+
+function limparFonte() {
+  document.getElementById('fonte').innerHTML = '';
+  document.getElementById('consultado').textContent = '';
+}
+function mostrarErro(txt) {
+  const el = document.getElementById('erroMsg');
+  el.style.display = 'block'; el.textContent = txt;
+  document.getElementById('conteudo').innerHTML = '';
+  limparFonte();
+}
+// nunca repassa texto cru do servidor/SQL para a tela (poderia vazar detalhe interno) —
+// só uma mensagem genérica por faixa de status.
+function mensagemErro(r) {
+  if (!r || r.status === 0) return 'sem conexão com o servidor.';
+  if (r.status === 404) return 'esta consulta ainda não está disponível (aguardando preparação no servidor).';
+  return 'Não foi possível completar a consulta agora. Tente novamente.';
+}
+
+function horaFmt(h) { return h ? String(h).slice(0, 5) : '—'; }
+function dataFmt(d) {
+  if (!d) return '—';
+  const [a, m, dd] = String(d).slice(0, 10).split('-');
+  return dd + '/' + m + '/' + a;
+}
+function horaCurta(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const tz = { timeZone: 'America/Sao_Paulo' };
+  const hora = d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, tz));
+  const dia = d.toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, tz));
+  const hoje = new Date().toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, tz));
+  return dia === hoje ? hora : dia + ' ' + hora;
+}
+
+// --------------------------------------------------------- loja única (casca)
+// Esta tela só cobre AGUA VERDE/SÃO BRAZ/AHU (as opções do próprio <select>). A rede pode ter
+// outras lojas (ex.: Boqueirão) que a casca conhece mas esta tela não — nesse caso não dá para
+// cair silenciosamente em "Todas" (isso misturaria linhas de lojas que o usuário não escolheu):
+// a tela trava em "sem coleta prevista para esta unidade" e nem chama a RPC.
+const LOJAS_SUPORTADAS = ['AGUA VERDE', 'SÃO BRAZ', 'AHU'];
+let SINCRONIZANDO_DA_CASCA = false;
+let LOJA_FORA_DE_ALCANCE = false;
+function aplicarLojaDaCasca(loja) {
+  const sel = document.getElementById('fUnidade');
+  SINCRONIZANDO_DA_CASCA = true;
+  if (!loja || loja === 'REDE') { sel.value = ''; LOJA_FORA_DE_ALCANCE = false; }       // REDE também seleciona "Todas"
+  else if (LOJAS_SUPORTADAS.includes(loja)) { sel.value = loja; LOJA_FORA_DE_ALCANCE = false; }
+  else { sel.value = ''; LOJA_FORA_DE_ALCANCE = true; }   // loja real da rede, mas fora do que esta tela cobre
+  SINCRONIZANDO_DA_CASCA = false;
+}
+async function sincronizarLoja() {
+  try { await lojaCarregar(); } catch (e) {}
+  aplicarLojaDaCasca(lojaAtual());
+}
+if (typeof aoMudarLoja === 'function') aoMudarLoja((loja) => { aplicarLojaDaCasca(loja); carregar(); });
+
+async function carregar() {
+  // incrementa ANTES de validar o filtro: mesmo um filtro inválido marca este pedido
+  // como o mais recente, então uma resposta antiga (de um pedido anterior válido, ainda
+  // em voo) não pode mais sobrescrever a tela depois que o usuário já mudou o filtro.
+  const minhaReq = ++ULTIMA_REQ;
+
+  limparFonte();
+
+  // a casca escolheu uma loja que esta tela não cobre: não consulta a RPC nem mostra
+  // linha/carimbo de nenhuma outra loja — só o aviso, até a casca escolher outra unidade.
+  if (LOJA_FORA_DE_ALCANCE) {
+    document.getElementById('erroMsg').style.display = 'none';
+    document.getElementById('conteudo').innerHTML = '<div class="rv-vazio">Sem coleta prevista para esta unidade.</div>';
+    return;
+  }
+
+  const unidade = document.getElementById('fUnidade').value || null;
+  const inicio = document.getElementById('fInicio').value;
+  const fim = document.getElementById('fFim').value;
+
+  if (!inicio || !fim) { mostrarErro('Informe o intervalo de datas.'); return; }
+  if (fim < inicio) { mostrarErro('A data final não pode ser antes da data inicial.'); return; }
+  if (diasEntreUTC(inicio, fim) > MAX_DIFF_DIAS) { mostrarErro('O intervalo máximo é de 31 dias corridos.'); return; }
+
+  document.getElementById('conteudo').innerHTML = '<div class="rv-vazio">Carregando…</div>';
+  document.getElementById('erroMsg').style.display = 'none';
+
+  let r;
+  try {
+    r = await trRpcSeguro('erp_reservas_ler', { p_unidade: unidade, p_inicio: inicio, p_fim: fim });
+  } catch (e) {
+    if (minhaReq !== ULTIMA_REQ) return;
+    mostrarErro('não foi possível completar a consulta agora.');
+    return;
+  }
+  if (minhaReq !== ULTIMA_REQ) return;   // resposta antiga: não sobrescreve filtro novo
+
+  if (r.status === 401) { exigirLogin('Entre de novo para ver as reservas.'); return; }
+  if (r.status === 403) {
+    // 403 nunca limpa a sessão nem aparece como lista vazia — é "sem acesso", algo bem diferente
+    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.');
+    return;
+  }
+  if (!r.ok) { mostrarErro(mensagemErro(r)); return; }
+
+  let dados;
+  try { dados = await r.json(); }
+  catch (e) { if (minhaReq !== ULTIMA_REQ) return; mostrarErro('resposta inesperada do servidor.'); return; }
+  if (minhaReq !== ULTIMA_REQ) return;   // JSON demorou e um pedido mais novo já começou
+
+  desenhar(dados || {});
+}
+
+// cada linha de fonte é por UNIDADE — nunca um carimbo único agregando tudo, para uma
+// unidade com leitura falhando não ficar escondida atrás de outra que está OK.
+function montarFontes(lista) {
+  const cont = document.getElementById('fonte');
+  cont.innerHTML = '';
+  (lista || []).forEach((x) => {
+    const linha = document.createElement('div');
+    linha.className = 'rv-fonte-linha';
+    const rot = document.createElement('span');
+    rot.className = 'rv-fonte-rot';
+    rot.textContent = x.rotulo + ':';
+    linha.appendChild(rot);
+    if (x.suportado === false) {
+      const sem = document.createElement('span');
+      sem.className = 'rv-fonte-sem';
+      sem.textContent = 'Sem coleta prevista';
+      linha.appendChild(sem);
+    } else {
+      const badge = document.createElement('span');
+      linha.appendChild(badge);
+      // só chama carimboDados quando HÁ ultimo_ok: o carimbo real mostra "sem dado" (vermelho,
+      // mas sem dizer POR QUE) quando a data é nula — aqui queremos o texto explícito "aguardando
+      // primeira leitura", que não é a mesma coisa que "zero reservas" nem que "deu erro".
+      if (x.ultimo_ok) carimboDados(badge, x.ultimo_ok, { avisoMin: 180, velhoMin: 1440 });
+      else { badge.className = 'rv-fonte-sem'; badge.textContent = 'aguardando primeira leitura'; }
+      // falha nunca parece saudável: confia no ultimo_status (a RPC já desempata por id, não só
+      // por "fim") — mesmo que a última tentativa tenha o MESMO horário de um ultimo_ok antigo
+      // (ex.: duas execuções no mesmo segundo), se o status mais recente não é OK, mostra o alerta.
+      // Não exige ultima_tentativa > ultimo_ok: isso escondia a falha em caso de empate de horário.
+      if (x.ultimo_status && x.ultimo_status !== 'OK' && x.ultima_tentativa) {
+        const falha = document.createElement('span');
+        falha.className = 'rv-fonte-falha';
+        falha.textContent = 'última tentativa falhou (' + x.ultimo_status + ') em ' + horaCurta(x.ultima_tentativa);
+        linha.appendChild(falha);
+      }
+    }
+    cont.appendChild(linha);
+  });
+}
+
+function desenhar(dados) {
+  montarFontes(dados.fonte && dados.fonte.fontes);
+  document.getElementById('consultado').textContent = dados.consultado_em ? 'Consultado em ' + horaCurta(dados.consultado_em) : '';
+
+  const linhas = Array.isArray(dados.reservas) ? dados.reservas : [];
+  const c = document.getElementById('conteudo');
+  if (!linhas.length) {
+    c.innerHTML = '<div class="rv-vazio">Nenhuma reserva encontrada para este filtro. Isto não significa que não existam reservas no GetIn — pode ser que a leitura ainda não tenha trazido dado para este período.</div>';
+  } else {
+    // só os campos da whitelist combinada com o Fábio: data/hora/unidade/nome/pessoas/área/
+    // status/fonte. Telefone, observação e pagamento nunca são lidos nem aparecem aqui.
+    c.innerHTML = '<div id="tabelaReservas"><table class="rv-tab"><thead><tr>' +
+      '<th>Data</th><th>Hora</th><th>Unidade</th><th>Nome</th><th class="n">Pessoas</th><th>Área</th><th>Status</th><th>Fonte</th>' +
+      '</tr></thead><tbody>' +
+      linhas.map((x) => '<tr>' +
+        '<td>' + esc(dataFmt(x.data)) + '</td>' +
+        '<td>' + esc(horaFmt(x.hora)) + '</td>' +
+        '<td>' + esc(un(x.unidade)) + '</td>' +
+        '<td>' + esc(x.nome_cliente || '—') + '</td>' +
+        '<td class="n">' + esc(x.pessoas == null ? '—' : x.pessoas) + '</td>' +
+        '<td>' + esc(x.area || '—') + '</td>' +
+        '<td>' + esc(x.status || '—') + '</td>' +
+        '<td>' + esc(x.origem || '—') + '</td>' +
+        '</tr>').join('') +
+      '</tbody></table></div>';
+  }
+  if (dados.truncado) {
+    const p = document.createElement('p');
+    p.className = 'rv-trunc';
+    p.textContent = 'Mostrando as primeiras ' + linhas.length + ' de ' + (dados.total_linhas != null ? dados.total_linhas : '—') + ' reservas. Estreite o filtro para ver o restante.';
+    c.appendChild(p);
+  }
+  const nota = document.createElement('p');
+  nota.className = 'rv-nota';
+  nota.textContent = 'Fonte esperada: GetIn, gravado no ERP. Só consulta — criar, editar e cancelar reserva continuam no GetIn. Unidade sem leitura ativa aqui aparece como "sem coleta prevista", nunca como "zero reservas".';
+  c.appendChild(nota);
+}
+
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+document.getElementById('fUnidade').addEventListener('change', () => {
+  // "Todas" pede REDE à casca — nunca string vazia, que lojaEscolher() recusaria em silêncio.
+  // Se a loja estiver travada (lojaTravada()), a casca já ignora o pedido; não insiste.
+  if (!SINCRONIZANDO_DA_CASCA && NA_CASCA && !(typeof lojaTravada === 'function' && lojaTravada())) {
+    const v = document.getElementById('fUnidade').value;
+    avisarCasca({ tipo: 'casca-loja-pedir', loja: v || 'REDE' });
+  }
+  carregar();
+});
+document.getElementById('fInicio').addEventListener('change', carregar);
+document.getElementById('fFim').addEventListener('change', carregar);
+
+padraoFiltros();
+if (!rmbSessao()) exigirLogin('Entre para ver as reservas.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { await sincronizarLoja(); carregar(); })();
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>

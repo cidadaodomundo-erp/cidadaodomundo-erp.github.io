@@ -32,6 +32,8 @@ window.CASCA_BUSCA = {
   clientes: ['crm', 'base de clientes', 'cliente novo', 'recorrencia'],
   site: ['site', 'pedido direto', 'canal proprio', 'accon'],
   delivery: ['delivery do dia', 'placar do delivery', 'cancelamentos do dia', 'avaliacoes do dia', 'tempo de entrega do dia'],
+  reservas: ['reserva', 'getin', 'mesa reservada', 'reserva de mesa', 'salao'],
+  pausados: ['pausado', 'produto pausado', 'item pausado', 'goomer', 'accon', 'cardapio pausado', 'item escondido', 'produto escondido'],
   atrasos: ['atraso', 'tempo de entrega', 'demora', 'turnos'],
   frete: ['taxa de entrega', 'distancia', 'raio de entrega', 'frete'],
   logfin: ['motoboy', 'entregadores', 'logistica', 'corridas'],
