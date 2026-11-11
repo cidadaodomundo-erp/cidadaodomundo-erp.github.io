@@ -1631,7 +1631,7 @@ function caixaHellenHtml() {
     const depois = filaR.length ? cinza(`depois deste: mais ${filaR.length} ${filaR.length === 1 ? 'dia' : 'dias'} com pendência`, filaR.map(ddSem).join(', ')) : '';
     // sobra e falta do fechamento do Saipos: só informação (regra do dono de 11/11), uma linha cinza que abre a lista
     const SF = CAIXA_SOBRAFALTA[u] || [], soma = (t) => SF.filter(x => x.tratamento === t).reduce((a, x) => a + Math.abs(x.valor), 0);
-    const rotT = { RECEITA: 'sobra → receita', QUEBRA_SALAO: 'quebra do salão (desconta do rateio dos 10%)', QUEBRA_DELIVERY: 'quebra do delivery' };
+    const rotT = { RECEITA: 'sobra → receita', QUEBRA_SALAO: 'quebra do salão (desconta do rateio dos 10%)', QUEBRA_DELIVERY: 'quebra do delivery — se souber o motoboy, registre a quebra dele' };   // 11/11: sem motoboy, perda da casa
     const sobraFalta = SF.length ? cinza(`Saipos: ${[['QUEBRA_SALAO', 'quebra do salão'], ['QUEBRA_DELIVERY', 'quebra do delivery'], ['RECEITA', 'sobra → receita']].filter(([t]) => soma(t) > 0).map(([t, r]) => `${r} R$ ${fmt(soma(t))}`).join(' · ')} (ver)`,
       SF.map(x => `${caixaDdm(x.dia)} · ${trEscH(x.frente || '')} · ${x.valor < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(x.valor))} → ${rotT[x.tratamento] || trEscH(x.tratamento)}`).join('<br>')) : '';
     if (!dv || !dv.dia || (!doDia.length && !filaR.length)) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${prim ? linha(prim) : ''}${resto}${depois}${sobraFalta}${contar}</div>`;
