@@ -1,0 +1,45 @@
+/* Eventos e ausências (rota peventos). Tudo prefixado com peve- : não afeta as outras rotas de Pessoas. Só variáveis do tema existente (claro e escuro). */
+.peve { color: var(--tx-1); max-width: 100%; }
+.peve * { box-sizing: border-box; }
+.peve-titulo { font-size: 20px; font-weight: 800; margin: 0 0 6px; }
+.peve-aviso { background: var(--surface); border: 1px solid var(--line-2); border-left: 4px solid #2a5fcc; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 13px; color: var(--tx-2); line-height: 1.4; }
+.peve-ctl { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 0 0 10px; }
+.peve-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--tx-3); min-width: 0; }
+.peve-campo input, .peve-campo select { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 7px 8px; font: inherit; font-size: 14px; max-width: 100%; }
+.peve-btn { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 12px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.peve-btn[disabled] { opacity: .5; cursor: default; }
+.peve-status { border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; font-size: 14px; border: 1px solid var(--line-2); background: var(--surface); }
+.peve-status.peve-erro { border-color: var(--farol-fora); color: var(--farol-fora); }
+.peve-status.peve-alerta { border-color: var(--farol-perto); }
+.peve-meta { font-size: 12px; color: var(--tx-3); margin: 0 0 8px; line-height: 1.5; }
+.peve-rotulo { font-size: 12px; font-weight: 700; color: var(--tx-2); margin: 0 0 6px; }
+.peve-rotulo:empty { display: none; }
+.peve-rolagem { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.peve-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.peve-tab th { background: var(--th-claro); color: var(--th-claro-tx); text-align: left; padding: 8px; white-space: nowrap; border-bottom: 1px solid var(--line-2); }
+.peve-tab td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--tx-1); overflow-wrap: anywhere; }
+/* colunas factuais (Unidade, Origem, Início, Fim, Recebido): sem quebra no meio; a rolagem fica dentro de .peve-rolagem */
+.peve-tab td:nth-child(2), .peve-tab td:nth-child(3), .peve-tab td:nth-child(5), .peve-tab td:nth-child(6), .peve-tab td:nth-child(8) { white-space: nowrap; overflow-wrap: normal; }
+.peve-tab tr:nth-child(even) td { background: var(--zebra); }
+.peve-origem { font-weight: 700; }
+.peve-o-flash td:nth-child(3) { box-shadow: inset 3px 0 0 #2a5fcc; }
+.peve-o-rh td:nth-child(3) { box-shadow: inset 3px 0 0 var(--farol-perto, #b26a00); }
+.peve-prog { font-weight: 700; color: var(--info, #6f9be0); }
+.peve-pag { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 0; }
+.peve-pag:empty { display: none; }
+.peve-pag-txt { font-size: 13px; color: var(--tx-2); }
+@media (max-width: 640px) {
+  .peve-ctl { flex-direction: column; align-items: stretch; }
+  .peve-rolagem { overflow-x: visible; border: 0; }
+  .peve-tab thead { display: none; }
+  .peve-tab, .peve-tab tbody, .peve-tab tr, .peve-tab td { display: block; width: 100%; }
+  .peve-tab tr { border: 1px solid var(--line-2); border-radius: 8px; margin: 0 0 8px; background: var(--surface); }
+  .peve-tab td { border: 0; padding: 4px 10px; background: transparent !important; }
+  .peve-tab td:nth-child(2), .peve-tab td:nth-child(3), .peve-tab td:nth-child(5), .peve-tab td:nth-child(6), .peve-tab td:nth-child(8) { white-space: normal; overflow-wrap: anywhere; }   /* cartões: sem nowrap, não estoura 390px */
+  .peve-tab td::before { content: attr(data-rot) ": "; color: var(--tx-3); font-size: 12px; }
+  .peve-o-flash td:nth-child(3), .peve-o-rh td:nth-child(3) { box-shadow: none; }
+  .peve-o-flash { border-left: 4px solid #2a5fcc; }
+  .peve-o-rh { border-left: 4px solid var(--farol-perto, #b26a00); }
+  .peve-pag { justify-content: space-between; }
+}
+

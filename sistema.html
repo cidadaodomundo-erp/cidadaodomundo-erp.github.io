@@ -258,10 +258,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261110c"></script>
-<script src="casca/paginas.js?v=20261110c"></script>
-<script src="casca/modulos.js?v=20261110b"></script>
-<script src="casca/busca.js?v=20261110b"></script>
+<script src="casca/menu.js?v=20261110d"></script>
+<script src="casca/paginas.js?v=20261110d"></script>
+<script src="casca/modulos.js?v=20261110c"></script>
+<script src="casca/busca.js?v=20261110c"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -430,6 +430,9 @@ function atualizarFaixaLoja() {
 // tela só de quem vê pessoal: quem não vê não acha no menu (o banco também recusa)
 const SO_PESSOAL = new Set(['macertos', 'pcartao']);
 let VE_PESSOAL = null;
+// Eventos e ausências exige as DUAS permissões (ver e cadastrar pessoal), ambas === true: sem as duas a tela recusaria, então o item nem aparece
+const SO_PESSOAL_E_CADASTRO = new Set(['peventos']);
+let VE_CADASTRA = null;
 // tela só de DONO e FINANCEIRO
 const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
@@ -445,6 +448,7 @@ function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
+  if (SO_PESSOAL_E_CADASTRO.has(chave) && !(VE_PESSOAL === true && VE_CADASTRA === true)) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
   if (SO_DONO.has(chave) && !ehDono() && !(chave === 'agenda' && VE_EQUIPE === true)) return false;
   if (!PODE) return true;
@@ -772,6 +776,13 @@ async function carregarVePessoal() {
     return r.ok ? (await r.json()) === true : null;
   } catch (e) { return null; }
 }
+async function carregarPodeCadastrar() {   // mesma rpc que a tela já usa; só a casca passa a guardar o valor
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/pode_cadastrar_pessoal', {
+      method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: '{}' });
+    return r.ok ? (await r.json()) === true : null;
+  } catch (e) { return null; }
+}
 async function carregarVeEquipe() {
   try {
     const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/agenda_ve_equipe', {
@@ -848,7 +859,7 @@ temaAplicar(document.documentElement.classList.contains('tema-proposta') ? 'clar
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
   temaDoLogin();
-  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe()]);
+  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE, VE_CADASTRA] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe(), carregarPodeCadastrar()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
@@ -874,3 +885,4 @@ async function montar() {
 <script src="nucleo/ajuda.js?v=20261030b"></script>
 </body>
 </html>
+

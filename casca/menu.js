@@ -259,6 +259,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "peventos",
+    "rotulo": "Eventos e ausências",
+    "icone": "🗒️",
+    "origem": "fabio"
+   },
+   {
     "chave": "pcalc",
     "rotulo": "Cálculos da folha",
     "icone": "🧮"
@@ -445,3 +451,4 @@ window.CASCA_MENU = [
   ]
  }
 ];
+

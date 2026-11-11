@@ -39,7 +39,7 @@ window.CASCA_MODULOS = [
   { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio'] },
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
-    lancar: ['phoje', 'pcartao', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
+    lancar: ['phoje', 'pcartao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
   { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
     lancar: [], acompanhar: ['delivery', 'reservas', 'pausados', 'atrasos', 'atendimento', 'link:portal-qualidade'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
@@ -47,3 +47,4 @@ window.CASCA_MODULOS = [
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: [], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];
+
