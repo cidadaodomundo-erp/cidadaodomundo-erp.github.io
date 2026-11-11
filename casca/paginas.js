@@ -79,6 +79,9 @@ window.CASCA_PAGINAS = {
   // 10/11/2026: Reservas (GetIn) e Produtos pausados, telas do Fábio incorporadas ao portal novo
   reservas: 'reservas/index.html',
   pausados: 'pausados/index.html',
+  // 11/11/2026: Reunião semanal (pauta temporária em memória, lote em construção). Está em CASCA_TELAS_POR_LOJA porque a
+  // tela separa de verdade o rascunho pela loja do seletor (nenhum dado de negócio é filtrado).
+  reuniao: 'reuniao/index.html?v=20261111a',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -124,5 +127,7 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   // 10/11/2026: Reservas e Produtos pausados seguem de verdade o seletor único (lojaCarregar/lojaAtual/aoMudarLoja)
   'reservas', 'pausados',
   // 11/11/2026: Delivery do dia — as 7 abas (4 antigas e 3 novas) seguem a loja escolhida (lista de lojas autorizadas)
-  'delivery'];
+  'delivery',
+  // 11/11/2026: Reunião semanal — o rascunho em memória é separado por loja (rede + lojas autorizadas)
+  'reuniao'];
 

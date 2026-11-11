@@ -1,0 +1,58 @@
+/* Reunião semanal. Usa as variáveis do nucleo.css (escuro por padrão; html.tema-proposta = claro). */
+.na-casca body::before { display: none !important; }
+.rn { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; color: var(--tx-1, #fff); }
+.rn h1 { font-size: 20px; margin: 4px 0 8px; }
+.rn h2 { font-size: 15px; margin: 22px 0 8px; }
+.rn-obras { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  border: 1px solid var(--farol-perto, #f5a623); color: var(--farol-perto, #f5a623); vertical-align: middle; }
+.rn-aviso { border: 1px solid var(--farol-perto, #f5a623); border-radius: 10px; padding: 10px 12px; margin: 8px 0 14px;
+  background: var(--surface, #1e1e1c); font-size: 13.5px; line-height: 1.45; }
+.rn-ctx { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 6px; }
+.rn-ctx-info { font-size: 13px; color: var(--tx-2, #c3c2b7); min-height: 1.4em; margin: 4px 0 10px; }
+.rn-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; flex: 1 1 160px; min-width: 0; }
+.rn-rot { color: var(--tx-2, #c3c2b7); font-weight: 700; }
+.rn input, .rn select, .rn textarea { font: inherit; font-size: 14px; padding: 9px 10px; min-height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface, #1e1e1c); color: inherit; }
+.rn textarea { resize: vertical; min-height: 72px; }
+.rn-btn { font: inherit; font-size: 14px; font-weight: 700; padding: 10px 14px; min-height: 44px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface-2, #2a2a27); color: inherit; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.rn-btn:hover { border-color: var(--brand, #c8102e); }
+.rn-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rn-perigo { border-color: var(--farol-fora, #ff6b6b); }
+.rn a.rn-btn { color: var(--info, #58a6ff); }
+.rn :focus-visible, .rn-x:focus-visible { outline: 3px solid var(--info, #58a6ff); outline-offset: 2px; }
+.rn-linha { display: flex; flex-wrap: wrap; gap: 10px; }
+.rn-linha .rn-campo { flex: 1 1 180px; }
+.rn-add { display: flex; gap: 8px; margin: 0 0 8px; }
+.rn-add input { flex: 1; }
+.rn-chips { list-style: none; padding: 0; margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.rn-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface-2, #2a2a27); font-size: 13.5px; }
+.rn-x { font: inherit; min-width: 36px; min-height: 36px; border: 0; background: transparent; color: inherit; cursor: pointer; border-radius: 999px; }
+.rn-tema { border: 1px solid var(--line, #34332f); border-radius: 10px; padding: 10px; margin: 0 0 10px; background: var(--surface, #1e1e1c); display: flex; flex-direction: column; gap: 8px; }
+.rn-tema-topo { display: flex; gap: 8px; align-items: center; }
+.rn-num { font-weight: 800; min-width: 22px; text-align: center; color: var(--tx-2, #c3c2b7); }
+.rn-vazio { opacity: .8; }
+.rn-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.rn-atalhos { display: flex; flex-wrap: wrap; gap: 8px; }
+.rn-confirma { border: 1px solid var(--farol-fora, #ff6b6b); border-radius: 10px; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rn-confirma p { flex: 1 1 100%; margin: 0; font-size: 13.5px; line-height: 1.45; }
+.rn-nota { font-size: 12px; color: var(--tx-3, #a5a49a); line-height: 1.45; }
+#bloqueio { border: 1px solid var(--farol-fora, #ff6b6b); border-radius: 10px; padding: 14px; margin: 12px 0; }
+#impressao { display: none; }
+
+@media (max-width: 480px) {
+  .rn-tema-topo { flex-wrap: wrap; }
+  .rn-tema-topo input { flex: 1 1 60%; }
+  .rn-acoes .rn-btn, .rn-atalhos .rn-btn { flex: 1 1 100%; }
+}
+
+@media print {
+  html, body { background: #fff !important; color: #000 !important; }
+  body > *:not(#impressao), .main-content { display: none !important; }
+  #impressao { display: block !important; color: #000; background: #fff; font: 12pt/1.4 serif; }
+  #impressao h1 { font-size: 16pt; } #impressao h2 { font-size: 13pt; margin: 12pt 0 4pt; }
+  #impressao p { margin: 2pt 0; } .rn-pre { white-space: pre-wrap; }
+  .rn-imp-tema { break-inside: avoid; }
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Reunião semanal · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- REUNIÃO SEMANAL (11/11/2026, lote em construção). Pauta TEMPORÁRIA: vive só na memória desta aba, não é salva no
+     sistema e some ao fechar. Não lê banco, não grava nada, não usa localStorage/sessionStorage para a pauta. Exige a
+     sessão que já existe (sem login novo). Os botões "Ver ..." só abrem telas que já existem na casca. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="reuniao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap rn">
+    <h1>Reunião semanal <span class="rn-obras">Em construção</span></h1>
+    <div class="rn-aviso" role="note">
+      <strong>Pauta temporária nesta aba.</strong> Ainda não é compartilhada nem salva no sistema: o que você digitar aqui
+      se perde ao fechar a aba ou sair da conta. Use “Exportar ata” para guardar o texto.
+    </div>
+
+    <div id="bloqueio" hidden role="alert"></div>
+
+    <div id="app" hidden>
+      <div class="rn-ctx">
+        <label class="rn-campo"><span class="rn-rot">Data da reunião</span><input type="date" id="dia"></label>
+        <label class="rn-campo"><span class="rn-rot">Loja</span><select id="loja"></select></label>
+      </div>
+      <p class="rn-ctx-info" id="avisoCtx" role="status" aria-live="polite"></p>
+
+      <h2>Participantes</h2>
+      <div class="rn-add">
+        <input type="text" id="novoPart" maxlength="80" placeholder="Nome (livre, só nesta aba)" aria-label="Nome do participante">
+        <button type="button" class="rn-btn" id="btnPart">Adicionar</button>
+      </div>
+      <ul class="rn-chips" id="participantes"></ul>
+
+      <h2>Pauta</h2>
+      <div id="temas"></div>
+      <button type="button" class="rn-btn" id="btnTema">+ Adicionar assunto</button>
+
+      <h2>Anotações da reunião</h2>
+      <textarea id="ata" disabled rows="6" maxlength="10000" aria-label="Anotações da reunião" placeholder="Anotações novas, digitadas por você."></textarea>
+
+      <div class="rn-acoes">
+        <button type="button" class="rn-btn" id="btnExportar">Exportar ata (.txt)</button>
+        <button type="button" class="rn-btn" id="btnImprimir">Imprimir pauta</button>
+        <span id="limparBox"></span>
+      </div>
+
+      <h2>Abrir indicadores existentes</h2>
+      <div class="rn-atalhos" id="atalhos"></div>
+      <p class="rn-nota">Esta página não repete números: ela só abre as telas que já mostram vendas, delivery, qualidade e reservas. Dentro do portal, a pauta fica guardada enquanto a aba estiver aberta.</p>
+    </div>
+  </div>
+</div>
+<div id="impressao" aria-hidden="true"></div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="reuniao-modelo.js?v=20261111a"></script>
+<script src="reuniao.js?v=20261111a"></script>
+<script>ReuniaoTela.iniciar();</script>
+</body>
+</html>

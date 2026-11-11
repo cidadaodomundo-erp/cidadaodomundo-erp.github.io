@@ -10,6 +10,7 @@ window.CASCA_BUSCA = {
   placar: ['fechamento do mes', 'fechar o mes', 'mes fechado', 'mes em uma pagina', 'faturamento', 'vendas do mes', 'resultado', 'quanto vendemos', 'meta do mes', 'receita'],
   indicadores: ['kpi', 'metas', 'farol', 'indicador'],
   semana: ['semana passada', 'relatorio semanal', 'comparar semanas'],
+  reuniao: ['reuniao', 'reuniao semanal', 'pauta', 'ata', 'decisoes', 'decisao'],
   fechamento: ['fechar o mes', 'mes fechado', 'resultado do mes'],
   evolucao: ['crescimento', 'vendas por mes', 'historico de vendas', 'grafico de vendas'],
   dre: ['lucro', 'prejuizo', 'demonstrativo', 'resultado contabil', 'margem'],

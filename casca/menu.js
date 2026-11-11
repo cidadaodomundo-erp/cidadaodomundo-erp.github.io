@@ -34,6 +34,12 @@ window.CASCA_MENU = [
     "icone": "📅"
    },
    {
+    "chave": "reuniao",
+    "rotulo": "Reunião semanal",
+    "icone": "🗓️",
+    "origem": "fabio"
+   },
+   {
     "chave": "fechamento",
     "rotulo": "Fechamento do mês",
     "icone": "📖"
