@@ -315,6 +315,12 @@ window.CASCA_MENU = [
     "chave": "cargos",
     "rotulo": "Cargos, salários e custo",
     "icone": "🪪"
+   },
+   {
+    "chave": "freelas",
+    "rotulo": "Taxas e Freelas",
+    "icone": "🤝",
+    "origem": "fabio"
    }
   ]
  },

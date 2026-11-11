@@ -1,0 +1,50 @@
+/* Taxas e Freelas. Usa as variáveis do nucleo.css (escuro por padrão; html.tema-proposta = claro). Mobile primeiro. */
+.na-casca body::before { display: none !important; }
+.fl { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; color: var(--tx-1, #fff); }
+.fl h1 { font-size: 20px; margin: 4px 0 8px; }
+.fl h2 { font-size: 15px; margin: 24px 0 8px; }
+.fl-obras { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  border: 1px solid var(--farol-perto, #f5a623); color: var(--farol-perto, #f5a623); vertical-align: middle; }
+.fl-aviso { border: 1px solid var(--farol-perto, #f5a623); border-radius: 10px; padding: 10px 12px; margin: 8px 0 14px;
+  background: var(--surface, #1e1e1c); font-size: 13.5px; line-height: 1.45; }
+.fl-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.fl-abas { display: flex; flex-wrap: wrap; gap: 6px; }
+.fl-aba, .fl-btn { font: inherit; font-size: 14px; font-weight: 700; padding: 10px 14px; min-height: 44px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface-2, #2a2a27); color: inherit; box-sizing: border-box; }
+.fl-btn { border-radius: 8px; }
+.fl-aba.on { background: var(--brand, #c8102e); border-color: var(--brand, #c8102e); color: #fff; }
+.fl-btn:hover, .fl-aba:hover { border-color: var(--brand, #c8102e); }
+.fl-btn:disabled { opacity: .5; cursor: not-allowed; }
+.fl :focus-visible { outline: 3px solid var(--info, #58a6ff); outline-offset: 2px; }
+.fl-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
+.fl-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; flex: 1 1 180px; min-width: 0; }
+.fl-rot { color: var(--tx-2, #c3c2b7); font-weight: 700; }
+.fl input, .fl select { font: inherit; font-size: 14px; padding: 9px 10px; min-height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface, #1e1e1c); color: inherit; }
+.fl-fonte { font-size: 12.5px; color: var(--tx-2, #c3c2b7); margin: 4px 0 8px; line-height: 1.4; }
+.fl-estado { font-size: 14px; line-height: 1.45; margin: 8px 0; }
+.fl-aviso-linha, .fl-estado.fl-aviso { border-left: 3px solid var(--farol-perto, #f5a623); padding-left: 10px; }
+.fl-estado.fl-erro { border-left: 3px solid var(--farol-fora, #ff6b6b); padding-left: 10px; }
+.fl-contagem { font-size: 13px; color: var(--tx-2, #c3c2b7); margin: 6px 0; }
+.fl-lista { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.fl-lista > p { grid-column: 1 / -1; margin: 0; }
+.fl-card { border: 1px solid var(--line, #34332f); border-radius: 10px; padding: 12px; background: var(--surface, #1e1e1c); min-width: 0; }
+.fl-nome { font-size: 15px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.fl-dados { margin: 0; display: grid; grid-template-columns: 1fr; gap: 4px; }
+.fl-par { display: flex; gap: 8px; font-size: 13.5px; min-width: 0; }
+.fl-par dt { flex: 0 0 auto; min-width: 104px; color: var(--tx-2, #c3c2b7); font-weight: 700; }
+.fl-par dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.fl-nota { font-size: 12px; color: var(--tx-3, #a5a49a); line-height: 1.45; }
+.fl-obras-grade { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.fl-card-obras p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--tx-2, #c3c2b7); }
+#bloqueio { border: 1px solid var(--farol-fora, #ff6b6b); border-radius: 10px; padding: 14px; margin: 12px 0; }
+#bloqueio p { margin: 0 0 10px; }
+
+@media (min-width: 600px) {
+  .fl-lista { grid-template-columns: 1fr 1fr; }
+  .fl-obras-grade { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .fl-barra .fl-btn, .fl-abas { width: 100%; }
+  .fl-aba { flex: 1 1 auto; }
+}
