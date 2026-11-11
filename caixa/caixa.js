@@ -125,7 +125,7 @@ function caixaFrentesFaixa(unidade, dia) {
     const nome = caixaFrenteNome(unidade, t.caixa), d = D.find(l => String(l.descricao || '').replace(/^.*?-\s*/, '').toLowerCase() === nome.toLowerCase());
     const v = d ? Math.round((cgNum(d.credito) - cgNum(d.debito)) * 100) / 100 : null;
     const sai = t.fechado === false ? `<b style="color:var(--farol-fora);">aberta desde ${hm(t.aberto_em)}</b>` : `<span style="color:var(--farol-ok);">fechada${t.fechado_em ? ' às ' + hm(t.fechado_em) : ''}</span>`;
-    const dif = t.fechado === false ? '—' : v == null || Math.abs(v) < 0.005 ? 'sem diferença' : Math.abs(v) <= 1.0001 ? `<span style="color:var(--tx-4);">R$ ${fmt(v)} (absorvido)</span>` : `<b style="color:var(--farol-perto);">R$ ${fmt(v)}</b>`;
+    const dif = t.fechado === false ? '—' : v == null || Math.abs(v) <= 1.0001 ? 'sem diferença' : `<b style="color:var(--farol-perto);">R$ ${fmt(v)}</b>`;
     return `<tr><td><b>${trEscH(nome)}</b></td><td>${sai}</td><td>${dif}</td></tr>`;
   }).join('');
   const pain = itens == null ? '' : itens.length ? `<b style="color:var(--farol-perto);">falta: ${[...new Set(itens.map(x => tipos[x.bloco] || 'conferir'))].join(', ')}</b>` : '<b style="color:var(--farol-ok);">✓ painel fechou</b>';
@@ -1220,13 +1220,15 @@ async function caixaRegistrarNoDia(unidade, dia, caixa, idF) {
 }
 // Filtros do modulo (dono, 09/09/2026: "mais enxuto, com mais filtros"): loja,
 // janela de dias e "so pendencias". Ficam no navegador da pessoa.
+// 11/11/2026 (dono: "as telas do dono e da Arissa mostram coisas diferentes"): o filtro de CAIXA (Salão/Delivery) não fica mais
+// guardado — o "Salão" esquecido no navegador do dono escondia o Delivery. Vale só enquanto a página está aberta.
 let CAIXA_FILTRO = (() => {
   const padrao = { loja: '', dias: 15, soPend: false, naoConf: false, caixa: '' };
-  try { return Object.assign(padrao, JSON.parse(localStorage.getItem('caixaFiltro') || '{}')); } catch (e) { return padrao; }
+  try { const salvo = JSON.parse(localStorage.getItem('caixaFiltro') || '{}'); delete salvo.caixa; return Object.assign(padrao, salvo); } catch (e) { return padrao; }
 })();
 function caixaFiltrar(campo, valor) {
   CAIXA_FILTRO[campo] = valor;
-  try { localStorage.setItem('caixaFiltro', JSON.stringify(CAIXA_FILTRO)); } catch (e) {}
+  try { localStorage.setItem('caixaFiltro', JSON.stringify(Object.assign({}, CAIXA_FILTRO, { caixa: '' }))); } catch (e) {}
   renderModuloCaixa();
 }
 
@@ -1239,15 +1241,17 @@ function caixaFiltrar(campo, valor) {
 // loja (SB 159,54 em 20/10; Ahú 430,75 e AV 11.585,71 em 21/10). O contado só vira diferença quando a contagem cobrir
 // cofre + gaveta (contagem_cobre_cofre); hoje caixa_contagem é a da gaveta do salão, então mostra e não acusa.
 // ------------------------------------------------------------------
-let COFRE_DIA = null, COFRE_ENVIOS = null;
+let COFRE_DIA = null, COFRE_ENVIOS = null, COFRE_GAVETA_SB = null;
 async function cofreCarregar() {
   try {
-    const [d, e] = await Promise.all([
+    const [d, e, g] = await Promise.all([
       consultarTudo('vw_caixa_cofre_dia?select=*&order=unidade,dia'),
       consultarTudo('vw_caixa_cofre_sb_envios?select=*&order=data_envio.desc,saida_id_titulo'),
+      // 11/11/2026 (regra do dono: o dinheiro do SB tem gaveta própria na AV e fica fora da contagem da AV): o saldo dessa gaveta
+      consultarTudo('vw_caixa_gaveta_sb_dia?select=unidade,dia,entrou,saiu,saldo_fim_dia&order=dia').catch((x) => { console.warn('gaveta SB:', x.message); return []; }),
     ]);
-    COFRE_DIA = d; COFRE_ENVIOS = e;
-  } catch (err) { COFRE_DIA = []; COFRE_ENVIOS = []; console.warn('cofre:', err.message); }
+    COFRE_DIA = d; COFRE_ENVIOS = e; COFRE_GAVETA_SB = g;
+  } catch (err) { COFRE_DIA = []; COFRE_ENVIOS = []; COFRE_GAVETA_SB = []; console.warn('cofre:', err.message); }
 }
 function cofreHtml() {
   if (!COFRE_DIA) return '';
@@ -1295,7 +1299,8 @@ function cofreHtml() {
   // dinheiro do SB para a AV: o robô lança a entrada na AV sozinho; a Arissa só marca o que NÃO chegou
   // 28/10/2026: o envio SB → AV só é assunto dessas duas lojas (e da Rede); no Ahú o quadro não aparece
   const vSB = caixaLojaVisao();
-  const E = !vSB || vSB === LOJA_REDE || vSB === 'SÃO BRAZ' || vSB === 'AGUA VERDE' ? (COFRE_ENVIOS || []) : [];
+  const sbAqui = !vSB || vSB === LOJA_REDE || vSB === 'SÃO BRAZ' || vSB === 'AGUA VERDE';
+  const E = sbAqui ? (COFRE_ENVIOS || []) : [];
   const entrou = E.filter((x) => x.situacao === 'ENTROU NA AV');
   const robo = E.filter((x) => x.situacao === 'ROBO VAI LANCAR');
   const naoChegou = E.filter((x) => String(x.situacao).startsWith('MARCADO'));
@@ -1312,13 +1317,17 @@ function cofreHtml() {
           : `<span style="color:var(--farol-fora);">não chegou</span>${x.nao_recebido_obs ? ' — ' + trEscH(x.nao_recebido_obs) : ''}`}</td><td>${acao}</td></tr>`;
   };
   const pendentes = [...robo, ...naoChegou];
-  const blocoSB = E.length ? `<div class="section-label">Dinheiro do São Braz para a Água Verde</div>
-    <div class="contexto" style="text-align:left;">${E.length} envios desde ${dm(E[E.length - 1].data_envio)}, R$ ${fmt(soma(E))}:
-      <b style="color:var(--farol-ok);">${entrou.length} já entraram na AV (R$ ${fmt(soma(entrou))})</b>${robo.length ? ` · ${robo.length} o robô vai lançar (R$ ${fmt(soma(robo))})` : ''}${naoChegou.length ? ` · <b style="color:var(--farol-fora);">${naoChegou.length} marcados como não chegou</b>` : ''}.
-      <div class="caption-label" style="text-align:left;">O robô lança a entrada na AV sozinho. Se o dinheiro de um envio não chegou, ${marcaNaoChegou ? 'marque "Não chegou"' : 'a Hellen marca "Não chegou"'} e o robô não lança.</div></div>
+  // 11/11/2026 (proposta "caixa mais simples", 2 e 3.6): só os envios pendentes e a gaveta do SB à vista; o resumo e os que já entraram no "ver"
+  const hojeSB = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const gSB = sbAqui ? (COFRE_GAVETA_SB || []).filter((r) => String(r.dia).slice(0, 10) <= hojeSB).slice(-1)[0] : null;
+  const gavetaSB = gSB ? `<div style="margin:4px 0;">Gaveta do SB (fica na AV, não entra na contagem da AV): <b>R$ ${fmt(Number(gSB.saldo_fim_dia))}</b> <span class="caption-label">em ${dm(gSB.dia)}</span></div>` : '';
+  const blocoSB = E.length || gSB ? `<div class="section-label">Dinheiro do São Braz para a Água Verde</div>
+    <div class="contexto" style="text-align:left;">${gavetaSB}
+      ${pendentes.length ? `<div class="caption-label" style="text-align:left;">O robô lança a entrada na AV sozinho. Se o dinheiro de um envio não chegou, ${marcaNaoChegou ? 'marque "Não chegou"' : 'a Hellen marca "Não chegou"'} e o robô não lança.</div>` : `<div style="color:var(--farol-ok);">nenhum envio pendente</div>`}</div>
     ${pendentes.length ? `<div id="tabelaCofreSbPend"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${pendentes.map(linha).join('')}</tbody></table></div>` : ''}
-    <details><summary style="cursor:pointer;">ver os ${entrou.length} que já entraram</summary>
-      <div id="tabelaCofreSbOk"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${entrou.map(linha).join('')}</tbody></table></div></details>` : '';
+    ${E.length ? `<details><summary style="cursor:pointer;">ver os ${entrou.length} que já entraram</summary>
+      <div class="caption-label" style="text-align:left;">${E.length} envios desde ${dm(E[E.length - 1].data_envio)}, R$ ${fmt(soma(E))}: ${entrou.length} já entraram na AV (R$ ${fmt(soma(entrou))})${robo.length ? ` · ${robo.length} o robô vai lançar (R$ ${fmt(soma(robo))})` : ''}${naoChegou.length ? ` · ${naoChegou.length} marcados como não chegou` : ''}.</div>
+      <div id="tabelaCofreSbOk"><table><thead><tr><th>Saiu do SB</th><th style="text-align:right;">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${entrou.map(linha).join('')}</tbody></table></div></details>` : ''}` : '';
   // 05/11/2026 (dono: "podemos eliminar esse quadro, a contagem já é feita na linha de cada caixa"): a contagem foi para a
   // linha "Dinheiro da loja" de cada dia (cofreLinhaDia); aqui fica só o envio do SB para a AV
   void cards;
@@ -1335,7 +1344,9 @@ function cofreLinhaDia(unidade, dia) {
   // 11/11/2026 (dono 18:19: "pra Arissa não aparece mais o campo da gaveta"): contar o dinheiro de HOJE nunca trava (é físico: se não
   // contar hoje, o número se perde); a contagem gravada se corrige ("corrigir" abre o campo preenchido; o banco só deixa quem gravou)
   const livre = dia === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) ? ' cx-livre' : '';
-  const cab = `<div id="cfBox_${k}" style="margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;"><b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">gaveta + cofre, contados juntos no fim do dia ${dm(dia)}</span>`;
+  // 11/11/2026 (regra do dono): na AV a gaveta do SB fica fora da contagem
+  const leg = unidade === 'AGUA VERDE' ? `conte a gaveta e o cofre da AV — <b>sem</b> a gaveta do SB (fim do dia ${dm(dia)})` : `gaveta + cofre, contados juntos no fim do dia ${dm(dia)}`;
+  const cab = `<div id="cfBox_${k}" style="margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;"><b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">${leg}</span>`;
   if (!r) return cab + `<div style="font-size:12.5px; color:var(--tx-4); margin-top:4px;">sem saldo do cofre para este dia no sistema</div></div>`;
   if (r.contagem_cobre_cofre === true && r.contado != null) {
     const dif = Number(r.diferenca);
@@ -1354,7 +1365,7 @@ function cofreCorrigir(unidade, dia, k, atual) {
   const box = document.getElementById('cfBox_' + k);
   if (!box) return;
   const livre = dia === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) ? 'cx-livre' : '';
-  box.innerHTML = `<b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">corrigir a contagem de ${dia.split('-').reverse().join('/')}</span>
+  box.innerHTML = `<b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">corrigir a contagem de ${dia.split('-').reverse().join('/')}${unidade === 'AGUA VERDE' ? ' — gaveta e cofre da AV, <b>sem</b> a gaveta do SB' : ''}</span>
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
       <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" value="${Number(atual) || ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
       <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a correção</button></div>`;
@@ -1449,9 +1460,11 @@ async function caixaHellenCarregar() {
   try {
     // 06/11/2026 (dono: "caixa aberto no Saipos e caixa com diferença são coisas diferentes"): nomes das frentes e a diferença
     // que o turno deixou no fechamento do Saipos (lançamento "Diferença de Frente de Caixa - <nome>", subtipo DIFERENÇA DE CAIXA)
+    // 11/11/2026 (dono: "as telas do dono e da Arissa mostram coisas diferentes"): lida pela vw_caixa_diferenca_saipos, que já
+    // filtra por quem confere a loja — a fin_lancamentos fica fechada para quem não está em tr_usuarios e voltava vazia
     const [frentes, difsai] = await Promise.all([
       consultarTudo('caixa_frente_nome?select=unidade,caixa_usuario,nome&order=unidade,caixa_usuario').catch(() => []),
-      consultarTudo('fin_lancamentos?select=id,data,unidade,descricao,credito,debito&subtipo=eq.' + encodeURIComponent('DIFERENÇA DE CAIXA') + '&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
+      consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
@@ -1588,25 +1601,38 @@ function caixaHellenHtml() {
     return `<div onclick="caixaHellenAbrir(${x.i})" title="clique para abrir o dia" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);cursor:pointer;">
       <span style="flex:1 1 auto;">${t.txt}</span>${t.btn}</div>`; };
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
-  const cartoes = H.lojas.map((u) => {
-    const dv = caixaDiaDaVez(u);
-    const faz = todos.filter(x => x.u === u && ((dv && dv.dia && x.dia === dv.dia && !naoTrava(x)) || (x.bloco === 'quebra')));
-    if (!dv || !dv.dia) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${faz.length ? faz.map(linha).join('') : ''}</div>`;
-    const n = faz.length;
-    return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-perto);">
-      <div><b>${nomeLoja(u)}</b> · dia da vez <b>${caixaDdm(dv.dia)}</b> · ${n} ${n === 1 ? 'coisa para fazer' : 'coisas para fazer'}${dv.fila.length ? ` · <span style="color:var(--tx-4);">${dv.fila.length} ${dv.fila.length === 1 ? 'dia' : 'dias'} na fila</span>` : ''}</div>
-      ${faz.map(linha).join('')}</div>`;
-  }).join('');
   // recolhidos: uma linha cinza cada
   const cinza = (rot, corpo) => corpo ? `<details style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">${rot}</summary><div style="margin:4px 0 0 14px;">${corpo}</div></details>` : '';
-  const fila = H.lojas.map(u => { const dv = caixaDiaDaVez(u); return dv && dv.fila.length ? `${nomeLoja(u)}: ${dv.fila.map(caixaDdm).join(', ')}` : ''; }).filter(Boolean);
-  const nFila = H.lojas.reduce((a, u) => { const dv = caixaDiaDaVez(u); return a + (dv ? dv.fila.length : 0); }, 0);
+  const SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], ddSem = d => caixaDdm(d) + ' (' + SEM[new Date(String(d).slice(0, 10) + 'T12:00:00').getDay()] + ')';
+  const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  // 11/11/2026 (dono 18:15: "confuso e poluído"; proposta 3.1): UMA tarefa por vez — a primeira do dia da vez; as outras do mesmo dia
+  // em "mais N deste dia (ver)", os dias seguintes em "depois deste: mais N dias". Contar o dinheiro de hoje fica sempre à vista.
+  const cartoes = H.lojas.map((u) => {
+    const dv = caixaDiaDaVez(u);
+    const doDia = todos.filter(x => x.u === u && dv && dv.dia && x.dia === dv.dia && !naoTrava(x) && x.bloco !== 'contagem');
+    const quebras = todos.filter(x => x.u === u && x.bloco === 'quebra');
+    const conta = todos.find(x => x.u === u && x.bloco === 'contagem');
+    const cofHoje = (COFRE_DIA || []).find(r => r.unidade === u && String(r.dia).slice(0, 10) === hojeSP);
+    const contar = conta ? `<div onclick="caixaHellenAbrir(${conta.i})" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line);cursor:pointer;">
+        <span style="flex:1 1 auto;">Dinheiro de hoje (${caixaDdm(conta.dia)}): <b style="color:var(--farol-perto);">ainda não contado</b></span>${caixaTarefa(conta).btn}</div>`
+      : cofHoje && cofHoje.contado != null ? `<div style="padding:7px 0;border-top:1px solid var(--line);">Dinheiro de hoje (${caixaDdm(hojeSP)}): <span style="color:var(--farol-ok);">✓ contado</span></div>` : '';
+    const prim = doDia[0] || quebras[0];
+    const restoDia = doDia.slice(1), restoQ = quebras.filter(x => x !== prim);
+    const resto = (restoDia.length ? cinza(`mais ${restoDia.length} deste dia (ver)`, restoDia.map(linha).join('')) : '')
+      + (restoQ.length ? cinza(`mais ${restoQ.length} ${restoQ.length === 1 ? 'quebra' : 'quebras'} a descontar ou repor (ver)`, restoQ.map(linha).join('')) : '');
+    // o dia que só tem a contagem de hoje não conta como "dia com pendência": ela já aparece na linha do dinheiro de hoje
+    const filaR = dv ? dv.fila.filter(d => todos.some(x => x.u === u && x.dia === d && !naoTrava(x) && x.bloco !== 'contagem')) : [];
+    const depois = filaR.length ? cinza(`depois deste: mais ${filaR.length} ${filaR.length === 1 ? 'dia' : 'dias'} com pendência`, filaR.map(ddSem).join(', ')) : '';
+    if (!dv || !dv.dia || (!doDia.length && !filaR.length)) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${prim ? linha(prim) : ''}${resto}${depois}${contar}</div>`;
+    return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-perto);">
+      <div><b>${nomeLoja(u)}</b> · dia da vez <b>${ddSem(dv.dia)}</b></div>
+      ${prim ? linha(prim) : ''}${resto}${depois}${contar}</div>`;
+  }).join('');
   const esp = todos.filter(x => x.bloco === 'aguardando');
   const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
   const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
   const robo = rb.length ? `${vai.length ? `vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''}` : '';
   return `${cartoes}
-    ${cinza(`na fila: ${nFila} ${nFila === 1 ? 'dia' : 'dias'}`, nFila ? fila.join('<br>') + '<div style="font-size:11.5px;">cada dia abre quando o anterior ficar ✓</div>' : '')}
     ${cinza(`aguardando: ${esp.length} (não precisa fazer nada)`, esp.length ? esp.map(x => `${nomeLoja(x.u)} · ${caixaTarefa(x).txt}`).join('<br>') : '')}
     ${cinza(`o robô vai fazer: ${vai.length + feito.length} troca(s) de bandeira`, robo)}`;
 }
@@ -1677,15 +1703,22 @@ function renderModuloCaixa() {
           <th style="padding:3px 6px; font-weight:normal;" title="carimbo de quem conferiu cada caixa do turno">conferido</th>
           <th></th></tr>`;
   const btn = (ativo, onclick, rotulo) => `<button class="navbtn ${ativo ? 'active' : ''}" onclick="${onclick}">${rotulo}</button>`;
+  // 11/11/2026 (proposta 3.3): os filtros ficam num "filtros" recolhido; o filtro de caixa ligado aparece numa faixa à vista
+  const filtroLigado = F.dias !== 15 || F.soPend || F.naoConf;
   const filtros = `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0 4px;">
-    ${botoesLoja}    ${[7, 15, 30, 60].map(n => btn(F.dias === n, `caixaFiltrar('dias',${n})`, n + ' dias')).join('')}
-    <span style="width:12px;"></span>
-    ${btn(F.soPend, `caixaFiltrar('soPend',${!F.soPend})`, 'só pendências')}
-    ${btn(F.naoConf, `caixaFiltrar('naoConf',${!F.naoConf})`, 'não conferidos')}
-    <span style="width:12px;"></span>
-    <span style="font-size:12px; color:var(--tx-3);" title="muda o módulo inteiro para um caixa só: tabela do dia, contagem, conferido e o clique no dia">caixa:</span>${btn(!F.caixa, "caixaFiltrar('caixa','')", 'Os dois')}${btn(F.caixa === 'SALÃO', "caixaFiltrar('caixa','SALÃO')", 'Salão')}${btn(F.caixa === 'DELIVERY', "caixaFiltrar('caixa','DELIVERY')", 'Delivery')}
+    ${botoesLoja}
+    <details style="font-size:12px; color:var(--tx-3);"${filtroLigado ? ' open' : ''}><summary style="cursor:pointer;">filtros${filtroLigado ? ' (ligados)' : ''}</summary>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:4px;">
+      ${[7, 15, 30, 60].map(n => btn(F.dias === n, `caixaFiltrar('dias',${n})`, n + ' dias')).join('')}
+      <span style="width:12px;"></span>
+      ${btn(F.soPend, `caixaFiltrar('soPend',${!F.soPend})`, 'só pendências')}
+      ${btn(F.naoConf, `caixaFiltrar('naoConf',${!F.naoConf})`, 'não conferidos')}
+      <span style="width:12px;"></span>
+      <span title="muda o módulo inteiro para um caixa só: tabela do dia, contagem, conferido e o clique no dia">caixa:</span>${btn(!F.caixa, "caixaFiltrar('caixa','')", 'Os dois')}${btn(F.caixa === 'SALÃO', "caixaFiltrar('caixa','SALÃO')", 'Salão')}${btn(F.caixa === 'DELIVERY', "caixaFiltrar('caixa','DELIVERY')", 'Delivery')}
+      </div></details>
     <button onclick="caixaAvisar()" title="manda um recado para o Neto com a loja e o dia que você está vendo — ele recebe pelo resumo do robô" style="font:inherit; font-size:12px; padding:3px 12px; cursor:pointer; margin-left:auto; font-weight:600;">✉ Avisar o Neto</button>
-  </div>`;
+  </div>
+  ${F.caixa ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); font-size:12px;">mostrando só o ${F.caixa === 'SALÃO' ? 'Salão' : 'Delivery'} · <a href="javascript:void(0)" onclick="caixaFiltrar('caixa','')">mostrar os dois</a></div>` : ''}`;
 
   let blocos = '';
   let pendTotal = 0, semFechTotal = 0;
@@ -1703,8 +1736,8 @@ function renderModuloCaixa() {
     const caixasDaLoja = (temSalao ? ['SALÃO', 'DELIVERY'] : ['DELIVERY']).filter(cx => !F.caixa || cx === F.caixa);
     const saldoC = saldoDe(unidade, 'CARTAO'), saldoV = saldoDe(unidade, 'VOUCHER');
 
-    let semFech = 0, pend = 0;
-    const linhas = dias.map(iso => {
+    let semFech = 0, pend = 0, depoisDaVez = null;
+    const linhasDia = dias.map(iso => {
       const r = porDia[iso];
       const aberto = iso === hoje;
       const c = cartaoDe[unidade + '|' + iso + '|CARTAO'] || {};
@@ -1739,37 +1772,43 @@ function renderModuloCaixa() {
       const chaveResto = chaveSem <= 0 ? 0 : Math.max(0, chaveSem - efeito('pix_chave'));
       const dinExplicado = vals.some(v => v.bloco === 'dinheiro');
       const aguardHtml0 = '<span style="color:#9aa4af;" title="vale esperando a Rede (até 7 dias): não precisa fazer nada">aguardando</span>';
-      const badge = vals.length ? ` <span style="color:#9aa4af; font-weight:normal;" title="pendências explicadas por quem conferiu">· ${vals.length} explicada(s)</span>` : '';
+      // 11/11/2026 (proposta 3.3): o "· N explicada(s)" saiu da lista (confundia "fechou" com "tem coisa"); as explicadas seguem no dia
+      const badge = '';
       const expl = v => '<span style="color:#9aa4af; text-decoration:line-through;" title="explicada">R$ ' + fmt(v) + '</span>';
       let situacao, cor = '', alerta = false;
       // 06/11/2026 (dono, via Financeiro: "veja se essa tela está trazendo as pendencias atualizadas"): com a lista
       // "Para você resolver" montada, o status do dia sai dos MESMOS itens dela (a diferença total não decide mais)
       const HI = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && iso >= caixaHellenCorte(unidade) ? caixaHellenItens() : null;
       const itDia = HI ? HI.filter(x => x.u === unidade && x.dia === iso && x.bloco !== 'quebra' && (!F.caixa || !x.caixa || x.caixa === F.caixa)) : null;
-      const tipoIt = { aberto: 'falta fechar no Saipos', difsaipos: 'diferença no fechamento do Saipos', contagem: 'dinheiro (falta contar)', cofre: 'dinheiro', troca: 'maquininha', semcobr: 'maquininha', pix: 'PIX', online: 'online', erro: 'o dia' };
+      // 11/11/2026 (proposta 3.3): a situação em frase com verbo, o que a pessoa vai fazer
+      const tipoIt = { aberto: 'fechar o caixa no Saipos', difsaipos: 'explicar a diferença do Saipos', contagem: 'contar o dinheiro', cofre: 'explicar o dinheiro contado', troca: 'trocar bandeira', semcobr: 'conferir a maquininha', pix: 'achar o PIX', online: 'trocar a forma do online', erro: 'abrir o dia' };
       if (aberto) situacao = '<span style="color:#9aa4af;">dia em aberto</span>';
       else if (itDia) {
         const ac = itDia.filter(x => x.bloco !== 'aguardando');
-        if (ac.length) { situacao = `<b style="color:${ac.some(x => x.bloco === 'aberto') ? 'var(--farol-fora)' : 'var(--farol-perto)'};">conferir ${[...new Set(ac.map(x => tipoIt[x.bloco] || 'maquininha'))].join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; if (ac.some(x => x.bloco === 'aberto')) semFech++; }
+        if (ac.length) { situacao = `<b style="color:${ac.some(x => x.bloco === 'aberto') ? 'var(--farol-fora)' : 'var(--farol-perto)'};">${[...new Set(ac.map(x => tipoIt[x.bloco] || 'conferir a maquininha'))].join(', ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; if (ac.some(x => x.bloco === 'aberto')) semFech++; }
         else if (itDia.length) situacao = aguardHtml0;
         else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
       }
       else if (!temDinheiro && maqPdv === 0 && maqReal === 0 && chavePdv === 0) situacao = '<span style="color:#9aa4af;">sem movimento</span>';
-      else if (semFechDia && !dinExplicado) { situacao = '<b style="color:var(--farol-fora);">turno não fechou</b>' + badge; cor = 'background:rgba(255,107,107,.07);'; alerta = true; semFech++; }
+      else if (semFechDia && !dinExplicado) { situacao = '<b style="color:var(--farol-fora);">fechar o caixa no Saipos</b>' + badge; cor = 'background:rgba(255,107,107,.07);'; alerta = true; semFech++; }
       else {
         const o = [];
-        if (!dinExplicado) { if (faltaContar) o.push('dinheiro (falta contar)'); else if (Math.abs(dinDif) >= 0.01) o.push('dinheiro'); }
-        if (Math.abs(maqResto) >= 0.01) o.push('maquininha');
-        if (chaveResto > 0) o.push('PIX chave');
-        if (o.length) { situacao = `<b style="color:var(--farol-perto);">conferir ${o.join(' + ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; }
+        if (!dinExplicado) { if (faltaContar) o.push('contar o dinheiro'); else if (Math.abs(dinDif) >= 0.01) o.push('explicar o dinheiro'); }
+        if (Math.abs(maqResto) >= 0.01) o.push('conferir a maquininha');
+        if (chaveResto > 0) o.push('achar o PIX chave');
+        if (o.length) { situacao = `<b style="color:var(--farol-perto);">${o.join(', ')}</b>` + badge; cor = 'background:rgba(245,166,35,.07);'; alerta = true; }
         else situacao = '<span style="color:#3f9c5a;">✔ fechou</span>' + badge;
       }
       // dias antes do recomeço: a lista não cobre, não ficam verdes — escondidos (Financeiro, 06/11), com link de consulta
       const temLista = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs;
       if (temLista && iso < caixaHellenCorte(unidade) && !CAIXA_ANTES[unidade]) return '';
       const dvz = temLista && iso >= caixaHellenCorte(unidade) ? caixaDiaDaVez(unidade) : null;
-      if (dvz && dvz.dia && iso === dvz.dia) situacao += ' <b style="color:var(--tx-1);">← dia da vez</b>';
-      else if (dvz && dvz.dia && iso > dvz.dia && !aberto) { situacao = `<span style="color:#9aa4af;">🔒 espera o ${caixaDdm(dvz.dia)}</span> <span style="color:#9aa4af;font-size:11px;">(${situacao.replace(/<[^>]+>/g, '')})</span>`; cor = ''; }
+      // 11/11/2026 (proposta 3.2): a trava sai de cada linha e fica dita uma vez no alto da lista (travaTopo)
+      const ehVez = !!(dvz && dvz.dia && iso === dvz.dia);
+      if (dvz && dvz.dia && iso > dvz.dia && !aberto) depoisDaVez = dvz.dia;
+      // dia verde (fechou ou sem movimento) que não é hoje nem o dia da vez: entra no grupo "✓ … fecharam" (proposta 3.3)
+      const quieto = !aberto && !alerta && !ehVez && /✔ fechou|sem movimento/.test(situacao);
+      if (ehVez) situacao += ' <b style="color:var(--tx-1);">← dia da vez</b>';
       if (alerta) pend++;
       if (F.soPend && !alerta) return '';
       // carimbo de conferido por caixa (10/09/2026)
@@ -1777,15 +1816,37 @@ function renderModuloCaixa() {
       const semMov = !temDinheiro && maqPdv === 0 && maqReal === 0 && chavePdv === 0;
       const faltaConf = !aberto && !semMov && caixasDaLoja.some(cx => !confs.some(c => c.caixa === cx));
       if (F.naoConf && !faltaConf) return '';
-      const confHtml = aberto || semMov ? vazio : caixasDaLoja.map(cx => { const c = confs.find(x => x.caixa === cx); const rot = cx === 'SALÃO' ? 'Salão' : 'Delivery';
-        return c ? `<span style="color:#3f9c5a;" title="${String(c.quem || '').split('@')[0]} · ${String(c.conferido_em || '').slice(0, 16).replace('T', ' ')}">${rot} ✔</span>` : `<span style="color:#9aa4af;">${rot} —</span>`; }).join(' · ');
-      const aguardHtml = '<span style="color:#9aa4af;" title="PIX: até 6 dias (fim de semana e feriado atrasam); maquininha: a madrugada do turno chega amanhã">aguardando</span>';
-      return `<tr style="${cor} cursor:pointer;" onclick="abrirDiaConcartao('${unidade.replace(/'/g, "\\'")}', '${iso}')" title="clique para abrir as transações do dia e o que cada caixa fechou">
+      // 11/11/2026 (proposta 3.4): quem conferiu e quando, à vista ("Arissa, 09/11 19:12"); sem carimbo, "—"; caixa sem carimbo diz qual falta
+      const carimbo = c => { const nome = String(c.quem || '').split('@')[0].split(/[._-]/)[0]; const ts = c.conferido_em || c.hora; const d = ts ? new Date(ts) : null;
+        const qd = d && !isNaN(d) ? d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '';
+        return (nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : 'alguém') + (qd ? ', ' + qd : ''); };
+      const comC = caixasDaLoja.map(cx => ({ cx, c: confs.find(x => x.caixa === cx) })), feitos = comC.filter(o => o.c);
+      const ultC = feitos.map(o => o.c).sort((a, b) => String(b.conferido_em || '').localeCompare(String(a.conferido_em || '')))[0];
+      const faltamC = comC.filter(o => !o.c).map(o => o.cx === 'SALÃO' ? 'Salão' : 'Delivery');
+      const confHtml = aberto || semMov || !ultC ? vazio
+        : `<span style="color:var(--farol-ok);" title="${feitos.map(o => (o.cx === 'SALÃO' ? 'Salão' : 'Delivery') + ': ' + carimbo(o.c)).join(' · ')}">${carimbo(ultC)}</span>${faltamC.length ? ` <span style="color:var(--tx-4);">· falta o ${faltamC.join(' e o ')}</span>` : ''}`;
+      return { iso, quieto, semMov: /sem movimento/.test(situacao), html: `<tr style="${cor} cursor:pointer;" onclick="abrirDiaConcartao('${unidade.replace(/'/g, "\\'")}', '${iso}')" title="clique para abrir as transações do dia e o que cada caixa fechou">
         <td style="padding:3px 6px; white-space:nowrap;">${fmtDia(iso)}</td>
         <td style="padding:3px 6px; white-space:nowrap;">${situacao}</td>
         <td style="padding:3px 6px; white-space:nowrap;">${confHtml}</td>
-        <td style="padding:3px 6px; color:#9aa4af; font-size:11px; white-space:nowrap;">abrir ›</td></tr>`;
-    }).join('');
+        <td style="padding:3px 6px; color:#9aa4af; font-size:11px; white-space:nowrap;">abrir ›</td></tr>` };
+    }).filter(Boolean);
+    // 11/11/2026 (proposta 3.3): dias verdes seguidos viram uma linha "✓ dd/mm a dd/mm fecharam (N dias)", que abre ao clicar
+    const kGrupo = unidade.replace(/[^A-Za-z]/g, '');
+    let linhas = '', run = [];
+    const fechaRun = () => {
+      if (run.length >= 2) {
+        const gid = 'cxg_' + kGrupo + '_' + run[0].iso.replace(/-/g, ''), nSem = run.filter(x => x.semMov).length;
+        const ini = run[run.length - 1].iso, fim = run[0].iso;   // a lista vem do mais novo para o mais velho
+        linhas += `<tr style="cursor:pointer;" onclick="document.querySelectorAll('.${gid}').forEach(t => { t.style.display = t.style.display === 'none' ? '' : 'none'; })" title="clique para ver os dias">
+          <td colspan="4" style="padding:3px 6px; color:var(--farol-ok);">✓ ${caixaDdm(ini)} a ${caixaDdm(fim)} fecharam (${run.length} dias${nSem ? ', ' + nSem + ' sem movimento' : ''}) <span style="color:var(--tx-4); font-size:11px;">ver ›</span></td></tr>`
+          + run.map(x => x.html.replace('<tr style="', `<tr class="${gid}" style="display:none; `)).join('');
+      } else linhas += run.map(x => x.html).join('');
+      run = [];
+    };
+    linhasDia.forEach(x => { if (x.quieto) run.push(x); else { fechaRun(); linhas += x.html; } });
+    fechaRun();
+    const travaTopo = depoisDaVez ? `<div style="font-size:12px; color:var(--tx-4); margin-bottom:4px;">🔒 Os dias depois de ${caixaDdm(depoisDaVez)} abrem quando o ${caixaDdm(depoisDaVez)} ficar ✓.</div>` : '';
     pendTotal += pend; semFechTotal += semFech;
 
     const corBorda = semFech ? 'var(--farol-fora)' : (pend ? 'var(--farol-perto)' : '#3f9c5a');
@@ -1797,10 +1858,11 @@ function renderModuloCaixa() {
     <div class="contexto" style="border-color:${corBorda}; text-align:left;">
       <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:baseline; margin-bottom:6px;">
         <div>${resumo}</div>
-        <div style="font-size:12px; color:#9aa4af;" title="PDV − maquininha, acumulado desde 19/02; diferença que aparece e some no dia seguinte é horário, a que fica é venda sem par">saldo desde 19/02:
+        ${typeof souODono === 'function' && souODono() ? `<div style="font-size:12px; color:#9aa4af;" title="PDV − maquininha, acumulado desde 19/02; diferença que aparece e some no dia seguinte é horário, a que fica é venda sem par">saldo desde 19/02:
           cartão <b style="color:${corSaldo(saldoC)};">${saldoC === null ? '—' : 'R$ ' + fmt(saldoC)}</b> ·
-          vale <b style="color:${corSaldo(saldoV)};">${saldoV === null ? '—' : 'R$ ' + fmt(saldoV)}</b></div>
+          vale <b style="color:${corSaldo(saldoV)};">${saldoV === null ? '—' : 'R$ ' + fmt(saldoV)}</b></div>` : ''}
       </div>
+      ${travaTopo}
       <div style="overflow-x:auto;"><table style="border-collapse:collapse; width:100%; font-size:12px;">
         ${cabecalho}${linhas || `<tr><td colspan="4" style="padding:8px 6px; color:#9aa4af;">nenhum dia com pendência na janela</td></tr>`}</table></div>
       ${CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && dias.some(d => d < caixaHellenCorte(unidade))
@@ -1815,15 +1877,6 @@ function renderModuloCaixa() {
     <details class="cx-cofre" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
     <details class="cx-historico" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">conferência do dia a dia (histórico)${pendTotal ? ` · ${pendTotal} dia(s) com pendência` : ''}</summary>
     <div class="contexto" style="text-align:left;">
-      <details style="margin-top:6px; font-size:12px; color:#9aa4af;"><summary style="cursor:pointer;">como ler</summary>
-        <b>Turno não fechou</b> = o caixa que fez as vendas ainda está aberto no Saipos (o clique no dia diz qual). <b>Dinheiro</b>: venda em dinheiro no PDV × o que a contagem da gaveta registrou como enviado, caixa a caixa
-        (Arissa: Água Verde e Ahú · Diego: São Braz); dia sem contagem aparece como "falta contar" — a contagem se registra dentro do dia, na linha <b>Dinheiro</b>. <b>Maquininha</b>: cartão e vale × transações
-        da Rede, mais o PIX QR da maquininha × crédito no banco (cai linha a linha, "PIX QRS"). <b>PIX chave</b>: avulso
-        na chave CNPJ × transferência no banco. <b>O dia é o turno</b>: das 10h até o fechamento do caixa (corte às 10h), igual ao caixa do
-        Saipos. A Rede só entrega as transações no dia seguinte, então a madrugada do turno de ontem aparece como
-        "aguardando" e fecha sozinha amanhã; o vale demora dias para aparecer na Rede. Regra do dono: <b>caixa bom não tem quebra</b> — toda diferença aparece e pede investigação.
-        Clique no dia para ver as transações lado a lado e o que cada caixa (Salão / Delivery) fechou. Fora daqui:
-        pagamento online (iFood/site) e Boqueirão.</details>
       ${filtros}
     </div>
     ${blocos}
@@ -1838,9 +1891,9 @@ function caixaGuia() {
   if (CAIXA_GUIA_OK || typeof guiaRegistrar !== 'function') return;
   CAIXA_GUIA_OK = true;
   guiaRegistrar('caixa', [
-    { sel: '.cx-cartao', texto: 'Cada loja tem um cartão com o <b>dia da vez</b> e o que falta fazer nele. Quando o dia fica ✓, o próximo abre sozinho.' },
-    { sel: '.cx-cartao .preset-btn', texto: 'Cada linha é uma tarefa. O botão (<b>Contar</b>, <b>Explicar</b>, <b>Abrir o dia</b>) leva direto onde se resolve; tocar na linha abre o dia.' },
-    { sel: 'details.cx-cofre > summary', texto: '<b>Dinheiro do São Braz para a Água Verde</b>: os envios do SB e se já entraram na AV. O robô lança a entrada sozinho.' },
+    { sel: '.cx-cartao', texto: 'Cada loja tem um cartão com o <b>dia da vez</b> e uma tarefa por vez; as outras do mesmo dia ficam em "mais N deste dia". O <b>dinheiro de hoje</b> se conta sempre, no fim do cartão. Quando o dia fica ✓, o próximo abre sozinho.' },
+    { sel: '.cx-cartao .preset-btn', texto: 'O botão (<b>Contar</b>, <b>Explicar</b>, <b>Abrir o dia</b>) leva direto onde se resolve; tocar na linha abre o dia.' },
+    { sel: 'details.cx-cofre > summary', texto: '<b>Dinheiro do São Braz para a Água Verde</b>: os envios que faltam confirmar e a gaveta do SB (fica na AV, fora da contagem da AV). O robô lança a entrada sozinho.' },
     { sel: 'details.cx-historico > summary', texto: '<b>Conferência do dia a dia</b>: o histórico de cada dia. Toque no dia para ver as transações; lá também fica o botão <b>✉ Avisar o Neto</b>.' },
   ]);
   guiaTalvez('caixa');
