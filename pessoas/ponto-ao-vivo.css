@@ -1,0 +1,23 @@
+/* Ponto ao Vivo — estilos isolados (prefixo pao-). Não altera nenhuma regra existente. */
+#view-pao .pao-barra { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+#view-pao .pao-sub { color: #555; margin: 0 0 8px; }
+#view-pao .pao-status { margin: 8px 0; }
+#view-pao .pao-erro { color: #a32020; font-weight: 600; }
+#view-pao .pao-resumo { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+#view-pao .pao-card { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; min-width: 110px; display: flex; flex-direction: column; }
+#view-pao .pao-card b { font-size: 1.4em; }
+#view-pao .pao-aviso { margin: 2px 0; font-size: .9em; color: #6b4e00; }
+#view-pao .pao-tab { width: 100%; border-collapse: collapse; font-size: .92em; }
+#view-pao .pao-tab th, #view-pao .pao-tab td { border-bottom: 1px solid #eee; padding: 6px 8px; text-align: left; vertical-align: top; }
+#view-pao .pao-sit-ok { color: #1b6b2f; font-weight: 600; }
+#view-pao .pao-sit-ver { color: #8a5a00; font-weight: 600; }
+#view-pao .pao-sit-neutro { color: #555; }
+#view-pao .pao-expl { color: #555; font-size: .88em; }
+#view-pao .pao-alerta { color: #8a5a00; font-size: .88em; margin-top: 2px; }
+#view-pao .pao-lido { color: #888; font-size: .8em; }
+@media (max-width: 700px) {
+  #view-pao .pao-tab thead { display: none; }
+  #view-pao .pao-tab td { display: block; border: 0; padding: 2px 8px; }
+  #view-pao .pao-tab td::before { content: attr(data-rot) ': '; font-weight: 600; }
+  #view-pao .pao-tab tr { display: block; border-bottom: 1px solid #ddd; padding: 6px 0; }
+}

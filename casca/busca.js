@@ -47,6 +47,7 @@ window.CASCA_BUSCA = {
   pacertos: ['saipos folha', 'acerto da folha'],
   phoje: ['o que fazer hoje', 'rh hoje', 'pendencias do rh', 'tarefas do rh'],
   pcartao: ['consulta de ponto', 'cartao de ponto', 'espelho de ponto', 'ponto', 'batidas', 'entrada e saida'],
+  pao: ['ponto ao vivo', 'quem esta na loja', 'quem esta no intervalo', 'batidas de hoje', 'conferir ponto'],
   peventos: ['eventos e ausencias', 'ausencias', 'ausencia', 'atestado', 'licenca', 'afastamento', 'ocorrencias do rh', 'registros do rh', 'eventos do rh'],
   pcalc: ['calculos da folha', 'adiantamento', 'vale transporte', 'vt', 'va', 'vale alimentacao', 'gratificacao', 'bonificacao', '10%', 'dez por cento', 'por fora'],
   rh: ['desconto em folha', 'emprestimo', 'vale', 'divida', 'desconto'],

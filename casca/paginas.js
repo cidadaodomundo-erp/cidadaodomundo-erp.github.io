@@ -39,6 +39,7 @@ window.CASCA_PAGINAS = {
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
   pcartao: 'pessoas/index.html#pcartao',
+  pao: 'pessoas/index.html#pao',
   peventos: 'pessoas/index.html#peventos',
   padm: 'pessoas/index.html#padm',
   atividades: 'atividades/index.html',
@@ -116,7 +117,7 @@ window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades'];
 window.CASCA_TELAS_POR_LOJA = ['caixa',
   'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao', 'reqpedir', 'reqseparar',
   'listas', 'listasfin',
-  'phoje', 'pcartao', 'peventos', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
+  'phoje', 'pcartao', 'pao', 'peventos', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
