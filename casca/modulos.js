@@ -32,7 +32,7 @@ window.CASCA_MODULOS = [
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto', 'manutencao', 'prestadores'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto', 'manutencao', 'prestadores', 'mercadolivre', 'encomendas'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
@@ -41,7 +41,7 @@ window.CASCA_MODULOS = [
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
     lancar: ['phoje', 'pcartao', 'pao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos', 'freelas'], acompanhar: [] },   // ordem do dono (06/11)
   { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
-    lancar: [], acompanhar: ['delivery', 'reservas', 'pausados', 'atrasos', 'atendimento', 'link:portal-qualidade'] },
+    lancar: [], acompanhar: ['delivery', 'reservas', 'pausados', 'cozinha', 'tvs', 'salao', 'atrasos', 'atendimento', 'link:portal-qualidade'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',

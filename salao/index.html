@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Salão · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap oc">
+    <h1>Salão <span class="oc-obras">Em construção</span></h1>
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+    <div id="app" hidden></div>
+  </div>
+</div>
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
+<script>
+OperacaoConstrucao.iniciar({
+  titulo: 'Salão',
+  aviso: 'O acompanhamento de mesas e comandas ainda está em construção. Reservas já funciona na própria tela e não é substituída por esta.',
+  legenda: 'Mesa ou comanda (preparado)',
+  campos: [
+    { r: 'Loja', t: 'loja' },
+    { r: 'Data/Turno', t: 'text' },
+    { r: 'Mesa/comanda', t: 'text' },
+    { r: 'Pessoas', t: 'number', m: 'numeric' },
+    { r: 'Situação', t: 'select' },
+    { r: 'Responsável', t: 'select' }
+  ],
+  atalhos: [
+    { r: 'Ver Reservas', chave: 'reservas' },
+    { r: 'Ver Produtos pausados', chave: 'pausados' },
+    { r: 'Ver Taxas e Freelas', chave: 'freelas' }
+  ]
+});
+</script>
+</body>
+</html>

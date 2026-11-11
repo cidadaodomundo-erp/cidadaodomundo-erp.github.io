@@ -87,6 +87,12 @@ window.CASCA_PAGINAS = {
   // 11/11/2026: Manutenção e Quem conserta (duas rotas da mesma página; chamados só preparados, diretório de prestadores só consulta)
   manutencao: 'manutencao/index.html?v=20261111a#chamados',
   prestadores: 'manutencao/index.html?v=20261111a#prestadores',
+  // 11/11/2026: cinco telas em construção (campos desabilitados; nada é lido, enviado ou salvo)
+  cozinha: 'cozinha/index.html?v=20261111a',
+  tvs: 'tvs/index.html?v=20261111a',
+  salao: 'salao/index.html?v=20261111a',
+  mercadolivre: 'mercadolivre/index.html?v=20261111a',
+  encomendas: 'encomendas/index.html?v=20261111a',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -140,5 +146,7 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   // 11/11/2026: Taxas e Freelas — a consulta segue a loja escolhida (lojas concretas da allowlist; REDE não é curinga)
   'freelas',
   // 11/11/2026: Manutenção — o campo Loja dos chamados (ainda desabilitado, nada é gravado) mostra a loja do seletor
-  'manutencao'];
+  'manutencao',
+  // 11/11/2026: o campo Loja das cinco telas em construção mostra a loja do seletor (desabilitado, nada é gravado)
+  'cozinha', 'tvs', 'salao', 'mercadolivre', 'encomendas'];
 

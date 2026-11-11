@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>TVs · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap oc">
+    <h1>TVs <span class="oc-obras">Em construção</span></h1>
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+    <div id="app" hidden></div>
+  </div>
+</div>
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
+<script>
+OperacaoConstrucao.iniciar({
+  titulo: 'TVs',
+  aviso: 'O vínculo com aparelhos e fontes ainda está em construção. Nenhuma TV será ativada por esta tela.',
+  legenda: 'TV (preparado)',
+  campos: [
+    { r: 'Loja', t: 'loja' },
+    { r: 'Aparelho/local', t: 'select', o: ['Cozinha', 'Expedição', 'Salão'] },
+    { r: 'Conteúdo', t: 'select' },
+    { r: 'Orientação', t: 'select', o: ['Horizontal', 'Vertical'] }
+  ],
+  atalhos: [
+    { r: 'Ver Delivery', chave: 'delivery' },
+    { r: 'Ver Reservas', chave: 'reservas' },
+    { r: 'Ver Qualidade', chave: 'qualidade' }
+  ]
+});
+</script>
+</body>
+</html>
