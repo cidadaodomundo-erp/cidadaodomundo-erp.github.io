@@ -10,6 +10,12 @@
 .op-campo dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
 .op-campo dd.op-vazio { font-weight:400; font-style:italic; opacity:.7; }
 .op-regras { font-size:13px; line-height:1.5; padding-left:18px; margin:0 0 8px; }
+.op-tabela { overflow-x:auto; margin:0 0 10px; }
+.op-fontes { list-style:none; padding:0; margin:0 0 10px; font-size:13px; line-height:1.6; }
+.op-parcial { border-color:var(--farol-fora); color:var(--farol-fora); }
+.op-btn { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
 .op-lista { list-style:none; padding:0; margin:0; }
 .op-lista li { padding:7px 0; border-bottom:1px solid var(--line); font-size:14px; }
 .op-lista li span:not(.op-selo) { opacity:.75; font-size:13px; }
+.op-banner a, .op-lista a { color:var(--tx-1); text-decoration:underline; text-underline-offset:3px; }
+.op-banner a:focus-visible, .op-lista a:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }

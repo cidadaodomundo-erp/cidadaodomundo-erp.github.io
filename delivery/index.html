@@ -21,7 +21,7 @@
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="operacao.css?v=20261111a">
+<link rel="stylesheet" href="operacao.css?v=20261111b">
 <style>
   .na-casca body::before { display:none !important; }
   .dl-topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 14px; }
@@ -69,11 +69,16 @@
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="../nucleo/telas-extra.js?v=20261106a"></script>
-<script src="operacao.js?v=20261111a"></script>
+<script src="operacao-modelo.js?v=20261111b"></script>
+<script src="operacao-dados.js?v=20261111b"></script>
+<script src="operacao.js?v=20261111b"></script>
 <script>
 const TELA = 'delivery';
+const M = ModeloDelivery;
 let DADOS = null, ABA = DeliveryOperacao.abaDoHash(location.hash);
 let SESSAO_OK = false, SEQ = 0, DADOS_DIA = null; // SEQ: só a leitura mais recente pode mostrar resultado
+// Abas novas (Chegada e Escala): NOVO = última leitura mostrada; SEQ_NOVO = só a leitura mais recente vale; LOJAS_INFO = lojas autorizadas.
+let NOVO = null, SEQ_NOVO = 0, LOJAS_INFO = null;
 const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz', 'BOQUEIRAO': 'Boqueirão' };
 const un = (u) => NOME_UN[u] || u || '—';
 const n0 = (v) => v == null ? '—' : Number(v).toLocaleString('pt-BR');
@@ -82,9 +87,24 @@ const dlMin = (v) => v == null ? '—' : String(v).replace('.', ',') + ' min';
 const dlPct = (a, b) => (!b ? '—' : Math.round(100 * a / b) + '%');
 const esc = trEscH;
 
+// Tela visível = aba do navegador em primeiro plano E moldura da casca não escondida. Oculta: nenhuma leitura de rede.
+// window.frameElement pode falhar por origem; nesse caso segue só com o documento.
+function telaVisivel() {
+  if (document.hidden) return false;
+  try { const f = window.frameElement; if (f && f.hidden) return false; } catch (e) { /* sem acesso à moldura */ }
+  return true;
+}
+// Identidade = e-mail da sessão, normalizado. Nunca lê token nem JWT, e nunca vai a log.
+function identidadeDe(s) {
+  return s && typeof s.email === 'string' && s.email.trim() ? s.email.trim().toLowerCase() : null;
+}
+function sessaoDeTexto(txt) { try { return JSON.parse(txt || 'null'); } catch (e) { return null; } }
+let IDENT = identidadeDe(rmbSessao()); // conta com que esta página abriu
+let LEITURA_PENDENTE = false;           // houve leitura pulada porque a tela estava oculta; retoma quando voltar
+
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
-  SESSAO_OK = false; DADOS = null; DADOS_DIA = null;
+  SESSAO_OK = false; DADOS = null; DADOS_DIA = null; NOVO = null; LOJAS_INFO = null; SEQ++; SEQ_NOVO++;
   document.getElementById('conteudo').innerHTML = '';
   document.getElementById('erroMsg').style.display = 'none';
   document.getElementById('operacao').innerHTML = '';
@@ -97,8 +117,10 @@ function hojeBR() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'A
 // e as abas novas não dependem disto.
 async function carregar() {
   if (!SESSAO_OK) return;
+  if (!telaVisivel()) { LEITURA_PENDENTE = true; return; } // oculta: nenhuma leitura de rede
   const dia = document.getElementById('dia').value || hojeBR();
   const seq = ++SEQ;
+  if (dia > hojeBR()) { DADOS = null; DADOS_DIA = null; return; } // dia futuro só existe na Escala; as outras abas nunca o consultam
   if (DADOS && DADOS_DIA !== dia) DADOS = null; // dado de outro dia nunca fica na tela
   document.getElementById('conteudo').innerHTML = '<div class="dl-vazio">Carregando…</div>';
   const erro = (msg) => {
@@ -108,7 +130,11 @@ async function carregar() {
     document.getElementById('conteudo').innerHTML = '';
   };
   // Depois de cada await: só vale a leitura mais recente e com sessão ainda aberta (SEQ e SESSAO_OK).
-  const vigente = () => seq === SEQ && SESSAO_OK;
+  const vigente = () => {
+    if (seq !== SEQ || !SESSAO_OK) return false;
+    if (!telaVisivel()) { LEITURA_PENDENTE = true; return false; } // escondida no meio: a resposta é descartada
+    return true;
+  };
   try {
     const r = await trRpcSeguro('delivery_dia', { p_dia: dia });
     if (!vigente()) return; // resposta de uma leitura já trocada, ou sessão encerrada
@@ -134,16 +160,70 @@ function mostrar() {
   document.getElementById('legado').style.display = nova ? 'none' : '';
   const op = document.getElementById('operacao');
   op.style.display = nova ? '' : 'none';
-  if (nova) op.innerHTML = DeliveryOperacao.render(ABA, {
-    dia: document.getElementById('dia').value || hojeBR(),
-    loja: lojaNome(lojaAtual()) || null // seletor único (nucleo/loja.js); sem loja carregada fica em branco
-  });
-  else if (DADOS) desenhar();
+  if (nova) {
+    const dia = diaSel(), loja = lojaAtual() || null;
+    // só mostra a leitura que vale para este dia, esta loja e esta aba; senão "Carregando…" (nunca a lista de outro contexto)
+    const dados = ehLeitura(ABA) ? (NOVO && NOVO.aba === ABA && NOVO.dia === dia && NOVO.loja === loja ? NOVO : { fase: 'carregando' }) : undefined;
+    op.innerHTML = DeliveryOperacao.render(ABA, {
+      dia,
+      loja: lojaNome(loja) || null, // seletor único (nucleo/loja.js); sem loja carregada fica em branco
+      dados
+    });
+  } else if (DADOS) desenhar();
+}
+
+const diaSel = () => document.getElementById('dia').value || hojeBR();
+const ehLeitura = (a) => a === 'chegada' || a === 'escala';
+function limparNovo() { NOVO = null; SEQ_NOVO++; } // troca de aba, dia ou loja: a lista antiga some e a leitura em voo perde o valor
+
+// Futuro só na Escala; nas demais abas o limite é Hoje. Devolve true se mudou o dia escolhido.
+function ajustarDia() {
+  const h = hojeBR();
+  const futuroOk = ABA === 'escala';
+  campoDia.max = futuroOk ? '' : h;
+  if (!futuroOk && campoDia.value > h) { campoDia.value = h; return true; }
+  return false;
+}
+
+const DD = DeliveryDados.criar({ trFetch, modelo: M, lojaCarregar, lojaAtual });
+async function garantirLojas() {
+  try { const i = await lojaCarregar(); if (i && Array.isArray(i.lojas)) LOJAS_INFO = i; } catch (e) { /* segue sem lista: nada é mostrado */ }
+}
+
+// Leitura das abas novas: só com Chegada ou Escala aberta, tela visível e sessão ativa. Nunca rejeita.
+async function lerNovas(limpar) {
+  if (!SESSAO_OK || !ehLeitura(ABA)) return;
+  if (!telaVisivel()) { LEITURA_PENDENTE = true; return; } // guarda inicial: oculta não faz nenhum GET
+  LEITURA_PENDENTE = false;
+  const aba = ABA, dia = diaSel(), loja0 = lojaAtual() || null;
+  if (limpar || !NOVO || NOVO.aba !== aba || NOVO.dia !== dia || NOVO.loja !== loja0) NOVO = { aba, dia, loja: loja0, fase: 'carregando' };
+  const seq = ++SEQ_NOVO;
+  mostrar();
+  // DeliveryDados chama isto antes de cada GET e depois de cada await: escondida no meio, a resposta é descartada
+  const vigente = () => {
+    if (seq !== SEQ_NOVO || !SESSAO_OK || ABA !== aba || diaSel() !== dia) return false;
+    if (!telaVisivel()) { LEITURA_PENDENTE = true; return false; }
+    return true;
+  };
+  let r;
+  try { r = await DD.ler(aba, dia, vigente); } catch (e) { r = { fase: 'aviso', mensagem: 'Não foi possível ler agora.' }; }
+  if (!vigente() || r.fase === 'descartado') return;
+  if (r.fase === 'sessao') { exigirLogin('Entre de novo para ver o delivery.'); return; }
+  NOVO = { aba, dia, loja: lojaAtual() || null, fase: r.fase, mensagem: r.mensagem, resultado: r.resultado };
+  mostrar();
+}
+
+// As 4 abas antigas só mostram as lojas autorizadas e escolhidas no seletor; o dado bruto (DADOS) fica guardado para refiltrar.
+function lojasLegado() {
+  if (!LOJAS_INFO) return { aviso: 'Carregando as lojas autorizadas' };
+  if (!LOJAS_INFO.lojas.length) return { aviso: 'Esta conta não tem loja cadastrada para ver o Delivery.' };
+  const l = M.lojasPermitidas(LOJAS_INFO.lojas, lojaAtual());
+  return l.length ? { lojas: l } : { aviso: 'Escolha uma das lojas autorizadas para ver esta tela.' };
 }
 
 function fontes() {
   const f = document.getElementById('fontes');
-  f.innerHTML = '<span>iFood</span><span id="f1"></span><span>TrackEat</span><span id="f2"></span><span>Avaliações</span><span id="f3"></span>';
+  f.innerHTML = '<span>Última leitura geral das fontes:</span><span>iFood</span><span id="f1"></span><span>TrackEat</span><span id="f2"></span><span>Avaliações</span><span id="f3"></span>';
   const u = DADOS.ultimo_dado || {};
   carimboDados('#f1', u.ifood, { avisoMin: 30, velhoMin: 120 });
   carimboDados('#f2', u.trackeat, { avisoMin: 30, velhoMin: 120 });
@@ -160,8 +240,11 @@ function tabela(id, cab, linhas) {
 
 function desenhar() {
   document.querySelectorAll('#abas button').forEach((b) => b.classList.toggle('on', b.dataset.aba === ABA));
-  const U = DADOS.unidades || [];
   const c = document.getElementById('conteudo');
+  const LJ = lojasLegado();
+  if (LJ.aviso) { c.innerHTML = '<div class="dl-vazio">' + esc(LJ.aviso) + '</div>'; return; }
+  const daLoja = (x) => !!x && LJ.lojas.indexOf(x.unidade) >= 0; // só filtra linhas; os cálculos seguem os mesmos
+  const U = (DADOS.unidades || []).filter(daLoja);
   const soma = (k) => U.reduce((s, x) => s + Number(x[k] || 0), 0);
 
   if (ABA === 'placar') {
@@ -187,13 +270,13 @@ function desenhar() {
       '<p class="dl-nota">Tempos são a mediana (metade dos pedidos levou menos, metade mais). "Depois do prometido" compara a hora da entrega no TrackEat com a promessa ao cliente. ' +
       'O Boqueirão não usa TrackEat, e no iFood o tempo dele inclui pedidos agendados, por isso pode aparecer alto.</p>';
   } else if (ABA === 'cancel') {
-    const L = DADOS.cancelamentos || [];
+    const L = (DADOS.cancelamentos || []).filter(daLoja);
     c.innerHTML = tabela('tabelaCancel',
       [{ t: 'Loja' }, { t: 'Motivo' }, { t: 'Tipo' }, { t: 'Pedidos', n: 1 }, { t: 'Valor', n: 1 }],
       L.map((x) => [un(x.unidade), esc(x.motivo), esc(x.origem === 'TOTAL' ? 'inteiro' : x.origem === 'PARTIAL' ? 'parcial' : x.origem), n0(x.qtd), rs(x.valor)])) +
       '<p class="dl-nota">Fonte: motivo informado pelo iFood em cada pedido cancelado do dia.</p>';
   } else {
-    const L = DADOS.avaliacoes_ruins || [];
+    const L = (DADOS.avaliacoes_ruins || []).filter(daLoja);
     c.innerHTML =
       tabela('tabelaNotas',
         [{ t: 'Loja' }, { t: 'Avaliações no dia', n: 1 }, { t: 'Nota média', n: 1 }, { t: 'Notas 1 e 2', n: 1 }],
@@ -210,17 +293,66 @@ document.getElementById('abas').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-aba]'); if (!b) return;
   location.hash = b.dataset.aba; // vira entrada no histórico; o hashchange abaixo troca a aba
 });
-window.addEventListener('hashchange', () => { ABA = DeliveryOperacao.abaDoHash(location.hash); mostrar(); });
+window.addEventListener('hashchange', () => {
+  const nova = DeliveryOperacao.abaDoHash(location.hash);
+  const mudou = nova !== ABA;
+  ABA = nova;
+  if (mudou) limparNovo();
+  const diaMudou = ajustarDia(); // voltar de Escala com dia futuro: ajusta para Hoje antes de consultar qualquer coisa
+  mostrar();
+  if (diaMudou) carregar();
+  lerNovas();
+});
 const campoDia = document.getElementById('dia');
-campoDia.value = hojeBR(); campoDia.max = hojeBR();
-campoDia.addEventListener('change', () => { mostrar(); carregar(); });
+let HOJE = hojeBR();
+campoDia.value = HOJE;
+ajustarDia();
+campoDia.addEventListener('change', () => { ajustarDia(); limparNovo(); mostrar(); carregar(); lerNovas(); });
 document.getElementById('opBanner').innerHTML = DeliveryOperacao.banner();
+// "Tentar de novo": refaz só a leitura (nunca grava nada)
+document.getElementById('operacao').addEventListener('click', (e) => {
+  const b = e.target && e.target.closest ? e.target.closest('[data-acao="tentar"]') : null;
+  if (b) lerNovas(true);
+});
+// Sair (logout, token recusado) = exigir login. Outra conta nesta origem = limpar tudo ANTES de recarregar.
+// Mesma conta (renovação do token, mesmo e-mail) não muda nada.
+// Não apaga o login novo: a conta B precisa continuar válida depois do reload.
+function trocarConta() {
+  SESSAO_OK = false; DADOS = null; DADOS_DIA = null; NOVO = null; LOJAS_INFO = null; LEITURA_PENDENTE = false;
+  SEQ++; SEQ_NOVO++; // respostas em voo de A não podem mais aparecer
+  document.getElementById('conteudo').innerHTML = '';
+  document.getElementById('erroMsg').style.display = 'none';
+  document.getElementById('erroMsg').textContent = '';
+  document.getElementById('operacao').innerHTML = '';
+  location.reload(); // o cache da loja (nucleo/loja.js) zera com a página; a página nova usa a sessão atual
+}
+window.addEventListener('storage', (e) => {
+  if (!SESSAO_OK) return;
+  if (e.key === null || (e.key === 'rmbSessao' && e.newValue === null)) { exigirLogin('Sua sessão foi encerrada. Entre de novo.'); return; }
+  if (e.key !== 'rmbSessao') return;
+  const nova = identidadeDe(sessaoDeTexto(e.newValue));
+  if (nova && nova === IDENT) return; // mesma conta: renovação de token, nada muda
+  trocarConta(); // outra conta, sem e-mail ou JSON inválido: não reusa a conta anterior
+});
 
-// A cada 5 min: se o dia virou e o seletor estava no "hoje" antigo, acompanha o novo dia.
+// Voltou a ficar visível: retoma só o que foi pulado. Nada é lido por conta própria enquanto oculta.
+function retomarSePendente() {
+  if (!LEITURA_PENDENTE || !SESSAO_OK || !telaVisivel()) return;
+  LEITURA_PENDENTE = false;
+  mostrar(); carregar();
+  garantirLojas().then(() => { mostrar(); lerNovas(true); });
+}
+document.addEventListener('visibilitychange', retomarSePendente);
+window.addEventListener('resize', retomarSePendente); // a moldura da casca muda de tamanho ao aparecer
+
+// A cada 5 min (único timer): se o dia virou e o seletor estava no "hoje" antigo, acompanha o novo dia;
+// as leituras (carregar/lerNovas) já checam se a tela está visível.
 function atualizarPeriodico() {
   const h = hojeBR();
-  if (campoDia.max !== h) { const seguia = campoDia.value === campoDia.max; campoDia.max = h; if (seguia) campoDia.value = h; }
+  if (HOJE !== h) { const seguia = campoDia.value === HOJE; HOJE = h; if (seguia) campoDia.value = h; ajustarDia(); }
+  if (!LOJAS_INFO && telaVisivel()) garantirLojas().then(() => mostrar());
   if (campoDia.value === h) { mostrar(); carregar(); }
+  if (diaSel() >= h) lerNovas();
 }
 
 if (!rmbSessao()) exigirLogin('Entre para ver o delivery.');
@@ -228,12 +360,14 @@ else {
   SESSAO_OK = true;
   registrarUso(TELA); avisarCasca({ tipo: 'casca-modulo', nome: TELA });
   mostrar(); carregar();
-  // loja: depois de carregar a lista de lojas, a aba nova mostra a loja real; ao trocar a loja, a tela acompanha
-  lojaCarregar().catch(() => null).then(() => mostrar());
-  aoMudarLoja(() => { mostrar(); carregar(); });
+  // loja: depois de carregar a lista de lojas, as abas mostram só as lojas autorizadas; ao trocar a loja, a tela acompanha
+  if (telaVisivel()) garantirLojas().then(() => { mostrar(); lerNovas(); });
+  else LEITURA_PENDENTE = true; // oculta ao abrir: nada de rede; a leitura começa quando a tela voltar
+  aoMudarLoja(() => { limparNovo(); mostrar(); carregar(); lerNovas(); });
   setInterval(atualizarPeriodico, 5 * 60 * 1000);
 }
-window.reentrarTela = carregar;
+// a casca chama ao reabrir a tela: relê com os filtros atuais (dia e loja), sem timer novo
+window.reentrarTela = () => { if (!SESSAO_OK) return; ajustarDia(); mostrar(); carregar(); lerNovas(true); };
 </script>
 </body>
 </html>
