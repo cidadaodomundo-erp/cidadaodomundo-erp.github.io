@@ -194,7 +194,7 @@
       '<li>Na Chegada do dia, veja se as duas fontes de entregas (Foody e TrackEat) foram lidas e a hora da última leitura de cada uma.</li>' +
       '<li>Na Escala do Delivery, veja se a escala da loja e do dia foi lida e se o fim de algum turno cai no dia seguinte.</li>' +
       '<li>Motoboy escalado sem atividade registrada: pergunte à loja. Não haver atividade não comprova falta nem atraso.</li>' +
-      '<li>Atividade de madrugada pertence ao dia seguinte e não indica a hora de chegada.</li>' +
+      '<li>Na madrugada, confira a data e o turno informados pela fonte. O horário de uma atividade não comprova a chegada.</li>' +
       '</ul>' +
       '<h3>Já disponíveis</h3><ul class="op-lista">' +
       atuais.map((a) => '<li><a href="#' + a[0] + '">' + esc(a[1]) + '</a> <span>' + esc(a[2]) + '</span></li>').join('') +
