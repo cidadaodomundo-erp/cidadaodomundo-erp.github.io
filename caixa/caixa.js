@@ -103,7 +103,7 @@ function caixaDiaDaVez(u) {
   return { dia: dias[0] || null, fila: dias.slice(1) };
 }
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null;
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {};
 const cgNum = v => Number(v) || 0;
 function caixaFrenteNome(u, cx) {   // 'Caixa 14808' → 'CaixaSalao' (caixa_frente_nome); desconhecido fica "caixa <id>"
   const id = String(cx || '').replace(/\D/g, '');
@@ -125,7 +125,9 @@ function caixaFrentesFaixa(unidade, dia) {
     const nome = caixaFrenteNome(unidade, t.caixa), d = D.find(l => String(l.descricao || '').replace(/^.*?-\s*/, '').toLowerCase() === nome.toLowerCase());
     const v = d ? Math.round((cgNum(d.credito) - cgNum(d.debito)) * 100) / 100 : null;
     const sai = t.fechado === false ? `<b style="color:var(--farol-fora);">aberta desde ${hm(t.aberto_em)}</b>` : `<span style="color:var(--farol-ok);">fechada${t.fechado_em ? ' às ' + hm(t.fechado_em) : ''}</span>`;
-    const dif = t.fechado === false ? '—' : v == null || Math.abs(v) <= 1.0001 ? 'sem diferença' : `<b style="color:var(--farol-perto);">R$ ${fmt(v)}</b>`;
+    const rotT = { RECEITA: 'sobra → receita', QUEBRA_SALAO: 'quebra do salão', QUEBRA_DELIVERY: 'quebra do delivery' };   // regra do dono de 11/11
+    const dif = t.fechado === false ? '—' : v == null || Math.abs(v) <= 1.0001 ? 'sem diferença'
+      : d && d.tratamento ? `R$ ${fmt(v)} <span style="color:var(--tx-4);">· ${rotT[d.tratamento] || trEscH(d.tratamento)}</span>` : `<b style="color:var(--farol-perto);">R$ ${fmt(v)}</b>`;
     return `<tr><td><b>${trEscH(nome)}</b></td><td>${sai}</td><td>${dif}</td></tr>`;
   }).join('');
   const pain = itens == null ? '' : itens.length ? `<b style="color:var(--farol-perto);">falta: ${[...new Set(itens.map(x => tipos[x.bloco] || 'conferir'))].join(', ')}</b>` : '<b style="color:var(--farol-ok);">✓ painel fechou</b>';
@@ -1464,7 +1466,7 @@ async function caixaHellenCarregar() {
     // filtra por quem confere a loja — a fin_lancamentos fica fechada para quem não está em tr_usuarios e voltava vazia
     const [frentes, difsai] = await Promise.all([
       consultarTudo('caixa_frente_nome?select=unidade,caixa_usuario,nome&order=unidade,caixa_usuario').catch(() => []),
-      consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
+      consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito,frente,tipo,tratamento&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
@@ -1523,9 +1525,13 @@ function caixaHellenItens() {
     }
     // diferença no fechamento do Saipos (até R$ 1 é absorvida; acima vira item que a Hellen explica como quebra ou sobra)
     const valDS = {}; (CAIXA_VALID || []).filter(v => v.unidade === u).forEach(v => { valDS[v.dia + '|' + v.chave] = v; });
+    CAIXA_SOBRAFALTA[u] = [];
     (CAIXA_DIFSAI || []).filter(l => l.unidade === u && l.data >= corte).forEach(l => {
       const v = Math.round((cgNum(l.credito) - cgNum(l.debito)) * 100) / 100, nome = String(l.descricao || '').replace(/^.*?-\s*/, '');
       if (Math.abs(v) <= 1.0001) return;
+      // 11/11/2026 (dono 19:29: "sobra considera receita / falta considera quebra de caixa"): o banco já classifica
+      // (tratamento RECEITA | QUEBRA_SALAO | QUEBRA_DELIVERY); não vira tarefa nem trava o dia — só informação no cartão
+      if (l.tratamento) { (CAIXA_SOBRAFALTA[u] = CAIXA_SOBRAFALTA[u] || []).push({ dia: l.data, valor: v, frente: l.frente || nome, tratamento: l.tratamento }); return; }
       const chave = 'difsai:' + l.id;
       if (valDS[l.data + '|' + chave]) return;
       const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro',
@@ -1623,10 +1629,15 @@ function caixaHellenHtml() {
     // o dia que só tem a contagem de hoje não conta como "dia com pendência": ela já aparece na linha do dinheiro de hoje
     const filaR = dv ? dv.fila.filter(d => todos.some(x => x.u === u && x.dia === d && !naoTrava(x) && x.bloco !== 'contagem')) : [];
     const depois = filaR.length ? cinza(`depois deste: mais ${filaR.length} ${filaR.length === 1 ? 'dia' : 'dias'} com pendência`, filaR.map(ddSem).join(', ')) : '';
-    if (!dv || !dv.dia || (!doDia.length && !filaR.length)) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${prim ? linha(prim) : ''}${resto}${depois}${contar}</div>`;
+    // sobra e falta do fechamento do Saipos: só informação (regra do dono de 11/11), uma linha cinza que abre a lista
+    const SF = CAIXA_SOBRAFALTA[u] || [], soma = (t) => SF.filter(x => x.tratamento === t).reduce((a, x) => a + Math.abs(x.valor), 0);
+    const rotT = { RECEITA: 'sobra → receita', QUEBRA_SALAO: 'quebra do salão (desconta do rateio dos 10%)', QUEBRA_DELIVERY: 'quebra do delivery' };
+    const sobraFalta = SF.length ? cinza(`Saipos: ${[['QUEBRA_SALAO', 'quebra do salão'], ['QUEBRA_DELIVERY', 'quebra do delivery'], ['RECEITA', 'sobra → receita']].filter(([t]) => soma(t) > 0).map(([t, r]) => `${r} R$ ${fmt(soma(t))}`).join(' · ')} (ver)`,
+      SF.map(x => `${caixaDdm(x.dia)} · ${trEscH(x.frente || '')} · ${x.valor < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(x.valor))} → ${rotT[x.tratamento] || trEscH(x.tratamento)}`).join('<br>')) : '';
+    if (!dv || !dv.dia || (!doDia.length && !filaR.length)) return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-ok);"><b>${nomeLoja(u)}</b> · <span style="color:var(--farol-ok);font-weight:700;">✓ em dia até ${caixaDdm(H.ate)}</span>${prim ? linha(prim) : ''}${resto}${depois}${sobraFalta}${contar}</div>`;
     return `<div class="contexto cx-cartao" style="text-align:left;border-color:var(--farol-perto);">
       <div><b>${nomeLoja(u)}</b> · dia da vez <b>${ddSem(dv.dia)}</b></div>
-      ${prim ? linha(prim) : ''}${resto}${depois}${contar}</div>`;
+      ${prim ? linha(prim) : ''}${resto}${depois}${sobraFalta}${contar}</div>`;
   }).join('');
   const esp = todos.filter(x => x.bloco === 'aguardando');
   const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
