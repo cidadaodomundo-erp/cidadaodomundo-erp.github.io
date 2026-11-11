@@ -1,0 +1,54 @@
+/* Manutenção e Quem conserta. Usa as variáveis do nucleo.css (escuro por padrão; html.tema-proposta = claro). Mobile primeiro. */
+.na-casca body::before { display: none !important; }
+.mn { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; color: var(--tx-1, #fff); }
+.mn h1 { font-size: 20px; margin: 4px 0 8px; }
+.mn-obras { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  border: 1px solid var(--farol-perto, #f5a623); color: var(--farol-perto, #f5a623); vertical-align: middle; }
+.mn-aviso { border: 1px solid var(--farol-perto, #f5a623); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px;
+  background: var(--surface, #1e1e1c); font-size: 13.5px; line-height: 1.45; }
+.mn-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.mn-abas { display: flex; flex-wrap: wrap; gap: 6px; }
+.mn-aba, .mn-btn { font: inherit; font-size: 14px; font-weight: 700; padding: 10px 14px; min-height: 44px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface-2, #2a2a27); color: inherit; box-sizing: border-box; }
+.mn-btn { border-radius: 8px; }
+.mn-aba.on { background: var(--brand, #c8102e); border-color: var(--brand, #c8102e); color: #fff; }
+.mn-btn:hover, .mn-aba:hover { border-color: var(--brand, #c8102e); }
+.mn-btn:disabled { opacity: .5; cursor: not-allowed; }
+.mn :focus-visible { outline: 3px solid var(--info, #58a6ff); outline-offset: 2px; }
+.mn-form { border: 1px dashed var(--line-2, #45443f); border-radius: 10px; padding: 12px; margin: 8px 0 12px; display: grid; grid-template-columns: 1fr; gap: 10px; min-width: 0; }
+.mn-form legend { font-size: 13px; font-weight: 700; padding: 0 6px; color: var(--tx-2, #c3c2b7); }
+.mn-form[disabled] { opacity: .8; }
+.mn-form .mn-btn { justify-self: start; }
+.mn-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
+.mn-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; flex: 1 1 180px; min-width: 0; }
+.mn-rot { color: var(--tx-2, #c3c2b7); font-weight: 700; }
+.mn input, .mn select, .mn textarea { font: inherit; font-size: 14px; padding: 9px 10px; min-height: 44px; border-radius: 8px; width: 100%; box-sizing: border-box;
+  border: 1px solid var(--line-2, #45443f); background: var(--surface, #1e1e1c); color: inherit; }
+.mn textarea { min-height: 80px; resize: none; }
+.mn-fonte { font-size: 12.5px; color: var(--tx-2, #c3c2b7); margin: 4px 0 8px; line-height: 1.4; }
+.mn-estado { font-size: 14px; line-height: 1.45; margin: 8px 0; }
+.mn-estado.mn-aviso { border: 0; border-left: 3px solid var(--farol-perto, #f5a623); border-radius: 0; padding: 0 0 0 10px; background: none; }
+.mn-estado.mn-erro { border-left: 3px solid var(--farol-fora, #ff6b6b); padding-left: 10px; }
+.mn-contagem { font-size: 13px; color: var(--tx-2, #c3c2b7); margin: 6px 0; }
+.mn-lista { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.mn-lista > p { grid-column: 1 / -1; margin: 0; }
+.mn-card { border: 1px solid var(--line, #34332f); border-radius: 10px; padding: 12px; background: var(--surface, #1e1e1c); min-width: 0; }
+.mn-nome { font-size: 15px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.mn-dados { margin: 0; display: grid; grid-template-columns: 1fr; gap: 4px; }
+.mn-par { display: flex; gap: 8px; font-size: 13.5px; min-width: 0; }
+.mn-par dt { flex: 0 0 auto; min-width: 72px; color: var(--tx-2, #c3c2b7); font-weight: 700; }
+.mn-par dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.mn-nota { font-size: 12px; color: var(--tx-3, #a5a49a); line-height: 1.45; }
+.mn-atalho { font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 0; }
+#bloqueio { border: 1px solid var(--farol-fora, #ff6b6b); border-radius: 10px; padding: 14px; margin: 12px 0; }
+#bloqueio p { margin: 0 0 10px; }
+
+@media (min-width: 600px) {
+  .mn-lista { grid-template-columns: 1fr 1fr; }
+  .mn-form { grid-template-columns: 1fr 1fr; }
+  .mn-form legend, .mn-form #lojaInfo, .mn-form label:nth-of-type(3) { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+  .mn-barra .mn-btn, .mn-abas { width: 100%; }
+  .mn-aba { flex: 1 1 auto; }
+}

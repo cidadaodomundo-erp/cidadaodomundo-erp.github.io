@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Manutenção e Quem conserta · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- MANUTENÇÃO E QUEM CONSERTA (11/11/2026, lote em construção). Duas abas na mesma página (#chamados e #prestadores).
+     Chamados: só os campos preparados, desabilitados; nada é enviado ou salvo. Quem conserta: só consulta o cadastro de
+     prestadores que já existe no portal novo (diretório geral da empresa, sem loja). Não grava nada, não abre WhatsApp nem
+     liga para ninguém. Exige a sessão que já existe (sem login novo). -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="manutencao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap mn">
+    <h1>Manutenção e Quem conserta <span class="mn-obras">Em construção</span></h1>
+
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+
+    <div id="app" hidden>
+      <div class="mn-barra">
+        <div class="mn-abas" role="tablist" aria-label="Manutenção">
+          <button type="button" id="abaChamados" class="mn-aba on" role="tab" aria-selected="true" aria-controls="painelChamados">Manutenção</button>
+          <button type="button" id="abaPrestadores" class="mn-aba" role="tab" aria-selected="false" aria-controls="painelPrestadores">Quem conserta</button>
+        </div>
+        <button type="button" id="btnAtualizar" class="mn-btn" disabled hidden>Atualizar</button>
+      </div>
+
+      <section id="painelChamados" role="tabpanel" aria-label="Manutenção">
+        <div class="mn-aviso" role="note">
+          <strong>Em construção.</strong> A abertura e o acompanhamento de chamados ainda não estão ligados. Nada é enviado ou salvo aqui.
+        </div>
+        <p class="mn-nota">Os campos estão preparados para a próxima etapa.</p>
+        <fieldset class="mn-form" disabled>
+          <legend>Chamado de manutenção (preparado)</legend>
+          <label class="mn-campo"><span class="mn-rot">Loja</span>
+            <select id="campoLoja" disabled></select></label>
+          <div id="lojaInfo"></div>
+          <label class="mn-campo"><span class="mn-rot">Equipamento/local</span>
+            <input type="text" id="campoLocal" disabled></label>
+          <label class="mn-campo"><span class="mn-rot">Problema</span>
+            <textarea id="campoProblema" rows="3" disabled></textarea></label>
+          <label class="mn-campo"><span class="mn-rot">Prioridade</span>
+            <select id="campoPrioridade" disabled><option value="">Em breve</option></select></label>
+          <label class="mn-campo"><span class="mn-rot">Responsável</span>
+            <select id="campoResponsavel" disabled><option value="">Em breve</option></select></label>
+          <label class="mn-campo"><span class="mn-rot">Prazo</span>
+            <input type="date" id="campoPrazo" disabled></label>
+          <label class="mn-campo"><span class="mn-rot">Situação</span>
+            <select id="campoSituacao" disabled><option value="">Em breve</option></select></label>
+          <button type="button" class="mn-btn" disabled>Abrir chamado (em breve)</button>
+        </fieldset>
+        <p class="mn-atalho">Procurando quem conserta? <button type="button" id="btnQuemConserta" class="mn-btn">Ver Quem conserta</button></p>
+      </section>
+
+      <section id="painelPrestadores" role="tabpanel" aria-label="Quem conserta" hidden>
+        <div class="mn-aviso" role="note">
+          <strong>Diretório geral.</strong> Este cadastro não tem loja: a mesma lista vale para todas as lojas. Só consulta; nada é salvo,
+          nenhuma ligação ou mensagem é feita daqui.
+        </div>
+        <div class="mn-filtros">
+          <label class="mn-campo"><span class="mn-rot">Buscar por nome ou setor</span>
+            <input type="search" id="buscaTexto" maxlength="80" autocomplete="off"></label>
+          <label class="mn-campo"><span class="mn-rot">Setor</span>
+            <select id="filtroSetor"></select></label>
+        </div>
+        <div id="fontePrest"></div>
+        <div id="statusPrest" role="status" aria-live="polite"></div>
+        <div id="listaPrest" class="mn-lista"></div>
+        <p class="mn-nota">Prestadores ativos em ordem alfabética. Telefone aparece só como texto.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="manutencao-modelo.js?v=20261111a"></script>
+<script src="manutencao-dados.js?v=20261111a"></script>
+<script src="manutencao.js?v=20261111a"></script>
+<script>ManutencaoTela.iniciar();</script>
+</body>
+</html>

@@ -415,6 +415,18 @@ window.CASCA_MENU = [
     "icone": "🛒"
    },
    {
+    "chave": "manutencao",
+    "rotulo": "Manutenção",
+    "icone": "🔧",
+    "origem": "fabio"
+   },
+   {
+    "chave": "prestadores",
+    "rotulo": "Quem conserta",
+    "icone": "🧰",
+    "origem": "fabio"
+   },
+   {
     "chave": "listas",
     "rotulo": "Listas · Pedidos",
     "icone": "📦"

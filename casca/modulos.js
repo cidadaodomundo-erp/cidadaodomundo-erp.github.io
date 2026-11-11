@@ -32,7 +32,7 @@ window.CASCA_MODULOS = [
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto', 'manutencao', 'prestadores'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },

@@ -52,6 +52,8 @@ window.CASCA_BUSCA = {
   peventos: ['eventos e ausencias', 'ausencias', 'ausencia', 'atestado', 'licenca', 'afastamento', 'ocorrencias do rh', 'registros do rh', 'eventos do rh'],
   pcalc: ['calculos da folha', 'adiantamento', 'vale transporte', 'vt', 'va', 'vale alimentacao', 'gratificacao', 'bonificacao', '10%', 'dez por cento', 'por fora'],
   freelas: ['taxas e freelas', 'freela', 'freelas', 'freelancer', 'ponto freela', 'taxa', 'valor-hora', 'valor hora', 'valor por hora', 'contato de freela'],
+  manutencao: ['manutencao', 'chamado', 'chamados', 'conserto', 'consertar', 'equipamento quebrado', 'defeito', 'reparo', 'problema na loja'],
+  prestadores: ['quem conserta', 'prestador', 'prestadores', 'tecnico', 'encanador', 'eletricista', 'contato de prestador', 'telefone de prestador'],
   rh: ['desconto em folha', 'emprestimo', 'vale', 'divida', 'desconto'],
   penvio: ['enviar a contabilidade', 'contabilidade', 'envio da folha'],
   pconf: ['conferencia da folha', 'conferir folha', 'validar folha', 'holerite', 'pagamento da folha', 'folha de pagamento'],
