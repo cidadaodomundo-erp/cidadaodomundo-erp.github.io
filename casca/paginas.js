@@ -82,6 +82,8 @@ window.CASCA_PAGINAS = {
   // 11/11/2026: Reunião semanal (pauta temporária em memória, lote em construção). Está em CASCA_TELAS_POR_LOJA porque a
   // tela separa de verdade o rascunho pela loja do seletor (nenhum dado de negócio é filtrado).
   reuniao: 'reuniao/index.html?v=20261111a',
+  // 11/11/2026: Taxas e Freelas (só consulta dos cadastros e valores-hora que já existem no ERP; ponto/QR/pagamentos em construção).
+  freelas: 'freelas/index.html?v=20261111a',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -129,5 +131,7 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   // 11/11/2026: Delivery do dia — as 7 abas (4 antigas e 3 novas) seguem a loja escolhida (lista de lojas autorizadas)
   'delivery',
   // 11/11/2026: Reunião semanal — o rascunho em memória é separado por loja (rede + lojas autorizadas)
-  'reuniao'];
+  'reuniao',
+  // 11/11/2026: Taxas e Freelas — a consulta segue a loja escolhida (lojas concretas da allowlist; REDE não é curinga)
+  'freelas'];
 

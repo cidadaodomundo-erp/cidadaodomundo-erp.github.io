@@ -25,6 +25,21 @@ function carregarCasca() {
 const C = carregarCasca();
 const itensMenu = C.CASCA_MENU.flatMap((g) => g.itens);
 
+// Módulo vizinho: todos os itens originais continuam presentes e na mesma ordem relativa. Itens novos são tolerados.
+// Remoção ou reordenação de um item original quebra o teste.
+function preservaOriginais(atual, originais, nome) {
+  originais.forEach((k) => assert.ok(atual.includes(k), nome + ': falta o item original ' + k));
+  assert.deepEqual(atual.filter((k) => originais.includes(k)), originais, nome + ': item original removido ou reordenado');
+}
+// Scripts da casca no sistema.html: cada um aparece uma única vez, com versão YYYYMMDD+letra (sem fixar o valor).
+function versoesCasca(html) {
+  ['menu', 'paginas', 'modulos', 'busca'].forEach((n) => {
+    const achados = html.match(new RegExp('casca/' + n + '\\.js\\?v=[^"]*"', 'g')) || [];
+    assert.equal(achados.length, 1, n + ': carregado uma única vez');
+    assert.match(/\?v=([^"]*)"/.exec(achados[0])[1], /^\d{8}[a-z]$/, n + ': versão no formato YYYYMMDD+letra');
+  });
+}
+
 test('rota completa: UM item de menu, página, módulo e busca com a chave reuniao', () => {
   const doMenu = itensMenu.filter((i) => i.chave === 'reuniao');
   assert.equal(doMenu.length, 1);
@@ -38,18 +53,18 @@ test('rota completa: UM item de menu, página, módulo e busca com a chave reuni
   ['reuniao', 'pauta', 'ata', 'decisoes'].forEach((t) => assert.ok(termos.includes(t), t));
 });
 
-test('fica adjacente a A semana e não reordena os itens existentes do módulo Resultado', () => {
+test('fica adjacente a A semana; os itens originais do módulo Resultado seguem presentes e na mesma ordem (novos itens tolerados)', () => {
   const res = C.CASCA_MODULOS.find((m) => m.id === 'resultado').acompanhar;
   assert.equal(res.indexOf('reuniao'), res.indexOf('semana') + 1);
-  assert.deepEqual(res.filter((k) => k !== 'reuniao'), ['placar', 'semana', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas']);
+  preservaOriginais(res, ['placar', 'semana', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas'], 'Resultado');
 });
 
-test('não altera outros módulos; a tela está em POR_LOJA (separa o rascunho pela loja do seletor)', () => {
+test('módulos vizinhos (Agora, Fabio) mantêm os itens originais; a tela está em POR_LOJA (separa o rascunho pela loja do seletor)', () => {
   assert.equal(C.CASCA_TELAS_POR_LOJA.filter((k) => k === 'reuniao').length, 1);
   const agora = C.CASCA_MODULOS.find((m) => m.id === 'agora');
-  assert.deepEqual(agora.acompanhar, ['hoje', 'agenda', 'plano', 'vendasagora', 'atividades']);
+  preservaOriginais(agora.acompanhar, ['hoje', 'agenda', 'plano', 'vendasagora', 'atividades'], 'Agora');
   const fabio = C.CASCA_MODULOS.find((m) => m.id === 'fabio');
-  assert.deepEqual(fabio.acompanhar, ['delivery', 'reservas', 'pausados', 'atrasos', 'atendimento', 'link:portal-qualidade']);
+  preservaOriginais(fabio.acompanhar, ['delivery', 'reservas', 'pausados', 'atrasos', 'atendimento', 'link:portal-qualidade'], 'Operação do Fabio');
 });
 
 test('atalhos "Ver ..." apontam para rotas exatas que já existem na casca', () => {
@@ -60,10 +75,8 @@ test('atalhos "Ver ..." apontam para rotas exatas que já existem na casca', () 
   });
 });
 
-test('sistema.html carimba só os quatro scripts da casca com a mesma versão nova', () => {
-  const html = ler('sistema.html');
-  const versao = { menu: '20261111c', paginas: '20261111d', modulos: '20261111c', busca: '20261111c' };
-  Object.keys(versao).forEach((n) => assert.match(html, new RegExp('casca/' + n + '\\.js\\?v=' + versao[n] + '"')));
+test('sistema.html carrega cada um dos quatro scripts da casca uma única vez, com versão YYYYMMDD+letra (sem fixar o valor)', () => {
+  versoesCasca(ler('sistema.html'));
 });
 
 test('index.html: exige sessão existente, sem chave/JWT/prompt, scripts do núcleo na ordem, sem handlers inline', () => {

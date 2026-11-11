@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Taxas e Freelas · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- TAXAS E FREELAS (11/11/2026, lote em construção). Só consulta: mostra os contatos de freela e os valores por hora que já
+     estão cadastrados no ERP, da loja escolhida no seletor. Não grava nada, não calcula pagamento, não abre WhatsApp. Exige a
+     sessão que já existe (sem login novo). Ponto, QR de presença e pagamentos ainda estão em construção. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="freelas.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap fl">
+    <h1>Taxas e Freelas <span class="fl-obras">Em construção</span></h1>
+    <div class="fl-aviso" role="note">
+      <strong>Só consulta.</strong> Aqui aparecem os contatos de freela e os valores por hora que já estão cadastrados no portal novo.
+      Ponto, QR de presença e pagamentos ainda estão em construção. Nada nesta tela grava, calcula pagamento ou envia mensagem.
+    </div>
+
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+
+    <div id="app" hidden>
+      <div class="fl-barra">
+        <div class="fl-abas" role="tablist" aria-label="Consultas">
+          <button type="button" id="abaContatos" class="fl-aba on" role="tab" aria-selected="true" aria-controls="painelContatos">Contatos</button>
+          <button type="button" id="abaValores" class="fl-aba" role="tab" aria-selected="false" aria-controls="painelValores">Valores por hora</button>
+        </div>
+        <button type="button" id="btnAtualizar" class="fl-btn" disabled>Atualizar</button>
+      </div>
+
+      <section id="painelContatos" role="tabpanel" aria-label="Contatos">
+        <div class="fl-filtros">
+          <label class="fl-campo"><span class="fl-rot">Buscar por nome ou setor</span>
+            <input type="search" id="buscaTexto" maxlength="80" autocomplete="off"></label>
+          <label class="fl-campo"><span class="fl-rot">Setor</span>
+            <select id="filtroSetor"></select></label>
+        </div>
+        <div id="fonteContatos"></div>
+        <div id="statusContatos" role="status" aria-live="polite"></div>
+        <div id="listaContatos" class="fl-lista"></div>
+        <p class="fl-nota">Contatos em ordem alfabética, só os ativos da loja escolhida. Cadastros sem loja definida só entram depois que alguém definir a loja no cadastro.</p>
+      </section>
+
+      <section id="painelValores" role="tabpanel" aria-label="Valores por hora" hidden>
+        <div id="fonteValores"></div>
+        <div id="statusValores" role="status" aria-live="polite"></div>
+        <div id="listaValores" class="fl-lista"></div>
+      </section>
+
+      <h2>Em construção</h2>
+      <div class="fl-obras-grade">
+        <section class="fl-card fl-card-obras" aria-label="Ponto do freela">
+          <h3 class="fl-nome">Ponto do freela <span class="fl-obras">Em construção</span></h3>
+          <p>Ainda não está ligado ao portal novo. Nenhuma presença é registrada por aqui.</p>
+        </section>
+        <section class="fl-card fl-card-obras" aria-label="QR de presença">
+          <h3 class="fl-nome">QR de presença <span class="fl-obras">Em construção</span></h3>
+          <p>Ainda não está ligado ao portal novo. Nenhum QR é lido ou gerado por aqui.</p>
+        </section>
+        <section class="fl-card fl-card-obras" aria-label="Pagamentos de freela">
+          <h3 class="fl-nome">Pagamentos <span class="fl-obras">Em construção</span></h3>
+          <p>Ainda não está ligado ao portal novo. Nenhum pagamento é calculado ou feito por aqui.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="freelas-modelo.js?v=20261111a"></script>
+<script src="freelas-dados.js?v=20261111a"></script>
+<script src="freelas.js?v=20261111a"></script>
+<script>FreelasTela.iniciar();</script>
+</body>
+</html>
