@@ -137,7 +137,7 @@ function caixaTravarDia(unidade, dia) {
   const cont = document.getElementById('concartao-dia');
   if (!cont) return;
   if (!document.getElementById('cxTravaCss')) { const st = document.createElement('style'); st.id = 'cxTravaCss';
-    st.textContent = '.cx-travado button:not(.cx-livre), .cx-travado input, .cx-travado select, .cx-travado textarea { pointer-events:none; opacity:.4; }'; document.head.appendChild(st); }
+    st.textContent = '.cx-travado button:not(.cx-livre), .cx-travado input:not(.cx-livre), .cx-travado select, .cx-travado textarea { pointer-events:none; opacity:.4; }'; document.head.appendChild(st); }   // 11/11: a contagem de hoje fica fora da trava (cx-livre)
   const dv = caixaDiaDaVez(unidade), trava = dv && dv.dia && dia > dv.dia;
   cont.classList.toggle('cx-travado', !!trava);
   const old = document.getElementById('cxTravaAviso'); if (old) old.remove();
@@ -1332,22 +1332,40 @@ function cofreLinhaDia(unidade, dia) {
   const k = (unidade + dia).replace(/[^A-Z0-9]/g, '');
   const email = String((rmbSessao() || {}).email || '').toLowerCase();
   const pode = (typeof souODono === 'function' && souODono()) || (CAIXA_RESP || []).some((x) => String(x.email).toLowerCase() === email && x.unidade === unidade);
-  const cab = `<div style="margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;"><b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">gaveta + cofre, contados juntos no fim do dia ${dm(dia)}</span>`;
+  // 11/11/2026 (dono 18:19: "pra Arissa não aparece mais o campo da gaveta"): contar o dinheiro de HOJE nunca trava (é físico: se não
+  // contar hoje, o número se perde); a contagem gravada se corrige ("corrigir" abre o campo preenchido; o banco só deixa quem gravou)
+  const livre = dia === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) ? ' cx-livre' : '';
+  const cab = `<div id="cfBox_${k}" style="margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px;"><b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">gaveta + cofre, contados juntos no fim do dia ${dm(dia)}</span>`;
   if (!r) return cab + `<div style="font-size:12.5px; color:var(--tx-4); margin-top:4px;">sem saldo do cofre para este dia no sistema</div></div>`;
   if (r.contagem_cobre_cofre === true && r.contado != null) {
     const dif = Number(r.diferenca);
     return cab + `<div style="margin-top:4px;">contado R$ ${fmt(Number(r.contado))} × Saipos R$ ${fmt(Number(r.saldo_fim_dia))} —
-      ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))}</b>`}</div></div>`;
+      ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))}</b>`}
+      ${pode ? ` <button class="preset-btn${livre}" onclick="cofreCorrigir('${unidade}', '${dia}', '${k}', ${Number(r.contado)})">corrigir</button>` : ''}</div></div>`;
   }
   if (!pode) return cab + `<div style="margin-top:4px; color:var(--farol-perto);">ainda não contado</div></div>`;
   return cab + `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
-      <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
-      <button class="preset-btn" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a contagem</button>
+      <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre.trim()}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      <button class="preset-btn${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a contagem</button>
       <span class="caption-label">O saldo do Saipos aparece depois de gravar.</span></div></div>`;
 }
+// abre o campo de novo, já preenchido, no lugar do "contado × Saipos" (grava por cima: o upsert é o mesmo)
+function cofreCorrigir(unidade, dia, k, atual) {
+  const box = document.getElementById('cfBox_' + k);
+  if (!box) return;
+  const livre = dia === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) ? 'cx-livre' : '';
+  box.innerHTML = `<b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">corrigir a contagem de ${dia.split('-').reverse().join('/')}</span>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
+      <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" value="${Number(atual) || ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a correção</button></div>`;
+  const el = document.getElementById('cfT_' + k); if (el) el.focus();
+}
+let COFRE_ZERO = null;   // o 0 só passa no segundo clique (11/11: em 04/11 um 0 gravado por engano travou a fila)
 async function cofreGravarTotal(unidade, dia, k) {
   const el = document.getElementById('cfT_' + k), v = el ? el.value : '';
   if (v === '') { avisoAcao('atencao', '! Digite o dinheiro contado (gaveta + cofre). Se não tinha nada, digite 0.'); return; }
+  if (Number(v) === 0 && COFRE_ZERO !== k) { COFRE_ZERO = k; avisoAcao('atencao', '! Você contou R$ 0,00 na gaveta e no cofre juntos? O sistema espera dinheiro aqui. Se é isso mesmo, clique em gravar de novo.'); return; }
+  COFRE_ZERO = null;
   const s = rmbSessao();
   avisoAcao('enviando', 'Gravando a contagem do dinheiro…');
   try {
