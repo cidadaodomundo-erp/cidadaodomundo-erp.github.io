@@ -75,7 +75,7 @@ window.CASCA_PAGINAS = {
   cardapio: 'canal/index.html#cardapio',
   clientes: 'canal/index.html#clientes',
   site: 'canal/index.html#site',
-  delivery: 'delivery/index.html',
+  delivery: 'delivery/index.html?v=20261111b',
   // 10/11/2026: Reservas (GetIn) e Produtos pausados, telas do Fábio incorporadas ao portal novo
   reservas: 'reservas/index.html',
   pausados: 'pausados/index.html',
@@ -122,5 +122,7 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
   // 10/11/2026: Reservas e Produtos pausados seguem de verdade o seletor único (lojaCarregar/lojaAtual/aoMudarLoja)
-  'reservas', 'pausados'];
+  'reservas', 'pausados',
+  // 11/11/2026: Delivery do dia — as 7 abas (4 antigas e 3 novas) seguem a loja escolhida (lista de lojas autorizadas)
+  'delivery'];
 
