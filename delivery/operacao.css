@@ -1,0 +1,15 @@
+.op-banner { font-size:13px; line-height:1.45; margin:0 0 12px; padding:8px 12px; border-radius:8px; border:1px dashed var(--line-2); background:var(--surface); }
+.op-selo { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; border:1px solid var(--line-2); opacity:.85; vertical-align:middle; white-space:nowrap; }
+.dl-abas button .op-selo { margin-left:6px; font-size:10px; border-color:currentColor; }
+.op-painel h2 { font-size:17px; margin:4px 0 8px; }
+.op-painel h3 { font-size:15px; margin:16px 0 6px; }
+.op-aviso, .op-nota { font-size:13px; line-height:1.45; margin:0 0 12px; opacity:.85; }
+.op-campos { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin:0 0 12px; }
+.op-campo { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+.op-campo dt { font-size:12px; opacity:.7; }
+.op-campo dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
+.op-campo dd.op-vazio { font-weight:400; font-style:italic; opacity:.7; }
+.op-regras { font-size:13px; line-height:1.5; padding-left:18px; margin:0 0 8px; }
+.op-lista { list-style:none; padding:0; margin:0; }
+.op-lista li { padding:7px 0; border-bottom:1px solid var(--line); font-size:14px; }
+.op-lista li span:not(.op-selo) { opacity:.75; font-size:13px; }
