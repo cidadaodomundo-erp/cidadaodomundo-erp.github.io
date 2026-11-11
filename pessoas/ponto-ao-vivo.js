@@ -219,10 +219,11 @@
         return () => { document.removeEventListener('visibilitychange', fn); if (o) o.disconnect(); };
       },
       escalaDia: null,      // objeto futuro (escala diária): hoje não existe no ERP
-      dowConvencao: null,   // 'DOM0' | 'SEG1': escolha do Fabio
+      dowConvencao: null,   // 'DOM0' | 'SEG1': definição administrativa pendente
     };
   }
   function entrarPesPontoAoVivo() { if (!inst) inst = criar(depsPadrao()); return inst.entrar(); }
 
   return Object.assign({}, M, { criar, entrarPesPontoAoVivo, PESSOAS_PATH, batidasPath, ausenciaPath, ocorrenciaPath, colunaHorariosAusente, passaFiltro, INTERVALO_ATUALIZACAO_MS });
 });
+

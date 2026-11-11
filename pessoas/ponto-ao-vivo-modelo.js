@@ -174,7 +174,7 @@
    * cruzar({ pessoas, batidas, ausencias, ocorrencias, dia, consultadoEm, loja, redeOk, fontes, escalaDia, dowConvencao, limiteLeituraMin })
    *  - fontes: { ausencias:true|false, ocorrencias:true|false } (false/ausente = fonte NÃO carregada ou truncada)
    *  - escalaDia: Map|objeto { [pessoaId]: escala } — objeto futuro; ausente em produção hoje
-   *  - dowConvencao: 'DOM0' | 'SEG1' | null (escolha do Fabio; null => folga fixa do cadastro não é usada)
+   *  - dowConvencao: 'DOM0' | 'SEG1' | null (definição administrativa pendente; null => folga fixa do cadastro não é usada)
    */
   function cruzar(o) {
     const { pessoas, batidas, dia, consultadoEm, loja, redeOk } = o;
@@ -356,8 +356,8 @@
       escalaDiaria: comEscala > 0, pessoasComEscala: comEscala,
       atrasoJornadaIntervalo: comEscala > 0
         ? 'Avaliados só para ' + comEscala + ' pessoa(s) com escala fornecida.'
-        : 'NÃO AVALIADOS: não existe escala diária/horário oficial no ERP mínimo (rh_pessoa, rh_flash_batida, rh_flash_ausencia, rh_ocorrencia). Objeto futuro: escolha do Fabio.',
-      folga: o.dowConvencao === 'DOM0' || o.dowConvencao === 'SEG1' ? 'Folga fixa do cadastro usada (convenção ' + o.dowConvencao + ').' : 'Folga fixa do cadastro NÃO usada: convenção do dia da semana não definida (escolha do Fabio).',
+        : 'NÃO AVALIADOS: não existe escala diária/horário oficial no ERP mínimo (rh_pessoa, rh_flash_batida, rh_flash_ausencia, rh_ocorrencia). Objeto futuro: definição administrativa.',
+      folga: o.dowConvencao === 'DOM0' || o.dowConvencao === 'SEG1' ? 'Folga fixa do cadastro usada (convenção ' + o.dowConvencao + ').' : 'Folga fixa do cadastro NÃO usada: convenção do dia da semana não definida (definição administrativa pendente).',
     });
     return Object.freeze({ dia, posicao, linhas: Object.freeze(linhas), resumo: Object.freeze(resumo), avisos: Object.freeze(avisos), avaliacao, leituraIdadeMin });
   }
@@ -367,3 +367,4 @@
     brtAgora, lojaCombina, nomeSeguro, dataReal, diaSeguinte, diasDesde1970, dataDeDias, dowDom0,
   };
 });
+

@@ -1,10 +1,10 @@
-// Peça comum das telas que vêm do portal antigo do Fábio (06/11/2026, Fase 0 da mudança).
+// Peça comum das telas que vêm do portal anterior (06/11/2026, Fase 0 da migração).
 // Carrega DEPOIS de nucleo.js. Não lê banco nenhum e não grava nada: só ajuda a tela.
 //   1) Ordenar qualquer tabela clicando no título da coluna (clique de novo inverte).
 //      Título que já tem onclick próprio, ou com data-sem-ordem, fica de fora.
 //   2) Carimbo "dados até": carimboDados(elemento, quando, {avisoMin, velhoMin}) põe ao lado do título
 //      um selo verde/amarelo/vermelho com a hora do dado mais novo que a tela recebeu.
-// Não tem caixa de anotação de propósito (decisão do Fábio 06/11: anotação não atravessa para o ERP).
+// Não tem caixa de anotação de propósito (definição administrativa de 06/11: anotação não atravessa para o ERP).
 (function () {
   'use strict';
 
@@ -74,3 +74,4 @@
     return c;
   };
 })();
+

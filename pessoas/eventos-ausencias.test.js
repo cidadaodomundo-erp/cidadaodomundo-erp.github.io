@@ -1,6 +1,6 @@
-// node --test pessoas/eventos-ausencias.test.js   (a partir da raiz do portal já com os arquivos desta entrega sobrepostos à cópia do main)
+// node --test pessoas/eventos-ausencias.test.js   (a partir da raiz do repositório)
 // Módulo REAL; só rede, DOM e sessão são ficções; todos os dados abaixo são FICTÍCIOS. Nenhuma rede, banco ou navegador.
-// Os testes que usam o consultarTudo REAL precisam de nucleo/nucleo.js: procuram na raiz do portal e, se não houver, na cópia-fonte.
+// Os testes que usam o consultarTudo REAL precisam de nucleo/nucleo.js: procuram na raiz do repositório e, se não houver, em PORTAL_BASE (opcional).
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -9,10 +9,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const EA = require('./eventos-ausencias.js');
 const RAIZ = path.join(__dirname, '..');
-const FONTE = 'C:\\Users\\Fabio Ikoma\\Documents\\Codex\\2026-11-09\\vam\\work\\ponto-pessoas-integracao-10-11';
 const ler = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const lerNucleo = () => {
-  for (const base of [RAIZ, process.env.PORTAL_BASE, FONTE]) {
+  for (const base of [RAIZ, process.env.PORTAL_BASE]) {
     if (!base) continue;
     const p = path.join(base, 'nucleo', 'nucleo.js');
     if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
@@ -84,11 +83,11 @@ const campoBusca = (raiz) => todos(raiz, (e) => e.tag === 'input' && e.type === 
 const COL = { pessoa: 0, unidade: 1, origem: 2, tipo: 3, inicio: 4, fim: 5, detalhe: 6, recebido: 7, situacao: 8 };
 
 // ---------- rota e casca ----------
-test('rota peventos registrada por inteiro, no módulo Pessoas, azul/selo Fábio, sem remover pcartao', () => {
+test('rota peventos registrada por inteiro, no módulo Pessoas, azul/selo Migrado, sem remover pcartao', () => {
   const ctx = (f) => { const w = {}; vm.runInNewContext(ler(f), { window: w }); return w; };
   const menu = ctx('casca/menu.js').CASCA_MENU;
   const item = menu.find((g) => g.id === 'gRh').itens.find((i) => i.chave === 'peventos');
-  assert.ok(item); assert.equal(item.rotulo, 'Eventos e ausências'); assert.equal(item.origem, 'fabio'); assert.ok(item.icone);
+  assert.ok(item); assert.equal(item.rotulo, 'Eventos e ausências'); assert.equal(item.origem, 'migracao'); assert.ok(item.icone);
   assert.equal(menu.flatMap((g) => g.itens).filter((i) => i.chave === 'peventos').length, 1);
   assert.ok(menu.find((g) => g.id === 'gRh').itens.some((i) => i.chave === 'pcartao'), 'pcartao continua no menu');
   const pg = ctx('casca/paginas.js');
@@ -108,10 +107,10 @@ test('rota peventos registrada por inteiro, no módulo Pessoas, azul/selo Fábio
   assert.match(html, /pcartao:\s*entrarPesPonto/);
   const sis = ler('sistema.html');
   assert.match(sis, /SO_PESSOAL = new Set\(\['macertos', 'pcartao'\]\)/);   // como na fonte: nada mudou para as outras telas
-  assert.match(sis, /SO_PESSOAL_E_CADASTRO = new Set\(\['peventos'\]\)/);
-  assert.match(sis, /i\.origem === 'fabio' \? '<span class="selo-fabio">Fábio<\/span>'/);
-  assert.match(sis, /casca\/menu\.js\?v=20261110d/); assert.match(sis, /casca\/paginas\.js\?v=20261110d/);
-  assert.match(sis, /casca\/modulos\.js\?v=20261110c/); assert.match(sis, /casca\/busca\.js\?v=20261110c/);
+  assert.match(sis, /SO_PESSOAL_E_CADASTRO = new Set\(\['peventos', 'pao'\]\)/);
+  assert.match(sis, /i\.origem === 'migracao' \? '<span class="selo-migracao">Migrado<\/span>'/);
+  assert.match(sis, /casca\/menu\.js\?v=20261110f/); assert.match(sis, /casca\/paginas\.js\?v=20261110e/);
+  assert.match(sis, /casca\/modulos\.js\?v=20261110d/); assert.match(sis, /casca\/busca\.js\?v=20261110d/);
   assert.equal(typeof EA.entrarPesEventos, 'function');
 });
 
@@ -630,4 +629,5 @@ test('ligação padrão: usa trRpc, consultarTudo e o seletor de loja da casca (
     for (const k of Object.keys(globais)) { if (salvos[k]) Object.defineProperty(globalThis, k, salvos[k]); else delete globalThis[k]; }
   }
 });
+
 

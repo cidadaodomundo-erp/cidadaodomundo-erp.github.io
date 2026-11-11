@@ -127,7 +127,7 @@
     if (d === undefined || d === null) return true;
     return dataReal(d) && d >= p.admissao;
   }
-  // outro cadastro com o MESMO flash_id pode ser o dono do dia? (período inválido = não dá para excluir)
+  // outro cadastro com o MESMO flash_id pode ser o titular do dia? (período inválido = não dá para excluir)
   function podeCobrir(q, dia) {
     if (!periodoValido(q)) return true;
     return dia >= q.admissao && (q.desligamento == null || dia <= q.desligamento);
@@ -505,4 +505,5 @@
     MAX_DIAS, POR_PAGINA, LIMITE_AUSENCIA, PESSOAS_PATH, ULTIMA_AUSENCIA_PATH, ULTIMA_OCORRENCIA_PATH, ausenciaPath, ocorrenciaPath,
   };
 });
+
 

@@ -10,12 +10,12 @@
 <title>Produtos pausados · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
-<!-- PRODUTOS PAUSADOS (10/11/2026, tela do Fábio incorporada ao portal novo; revisada 10/11/2026). Só leitura da
+<!-- PRODUTOS PAUSADOS (10/11/2026, tela migrada do portal anterior; revisada 10/11/2026). Só leitura da
      tabela cardapio_pausado (Goomer/Accon). Sem pausar, despausar ou editar motivo — nenhum botão de ação. Os
      leitores próprios do Goomer/Accon ainda não foram ativados nesta etapa: a tela não afirma estar lendo hoje,
      só mostra o que a rotina já gravou, com o carimbo de quando. Goomer só cobre Água Verde e São Braz; Ahú entra
      como "sem coleta prevista". Lê pela RPC erp_pausados_ler (sql/ativar-consultas-reservas-pausados.sql), ainda
-     não aplicada: até o clique do Fábio, esta tela mostra "sem acesso". -->
+     não aplicada: até a ativação pela Administração, esta tela mostra "sem acesso". -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -174,7 +174,7 @@ async function carregar() {
   if (r.status === 401) { exigirLogin('Entre de novo para ver os produtos pausados.'); return; }
   if (r.status === 403) {
     // 403 nunca limpa a sessão nem aparece como lista vazia
-    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.');
+    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com a Administração.');
     return;
   }
   if (!r.ok) { mostrarErro(mensagemErro(r)); return; }
@@ -289,3 +289,4 @@ window.reentrarTela = carregar;
 </script>
 </body>
 </html>
+

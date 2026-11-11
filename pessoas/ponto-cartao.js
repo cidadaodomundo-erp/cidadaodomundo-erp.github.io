@@ -89,7 +89,7 @@
     if (d === undefined || d === null) return true;
     return modelo.dataCalendarValida(d) && d >= p.admissao;
   }
-  // outro cadastro com o MESMO flash_id pode ser o dono do dia? (período inválido = não dá para excluir)
+  // outro cadastro com o MESMO flash_id pode ser o titular do dia? (período inválido = não dá para excluir)
   function podeCobrir(q, dia) {
     if (!periodoValido(q)) return true;
     return dia >= q.admissao && (q.desligamento == null || dia <= q.desligamento);
@@ -372,3 +372,4 @@
 
   return { criar, cruzar, validarIntervalo, listarDias, lojaCombina, nomeSeguro, entrarPesPonto, CONF, MAX_DIAS, PESSOAS_PATH, ULTIMA_PATH, batidasPath };
 });
+

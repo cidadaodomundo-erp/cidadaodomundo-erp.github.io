@@ -52,7 +52,7 @@ test('rota pcartao registrada por inteiro, no módulo Pessoas, sem cair no legad
   const ctx = (f) => { const w = {}; vm.runInNewContext(ler(f), { window: w }); return w; };
   const menu = ctx('casca/menu.js').CASCA_MENU;
   const item = menu.find((g) => g.id === 'gRh').itens.find((i) => i.chave === 'pcartao');
-  assert.ok(item); assert.equal(item.rotulo, 'Consulta de ponto'); assert.equal(item.origem, 'fabio'); assert.match(item.icone, /🕒|⏰|⏱|🕐/);
+  assert.ok(item); assert.equal(item.rotulo, 'Consulta de ponto'); assert.equal(item.origem, 'migracao'); assert.match(item.icone, /🕒|⏰|⏱|🕐/);
   assert.equal(menu.flatMap((g) => g.itens).filter((i) => i.chave === 'pcartao').length, 1);
   const pg = ctx('casca/paginas.js');
   assert.equal(pg.CASCA_PAGINAS.pcartao, 'pessoas/index.html#pcartao');
@@ -278,3 +278,4 @@ test('só consome fontes de leitura permitidas', async () => {
   assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_cadastrar_pessoal', 'rpc:pode_ver_pessoal']);
   assert.ok(tabelas(t.log).every((c) => /^rh_(pessoa|flash_batida)\?select=[a-z_,]+/.test(c)));
 });
+

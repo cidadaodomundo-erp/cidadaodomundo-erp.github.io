@@ -10,12 +10,12 @@
 <title>Reservas (GetIn) · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
-<!-- RESERVAS GETIN (10/11/2026, tela do Fábio incorporada ao portal novo; revisada 10/11/2026). Só leitura. Mostra o
+<!-- RESERVAS GETIN (10/11/2026, tela migrada do portal anterior; revisada 10/11/2026). Só leitura. Mostra o
      que o GetIn já mandou para o ERP (tabela salao_reserva, preenchida por robô fora desta etapa). Sem criar, editar
-     ou cancelar reserva — nenhum botão de ação. Nome completo do cliente aparece só aqui (decisão combinada com o
-     Fábio); telefone, observação e pagamento não entram na tela nem são pedidos ao servidor. Lê pela RPC
-     erp_reservas_ler (sql/ativar-consultas-reservas-pausados.sql), que ainda não foi aplicada: até o clique do
-     Fábio, esta tela mostra "sem acesso". -->
+     ou cancelar reserva — nenhum botão de ação. Nome completo do cliente aparece só aqui (definição administrativa);
+     telefone, observação e pagamento não entram na tela nem são pedidos ao servidor. Lê pela RPC
+     erp_reservas_ler (sql/ativar-consultas-reservas-pausados.sql), que ainda não foi aplicada: até a ativação
+     pela Administração, esta tela mostra "sem acesso". -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -208,7 +208,7 @@ async function carregar() {
   if (r.status === 401) { exigirLogin('Entre de novo para ver as reservas.'); return; }
   if (r.status === 403) {
     // 403 nunca limpa a sessão nem aparece como lista vazia — é "sem acesso", algo bem diferente
-    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.');
+    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com a Administração.');
     return;
   }
   if (!r.ok) { mostrarErro(mensagemErro(r)); return; }
@@ -270,7 +270,7 @@ function desenhar(dados) {
   if (!linhas.length) {
     c.innerHTML = '<div class="rv-vazio">Nenhuma reserva encontrada para este filtro. Isto não significa que não existam reservas no GetIn — pode ser que a leitura ainda não tenha trazido dado para este período.</div>';
   } else {
-    // só os campos da whitelist combinada com o Fábio: data/hora/unidade/nome/pessoas/área/
+    // só os campos da whitelist definida pela Administração: data/hora/unidade/nome/pessoas/área/
     // status/fonte. Telefone, observação e pagamento nunca são lidos nem aparecem aqui.
     c.innerHTML = '<div id="tabelaReservas"><table class="rv-tab"><thead><tr>' +
       '<th>Data</th><th>Hora</th><th>Unidade</th><th>Nome</th><th class="n">Pessoas</th><th>Área</th><th>Status</th><th>Fonte</th>' +
@@ -323,3 +323,4 @@ window.reentrarTela = carregar;
 </script>
 </body>
 </html>
+
