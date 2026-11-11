@@ -259,6 +259,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "pao",
+    "rotulo": "Ponto ao Vivo",
+    "icone": "🟢",
+    "origem": "fabio"
+   },
+   {
     "chave": "peventos",
     "rotulo": "Eventos e ausências",
     "icone": "🗒️",
