@@ -2394,6 +2394,8 @@ function cgAbaFerias() {
   const A = U.filter((x) => alerta(x) || perto(x));
   const dataBase = per.map((x) => x.data_base).filter(Boolean).sort().pop();
   let h = dataBase ? `<h3 style="margin:8px 0;">Programação da contabilidade de ${cgData(dataBase)}</h3>` : '';
+  // 11/11/2026 (dono 17:35, chat RH; proposta 2026-11-11-rh-ferias-vence-a-segunda): a regra à vista
+  h += '<div class="contexto" style="text-align:left;"><b>Férias são obrigatórias antes de vencer a segunda.</b> Depois disso, paga em dobro.</div>';
   if (A.length) h += `<div class="contexto" style="text-align:left;border-color:${A.some(alerta) ? 'var(--farol-fora)' : 'var(--farol-perto)'};">${A.map((x) =>
       `<div style="color:${alerta(x) ? cor(sit(x)) : 'var(--farol-perto)'};font-weight:700;">${cgEsc(cgNome(x.nome || x.apelido))} — ${cgN(x.dias_a_gozar)} dias — começar até ${cgData(x.limite_gozo)} — ${alerta(x) ? cgEsc(sit(x)) : 'perto do limite'}</div>`).join('')}</div>`;
   else h += `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nenhuma férias em dobro, obrigatória ou perto do limite agora.</b></div>`;
@@ -2410,19 +2412,32 @@ function cgAbaFerias() {
       ${P60 ? `<div class="card neutral"><div class="card-lbl">A pagar em 60 dias</div><div class="card-val">${cgR0(soma60())}</div><div class="card-pct">provisão ${cgR0(soma60('ESTIMATIVA'))} · despesa ${cgR0(soma60('CALCULADO'))}</div></div>` : ''}
     </div>
     ${cgFiltroUnidade(CARGOS.pessoas)}`;
-  const vis = F.ferCard === 'podem' ? podem : F.ferCard === 'marcadas' ? U.filter(marcada) : F.ferCard === 'formacao' ? U.filter(formacao) : U.filter((x) => !formacao(x) || marcada(x));
+  const vis = (F.ferCard === 'podem' ? podem : F.ferCard === 'marcadas' ? U.filter(marcada) : F.ferCard === 'formacao' ? U.filter(formacao) : U.filter((x) => !formacao(x) || marcada(x)))
+    .slice().sort((a, b) => String(a.limite_gozo || '9999').localeCompare(String(b.limite_gozo || '9999')) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));   // quem está mais perto do limite primeiro
+  const maisUmAno = (d) => { if (!d) return null; const x = new Date(String(d).slice(0, 10) + 'T12:00:00'); x.setFullYear(x.getFullYear() + 1); return x.toLocaleDateString('en-CA'); };
+  // farol do "Começar até": verde acima de 90 dias (ou já marcada dentro do prazo), amarelo abaixo, vermelho quando passou (com o dobro)
+  const comecar = (x) => {
+    if (!x.limite_gozo) return '–';
+    const n = x.dias_ate_o_limite == null ? null : cgN(x.dias_ate_o_limite);
+    if (formacao(x)) return `<span style="color:var(--tx-4);">${cgData(x.limite_gozo)}</span>`;
+    if (n !== null && n < 0) return `<b style="color:var(--farol-fora);">${cgData(x.limite_gozo)}</b> <span style="color:var(--farol-fora);font-size:12px;">passou há ${-n} ${n === -1 ? 'dia' : 'dias'}${cgN(x.valor_estimado) ? ' · em dobro: ' + cgR(x.valor_estimado) : ''}</span>`;
+    if (marcada(x)) return `<b style="color:var(--farol-ok);">${cgData(x.limite_gozo)}</b> <span style="color:var(--farol-ok);font-size:12px;">programada</span>`;
+    const c = n !== null && n < 90 ? 'var(--farol-perto)' : 'var(--farol-ok)';
+    return `<b style="color:${c};">${cgData(x.limite_gozo)}</b>${n === null ? '' : ` <span style="color:${c};font-size:12px;">${n === 0 ? 'é hoje' : `faltam ${n} ${n === 1 ? 'dia' : 'dias'}`}</span>`}`;
+  };
   const goz = (pid) => (gozo || []).filter((g) => g.pessoa_id === pid);
-  h += `<div id="tabelaCgFerias" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Loja</th><th>Período aquisitivo</th><th>Limite para começar</th>
+  h += `<div id="tabelaCgFerias" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Loja</th><th>Venceu a 1ª</th><th>Vence a 2ª</th><th>Começar até</th>
       <th style="text-align:right;">Dias a gozar</th><th>Marcado na Flash</th><th style="text-align:right;">Valor estimado</th><th>Situação</th></tr></thead><tbody>
     ${vis.map((x) => { const k = `${x.pessoa_id}|${x.aquisitivo_inicio}`, ab = F.ferAberta === k, G = goz(x.pessoa_id);
       return `<tr style="cursor:pointer;" onclick="CARGOS_F.ferAberta=CARGOS_F.ferAberta==='${k}'?null:'${k}';renderModuloCargos()">
         <td>${cgEsc(cgNome(x.nome || x.apelido))}</td><td>${cgEsc(x.unidade || '')}</td>
-        <td>${cgData(x.aquisitivo_inicio)} a ${cgData(x.aquisitivo_fim)}</td><td>${cgData(x.limite_gozo)}</td>
+        <td title="período aquisitivo: ${cgData(x.aquisitivo_inicio)} a ${cgData(x.aquisitivo_fim)}">${formacao(x) ? `<span style="color:var(--tx-4);">vence em ${cgData(x.aquisitivo_fim)}</span>` : cgData(x.aquisitivo_fim)}</td>
+        <td>${x.aquisitivo_fim ? cgData(maisUmAno(x.aquisitivo_fim)) : '–'}</td><td style="white-space:normal;">${comecar(x)}</td>
         <td style="text-align:right;">${cgN(x.dias_a_gozar)}${cgN(x.dias_gozados) || cgN(x.faltas) ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgN(x.dias_direito)}</span>` : ''}</td>
         <td style="font-size:12px;">${cgN(x.dias_programados) ? cgEsc(cgFerMarcado(x)) : '<span style="color:var(--tx-5);">nada</span>'}</td>
         <td style="text-align:right;">${marcada(x) ? cgR(x.valor_programado) : cgN(x.valor_estimado) ? cgR(x.valor_estimado) : '–'}</td>
         <td style="color:${cor(sit(x))};font-weight:700;white-space:normal;">${cgEsc(sit(x))}</td></tr>
-        ${ab ? `<tr><td colspan="8"><b>Férias conhecidas de ${cgEsc(cgNome(x.nome || x.apelido))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
+        ${ab ? `<tr><td colspan="9"><b>Férias conhecidas de ${cgEsc(cgNome(x.nome || x.apelido))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
     </tbody></table></div>`;
   return h;
 }
