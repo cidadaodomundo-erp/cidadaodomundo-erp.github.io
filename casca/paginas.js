@@ -84,6 +84,9 @@ window.CASCA_PAGINAS = {
   reuniao: 'reuniao/index.html?v=20261111a',
   // 11/11/2026: Taxas e Freelas (só consulta dos cadastros e valores-hora que já existem no ERP; ponto/QR/pagamentos em construção).
   freelas: 'freelas/index.html?v=20261111a',
+  // 11/11/2026: Manutenção e Quem conserta (duas rotas da mesma página; chamados só preparados, diretório de prestadores só consulta)
+  manutencao: 'manutencao/index.html?v=20261111a#chamados',
+  prestadores: 'manutencao/index.html?v=20261111a#prestadores',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -115,7 +118,9 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades'];
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades',
+  // 11/11/2026: Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
+  'prestadores'];
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
@@ -133,5 +138,7 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   // 11/11/2026: Reunião semanal — o rascunho em memória é separado por loja (rede + lojas autorizadas)
   'reuniao',
   // 11/11/2026: Taxas e Freelas — a consulta segue a loja escolhida (lojas concretas da allowlist; REDE não é curinga)
-  'freelas'];
+  'freelas',
+  // 11/11/2026: Manutenção — o campo Loja dos chamados (ainda desabilitado, nada é gravado) mostra a loja do seletor
+  'manutencao'];
 
