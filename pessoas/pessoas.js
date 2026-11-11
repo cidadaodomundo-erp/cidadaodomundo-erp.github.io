@@ -2415,6 +2415,13 @@ function cgAbaFerias() {
   const vis = (F.ferCard === 'podem' ? podem : F.ferCard === 'marcadas' ? U.filter(marcada) : F.ferCard === 'formacao' ? U.filter(formacao) : U.filter((x) => !formacao(x) || marcada(x)))
     .slice().sort((a, b) => String(a.limite_gozo || '9999').localeCompare(String(b.limite_gozo || '9999')) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));   // quem está mais perto do limite primeiro
   const maisUmAno = (d) => { if (!d) return null; const x = new Date(String(d).slice(0, 10) + 'T12:00:00'); x.setFullYear(x.getFullYear() + 1); return x.toLocaleDateString('en-CA'); };
+  // "Vence a 2ª" = último dia em que as férias podem terminar: limite_gozo + dias a gozar − 1 (o limite da contabilidade já estica
+  // pelo afastamento; RH 11/11, caso do Alexandre). Sem dias a gozar (programada), fica fim do aquisitivo + 1 ano.
+  const venceSegunda = (x) => {
+    const n = cgN(x.dias_a_gozar);
+    if (x.limite_gozo && n > 0) { const d = new Date(String(x.limite_gozo).slice(0, 10) + 'T12:00:00'); d.setDate(d.getDate() + n - 1); return d.toLocaleDateString('en-CA'); }
+    return maisUmAno(x.aquisitivo_fim);
+  };
   // farol do "Começar até": verde acima de 90 dias (ou já marcada dentro do prazo), amarelo abaixo, vermelho quando passou (com o dobro)
   const comecar = (x) => {
     if (!x.limite_gozo) return '–';
@@ -2432,7 +2439,7 @@ function cgAbaFerias() {
       return `<tr style="cursor:pointer;" onclick="CARGOS_F.ferAberta=CARGOS_F.ferAberta==='${k}'?null:'${k}';renderModuloCargos()">
         <td>${cgEsc(cgNome(x.nome || x.apelido))}</td><td>${cgEsc(x.unidade || '')}</td>
         <td title="período aquisitivo: ${cgData(x.aquisitivo_inicio)} a ${cgData(x.aquisitivo_fim)}">${formacao(x) ? `<span style="color:var(--tx-4);">vence em ${cgData(x.aquisitivo_fim)}</span>` : cgData(x.aquisitivo_fim)}</td>
-        <td>${x.aquisitivo_fim ? cgData(maisUmAno(x.aquisitivo_fim)) : '–'}</td><td style="white-space:normal;">${comecar(x)}</td>
+        <td>${venceSegunda(x) ? cgData(venceSegunda(x)) : '–'}</td><td style="white-space:normal;">${comecar(x)}</td>
         <td style="text-align:right;">${cgN(x.dias_a_gozar)}${cgN(x.dias_gozados) || cgN(x.faltas) ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgN(x.dias_direito)}</span>` : ''}</td>
         <td style="font-size:12px;">${cgN(x.dias_programados) ? cgEsc(cgFerMarcado(x)) : '<span style="color:var(--tx-5);">nada</span>'}</td>
         <td style="text-align:right;">${marcada(x) ? cgR(x.valor_programado) : cgN(x.valor_estimado) ? cgR(x.valor_estimado) : '–'}</td>
