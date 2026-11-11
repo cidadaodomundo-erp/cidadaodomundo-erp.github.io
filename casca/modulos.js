@@ -27,7 +27,7 @@ window.CASCA_MODULOS = [
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
-    lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
+    lancar: [], acompanhar: ['placar', 'semana', 'reuniao', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
