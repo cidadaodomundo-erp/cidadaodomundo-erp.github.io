@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Cozinha · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap oc">
+    <h1>Cozinha <span class="oc-obras">Em construção</span></h1>
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+    <div id="app" hidden></div>
+  </div>
+</div>
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
+<script>
+OperacaoConstrucao.iniciar({
+  titulo: 'Cozinha',
+  aviso: 'A fila da cozinha ainda não está ligada. Esta tela não muda nenhum pedido.',
+  legenda: 'Pedido na cozinha (preparado)',
+  campos: [
+    { r: 'Loja', t: 'loja' },
+    { r: 'Data/Turno', t: 'text' },
+    { r: 'Pedido', t: 'text' },
+    { r: 'Canal', t: 'select' },
+    { r: 'Etapa', t: 'select', o: ['Recebido', 'Preparando', 'Pronto'] },
+    { r: 'Hora de entrada', t: 'time' },
+    { r: 'Hora de saída', t: 'time' }
+  ],
+  atalhos: [
+    { r: 'Ver produção e estoque', chave: 'producao' },
+    { r: 'Ver fichas técnicas', chave: 'fichas' },
+    { r: 'Ver qualidade', chave: 'qualidade' }
+  ]
+});
+</script>
+</body>
+</html>

@@ -187,6 +187,24 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "cozinha",
+    "rotulo": "Cozinha",
+    "icone": "👨‍🍳",
+    "origem": "fabio"
+   },
+   {
+    "chave": "tvs",
+    "rotulo": "TVs",
+    "icone": "📺",
+    "origem": "fabio"
+   },
+   {
+    "chave": "salao",
+    "rotulo": "Salão",
+    "icone": "🍽️",
+    "origem": "fabio"
+   },
+   {
     "chave": "atrasos",
     "rotulo": "Atrasos e turnos",
     "icone": "⏱️"
@@ -424,6 +442,18 @@ window.CASCA_MENU = [
     "chave": "prestadores",
     "rotulo": "Quem conserta",
     "icone": "🧰",
+    "origem": "fabio"
+   },
+   {
+    "chave": "mercadolivre",
+    "rotulo": "Mercado Livre",
+    "icone": "🛍️",
+    "origem": "fabio"
+   },
+   {
+    "chave": "encomendas",
+    "rotulo": "Encomendas",
+    "icone": "🎂",
     "origem": "fabio"
    },
    {

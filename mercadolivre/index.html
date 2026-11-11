@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Mercado Livre · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap oc">
+    <h1>Mercado Livre <span class="oc-obras">Em construção</span></h1>
+    <div id="bloqueio" hidden role="alert"></div>
+    <div id="statusGeral" role="status" aria-live="polite"></div>
+    <div id="app" hidden></div>
+  </div>
+</div>
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
+<script>
+OperacaoConstrucao.iniciar({
+  titulo: 'Mercado Livre',
+  aviso: 'A comparação de ofertas e a ligação ao Mercado Livre ainda não estão ativas.',
+  extras: ['Finalidade: compras empresariais. Nenhuma conta pessoal é aberta e nenhum anúncio é buscado automaticamente.'],
+  legenda: 'Produto a comprar (preparado)',
+  campos: [
+    { r: 'Loja', t: 'loja' },
+    { r: 'Produto exato', t: 'text' },
+    { r: 'Marca/modelo', t: 'text' },
+    { r: 'Código do produto', t: 'text' },
+    { r: 'Embalagem', t: 'text' },
+    { r: 'Quantidade', t: 'number', m: 'numeric' },
+    { r: 'Prazo', t: 'date' },
+    { r: 'CEP de entrega', t: 'text', m: 'numeric' }
+  ],
+  camposFuturos: [
+    { r: 'Oferta/link', t: 'text' },
+    { r: 'Custo total', t: 'text' },
+    { r: 'Frete', t: 'text' },
+    { r: 'Vendedor', t: 'text' }
+  ],
+  atalhos: [
+    { r: 'Pedir material', chave: 'reqpedir' },
+    { r: 'Teto de compra', chave: 'comprateto' },
+    { r: 'Posição de estoque', chave: 'posicao' }
+  ]
+});
+</script>
+</body>
+</html>
