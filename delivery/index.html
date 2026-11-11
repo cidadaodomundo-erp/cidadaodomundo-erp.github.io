@@ -13,13 +13,15 @@
 <!-- DELIVERY DO DIA (06/11/2026, Fase 1 da mudança do portal do Fábio para o ERP). Só leitura, sem nenhum botão que
      mude dado. Junta numa página as ideias de quatro telas do portal antigo: Tempo de Entrega, Placar do Delivery,
      Cancelamentos e Qualidade/Avaliações do dia. Lê só o banco do ERP, pela função delivery_dia(dia), que obedece
-     as regras de leitura de cada tabela (quem é de filial vê só a própria loja). Sem caixa de anotação. -->
+     as regras de leitura que o banco aplica a cada tabela (o isolamento por filial depende dessas regras e não é
+     verificado nesta página). Sem caixa de anotação. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="operacao.css?v=20261111a">
 <style>
   .na-casca body::before { display:none !important; }
   .dl-topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 14px; }
@@ -45,24 +47,33 @@
       <h1 id="titulo">Delivery do dia</h1>
       <input type="date" id="dia" aria-label="Dia">
     </div>
-    <div class="dl-fontes" id="fontes"></div>
+    <div class="op-banner" id="opBanner"></div>
     <div class="dl-abas" id="abas">
       <button data-aba="placar" class="on">Placar</button>
       <button data-aba="tempo">Tempo de entrega</button>
       <button data-aba="cancel">Cancelamentos</button>
       <button data-aba="quali">Avaliações do dia</button>
+      <button data-aba="chegada">Chegada do dia <span class="op-selo">Em construção</span></button>
+      <button data-aba="escala">Escala do Delivery <span class="op-selo">Em construção</span></button>
+      <button data-aba="conferencia">Conferência do Delivery <span class="op-selo">Em construção</span></button>
     </div>
-    <div id="erroMsg" style="display:none;"></div>
-    <div id="conteudo"><div class="dl-vazio">Carregando…</div></div>
+    <div id="legado">
+      <div class="dl-fontes" id="fontes"></div>
+      <div id="erroMsg" style="display:none;"></div>
+      <div id="conteudo"><div class="dl-vazio">Carregando…</div></div>
+    </div>
+    <div id="operacao" style="display:none;"></div>
   </div>
 </div>
 
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="../nucleo/telas-extra.js?v=20261106a"></script>
+<script src="operacao.js?v=20261111a"></script>
 <script>
 const TELA = 'delivery';
-let DADOS = null, ABA = (location.hash || '#placar').slice(1);
+let DADOS = null, ABA = DeliveryOperacao.abaDoHash(location.hash);
+let SESSAO_OK = false, SEQ = 0, DADOS_DIA = null; // SEQ: só a leitura mais recente pode mostrar resultado
 const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz', 'BOQUEIRAO': 'Boqueirão' };
 const un = (u) => NOME_UN[u] || u || '—';
 const n0 = (v) => v == null ? '—' : Number(v).toLocaleString('pt-BR');
@@ -73,26 +84,61 @@ const esc = trEscH;
 
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
+  SESSAO_OK = false; DADOS = null; DADOS_DIA = null;
+  document.getElementById('conteudo').innerHTML = '';
+  document.getElementById('erroMsg').style.display = 'none';
+  document.getElementById('operacao').innerHTML = '';
   if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
   location.href = '../sistema.html';
 }
 function hojeBR() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); }
 
+// Nunca rejeita (tudo dentro do try): o setInterval e o change não tratam erro. Erro limpa os dados antigos,
+// e as abas novas não dependem disto.
 async function carregar() {
+  if (!SESSAO_OK) return;
   const dia = document.getElementById('dia').value || hojeBR();
+  const seq = ++SEQ;
+  if (DADOS && DADOS_DIA !== dia) DADOS = null; // dado de outro dia nunca fica na tela
   document.getElementById('conteudo').innerHTML = '<div class="dl-vazio">Carregando…</div>';
-  const r = await trRpcSeguro('delivery_dia', { p_dia: dia });
-  if (r.status === 401) { exigirLogin('Entre de novo para ver o delivery.'); return; }
-  if (!r.ok) {
+  const erro = (msg) => {
+    DADOS = null; DADOS_DIA = null;
     const el = document.getElementById('erroMsg');
-    el.style.display = 'block'; el.textContent = 'Não deu para ler o delivery: ' + await trErroDe(r);
+    el.style.display = 'block'; el.textContent = 'Não deu para ler o delivery: ' + msg;
     document.getElementById('conteudo').innerHTML = '';
-    return;
+  };
+  // Depois de cada await: só vale a leitura mais recente e com sessão ainda aberta (SEQ e SESSAO_OK).
+  const vigente = () => seq === SEQ && SESSAO_OK;
+  try {
+    const r = await trRpcSeguro('delivery_dia', { p_dia: dia });
+    if (!vigente()) return; // resposta de uma leitura já trocada, ou sessão encerrada
+    if (r.status === 401) { exigirLogin('Entre de novo para ver o delivery.'); return; }
+    if (!r.ok) { const msg = await trErroDe(r); if (!vigente()) return; erro(msg); return; }
+    const dados = await r.json();
+    if (!vigente()) return;
+    DADOS = dados; DADOS_DIA = dia;
+    document.getElementById('erroMsg').style.display = 'none';
+    fontes();
+    mostrar();
+  } catch (e) {
+    if (!vigente()) return;
+    erro((e && e.message) || 'erro inesperado');
   }
-  document.getElementById('erroMsg').style.display = 'none';
-  DADOS = await r.json();
-  fontes();
-  desenhar();
+}
+
+// Mostra a aba escolhida: as 4 antigas dependem de DADOS; as 3 novas (Em construção) não dependem de nada do banco.
+function mostrar() {
+  if (!SESSAO_OK) return;
+  const nova = DeliveryOperacao.ehNova(ABA);
+  document.querySelectorAll('#abas button').forEach((b) => b.classList.toggle('on', b.dataset.aba === ABA));
+  document.getElementById('legado').style.display = nova ? 'none' : '';
+  const op = document.getElementById('operacao');
+  op.style.display = nova ? '' : 'none';
+  if (nova) op.innerHTML = DeliveryOperacao.render(ABA, {
+    dia: document.getElementById('dia').value || hojeBR(),
+    loja: lojaNome(lojaAtual()) || null // seletor único (nucleo/loja.js); sem loja carregada fica em branco
+  });
+  else if (DADOS) desenhar();
 }
 
 function fontes() {
@@ -162,14 +208,31 @@ function desenhar() {
 
 document.getElementById('abas').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-aba]'); if (!b) return;
-  ABA = b.dataset.aba; history.replaceState(null, '', '#' + ABA); if (DADOS) desenhar();
+  location.hash = b.dataset.aba; // vira entrada no histórico; o hashchange abaixo troca a aba
 });
+window.addEventListener('hashchange', () => { ABA = DeliveryOperacao.abaDoHash(location.hash); mostrar(); });
 const campoDia = document.getElementById('dia');
 campoDia.value = hojeBR(); campoDia.max = hojeBR();
-campoDia.addEventListener('change', carregar);
+campoDia.addEventListener('change', () => { mostrar(); carregar(); });
+document.getElementById('opBanner').innerHTML = DeliveryOperacao.banner();
+
+// A cada 5 min: se o dia virou e o seletor estava no "hoje" antigo, acompanha o novo dia.
+function atualizarPeriodico() {
+  const h = hojeBR();
+  if (campoDia.max !== h) { const seguia = campoDia.value === campoDia.max; campoDia.max = h; if (seguia) campoDia.value = h; }
+  if (campoDia.value === h) { mostrar(); carregar(); }
+}
 
 if (!rmbSessao()) exigirLogin('Entre para ver o delivery.');
-else { registrarUso(TELA); avisarCasca({ tipo: 'casca-modulo', nome: TELA }); carregar(); setInterval(() => { if (campoDia.value === hojeBR()) carregar(); }, 5 * 60 * 1000); }
+else {
+  SESSAO_OK = true;
+  registrarUso(TELA); avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  mostrar(); carregar();
+  // loja: depois de carregar a lista de lojas, a aba nova mostra a loja real; ao trocar a loja, a tela acompanha
+  lojaCarregar().catch(() => null).then(() => mostrar());
+  aoMudarLoja(() => { mostrar(); carregar(); });
+  setInterval(atualizarPeriodico, 5 * 60 * 1000);
+}
 window.reentrarTela = carregar;
 </script>
 </body>
