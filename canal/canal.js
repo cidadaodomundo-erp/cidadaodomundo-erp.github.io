@@ -407,7 +407,7 @@ function moduloCancelamentos(m, a) {
   const tabelaMotivos = motivos.length ? `
     <div id="tabelaMotivos">
       <table>
-        <tr><th>Categoria do motivo</th><th>Pedidos</th><th>% do total</th><th>Valor perdido</th><th>R$ por cancelamento</th></tr>
+        <thead><tr><th>Categoria do motivo</th><th>Pedidos</th><th>% dos cancelamentos</th><th>Valor perdido</th><th>R$ por cancelamento</th></tr></thead><tbody>
         ${(() => { const ord = motivos.slice().sort((a,b)=>b.valor-a.valor);
           CANCEL_LISTA_MOTIVOS = ord.map(x => x.responsavel);   // o clique vai por indice
           return ord.map((x, i) => { const sel = CANCEL_MOTIVO === x.responsavel;
@@ -417,43 +417,36 @@ function moduloCancelamentos(m, a) {
         ${(() => { const t = motivos.reduce((a, x) => ({ n: a.n + x.n, v: a.v + x.valor }), { n: 0, v: 0 });
           return `<tr class="liq"><td>TOTAL</td><td>${t.n}</td><td>100%</td>
             <td>R$ ${fmt(t.v)}</td><td>R$ ${fmt(t.n ? t.v / t.n : 0)}</td></tr>`; })()}
-      </table>
+      </tbody></table>
     </div>` : '';
 
   return cardsCancel(m, a) + `
+  <div class="section-label">Quanto dessa perda ainda dá para recuperar</div>
+  <div id="cancelRecuperavel"><div class="contexto">Consultando a fila de contestação...</div></div>
   ${CANCEL_MOTIVO ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
     <button class="preset-btn active" onclick="cancelFiltrarMotivo(null)">categoria ${CANCEL_MOTIVO === 'NAO_MAPEADO' ? 'sem categoria' : CANCEL_MOTIVO} ✕</button>
     <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cartões acima seguem o período inteiro, sem este recorte.</div>
   </div>` : ''}
-  <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:stretch; margin-top:14px;">
-    <div class="chart-box" style="flex:1 1 340px; height:300px;">
-      <div class="chart-title">Onde se perde mais dinheiro (R$)</div>
-      <div class="chart-canvas-wrap"><canvas id="chartMotivosValor"></canvas></div>
-    </div>
-    <div class="chart-box" style="flex:1 1 340px; height:300px;">
-      <div class="chart-title">O que mais acontece (nº de cancelamentos)</div>
-      <div class="chart-canvas-wrap"><canvas id="chartMotivosQtd"></canvas></div>
-    </div>
+  <div class="chart-box" style="height:300px; margin-top:14px;">
+    <div class="chart-title">Onde se perde mais dinheiro (R$) · clique numa barra para recortar</div>
+    <div class="chart-canvas-wrap"><canvas id="chartMotivosValor"></canvas></div>
   </div>
 
   ${tabelaMotivos}
-
-  <div class="section-label">Quanto dessa perda ainda dá para recuperar</div>
-  <div id="cancelRecuperavel"><div class="contexto">Consultando a fila de contestação...</div></div>
 
   ${lojasCancel.length ? `
   <div class="section-label">Onde mais se cancela — loja a loja${CANCEL_MOTIVO ? ' · ' + CANCEL_MOTIVO : ''}</div>
   <div class="caption-label" style="text-align:center;">Ordenado pelo valor perdido: a primeira linha é onde o dinheiro está saindo.</div>
   <div id="tabelaLojasCancel">
     <table>
-      <tr><th>Loja</th><th>Pedidos cancelados</th><th>Valor perdido</th><th title="Valor perdido dividido pelos pedidos cancelados — mostra se a loja perde muito de uma vez ou pouco em muitos pedidos.">R$ por cancelamento</th></tr>
+      <thead><tr><th>Loja</th><th>Pedidos cancelados</th><th>Valor perdido</th><th title="Valor perdido dividido pelos pedidos cancelados — mostra se a loja perde muito de uma vez ou pouco em muitos pedidos.">R$ por cancelamento</th></tr></thead><tbody>
       ${lojasCancel.map(x => `<tr><td>${x.nome}</td><td>${x.n.toLocaleString('pt-BR')}</td>
         <td>R$ ${fmt(x.valor)}</td><td>R$ ${fmt(x.unit)}</td></tr>`).join('')}
       ${(() => { const t = lojasCancel.reduce((s, x) => ({ n: s.n + x.n, v: s.v + x.valor }), { n: 0, v: 0 });
         return `<tr class="liq"><td>TOTAL</td><td>${t.n.toLocaleString('pt-BR')}</td>
           <td>R$ ${fmt(t.v)}</td><td>R$ ${fmt(t.n ? t.v / t.n : 0)}</td></tr>`; })()}
-    </table>
+    </tbody></table>
   </div>` : ''}
 
   <div class="section-label">Estamos melhorando ou piorando?${CANCEL_MOTIVO ? ' · ' + CANCEL_MOTIVO : ''}</div>
@@ -5202,9 +5195,6 @@ function renderChartMotivos() {
     d => `R$ ${fmt(d.valor)} em ${d.n} pedidos (R$ ${fmt(d.n ? d.valor/d.n : 0)} por cancelamento)`,
     d => 'R$ ' + fmt(d.valor), true);
 
-  barras('chartMotivosQtd', 'n', corToken('--info'), 'pedidos cancelados',
-    d => `${d.n} pedidos (${pct(d.pct)}% dos cancelamentos) — R$ ${fmt(d.valor)}`,
-    d => `${d.n} (${pct(d.pct)}%)`);
 
   renderChartsCancelEvolucao();
 }
