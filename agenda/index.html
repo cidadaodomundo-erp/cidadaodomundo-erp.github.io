@@ -94,7 +94,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   // 12/11/2026 (dono 01:09): o que o robô conferiu nas últimas 24 h aparece como "✓ conferido"
   const ontem = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf] = await Promise.all([
-    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota&para=is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,retorno_visto_em,fio,feito_em,confere,conferencia_nota&para=is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
@@ -195,7 +195,8 @@ function agDesenhar() {
     const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
-    return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''} <span class="f" title="número do item (os chats citam por ele)">#${p.id}</span></span>${acao}${bts}${feito}
+    const nv = agRetNovo(p);
+    return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t">${nv ? agBolinha(p.id) : ''}${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''} <span class="f" title="número do item (os chats citam por ele)">#${p.id}</span></span>${acao}${bts}${feito}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
@@ -220,7 +221,12 @@ function agDesenhar() {
   const corC = { dep: G.dep.length ? 'neg' : 'pos', anda: 'blue', saber: 'neutral' };
   h += `<div class="cards cards-3 ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
       <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${G[k].length}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}</div>`;
-  h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
+  // 12/11/2026 (dono 15:43): "● N respostas novas" — a frente respondeu e o dono ainda não abriu o cartão; clicar filtra
+  const novos = itens.filter((x) => x.pend && agRetNovo(x.pend));
+  if (!novos.length) AG.soNovos = false;
+  if (novos.length) h += `<div id="agRetCont" style="margin:6px 2px 0;"><a href="javascript:void(0)" onclick="agSoNovos(${AG.soNovos ? 'false' : 'true'})" style="color:var(--farol-fora);font-weight:700;text-decoration:none;">● ${novos.length} ${novos.length === 1 ? 'resposta nova' : 'respostas novas'}</a>${AG.soNovos ? ' <a href="javascript:void(0)" onclick="agSoNovos(false)" class="f">· ver tudo</a>' : ''}</div>`;
+  if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, 'nenhuma resposta nova');
+  else h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
   alvo.innerHTML = h;
   agRolarAteItem();
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
@@ -228,7 +234,24 @@ function agDesenhar() {
   agEquipeMontar().then(agGuia);
   agPlanoMontar();
 }
-function agFiltrar(k) { try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
+function agFiltrar(k) { AG.soNovos = false; try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
+// 12/11/2026 (dono 15:43, proposta 2026-11-12-agenda-bolinha-retorno): bolinha vermelha quando a frente respondeu o cartão
+// e o destinatário ainda não abriu. Some ao clicar no cartão (rpc dono_pendencia_retorno_visto); volta com retorno novo.
+function agRetNovo(p) { return !!(p && p.retorno_em && (!p.retorno_visto_em || p.retorno_visto_em < p.retorno_em)); }
+function agBolinha(id) { return `<span class="ag-bolinha" id="agBol_${id}" title="resposta nova" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--farol-fora);margin-right:6px;vertical-align:middle;"></span>`; }
+function agSoNovos(v) { AG.soNovos = !!v; agDesenhar(); }
+const AG_VISTO = new Set();
+async function agRetVisto(id) {
+  if (AG_VISTO.has(id)) return; AG_VISTO.add(id);
+  const r = await trRpcSeguro('dono_pendencia_retorno_visto', { p_id: id });
+  if (!r.ok) { AG_VISTO.delete(id); return; }
+  const agora = new Date().toISOString();
+  [AG.dados && AG.dados.pend, AGPL.pend].forEach((L) => Array.isArray(L) && L.forEach((p) => { if (p.id === id) p.retorno_visto_em = agora; }));
+  const b = document.getElementById('agBol_' + id); if (b) b.remove();
+  const el = document.getElementById('agItem_' + id); if (el) el.removeAttribute('onclick');
+  const c = document.getElementById('agRetCont'), n = document.querySelectorAll('.ag-bolinha').length;
+  if (c && !n) c.remove(); else if (c) { const a = c.querySelector('a'); if (a) a.textContent = `● ${n} ${n === 1 ? 'resposta nova' : 'respostas novas'}`; }
+}
 // GUIA DE PRIMEIRO ACESSO (07/11/2026, exemplo do padrão novo; mecanismo no nucleo.js): abre uma vez por login; "?" revê
 function agGuia() {
   guiaRegistrar('agenda', [
@@ -359,8 +382,9 @@ async function agPlanoMontar(reler) {
   if (reler || AGPL.pend === null) {
     const ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
     [AGPL.pend, AGPL.dev] = await Promise.all([
-      ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota,para&para=not.is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
-      ler('vw_juncao_desenvolvimento?select=*&order=prazo.nullslast,titulo')]);
+      ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,retorno_visto_em,fio,feito_em,confere,conferencia_nota,para&para=not.is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+      // 12/11/2026 (dono 15:35: "ordem lógica e de execução"): etapa e posição vêm do banco (juncao_ordem)
+      ler('vw_juncao_desenvolvimento?select=*&order=etapa_ordem.nullslast,ordem.nullslast,titulo')]);
   }
   const P = Array.isArray(AGPL.pend) ? AGPL.pend : [], D = Array.isArray(AGPL.dev) ? AGPL.dev : [];
   let box = document.getElementById('agPlano');
@@ -377,22 +401,32 @@ async function agPlanoMontar(reler) {
       : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${quando(p.respondido_em)}: ${agE(p.resposta)}</div>`
       : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
-    return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''} <span class="f">#${p.id}</span></span>${bts}
+    const nv = !dono && agRetNovo(p);   // no "Com o Fabio" a resposta é para ele: só ele apaga a bolinha
+    return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t">${nv ? agBolinha(p.id) : ''}${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''} <span class="f">#${p.id}</span></span>${bts}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   let h = '';
   if (AGPL.pend && AGPL.pend.erro) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li as pendências: ${agE(AGPL.pend.erro)}</div>`;
   if (P.length) h += `<div class="ag-bloco">${dono ? 'Com o Fabio' : 'Pendente com você'} (${P.length})${dono ? ' <span class="f">· o que depende dele; só ele marca</span>' : ''}</div>` + P.map(linhaA).join('');
   if (D.length) {
-    // o que mudou nos últimos 7 dias em destaque; o resto recolhido, por estado
+    // 12/11/2026 (dono 15:35; proposta 2026-11-12-desenvolvimentos-em-ordem): um subtítulo por etapa, na ordem de execução.
+    // Na etapa 1 a posição vira "1º, 2º…" (ali uma coisa destrava a seguinte). "Em espera" (6) e "Pronto" (9) recolhidos.
+    // Sem etapa no banco = "8. Novo: a ordenar". O que mudou nos últimos 7 dias leva "· mudou esta semana".
     const semana = new Date(Date.now() - 7 * 86400000).toISOString();
-    const novo = D.filter((d) => d.atualizado_em && d.atualizado_em >= semana), resto = D.filter((d) => !novo.includes(d));
     const linhaB = (d) => { const E = AGPL_ESTADO[d.estado] || [d.estado, 'var(--tx-3)'];
-      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t"><b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span></span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${d.detalhe ? `<div class="ag-ctx">${agE(d.detalhe)}</div>` : ''}</div>`; };
+      const pos = Number(d.etapa_ordem) === 1 && d.ordem != null ? `<b>${d.ordem}º</b> ` : '';
+      const mudou = d.atualizado_em && d.atualizado_em >= semana ? ' <span style="color:var(--info);">· mudou esta semana</span>' : '';
+      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t">${pos}<b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span>${mudou}</span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${d.detalhe ? `<div class="ag-ctx">${agE(d.detalhe)}</div>` : ''}</div>`; };
     const cont = Object.keys(AGPL_ESTADO).map((k) => [k, D.filter((d) => d.estado === k).length]).filter(([, n]) => n).map(([k, n]) => `${AGPL_ESTADO[k][0].toLowerCase()} ${n}`).join(' · ');
+    const etapas = [];
+    D.forEach((d) => { const nome = d.etapa || '8. Novo: a ordenar', eo = d.etapa_ordem == null ? 8 : Number(d.etapa_ordem);
+      let e = etapas.find((x) => x.nome === nome); if (!e) { e = { nome, eo, itens: [] }; etapas.push(e); } e.itens.push(d); });
+    etapas.sort((a, b) => a.eo - b.eo);
     h += `<div class="ag-bloco">Desenvolvimentos <span class="f">· ${cont}</span></div>`
-      + (novo.length ? novo.map(linhaB).join('') : '<div class="ag-lin"><span class="t" style="color:var(--tx-3);">nada mudou nos últimos 7 dias</span></div>')
-      + (resto.length ? `<details style="margin:4px 2px;"><summary style="cursor:pointer;color:var(--tx-3);font-size:13px;">o resto (${resto.length})</summary>${Object.keys(AGPL_ESTADO).map((k) => resto.filter((d) => d.estado === k).map(linhaB).join('')).join('')}</details>` : '');
+      + etapas.map((e) => { const tit = `${agE(e.nome)} <span class="f">(${e.itens.length})</span>`, corpo = e.itens.map(linhaB).join('');
+        return e.eo === 6 || e.eo === 9
+          ? `<details style="margin:6px 2px;"><summary style="cursor:pointer;color:var(--tx-3);font-size:13px;font-weight:700;">${tit}</summary>${corpo}</details>`
+          : `<div style="margin:10px 2px 4px;color:var(--tx-2);font-size:13px;font-weight:700;">${tit}</div>${corpo}`; }).join('');
   }
   box.innerHTML = h;
 }
@@ -486,6 +520,7 @@ function agRolarAteItem() {
   const n = agItemAlvo(); if (!n) return;
   const el = document.getElementById('agItem_' + n); if (!el) return;
   AG_ITEM_FEITO = true;
+  if (el.querySelector('.ag-bolinha')) agRetVisto(n);
   el.style.outline = '2px solid var(--info)'; el.style.borderRadius = '8px';
   setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
 }
