@@ -703,13 +703,18 @@ function lgPrecosHtml() {
   const sel = `<select id="lgEmpresa" style="min-width:280px;" onchange="LG.empresa=this.value;lgRender()"><option value="">Escolha a empresa</option>${LG.emp.map((e) => `<option value="${e.id}"${id === e.id ? ' selected' : ''}>${trEscH(e.nome)}</option>`).join('')}</select>`;
   if (!id) return sel;
   const P = new Map(LG.preco.filter((x) => x.empresa_id === id).map((x) => [x.produto_id, x.preco]));
+  // 12/11 (etapa 1b da lojinha): empresa ligada a uma tabela vê o preço dela onde não tem o próprio (loja_preco_vigente: próprio, senão o da tabela)
+  const emp = LG.emp.find((e) => e.id === id) || {}, tabNome = emp.tabela_id ? ((LG.modelos.find((m) => m.id === emp.tabela_id) || {}).nome || 'tabela') : null;
+  const PT = new Map(emp.tabela_id ? LG.preco.filter((x) => x.empresa_id === emp.tabela_id).map((x) => [x.produto_id, x.preco]) : []);
   const L = LG.prod.filter((p) => !b || orcNorm(p.nome_vitrine).includes(b));
   return `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">${sel}<input id="lgBprod" type="search" placeholder="Buscar produto" value="${trEscH(LG.bprod)}" style="width:220px;" oninput="LG.bprod=this.value;lgRender();const i=document.getElementById('lgBprod');i.focus();i.setSelectionRange(i.value.length,i.value.length)"></div>
-    <div id="tabelaLgPrecos" style="overflow-x:auto;"><table><thead><tr><th>Produto</th><th>Un</th><th>Preço</th><th>Na loja desta empresa</th></tr></thead><tbody>
-    ${L.map((p) => { const v = P.get(p.id), tem = v != null;
+    ${tabNome ? `<div class="caption-label" style="text-align:left;margin:-4px 0 8px;">Segue a tabela <b>${trEscH(tabNome)}</b>: o preço próprio, quando gravado, vale no lugar do da tabela.</div>` : ''}
+    <div id="tabelaLgPrecos" style="overflow-x:auto;"><table><thead><tr><th>Produto</th><th>Un</th><th>Preço próprio</th>${tabNome ? `<th>Preço da tabela</th>` : ''}<th>Na loja desta empresa</th></tr></thead><tbody>
+    ${L.map((p) => { const v = P.get(p.id), tem = v != null, vt = PT.get(p.id), temT = vt != null;
       return `<tr><td style="white-space:normal;">${trEscH(p.nome_vitrine)}</td><td>${trEscH(p.un_vitrine || p.un || '')}</td>
         <td style="white-space:nowrap;"><input id="lgPreco${p.id}" type="text" inputmode="decimal" value="${tem ? lgDin(v) : ''}" style="width:80px;text-align:right;"> <button type="button" class="preset-btn" onclick="lgGravarPreco(${id},${p.id})">Gravar</button></td>
-        <td style="color:${!p.ativo ? 'var(--farol-perto)' : tem ? 'var(--farol-ok)' : 'var(--tx-3)'};font-weight:700;">${!p.ativo ? 'Produto pausado' : tem ? 'Aparece' : 'Não aparece'}</td></tr>`; }).join('')}
+        ${tabNome ? `<td style="white-space:nowrap;color:${tem ? 'var(--tx-4)' : 'var(--tx-1)'};${tem && temT ? 'text-decoration:line-through;' : ''}">${temT ? 'R$ ' + lgDin(vt) : '–'}</td>` : ''}
+        <td style="color:${!p.ativo ? 'var(--farol-perto)' : tem || temT ? 'var(--farol-ok)' : 'var(--tx-3)'};font-weight:700;">${!p.ativo ? 'Produto pausado' : tem ? 'Aparece' + (tabNome ? ' · preço próprio' : '') : temT ? 'Aparece · preço da tabela' : 'Não aparece'}</td></tr>`; }).join('')}
     </tbody></table></div>`;
 }
 async function lgGravarPreco(emp, prod) {
