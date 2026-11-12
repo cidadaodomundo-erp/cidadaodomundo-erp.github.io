@@ -3313,26 +3313,28 @@ async function entrarProducao() {
 async function prdCarregar() {
   await estNomesCarregar();
   const u = encodeURIComponent(PRD.unidade);
-  const [receitas, lancamentos, base, move, perdas, itensEst] = await Promise.all([
+  const [receitas, lancamentos, base, move, perdas, itensEst, naHora] = await Promise.all([
     consultarTudo(`vw_est_producao_receita?select=*&unidade=eq.${u}&order=receita.asc`),
     // 21/10/2026: o lote com perda, entrou no estoque, planejado, rendimento e a marca de corrigida (vw_est_producao_lote)
     consultarTudo(`vw_est_producao_lote?select=*&unidade=eq.${u}&data=eq.${PRD.data}&order=criado_em.desc`),
     // 22/10/2026 (dono): só RECEITA da base em uso; água, refri e brownie de revenda tinham "ficha" de si mesmos
-    consultarTudo('ft_receita_base?select=nome_base,grupo_receita,nao_usa,nome_saipos&order=nome_base'),
+    consultarTudo('ft_receita_base?select=nome_base,grupo_receita,nao_usa&order=nome_base'),
     // 24/10/2026 (Estoque): por receita, se apontar move o saldo e por quê; e se é receita de fato (a regra é do banco)
     consultarTudo(`vw_est_receita_move?select=nome_base,move,motivo,e_receita&unidade=eq.${u}&order=nome_base`).catch(() => null),
     // 24/10/2026: perda fora da produção (estragou, venceu, caiu, voltou do salão) registrada no dia
     consultarTudo(`vw_est_perda?select=*&unidade=eq.${u}&data=eq.${PRD.data}&order=criado_em.desc`).catch(() => null),
     PRD.itensEst ? Promise.resolve(PRD.itensEst)
       : consultarTudo(`vw_est_controle_item?select=nome_base,un,saldo_hoje,fora_da_base&unidade=eq.${u}&order=nome_base`).catch(() => null),
+    // 12/11/2026 (Estoque): "feita na hora" é a regra do motor, por loja (FICHA: e sem item de estoque NA LOJA)
+    consultarTudo(`vw_est_receita_feita_na_hora?select=nome_base,rotulo&unidade=eq.${u}`).catch(() => []),
   ]);
   const grupoDe = new Map(base.filter((b) => !b.nao_usa && b.nome_base).map((b) => [b.nome_base, b.grupo_receita || 'SEM GRUPO']));
   const moveDe = move && move.length ? new Map(move.map((m) => [m.nome_base, m])) : null;
   PRD.receitas = receitas.filter((r) => grupoDe.has(r.nome_base) && !(moveDe && moveDe.get(r.nome_base) && moveDe.get(r.nome_base).e_receita === false))
     .map((r) => { const m = moveDe && moveDe.get(r.nome_base); return { ...r, grupo: grupoDe.get(r.nome_base), move: m ? m.move : null, move_motivo: m ? m.motivo : null }; });
-  // 12/11/2026 (Estoque, proposta 2026-11-12-apontar-feito-na-hora): no Saipos estas receitas são FICHA, não item de estoque —
-  // a venda já baixa a matéria-prima. Apontar vale para o plano e o rendimento, sem mexer no saldo: etiqueta, sem alerta.
-  PRD.naHora = new Set(base.filter((b) => /^FICHA:/i.test(String(b.nome_saipos || '').trim())).map((b) => b.nome_base));
+  // 12/11/2026 (Estoque, proposta 2026-11-12-apontar-feito-na-hora): a venda já baixa a matéria-prima dessas receitas.
+  // Apontar vale para o plano e o rendimento, sem mexer no saldo: etiqueta, sem alerta. Quem decide é a view (por loja).
+  PRD.naHora = new Set((Array.isArray(naHora) ? naHora : []).map((x) => x.nome_base));
   PRD.perdas = perdas;
   PRD.itensEst = itensEst;
   PRD.lancamentos = lancamentos;
