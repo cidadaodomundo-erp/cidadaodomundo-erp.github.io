@@ -2492,7 +2492,9 @@ async function cgHojeCarregar() {
       ler('vw_rh_calculos_mes?select=*&order=data_limite'), ler('vw_rh_ferias_alertas?select=*&order=limite_gozo')]);
     if (!r.ok) throw new Error(await trErroDe(r));
     const lemb = await ler('vw_rh_lembretes_hoje?select=*&order=data,tipo,lembrete_id,pessoa_id');
-    CARGOS.hoje = { L, calc, fer, lemb, leitura: (await r.json())[0] || {} };
+    // 12/11/2026 (dono, agenda 137; proposta 2026-11-12-rh-flash-aprovar.md): a Hellen marca e o robô aprova na Flash
+    const apr = await ler('vw_rh_flash_aprovar?select=chave,situacao_robo,texto_robo,nota,marcado_por');
+    CARGOS.hoje = { L, calc, fer, lemb, apr: new Map((Array.isArray(apr) ? apr : []).map((a) => [a.chave, a])), aprErro: apr && apr.erro, leitura: (await r.json())[0] || {} };
   } catch (e) { CARGOS.hoje = { erro: e.message }; }
   if (CARGOS_F.aba === 'hoje') renderModuloCargos();
 }
@@ -2530,7 +2532,7 @@ function cgHojeItens() {
   const acaoFlash = (x) => {
     const emp = `<div style="font-size:11px;color:var(--tx-4);">${cgEsc(x.empresa || '')}</div>`;
     if (x.grupo === 'Pagar' && x.pix_copia_cola) return `<b>${cgR(x.valor)}</b> <button type="button" class="preset-btn" data-pix="${cgEsc(x.pix_copia_cola)}" onclick="cgFcCopiar(this)">Copiar PIX</button>`;
-    return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${linkFlash(x) ? `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(linkFlash(x))}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
+    return `${x.grupo === 'Pagar' ? `<b>${cgR(x.valor)}</b> ` : ''}${x.grupo === 'Aprovar' ? cgFlashRoboHtml(x) : ''}${linkFlash(x) ?`<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="${cgEsc(linkFlash(x))}" target="_blank" rel="noopener">Abrir na Flash</a>` : ''}${emp}`;
   };
   if (Array.isArray(H.L)) for (const x of H.L) if (daLoja(x.empresa)) itens.push({ ...x, sub: [x.empresa, x.gestor ? 'gestor: ' + cgNome(x.gestor) : ''].filter(Boolean).join(' · '), acao: acaoFlash(x) });
   for (const i of cgFlashDaLoja(CARGOS.flash)) itens.push({ grupo: 'Corrigir', o_que: 'Flash: ' + (CG_FLASH_TIPO[i.tipo] || i.tipo), nome: i.nome, sub: i.empresa || i.unidade, detalhe: i.o_que_fazer, acao: `<a class="preset-btn" style="text-decoration:none;display:inline-block;" href="https://hros.flashapp.com.br/employees${FLASH_EMPRESA[String(i.empresa || i.unidade || '').toUpperCase()] ? '?company=' + FLASH_EMPRESA[String(i.empresa || i.unidade || '').toUpperCase()] : ''}" target="_blank" rel="noopener">Abrir na Flash</a>` });
@@ -2693,6 +2695,46 @@ async function cgFlashPedidoVer() {
     avisoAcao('ok', `✓ Flash lida às ${cgHM(x.atendido_em)}: as pendências já estão atualizadas.`);
   } catch (e) {}
 }
+// APROVAR PELO ROBÔ (12/11/2026): rh_flash_aprovar_marcar(chave, true/false); o robô do mini PC passa às 10:40, 13:40 e 17:40
+const CG_FLASH_ENVIANDO = new Set();
+function cgFlashRoboHtml(x) {
+  const H = CARGOS.hoje || {}, a = H.apr && H.apr.get(x.chave), s = a ? a.situacao_robo : 'NAO_MARCADO', k = cgEsc(String(x.chave || '')).replace(/'/g, '&#39;');
+  if (!x.chave) return '';
+  if (CG_FLASH_ENVIANDO.has(x.chave)) return '<div style="color:var(--info);margin-bottom:4px;">enviando…</div>';
+  if (s === 'NAO_MARCADO') {
+    const daPessoa = (Array.isArray(H.L) ? H.L : []).filter((y) => y.grupo === 'Aprovar' && y.nome === x.nome && y.empresa === x.empresa && y.chave !== x.chave
+      && !((H.apr.get(y.chave) || {}).situacao_robo || '').match(/^(MARCADO|APROVADO|CONFIRMADO)$/)).length;
+    return `<div style="margin-bottom:4px;"><button type="button" class="preset-btn active" onclick="cgFlashAprovar('${k}',true)">Aprovar pelo robô</button>${daPessoa
+      ? ` <a href="javascript:void(0)" style="font-size:11px;white-space:nowrap;" onclick="cgFlashAprovarPessoa('${k}')">marcar todos desta pessoa (${daPessoa + 1})</a>` : ''}</div>`;
+  }
+  const cor = s === 'CONFIRMADO' ? 'var(--farol-ok)' : /NAO_ACHEI|FALHOU/.test(s) ? 'var(--farol-fora)' : 'var(--info)';
+  const txt = s === 'MARCADO' ? 'na fila do robô (passa às 10:40, 13:40 e 17:40)' : a.texto_robo || s;
+  return `<div style="margin-bottom:4px;white-space:normal;max-width:240px;"><span style="color:${cor};font-weight:700;">${cgEsc(txt)}</span>${a.nota && s !== 'FALHOU' ? `<div style="font-size:11px;color:var(--tx-4);">${cgEsc(a.nota)}</div>` : ''}
+    ${s === 'MARCADO' || /NAO_ACHEI|FALHOU/.test(s) ? ` <button type="button" class="preset-btn" onclick="cgFlashAprovar('${k}',${s === 'MARCADO' ? 'false' : 'true'})">${s === 'MARCADO' ? 'Desfazer' : 'Tentar de novo'}</button>` : ''}</div>`;
+}
+async function cgFlashAprovar(chave, aprovar, semRecarregar) {
+  CG_FLASH_ENVIANDO.add(chave);
+  if (!semRecarregar) { avisoAcao('enviando', aprovar ? '… enviando ao robô' : '… desfazendo'); renderModuloCargos(); }
+  const r = await trRpcSeguro('rh_flash_aprovar_marcar', { p_chave: chave, p_aprovar: !!aprovar });
+  CG_FLASH_ENVIANDO.delete(chave);
+  if (!r.ok) { const e = await trErroDe(r); if (!semRecarregar) { renderModuloCargos(); avisoAcao('erro', `✗ Não deu: ${e}`, () => cgFlashAprovar(chave, aprovar)); } return e; }
+  if (semRecarregar) return null;
+  await cgHojeCarregar();
+  avisoAcao('ok', aprovar ? `✓ Na fila do robô às ${avisoHora()} — ele passa às 10:40, 13:40 e 17:40.` : `✓ Desfeito às ${avisoHora()}: o robô não vai aprovar este.`);
+  return null;
+}
+async function cgFlashAprovarPessoa(chave) {
+  const H = CARGOS.hoje || {}, x = (H.L || []).find((y) => y.chave === chave);
+  if (!x) return;
+  const ks = H.L.filter((y) => y.grupo === 'Aprovar' && y.nome === x.nome && y.empresa === x.empresa && !((H.apr.get(y.chave) || {}).situacao_robo || '').match(/^(MARCADO|APROVADO|CONFIRMADO)$/)).map((y) => y.chave);
+  avisoAcao('enviando', `… enviando ${ks.length} ao robô`);
+  ks.forEach((k) => CG_FLASH_ENVIANDO.add(k)); renderModuloCargos();
+  const erros = [];
+  for (const k of ks) { const e = await cgFlashAprovar(k, true, true); if (e) erros.push(e); }
+  await cgHojeCarregar();
+  if (erros.length) avisoAcao('erro', `✗ ${erros.length} de ${ks.length} não foram: ${erros[0]}`, () => cgFlashAprovarPessoa(chave));
+  else avisoAcao('ok', `✓ ${ks.length} na fila do robô às ${avisoHora()} — ele passa às 10:40, 13:40 e 17:40.`);
+}
 async function cgFcCopiar(b) {
   try {
     await navigator.clipboard.writeText(b.dataset.pix);
@@ -2803,17 +2845,18 @@ const RESC_BLOCO_A = [['data_aviso', 'Data em que o aviso foi entregue', 'date']
   ['reducao', 'Redução no aviso (não muda o valor)', 'reducao']];
 const RESC_BLOCO_B = [
   ['Salário', [['salario', 'Salário', 'num'], ['adicionais', 'Adicionais', 'num'], ['dias_saldo', 'Dias de saldo', 'num'], ['pega_vt', 'Desconta VT', 'sim']]],
-  ['Médias', [['media_variavel', 'Média variável', 'num'], ['media_aviso', 'Média no aviso', 'num'], ['media_13', 'Média no 13º', 'num'], ['media_ferias', 'Média nas férias', 'num']]],
+  ['Médias', [['media_variavel', 'Média variável', 'num'], ['media_aviso', 'Média no aviso', 'num'], ['media_13', 'Média no 13º', 'num'], ['media_ferias', 'Média nas férias proporcionais', 'num'], ['media_ferias_vencidas', 'Média nas férias vencidas', 'num']]],
   ['Faltas', [['faltas_dias', 'Faltas no mês (dias)', 'num'], ['atraso_horas', 'Atrasos (horas)', 'num'], ['faltas_aquisitivo', 'Faltas no período aquisitivo', 'num']]],
   ['Férias, vales e descontos', [['ferias_vencidas_dias', 'Férias vencidas (dias)', 'num'], ['adiantamentos', 'Adiantamento do mês', 'num'],
-    ['vt_nao_usado', 'VT do mês seguinte já creditado', 'num'], ['va_nao_usado', 'VA do mês seguinte já creditado', 'num'], ['gratificacao_salao', 'Gratificação do salão do mês', 'num']]],
+    ['vt_nao_usado', 'VT do mês seguinte já creditado', 'num'], ['va_nao_usado', 'VA do mês seguinte já creditado', 'num'], ['gratificacao_salao', 'Gratificação do salão do mês', 'num'],
+    ['salario_familia_cotas', 'Salário-família (cotas = filhos até 14 anos)', 'num']]],
   ['FGTS', [['saldo_fgts', 'Saldo do FGTS', 'num']]],
 ];
 const RESC_BLOCO_C = [['dsr_dias', 'DSR perdido (dias)', 'num'], ['atestado_dias', 'Dias de atestado no mês', 'num'], ['decimo_pago', '13º já adiantado', 'num'],
   ['va_rescisao', 'VA na rescisão', 'num'], ['descontos', 'Outros descontos', 'num'], ['descontos_motivo', 'Motivo dos outros descontos', 'txt'],
   ['anos_aviso', 'Anos para o aviso (só para forçar)', 'num', 'calcula'], ['avos13', 'Avos do 13º (só para forçar)', 'num', 'calcula'], ['avos_ferias', 'Avos de férias (só para forçar)', 'num', 'calcula']];
 // campos que o painel estima e alguém precisa conferir: âmbar até editar ou tocar em "confere"
-const RESC_CONFERIR = new Set(['faltas_dias', 'faltas_aquisitivo', 'media_variavel', 'media_aviso', 'media_13', 'media_ferias', 'saldo_fgts']);
+const RESC_CONFERIR = new Set(['faltas_dias', 'faltas_aquisitivo', 'media_variavel', 'media_aviso', 'media_13', 'media_ferias', 'media_ferias_vencidas', 'salario_familia_cotas', 'saldo_fgts']);
 const RESC_INPUT = 'width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);font:inherit;font-size:13px;';
 function cgRescPessoas() {
   const hoje = trHoje(), limite = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
