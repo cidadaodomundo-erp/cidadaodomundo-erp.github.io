@@ -93,20 +93,6 @@
   .mi .ic { width:18px; text-align:center; flex-shrink:0; font-size:13px; }
   .sinal { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; background:var(--farol-fora); color:var(--bg); font-size:11px; font-weight:700; line-height:18px; text-align:center; flex-shrink:0; }
   .grp .sinal { margin-left:8px; }
-  /* selo das telas incorporadas pelo Fabio (origem:'fabio' em casca/menu.js): texto visível, não é botão/link */
-  .selo-fabio { margin-left:6px; flex-shrink:0; padding:1px 6px; border-radius:999px; font-size:10.5px; font-weight:800;
-                background:#2a5fcc; color:#fff; border:1px solid #2a5fcc; }
-  /* item incorporado pelo Fabio: o próprio botão fica azul, não só o selo */
-  .mi-fabio { background:rgba(42,95,204,.16); border:1px solid #3f74e0; color:#cfe0ff; }
-  .mi-fabio .selo-fabio { background:#fff; color:#2a5fcc; border-color:#fff; }
-  .mi-fabio:hover { background:#2a5fcc; border-color:#2a5fcc; color:#fff; }
-  .mi-fabio:hover .selo-fabio { background:#fff; color:#2a5fcc; border-color:#fff; }
-  .mi-fabio.on { background:#2a5fcc; border-color:#2a5fcc; color:#fff; }
-  .mi-fabio.on .selo-fabio { background:#fff; color:#2a5fcc; border-color:#fff; }
-  .mi-fabio:focus-visible { outline:2px solid #cfe0ff; outline-offset:1px; }
-  html.tema-proposta .mi-fabio { background:rgba(42,95,204,.22); border-color:#2a5fcc; color:#cfe0ff; }
-  html.tema-proposta .mi-fabio:hover, html.tema-proposta .mi-fabio.on { background:#2a5fcc; border-color:#2a5fcc; color:#fff; }
-  html.tema-proposta .mi-fabio .selo-fabio, html.tema-proposta .mi-fabio:hover .selo-fabio, html.tema-proposta .mi-fabio.on .selo-fabio { background:#fff; color:#2a5fcc; border-color:#fff; }
   .grp { display:flex; align-items:center; width:100%; background:none; border:none; border-top:1px solid var(--line);
          color:var(--tx-5); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.8px;
          padding:14px 12px 6px; margin-top:6px; cursor:pointer; text-align:left; }
@@ -258,10 +244,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261111f"></script>
-<script src="casca/paginas.js?v=20261111g"></script>
-<script src="casca/modulos.js?v=20261111f"></script>
-<script src="casca/busca.js?v=20261111f"></script>
+<script src="casca/menu.js?v=20261107a"></script>
+<script src="casca/paginas.js?v=20261107b"></script>
+<script src="casca/modulos.js?v=20261107d"></script>
+<script src="casca/busca.js?v=20261107c"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -428,11 +414,8 @@ function atualizarFaixaLoja() {
 
 // -------------------------------------------------------------- menu
 // tela só de quem vê pessoal: quem não vê não acha no menu (o banco também recusa)
-const SO_PESSOAL = new Set(['macertos', 'pcartao']);
+const SO_PESSOAL = new Set(['macertos']);
 let VE_PESSOAL = null;
-// Eventos e ausências exige as DUAS permissões (ver e cadastrar pessoal), ambas === true: sem as duas a tela recusaria, então o item nem aparece
-const SO_PESSOAL_E_CADASTRO = new Set(['peventos', 'pao']);
-let VE_CADASTRA = null;
 // tela só de DONO e FINANCEIRO
 const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
@@ -448,9 +431,11 @@ function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
-  if (SO_PESSOAL_E_CADASTRO.has(chave) && !(VE_PESSOAL === true && VE_CADASTRA === true)) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
   if (SO_DONO.has(chave) && !ehDono() && !(chave === 'agenda' && VE_EQUIPE === true)) return false;
+  // 12/11/2026 02:22 (dono não viu a agenda no acesso da Rita): a Minha agenda é de TODO login — o banco (minha_agenda) só
+  // devolve o que é da própria pessoa, então ela não depende da lista de telas do painel_acesso (nenhum login restrito a tinha)
+  if (chave === 'agenda') return true;
   if (!PODE) return true;
   if (it.link) return false;                     // atalhos também somem para acesso restrito (igual ao painel)
   return PODE.includes(chave);
@@ -462,13 +447,11 @@ try { GRUPOS_ABERTOS = JSON.parse(localStorage.getItem('cascaGrupos') || '{}') |
 // número ao lado da tela; some quando zera. Grupo fechado mostra a soma no próprio título.
 const SINAIS = {};
 function sinalHtml(n) { return n > 0 ? `<span class="sinal" title="${n} sem resolver">${n}</span>` : ''; }
-// selo das telas incorporadas pelo Fabio (ITENS[chave].origem === 'fabio')
-function seloFabioHtml(i) { return i.origem === 'fabio' ? '<span class="selo-fabio">Fábio</span>' : ''; }
 function desenharMenu() {
   // menu novo (07/11/2026): a Hoje mora dentro de "Agora" (não fica solta no alto)
   let h = '';
-  if (!MOD_CFG.hojeNoModulo) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) => { const it = ITENS[i.chave] || i;
-    return `<button class="mi${i.chave === ATUAL ? ' on' : ''}${it.origem === 'fabio' ? ' mi-fabio' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${seloFabioHtml(it)}${sinalHtml(SINAIS[i.chave])}</button>`; }).join('');
+  if (!MOD_CFG.hojeNoModulo) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
+    `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${sinalHtml(SINAIS[i.chave])}</button>`).join('');
   // 22/10/2026: o menu segue os MÓDULOS do formato A (o mesmo agrupamento dos cartões do Início)
   MODULOS.forEach((g) => {
     const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => MOD_CFG.hojeNoModulo || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
@@ -477,7 +460,7 @@ function desenharMenu() {
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
     h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}${aberto ? '' : sinalHtml(itens.reduce((a, i) => a + (SINAIS[i.chave] || 0), 0))}<span class="seta">▶</span></button>`;
     h += '<div class="itens">' + itens.map((i) =>
-      `<button class="mi${i.chave === ATUAL ? ' on' : ''}${i.origem === 'fabio' ? ' mi-fabio' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${seloFabioHtml(i)}${sinalHtml(SINAIS[i.chave])}</button>`
+      `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`
     ).join('') + '</div>';
   });
   $('menu').innerHTML = h;
@@ -776,13 +759,6 @@ async function carregarVePessoal() {
     return r.ok ? (await r.json()) === true : null;
   } catch (e) { return null; }
 }
-async function carregarPodeCadastrar() {   // mesma rpc que a tela já usa; só a casca passa a guardar o valor
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/pode_cadastrar_pessoal', {
-      method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: '{}' });
-    return r.ok ? (await r.json()) === true : null;
-  } catch (e) { return null; }
-}
 async function carregarVeEquipe() {
   try {
     const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/agenda_ve_equipe', {
@@ -859,7 +835,7 @@ temaAplicar(document.documentElement.classList.contains('tema-proposta') ? 'clar
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
   temaDoLogin();
-  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE, VE_CADASTRA] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe(), carregarPodeCadastrar()]);
+  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
@@ -885,4 +861,3 @@ async function montar() {
 <script src="nucleo/ajuda.js?v=20261030b"></script>
 </body>
 </html>
-
