@@ -3094,7 +3094,7 @@ function hojeLigarRelogio() {
 // faturamento (venda cheia, com a promoção da loja no iFood) ÷ pedidos, por canal, de vw_ticket_canal_dia. Compara os mesmos
 // dias da semana anterior, só nos dias em que a loja abriu nas duas (§C3).
 let HOJE_TK = null;
-function hojeTicketCanalHtml(V) {
+function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variação do renderHoje
   if (!HOJE_TK || !HOJE_TK.length) return '';
   const so = finVazio(), menos7 = (s) => fxSomaDias(s, -7);
   const lojas = so ? [so] : ['AGUA VERDE', 'AHU', 'SÃO BRAZ'];
@@ -3241,7 +3241,7 @@ function renderHoje() {
       '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th></tr>' +
       V.linhas.filter(l => !finVazio() || l.u === finVazio()).map(l => linha(l.nome, l.a, l.ca, l.cb,
         [l.atrasada ? 'dados até ' + ddmm(l.ate) : '', l.fora.length ? 'variação sem ' + l.fora.map(diaRot).join(', ') + ' (fechada numa das semanas)' : ''].filter(Boolean).join(' · '))).join('') +
-      (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.ca, V.rede.cb, '', true)) + '</table></div>' + hojeTicketCanalHtml(V) +
+      (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.ca, V.rede.cb, '', true)) + '</table></div>' + hojeTicketCanalHtml(V, varTxt) +
       hojeFeriadoNota(V) +
       '<div style="text-align:center; margin-top:8px;">' + botao('evolucao', 'Evolução de vendas') + ' ' + botao('resumo', 'iFood por dentro') + '</div>';
   }
