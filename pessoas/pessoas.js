@@ -781,8 +781,8 @@ const CG_GUIA_JA = {};
 const CG_GUIAS = {
   cargos: ['pessoas', [
     { sel: '.card[onclick*="soConferir=true"]', texto: '<b>Com alerta</b>: toque para ver só quem tem diferença entre a Flash, o nosso cadastro e a tabela de cargos.' },
-    { sel: '#tabelaCgPessoas td.cg-seta', texto: '<b>Ver detalhes</b>: abre a pessoa — admissão, VT, VA, custo mês a mês — e o botão <b>Editar</b>.' },
-    { sel: 'button[onclick="mostrarModulo(\'padm\')"]', texto: 'Vai admitir alguém? <b>Nova admissão</b> leva à tela de Admissões.' },
+    { sel: '#tabelaCgPessoas td.cg-nome', texto: '<b>Clique no nome</b>: abre a pessoa — admissão, VT, VA, custo mês a mês — e o botão <b>Editar</b>.' },
+    { sel: 'a[onclick="mostrarModulo(\'padm\')"]', texto: 'Vai admitir alguém? <b>+ nova admissão</b> leva à tela de Admissões.' },
     { sel: 'button[onclick="cargosAba(\'custo\')"]', texto: 'Nas abas do alto: <b>Custo do mês</b>, <b>Por setor</b> e <b>Tabela de cargos</b>.' },
     { sel: 'a[onclick^="CARGOS_F.desligados"]', texto: '<b>ver desligados</b> mostra quem já saiu da folha.' },
   ]],
@@ -837,22 +837,22 @@ function cgAbaPessoas() {
       ${card(F.desligados ? 'Desligados' : 'Pessoas', base.length, !F.soConferir, 'CARGOS_F.soConferir=false;renderModuloCargos()', false)}
       ${card('Com alerta', nAl, F.soConferir, 'CARGOS_F.soConferir=true;renderModuloCargos()', nAl > 0)}
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-6px 0 8px;"><button type="button" class="preset-btn active" onclick="mostrarModulo('padm')">Nova admissão → Admissões</button><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;margin:-6px 0 8px;"><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-3);" onclick="mostrarModulo('padm')">+ nova admissão</a><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
 `;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
-    <thead><tr><th></th>${comLoja ? '<th>Loja</th>' : ''}<th>Nome</th><th>Cargo</th><th>Setor</th><th>Turno</th><th style="text-align:right;">Jornada</th><th style="text-align:right;">Salário</th><th style="text-align:right;" title="o que a pessoa custou de verdade em ${cgMesCustoFechado() ? cgMesRot(cgMesCustoFechado()) : 'o último mês fechado'} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta</th></tr></thead>
+    <thead><tr><th>Nome</th>${comLoja ? '<th>Loja</th>' : ''}<th>Cargo</th><th>Setor</th><th>Turno</th><th>Jornada</th><th>Salário</th><th title="o que a pessoa custou de verdade em ${cgMesCustoFechado() ? cgMesRot(cgMesCustoFechado()) : 'o último mês fechado'} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta / nota</th></tr></thead>
     <tbody>${vis.map((p) => { const A = alertas(p), ab = F.editando === p.id;
-      return `<tr style="cursor:pointer;" onclick="cgEditar(${p.id})">
-        <td class="cg-seta" style="color:var(--tx-3);font-size:12px;font-weight:600;white-space:nowrap;">${ab ? '▾ Fechar detalhes' : '▸ Ver detalhes'}</td>
+      return `<tr style="cursor:pointer;" onclick="cgEditar(${p.id})" title="${ab ? 'clique para fechar' : 'clique para ver os detalhes'}">
+        <td class="cg-nome"><span style="color:var(--tx-3);">${ab ? '▾' : '▸'}</span> ${cgEsc(cgNome(p.nome))}${p.contrato !== 'CLT' ? ` <span style="font-size:10px;color:var(--farol-perto);">${cgEsc(String(p.contrato).toLowerCase())}</span>` : ''}</td>
         ${comLoja ? `<td>${cgEsc(p.unidade)}</td>` : ''}
-        <td class="cg-nome">${cgEsc(cgNome(p.nome))}${p.contrato !== 'CLT' ? ` <span style="font-size:10px;color:var(--farol-perto);">${cgEsc(String(p.contrato).toLowerCase())}</span>` : ''}</td>
         <td style="white-space:normal;">${cgEsc(cgNome(p.cargo_completo || p.cargo))}</td>
         <td>${p.setor_rateio ? cgEsc(p.setor_rateio) : '–'}</td><td>${cgEsc(p.turno || '–')}</td>
-        <td style="text-align:right;">${p.horas ? p.horas + 'h' : '–'}</td>
-        <td class="cg-sal" style="text-align:right;">${cgR(p.salario)}</td>
-        <td style="text-align:right;">${(() => { const c = cgCustoDaPessoa(p.id).find((x) => String(x.mes).slice(0, 10) === cgMesCustoFechado()); return c ? cgR(c.total) : '<span style="color:var(--tx-5);">–</span>'; })()}</td>
+        <td>${p.horas ? p.horas + 'h' : '–'}</td>
+        <td class="cg-sal">${cgR(p.salario)}</td>
+        <td>${(() => { const c = cgCustoDaPessoa(p.id).find((x) => String(x.mes).slice(0, 10) === cgMesCustoFechado()); return c ? cgR(c.total) : '<span style="color:var(--tx-5);">–</span>'; })()}</td>
         <td class="cg-al" style="white-space:normal;min-width:160px;">${A.map((a) => `<span title="${cgEsc(a.todo)}" style="display:inline-block;font-size:11.5px;font-weight:700;color:var(--farol-perto);border:1px solid var(--farol-perto);border-radius:999px;padding:1px 8px;margin:1px 3px 1px 0;">${cgEsc(a.t)}</span>`).join('')}${nota(p)}</td></tr>
-        ${ab ? `<tr><td colspan="${comLoja ? 10 : 9}">${cgDetalhePessoa(p)}</td></tr>` : ''}`; }).join('')}</tbody></table></div>`;
+        ${ab ? `<tr><td colspan="${comLoja ? 9 : 8}">${cgDetalhePessoa(p)}</td></tr>` : ''}`; }).join('')}</tbody>
+    <tfoot><tr class="liq"><td>Total · ${vis.length} ${vis.length === 1 ? 'pessoa' : 'pessoas'}</td>${comLoja ? '<td></td>' : ''}<td></td><td></td><td></td><td></td><td>${cgR(vis.reduce((a, p) => a + (Number(p.salario) || 0), 0))}</td><td>${(() => { const m = cgMesCustoFechado(); let t = 0, achou = false; vis.forEach((p) => { const c = cgCustoDaPessoa(p.id).find((x) => String(x.mes).slice(0, 10) === m); if (c) { t += Number(c.total) || 0; achou = true; } }); return achou ? cgR(t) : '–'; })()}</td><td></td></tr></tfoot></table></div>`;
   if (F.soConferir && cgFlashDaLoja(CARGOS.flash).length) h += `<div class="section-label" style="text-align:left;">Corrigir na Flash</div>` + cgListaFlash(CARGOS.flash);
   return h;
 }
@@ -896,7 +896,7 @@ function cgAbrirPessoa(id) {
   const p = CARGOS.pessoas.find((x) => x.id === id);
   CARGOS_F.aba = 'pessoas'; CARGOS_F.desligados = p ? !p.ativo : false; CARGOS_F.soConferir = false; CARGOS_F.editando = null;
   cgEditar(id);
-  setTimeout(() => { const el = cgAlvo() && cgAlvo().querySelector('.cg-seta'); const r = [...(cgAlvo() || document).querySelectorAll('#tabelaCgPessoas tr')].find((t) => /Fechar detalhes/.test(t.textContent)); if (r) r.scrollIntoView({ block: 'center' }); }, 50);
+  setTimeout(() => { const el = cgAlvo() && cgAlvo().querySelector('.cg-seta'); const r = [...(cgAlvo() || document).querySelectorAll('#tabelaCgPessoas tr')].find((t) => t.cells[0] && t.cells[0].classList.contains('cg-nome') && /^\s*▾/.test(t.cells[0].textContent)); if (r) r.scrollIntoView({ block: 'center' }); }, 50);
 }
 // "Combinado além da folha" (dono 05/11/2026, chat RH): valor total combinado (paga a diferença do líquido) ou acréscimo
 // fixo. Quem muda é esta ficha; a Conferência da folha só mostra (rh_folha_combinado / rh_folha_combinado_salvar).
