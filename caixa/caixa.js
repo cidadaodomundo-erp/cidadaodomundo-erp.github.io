@@ -1972,7 +1972,9 @@ async function descCarregar() {
   if (DESC.chave === chave && DESC.linhas) { if (corpo()) corpo().innerHTML = descHtml(); return; }
   DESC.chave = chave; DESC.filtro = null; DESC.erro = null; DESC.linhas = null;
   if (corpo()) corpo().innerHTML = '<div class="contexto">Lendo os descontos…</div>';
-  const u = visao ? `&unidade=eq.${encodeURIComponent(visao)}` : '';
+  // as lojas do caixa: a do topo, ou as da Rede (nunca a palavra "REDE" como loja)
+  const lojasCx = caixaLojas().map((x) => x[0]);
+  const u = lojasCx.length ? `&unidade=in.(${lojasCx.map((x) => encodeURIComponent('"' + x + '"')).join(',')})` : '';
   const mes = desde.slice(0, 8) + '01';
   try {
     const [linhas, vendas, conc, refe] = await Promise.all([
