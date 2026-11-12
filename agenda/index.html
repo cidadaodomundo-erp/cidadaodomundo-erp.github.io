@@ -89,7 +89,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   await trRpcSeguro('dono_pendencia_conferir', {}).catch(() => {});
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal] = await Promise.all([
-    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
@@ -173,9 +173,14 @@ function agDesenhar() {
     const p = x.pend;
     if (!p) return `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
     const resp = p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — respondido, aguardando aplicar: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>` : '';
+    // 12/11/2026 (Organizador): a frente devolve ao dono ("↩ resposta para você"); o fio guarda a conversa
+    const fio = Array.isArray(p.fio) ? p.fio : [];
+    const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
+    const volta = !p.resposta && p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
+    const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${p.id})">Tenho dúvida</button>`;
     return `<div class="ag-lin ${x.tipo}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${resp}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
     let b = '';
