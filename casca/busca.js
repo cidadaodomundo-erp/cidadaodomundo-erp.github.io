@@ -46,6 +46,7 @@ window.CASCA_BUSCA = {
   rede: ['taxa da maquininha', 'cartao', 'adquirente', 'stone', 'cielo', 'taxas'],
   pacertos: ['saipos folha', 'acerto da folha'],
   phoje: ['o que fazer hoje', 'rh hoje', 'pendencias do rh', 'tarefas do rh'],
+  pao: ['ponto ao vivo', 'ponto agora', 'quem esta na loja', 'batidas de hoje', 'relogio de ponto'],
   pcalc: ['calculos da folha', 'adiantamento', 'vale transporte', 'vt', 'va', 'vale alimentacao', 'gratificacao', 'bonificacao', '10%', 'dez por cento', 'por fora'],
   rh: ['desconto em folha', 'emprestimo', 'vale', 'divida', 'desconto'],
   penvio: ['enviar a contabilidade', 'contabilidade', 'envio da folha'],
@@ -82,3 +83,4 @@ window.CASCA_BUSCA = {
   reembolsos: ['reembolso', 'pedir reembolso', 'gastei do meu bolso', 'nota fiscal de gasto'],
   'link:promos.html': ['calendario', 'calendario de promocoes'],
 };
+
