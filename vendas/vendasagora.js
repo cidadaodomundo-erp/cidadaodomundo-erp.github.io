@@ -79,10 +79,17 @@ function vaLegendaComparacao(c) {
   return `Comparado com ${vaPassado(ref.dia_base)} (${quando}) até esta hora.` + (sem ? ` Sem ${sem}, fechada em ${quando}.` : '');
 }
 
-function vaNumeros(ped, valor, comp) {
-  const med = ped ? valor / ped : 0;
+// 12/11/2026 (dono 03:35: "Ticket médio tem que ser medido por canal nos filtros e análises"): o valor médio sai sempre aberto
+// por canal, nunca um só misturando iFood e salão. A semana passada (vw_vendas_agora_semana_passada) não tem canal: o médio
+// fica sem comparação. Aqui é o caixa em tempo real: o iFood ainda sem a promoção paga pela loja (ela chega 1–2 dias depois).
+function vaMedioCanais(linhas) {
+  const m = {};
+  (linhas || []).forEach((l) => { const o = m[l.canal] || (m[l.canal] = { v: 0, p: 0 }); o.v += Number(l.valor) || 0; if (Number(l.valor) > 0) o.p += Number(l.pedidos) || 0; });
+  return Object.entries(m).filter(([, o]) => o.p > 0).sort((a, b) => b[1].p - a[1].p);
+}
+function vaNumeros(ped, valor, comp, linhas) {
   const c = comp && comp.valorBase ? comp : null;
-  const medHoje = c && c.pedHoje ? c.valorHoje / c.pedHoje : 0, medBase = c && c.pedBase ? c.valorBase / c.pedBase : 0;
+  const canais = vaMedioCanais(linhas);
   // loja fechada na semana passada está no total e fora da comparação: o "era" ao lado do total pareceria contradição
   const sem = c && c.fechadas.length ? 'sem ' + c.fechadas.map((b) => lojaNome(b.unidade)).join(', ') : '';
   const era = (txt) => sem || 'era ' + txt;
@@ -90,7 +97,9 @@ function vaNumeros(ped, valor, comp) {
   return `<div class="va-numeros">` +
     cartao('Faturamento', vaBrl(valor), c ? vaDelta(c.valorHoje, c.valorBase, era(vaBrl(c.valorBase))) : '') +
     cartao('Pedidos', vaInt(ped), c ? vaDelta(c.pedHoje, c.pedBase, era(vaInt(c.pedBase))) : '') +
-    cartao('Valor médio', vaBrl(med), c ? vaDelta(medHoje, medBase, era(vaBrl(medBase))) : '') + `</div>`;
+    (canais.length === 1
+      ? cartao('Valor médio · ' + trEscH(vaCanal(canais[0][0])), vaBrl(canais[0][1].v / canais[0][1].p), canais[0][0] === 'IFOOD' ? 'sem a promoção da loja' : '')
+      : `<div class="va-num"><div class="va-num-rot">Valor médio por canal</div><div class="va-medios">${canais.map(([k, o]) => `<div><span>${trEscH(vaCanal(k))}</span><b>${vaBrl(o.v / o.p)}</b></div>`).join('') || '–'}</div>${canais.some(([k]) => k === 'IFOOD') ? '<div class="va-delta">iFood sem a promoção da loja</div>' : ''}</div>`) + `</div>`;
 }
 function vaAvisoAtraso(lojas) {
   const atras = lojas.map((u) => ({ u, min: vaAtrasoMin(u) })).filter((x) => x.min);
@@ -118,12 +127,12 @@ function vaRede(el, cab) {
     const hora = !t ? 'sem leitura' : (vaAtrasoMin(d.u) ? `<span class="va-velho">número das ${vaHora(t)}</span>` : `às ${vaHora(t)}`);
     return `<button class="va-loja" ${podeTocar ? `onclick="vaPedirLoja('${trEscH(d.u)}')"` : 'disabled'}>
       <b>${trEscH(lojaNome(d.u))}</b><span class="va-loja-val">${vaBrl(d.valor)}</span>
-      <small>${vaPed(d.ped)} · médio ${vaBrl(d.ped ? d.valor / d.ped : 0)} · ${hora}</small><small>${cmp}</small></button>`;
+      <small>${vaPed(d.ped)} · ${hora}</small><small>${cmp}</small></button>`;
   };
   const partes = VA.linhas.filter((l) => !l.cancelada && l.unidade === VA_A_PARTE);
   const aparte = partes.length ? `<div class="va-titulo">Fora do total</div>` +
     linha({ u: VA_A_PARTE, valor: vaSoma(partes, 'valor'), ped: vaSoma(partes, 'pedidos'), base: null }, (LOJA_INFO.lojas || []).includes(VA_A_PARTE)) : '';
-  el.innerHTML = cab(lojas) + vaAvisoAtraso(lojas) + vaNumeros(vaSoma(ok, 'pedidos'), vaSoma(ok, 'valor'), comp) +
+  el.innerHTML = cab(lojas) + vaAvisoAtraso(lojas) + vaNumeros(vaSoma(ok, 'pedidos'), vaSoma(ok, 'valor'), comp, ok) +
     `<div class="va-comp">${vaLegendaComparacao(comp)}</div>` +
     `<div class="va-titulo">Por loja</div>` + dados.map((d) => linha(d, true)).join('') + aparte;
 }
@@ -146,10 +155,10 @@ function vaLoja(el, cab, u) {
   const blocos = VA_TIPOS.map((t) => {
     const ls = paraBlocos.filter((l) => l.tipo === t);
     const ped = vaSoma(ls, 'pedidos'), val = vaSoma(ls, 'valor');
-    return `<button class="va-tipo${f.tipo === t ? ' ativo' : ''}" onclick="vaFiltroTipo('${t}')"><b>${t}</b><span>${vaBrl(val)}</span><small>${vaPed(ped)} · médio ${vaBrl(ped ? val / ped : 0)}</small></button>`;
+    return `<button class="va-tipo${f.tipo === t ? ' ativo' : ''}" onclick="vaFiltroTipo('${t}')"><b>${t}</b><span>${vaBrl(val)}</span><small>${vaPed(ped)}${f.canal ? ' · médio ' + vaBrl(ped ? val / ped : 0) : ''}</small></button>`;
   }).join('');
   const linha = (rot, val) => `<div class="va-linha"><span>${rot}</span><b>${val}</b></div>`;
-  el.innerHTML = cab([u]) + vaAvisoAtraso([u]) + vaNumeros(vaSoma(ok, 'pedidos'), vaSoma(ok, 'valor'), comp) +
+  el.innerHTML = cab([u]) + vaAvisoAtraso([u]) + vaNumeros(vaSoma(ok, 'pedidos'), vaSoma(ok, 'valor'), comp, ok) +
     `<div class="va-comp">${comp ? vaLegendaComparacao(comp) : 'Com filtro, sem comparação com a semana passada.'}</div>` +
     `<div class="va-filtros">
       <label>Canal<select onchange="vaFiltro('canal', this.value)">${vaOpcoes(distintos('canal'), f.canal, 'Todos', vaCanal)}</select></label>
