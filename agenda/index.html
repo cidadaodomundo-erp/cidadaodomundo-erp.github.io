@@ -33,6 +33,7 @@
   .ag-bloco { font-size:15px; font-weight:800; color:var(--tx-1); margin:18px 2px 2px; }
   .ag-bloco .f { font-size:11.5px; font-weight:400; color:var(--tx-4); }
   details.ag-saber > summary { cursor:pointer; list-style-position:inside; }
+  .ag-ctx { flex-basis:100%; font-size:12px; color:var(--tx-3); margin-top:2px; line-height:1.4; }
   details.ag-saber { margin-top:14px; padding-top:4px; border-top:1px solid var(--line); }
   .ag-lin .bts { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
   .ag-form { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px 10px; margin:-2px 0 6px; border:1px dashed var(--line-2); border-radius:8px; }
@@ -88,7 +89,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   await trRpcSeguro('dono_pendencia_conferir', {}).catch(() => {});
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal] = await Promise.all([
-    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
@@ -115,11 +116,11 @@ function agDesenhar() {
   const ok = (x, rot) => { if (x && x.erro) { falhou.push(rot); return false; } return Array.isArray(x); };
   // 1) o que depende de mim (os chats gravam)
   if (ok(pend, 'o que depende de você')) pend.forEach((p) => {
-    if (!p.prazo || p.prazo <= hoje) AG.sinal++;
+    if (!p.resposta && (!p.prazo || p.prazo <= hoje)) AG.sinal++;   // respondido = aguardando aplicar: sai do número
     const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
-    add({ dep: true, dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.prazo && p.prazo < hoje ? 'atraso' : 'alerta' });
+    add({ dep: !p.resposta, dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.resposta ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p });
   });
   // 2) reembolso que só eu aprovo (o da Hellen)
   if (ok(rmb, 'reembolsos')) rmb.forEach((g) => (AG.sinal++, add({ dep: true, dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' })));
@@ -168,7 +169,13 @@ function agDesenhar() {
   const linha = (x) => {
     const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
     const feito = x.id ? `<button type="button" class="preset-btn" title="tirar da agenda" onclick="agFeito(${x.id})">✓</button>` : '';
-    return `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
+    // 12/11/2026 (dono, pelo Organizador): o contexto do item à vista, e responder ou tirar dúvida ali mesmo
+    const p = x.pend;
+    if (!p) return `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
+    const resp = p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — respondido, aguardando aplicar: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>` : '';
+    const bts = p.resposta ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${p.id})">Tenho dúvida</button>`;
+    return `<div class="ag-lin ${x.tipo}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${resp}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
     let b = '';
@@ -201,6 +208,43 @@ function agGuia() {
     { sel: '#tabelaAgEquipe', texto: '<b>Agenda da equipe</b>: clique na pessoa para ver a agenda dela, do jeito que ela vê.' },
   ]);
   guiaTalvez('agenda');
+}
+function agPend(id) { return ((AG.dados && Array.isArray(AG.dados.pend)) ? AG.dados.pend : []).find((p) => p.id === id) || {}; }
+function agRespForm(id) {
+  const box = document.getElementById('agForm_' + id); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  const p = agPend(id);
+  box.innerHTML = `<div class="ag-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin-top:6px;"><textarea id="agRespTx_${id}" rows="2" maxlength="2000" style="flex:1 1 260px;" placeholder="Sua resposta (a frente aplica e o item fecha sozinho)">${agE(p.resposta || '')}</textarea>
+    <button type="button" class="preset-btn active" onclick="agResponder(${id})">Enviar resposta</button><button type="button" class="preset-btn" onclick="agRespForm(${id})">Cancelar</button></div>`;
+  const t = document.getElementById('agRespTx_' + id); if (t) t.focus();
+}
+async function agResponder(id) {
+  const t = document.getElementById('agRespTx_' + id), txt = t ? t.value.trim() : '';
+  if (!txt) return avisoAcao('atencao', '! Escreva a resposta.');
+  avisoAcao('enviando', 'Enviando a resposta…');
+  const r = await trRpcSeguro('dono_pendencia_responder', { p_id: id, p_texto: txt });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agResponder(id));
+  avisoAcao('ok', `✓ Resposta enviada às ${avisoHora()}. A frente aplica e o item fecha sozinho.`);
+  await entrarAgenda(true);
+}
+function agDuvidaForm(id) {
+  const box = document.getElementById('agForm_' + id); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="ag-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin-top:6px;"><textarea id="agDuvTx_${id}" rows="2" maxlength="1500" style="flex:1 1 260px;" placeholder="Qual é a dúvida? A resposta vem pelo WhatsApp do robô."></textarea>
+    <button type="button" class="preset-btn active" onclick="agDuvida(${id})">Enviar dúvida</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${id})">Cancelar</button></div>`;
+  const t = document.getElementById('agDuvTx_' + id); if (t) t.focus();
+}
+// mesmo caminho do botão Ajuda (painel_ajuda): a triagem responde pelo WhatsApp do robô
+async function agDuvida(id) {
+  const t = document.getElementById('agDuvTx_' + id), txt = t ? t.value.trim() : '';
+  if (!txt) return avisoAcao('atencao', '! Escreva a dúvida.');
+  const p = agPend(id);
+  avisoAcao('enviando', 'Enviando a dúvida…');
+  const r = await trRpcSeguro('painel_ajuda_gravar', { p_tela: 'agenda', p_loja: null, p_tipo: 'duvida', p_print_url: null,
+    p_texto: `Dúvida do dono sobre o item da agenda #${id} (${p.frente || ''}; chave ${p.chave || ''}): "${p.o_que || ''}" — ${txt}` });
+  if (!r.ok) return avisoAcao('erro', `✗ Não chegou: ${await trErroDe(r)}`, () => agDuvida(id));
+  avisoAcao('ok', `✓ Dúvida enviada às ${avisoHora()}. A resposta vem pelo WhatsApp do robô.`);
+  const box = document.getElementById('agForm_' + id); if (box) box.innerHTML = '';
 }
 async function agFeito(id) {
   avisoAcao('enviando', '… tirando da agenda');
