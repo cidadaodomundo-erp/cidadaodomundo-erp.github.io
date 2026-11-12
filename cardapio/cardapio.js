@@ -637,6 +637,19 @@ let FICHA_MSG = null;    // confirmacao que sobrevive ao fechamento do formulari
 // so: FICHA_MSG e' zerado depois de desenhar.
 let FICHA_DESFAZER = null;   // { nome, novo, fonte, linhas:[{mp,qtd}] }
 
+// 12/11/2026 (Estoque, pedido do Organizador; dono 19:21): ficha de RECEITA (preparação) não se grava mais aqui. O caminho
+// é a Conferência de receitas (ft_conferencia_gravar), que o Estoque aplica pelo aplicar_conferencia_equipe.py.
+function fichaEhReceita(nome) {
+  const n = String(nome || '').trim().toUpperCase();
+  const f = FICHAS && FICHAS.lista.find((x) => x.ficha === n);
+  return !!(f && f.e_preparacao) || /\bRECEITA\b/.test(n);
+}
+function fichaIrConferencia(nome) {
+  try { sessionStorage.setItem('confFichaPedida', String(nome || '')); } catch (e) {}
+  window.top.location.href = (/\/cardapio\//.test(location.pathname) ? '../' : '') + 'sistema.html#conferencias/receitas';
+}
+const fichaBotaoConferencia = (nome) => `<button class="preset-btn active" onclick='fichaIrConferencia(${JSON.stringify(nome).replace(/'/g, '&#39;')})'>Mudar esta receita → Conferências</button>`;
+
 function fichaNova() {
   FICHA_EDIT = { nome: '', linhas: [{ mp: '', qtd: '' }, { mp: '', qtd: '' }], original: null };
   renderModuloFichas();
@@ -670,6 +683,9 @@ async function fichaSalvar() {
   const diz = (txt, cor) => { aviso.style.display = 'block'; aviso.style.borderColor = cor; aviso.innerHTML = txt; };
   const nome = (FICHA_EDIT.nome || '').trim().toUpperCase();
   if (!nome) return diz('Dê um nome à ficha.', 'var(--farol-fora)');
+  if (fichaEhReceita(nome) || (FICHA_EDIT.original && fichaEhReceita(FICHA_EDIT.original))) {
+    return diz(`Receita não se muda por aqui: ela vai pela Conferência de receitas. ${fichaBotaoConferencia(FICHA_EDIT.original || nome)}`, 'var(--farol-perto)');
+  }
 
   const { porItem } = FICHAS;
   const linhas = [];
@@ -992,7 +1008,8 @@ function renderModuloFichas() {
             <td colspan="4"></td><td><b>R$ ${fmt(total)}</b></td></tr>
         </tbody></table></div>
       ${origem}
-      ${(lista.find(f => f.ficha === nome) || {}).fonte === 'MANUAL' ? `
+      ${fichaEhReceita(nome) ? `<div style="margin-top:10px;">${fichaBotaoConferencia(nome)}</div>`
+        : (lista.find(f => f.ficha === nome) || {}).fonte === 'MANUAL' ? `
         <div style="margin-top:10px;">
           <button class="preset-btn" onclick="fichaEditar('${esc(nome)}')">Editar esta ficha</button>
           ${FICHA_APAGAR === nome

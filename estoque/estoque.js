@@ -4163,7 +4163,9 @@ const CONF_ABAS = [
   { id: 'custonota', rotulo: 'Custo pela nota', leg: 'nota × custo de hoje' },
   { id: 'itemfora', rotulo: 'Itens fora da base', leg: 'nome novo na nota ou venda' },
 ];
-let CONF_ABA = (() => { try { const a = new URLSearchParams(location.search).get('aba'); return ['custonota', 'itemfora'].includes(a) ? a : 'embalagem'; } catch (e) { return 'embalagem'; } })();
+let CONF_ABA = (() => { try { const a = new URLSearchParams(location.search).get('aba'); return ['custonota', 'itemfora', 'receitas', 'produtos', 'bebidas'].includes(a) ? a : 'embalagem'; } catch (e) { return 'embalagem'; } })();
+// 12/11/2026 (Estoque): "Mudar esta receita → Conferências" da tela Fichas chega com a ficha já aberta
+let CF_PEDIDA = (() => { try { const f = sessionStorage.getItem('confFichaPedida'); if (f) sessionStorage.removeItem('confFichaPedida'); return f; } catch (e) { return null; } })();
 async function entrarConferencias() {
   const alvo = document.getElementById('view-conferencias');
   if (!alvo) return;
@@ -4429,6 +4431,12 @@ function cfRender(id) {
   const c = CONF_FICHA[id], alvo = document.getElementById('cfCorpo');
   if (!alvo) return;
   const L = CF.fila[c.aba] || [], rasc = cfRasc(c), resp = cfResp(c);
+  if (CF_PEDIDA && L.length) {
+    const p = L.find((i) => i.f === CF_PEDIDA || i.nb === CF_PEDIDA);
+    if (p) { CF.aberto = p.id; CF.filtro = 'todas'; CF.busca = p.nb || ''; CF.enviada = null; }
+    else avisoAcao('atencao', `! ${CF_PEDIDA} não está na lista desta conferência.`);
+    CF_PEDIDA = null;
+  }
   const feitas = L.filter((i) => cfFeito(c, i)).length;
   const comecadas = L.filter((i) => cfComecada(c, i, rasc, resp));
   const b = CF.busca.toLowerCase();
@@ -4449,6 +4457,8 @@ function cfRender(id) {
       <b style="color:${ok ? 'var(--farol-ok)' : 'var(--tx-1)'};">Meta da Lana: ${semana} de ${CF_META_LANA} nesta semana${ok ? ' ✓' : ''}</b>
       <span style="font-size:12px; color:var(--tx-4);"> · desde seg ${s.dm} · ${CF.venda ? 'os que mais vendem primeiro' : 'a venda não abriu, lista em ordem alfabética'}</span></div>`;
   }
+  // 12/11/2026 (Estoque): o envio fica à vista; antes parecia que não tinha salvado e a Rita mandou 5 vezes
+  if (CF.enviada && CF.enviada.aba === c.aba) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ ${trEscH(CF.enviada.nb)} enviada às ${CF.enviada.hora}</b> — entra na ${id === 'receitas' ? 'receita' : 'ficha'} depois de aplicada. Não precisa enviar de novo.</div>`;
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
@@ -4499,7 +4509,7 @@ function cfRender(id) {
   if (lista.length > 60) h += `<div style="font-size:12px; color:var(--tx-4); text-align:center;">mostrando 60 de ${lista.length} — use a busca</div>`;
   alvo.innerHTML = h;
 }
-function cfAbrir(id, iid) { CF.aberto = CF.aberto === iid ? null : iid; cfRender(id); }
+function cfAbrir(id, iid) { CF.aberto = CF.aberto === iid ? null : iid; CF.enviada = null; cfRender(id); }
 function cfBuscar(id, v) {
   CF.busca = v; clearTimeout(window._cfB);
   window._cfB = setTimeout(() => { cfRender(id); const e = document.getElementById('cfBusca'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 350);
@@ -4573,7 +4583,8 @@ async function cfEnviar(id, iid, naofaz) {
   const ra = cfRasc(c); Object.keys(ra).filter((k) => k.startsWith(i.id + '|')).forEach((k) => delete ra[k]); cfGuardar(c.chave + '_rascunho', ra);
   cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; });
   CF.aberto = null;
-  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: conferida às ${avisoHora()}.`);
+  CF.enviada = { aba: c.aba, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora() };
+  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: enviada às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} depois de aplicada.`);
   cfRender(id);
   confAbasPintar();
 }
