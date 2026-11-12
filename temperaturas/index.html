@@ -121,6 +121,7 @@ function desenharCamaras(dados, esc) {
   return topo + '<div class="tc-grade">' + cartoes + '</div>';
 }
 
+let ULTIMO = null;
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
   if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
@@ -129,9 +130,9 @@ function exigirLogin(recado) {
 function mostrarErro(txt) {
   document.getElementById('conteudo').innerHTML = '<div class="tc-erro">' + esc(txt) + '</div>';
   document.getElementById('rodape').textContent = '';
+  ULTIMO = null;   // falha não pode ser apagada pelo repintar automático
 }
 let ULTIMA_REQ = 0;
-let ULTIMO = null;
 async function carregar() {
   const minhaReq = ++ULTIMA_REQ;
   let r;
@@ -145,7 +146,8 @@ async function carregar() {
   let dados;
   try { dados = await r.json(); } catch (e) { if (minhaReq === ULTIMA_REQ) mostrarErro('Resposta inesperada do servidor.'); return; }
   if (minhaReq !== ULTIMA_REQ) return;
-  ULTIMO = dados || {};
+  if (!dados || !Array.isArray(dados.camaras)) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  ULTIMO = dados;
   pintar();
 }
 function pintar() {
