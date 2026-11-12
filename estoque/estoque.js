@@ -4149,8 +4149,12 @@ const CONF_ABAS = [
   { id: 'receitas', rotulo: 'Receitas', leg: 'preparos da cozinha', pagina: 'conferencia-receitas.html' },
   { id: 'produtos', rotulo: 'Produtos', leg: 'o que se vende', pagina: 'conferencia-fichas.html' },
   { id: 'bebidas', rotulo: 'Bebidas', leg: 'doses e drinks', pagina: 'conferencia-bebidas.html' },
+  // 12/11/2026 (dono 14:54, livro chat-frente-telas/respostas/custo-nota-e-itens-fora-da-base-nas-conferencias): as duas
+  // filas que eram artefato viram abas daqui e item na agenda da Rita (o estoque_check.py cria e fecha sozinho).
+  { id: 'custonota', rotulo: 'Custo pela nota', leg: 'nota × custo de hoje' },
+  { id: 'itemfora', rotulo: 'Itens fora da base', leg: 'nome novo na nota ou venda' },
 ];
-let CONF_ABA = 'embalagem';
+let CONF_ABA = (() => { try { const a = new URLSearchParams(location.search).get('aba'); return ['custonota', 'itemfora'].includes(a) ? a : 'embalagem'; } catch (e) { return 'embalagem'; } })();
 async function entrarConferencias() {
   const alvo = document.getElementById('view-conferencias');
   if (!alvo) return;
@@ -4158,6 +4162,8 @@ async function entrarConferencias() {
   if (!rmbSessao()) { alvo.innerHTML = `<div class="contexto">Entre no painel para fazer as conferências.</div>`; return; }
   confRender();
   if (CONF_ABA === 'embalagem') await entrarEmbalagem();
+  else if (CONF_ABA === 'custonota') await cnEntrar();
+  else if (CONF_ABA === 'itemfora') await ifEntrar();
   else await cfEntrar(CONF_ABA);
   confAbasPintar();
 }
@@ -4168,6 +4174,8 @@ function confAbasPintar() {
     const el = document.getElementById('confN_' + x.id); if (!el) return;
     let f = null, n = null;
     if (x.id === 'embalagem') { if (EMB && EMB.linhas) { const fs = embFamilias(); f = fs.filter((y) => y.feita).length; n = fs.length; } }
+    else if (x.id === 'custonota') { if (CN.linhas) { el.textContent = CN.linhas.length ? ` ${CN.linhas.length}` : ' ✓'; el.style.color = CN.linhas.length ? 'var(--farol-perto)' : 'var(--farol-ok)'; } return; }
+    else if (x.id === 'itemfora') { if (IFB.linhas) { const n2 = IFB.linhas.filter((l) => !l.resposta).length; el.textContent = n2 ? ` ${n2}` : ' ✓'; el.style.color = n2 ? 'var(--farol-perto)' : 'var(--farol-ok)'; } return; }
     else { const c = CONF_FICHA[x.id], L = CF.fila[c.aba]; if (L) { n = L.length; f = L.filter((i) => cfFeito(c, i)).length; } }
     el.textContent = n == null ? '' : ` ${f}/${n}`; el.style.color = n && f === n ? 'var(--farol-ok)' : 'var(--tx-3)';
   });
@@ -4176,14 +4184,140 @@ function confAba(id) { CONF_ABA = id; CF.aberto = null; CF.busca = ''; entrarCon
 function confRender() {
   const alvo = document.getElementById('view-conferencias');
   const a = CONF_ABAS.find((x) => x.id === CONF_ABA) || CONF_ABAS[0];
+  const cap = a.id === 'custonota' ? 'A nota trouxe um preço diferente do custo de hoje: aplique o da nota ou mantenha o de hoje.'
+    : a.id === 'itemfora' ? 'Nome que apareceu na nota ou na venda e não está na base: diga o que ele é.'
+    : `Confira cada ficha uma vez. Conferida, ela vira <b>cadastro</b> e entra na base — dali em diante a mudança é feita
+      só na ficha (Rita, Lana e Neto), e o Fabio é avisado pelo WhatsApp.`;
   alvo.innerHTML = `<h2>Conferências</h2>
-    <div class="caption-label">Confira cada ficha uma vez. Conferida, ela vira <b>cadastro</b> e entra na base — dali em diante a mudança é feita
-      só na ficha (Rita, Lana e Neto), e o Fabio é avisado pelo WhatsApp.</div>
+    <div class="caption-label">${cap}</div>
     <div style="display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--line); margin:10px 0 14px;">${CONF_ABAS.map((x) =>
       `<button onclick="confAba('${x.id}')" style="background:none; border:none; border-bottom:3px solid ${x.id === a.id ? 'var(--marca-amarelo)' : 'transparent'};
         color:${x.id === a.id ? 'var(--tx-1)' : 'var(--tx-3)'}; font:inherit; font-weight:700; font-size:14px; padding:10px 14px; cursor:pointer; text-align:left;">${x.rotulo}<span id="confN_${x.id}"></span>
         <span style="display:block; font-weight:600; font-size:11.5px; color:var(--tx-4);">${x.leg}</span></button>`).join('')}</div>
     ${a.id === 'embalagem' ? '<div id="view-embalagem"></div>' : '<div id="cfCorpo"></div>'}`;
+}
+
+// ---- aba Custo pela nota (12/11/2026): lê est_conf_custo_nota_lista(), grava est_conf_custo_nota_responder(insumo,
+// APLICAR|MANTER, quem). APLICAR já roda ft_aplicar_custo_compra() no banco; a decisão vale para aquela nota. Só papel DONO
+// (Rita, compras, Neto); quem não pode recebe a frase do banco. Banco: script/sql/conferencias_custo_nota_itens_fora_2026_11_12.sql
+const CN = { linhas: null };
+const cnMoeda = (v, u) => v == null ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) + (u ? ' / ' + trEscH(u) : '');
+const cnDm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+const cnQuem = () => ((rmbSessao() || {}).email || '');
+async function cnEntrar() {
+  const alvo = document.getElementById('cfCorpo'); if (!alvo) return;
+  if (!CN.linhas) alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  const r = await trRpcSeguro('est_conf_custo_nota_lista', {});
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto">Não deu para abrir o Custo pela nota: ${trEscH(await trErroDe(r))}</div>`; return; }
+  CN.linhas = await r.json();
+  cnRender(); confAbasPintar();
+}
+function cnRender() {
+  const alvo = document.getElementById('cfCorpo'); if (!alvo || CONF_ABA !== 'custonota') return;
+  const L = CN.linhas || [];
+  if (!L.length) { alvo.innerHTML = `<div class="contexto" style="color:var(--farol-ok);">✓ Nenhuma nota esperando decisão de custo.</div>`; return; }
+  alvo.innerHTML = `<div style="margin-bottom:8px; color:var(--tx-3); font-size:13px;">${L.length} ${L.length === 1 ? 'insumo espera' : 'insumos esperam'} decisão · primeiro os que mais entram nas fichas</div>
+  <div id="tabelaConfCustoNota"><table><tr><th>Insumo</th><th>Custo hoje</th><th>Última nota</th><th>Diferença</th><th>Por que parou</th><th>Ação</th></tr>
+  ${L.map((l, i) => { const d = l.diferenca_pct == null ? null : Number(l.diferenca_pct);
+    return `<tr><td><b>${trEscH(l.insumo)}</b><div style="font-size:11.5px; color:var(--tx-4);">${l.usado_em_fichas ? 'em ' + l.usado_em_fichas + (l.usado_em_fichas === 1 ? ' ficha' : ' fichas') : 'em nenhuma ficha'}</div></td>
+      <td>${cnMoeda(l.custo_atual, l.un_atual)}</td>
+      <td>${cnMoeda(l.custo_nota, l.un_nota)}<div style="font-size:11.5px; color:var(--tx-4);">${trEscH(l.loja_nota || '')}${l.data_nota ? ' · ' + cnDm(l.data_nota) : ''}${l.nota ? ' · nota ' + trEscH(l.nota) : ''}</div></td>
+      <td style="color:${d != null && Math.abs(d) >= 20 ? 'var(--farol-fora)' : 'var(--tx-2)'};">${d == null ? '—' : (d > 0 ? '+' : '') + d.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'}</td>
+      <td style="font-size:12.5px;">${trEscH(l.o_que_e || '')}</td>
+      <td style="white-space:nowrap;"><button class="preset-btn" onclick="cnResponder(${i}, 'APLICAR')">Usar o da nota</button>
+        <button class="preset-btn" onclick="cnResponder(${i}, 'MANTER')">Manter o de hoje</button></td></tr>`; }).join('')}
+  </table></div>`;
+}
+async function cnResponder(i, dec) {
+  const l = (CN.linhas || [])[i]; if (!l) return;
+  const oque = dec === 'APLICAR' ? 'usar o custo da nota' : 'manter o custo de hoje';
+  avisoAcao('enviando', `Gravando ${l.insumo}: ${oque}…`);
+  const r = await trRpcSeguro('est_conf_custo_nota_responder', { p_insumo: l.insumo, p_decisao: dec, p_quem: cnQuem() });
+  if (!r.ok) return avisoAcao('erro', `✗ ${l.insumo} NÃO gravou: ${await trErroDe(r)}`, () => cnResponder(i, dec));
+  avisoAcao('ok', `✓ ${l.insumo}: ${oque} — gravado às ${avisoHora()}.`);
+  await cnEntrar();
+}
+
+// ---- aba Itens fora da base (12/11/2026): lê est_conf_item_fora_lista(), busca est_conf_item_base_busca(texto), grava
+// est_conf_item_fora_responder(nome_saipos, NOVO|IGUAL|NAO_USA, nome_base, subgrupo, quem). A resposta entra na base pelo
+// gravar_base_itens.py na próxima rodada do estoque_check.py; até lá a linha fica "respondido".
+const IFB = { linhas: null, aberto: null, grupos: null, achados: [], tBusca: null };
+const IF_RESP = { NOVO: 'item novo', IGUAL: 'igual a', NAO_USA: 'não usamos' };
+async function ifEntrar() {
+  const alvo = document.getElementById('cfCorpo'); if (!alvo) return;
+  if (!IFB.linhas) alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  const r = await trRpcSeguro('est_conf_item_fora_lista', {});
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto">Não deu para abrir os itens fora da base: ${trEscH(await trErroDe(r))}</div>`; return; }
+  IFB.linhas = await r.json();
+  if (!IFB.grupos) {
+    const g = await consultarTudo('ft_item_base?select=subgrupo&order=subgrupo').catch(() => []);
+    IFB.grupos = [...new Set(g.map((x) => x.subgrupo).filter(Boolean))].sort();
+  }
+  ifRender(); confAbasPintar();
+}
+function ifRespTexto(l) {
+  if (l.resposta === 'IGUAL') return 'igual a ' + trEscH(l.nome_base || '');
+  if (l.resposta === 'NOVO') return 'item novo: ' + trEscH(l.nome_base || '') + (l.subgrupo ? ' (' + trEscH(l.subgrupo) + ')' : '');
+  return 'não usamos';
+}
+function ifRender() {
+  const alvo = document.getElementById('cfCorpo'); if (!alvo || CONF_ABA !== 'itemfora') return;
+  const L = IFB.linhas || [], falta = L.filter((l) => !l.resposta).length;
+  if (!L.length) { alvo.innerHTML = `<div class="contexto" style="color:var(--farol-ok);">✓ Nenhum item fora da base.</div>`; return; }
+  const ab = IFB.aberto;
+  alvo.innerHTML = `<div style="margin-bottom:8px; color:var(--tx-3); font-size:13px;">${falta ? falta + (falta === 1 ? ' item falta responder' : ' itens faltam responder') : '✓ todos respondidos'} · de ${L.length}</div>
+  <div id="tabelaConfItemFora"><table><tr><th>Item (nome do Saipos)</th><th>Onde apareceu</th><th>Valor em 2026 (R$)</th><th>Resposta</th><th>Ação</th></tr>
+  ${L.map((l, i) => `<tr><td><b>${trEscH(l.nome_saipos)}</b>${l.grupo_saipos ? `<div style="font-size:11.5px; color:var(--tx-4);">${trEscH(l.grupo_saipos)}</div>` : ''}</td>
+      <td>${trEscH(l.onde_apareceu || '')}<div style="font-size:11.5px; color:var(--tx-4);">${trEscH(l.lojas || '')}${l.ultima ? ' · última ' + cnDm(l.ultima) : ''}</div></td>
+      <td>${l.valor_2026 == null ? '—' : Number(l.valor_2026).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td>${l.resposta ? `<span style="color:var(--farol-ok);">respondido — entra na base na próxima rodada</span><div style="font-size:11.5px; color:var(--tx-4);">${ifRespTexto(l)}${l.respondido_por ? ' · ' + trEscH(String(l.respondido_por).split('@')[0]) : ''}</div>`
+        : '<span style="color:var(--farol-perto);">falta</span>'}</td>
+      <td style="white-space:nowrap;">${['NOVO', 'IGUAL', 'NAO_USA'].map((m) => `<button class="preset-btn${ab && ab.i === i && ab.modo === m ? ' active' : ''}" onclick="ifAbrir(${i}, '${m}')">${m === 'IGUAL' ? 'Igual a…' : m === 'NOVO' ? 'Item novo' : 'Não usamos'}</button>`).join(' ')}</td></tr>
+    ${ab && ab.i === i ? `<tr><td colspan="5" style="background:var(--surface-2);">${ifEditor(l, ab.modo)}</td></tr>` : ''}`).join('')}
+  </table></div>`;
+  const foco = document.getElementById(ab && ab.modo === 'IGUAL' ? 'ifBusca' : 'ifNome'); if (foco) foco.focus();
+}
+function ifEditor(l, modo) {
+  if (modo === 'NAO_USA') return `<b>${trEscH(l.nome_saipos)}</b> não é item nosso: sai da lista. <button class="preset-btn" onclick="ifGravar()">Gravar: não usamos</button>
+    <button class="preset-btn" onclick="ifAbrir(-1)">Cancelar</button>`;
+  if (modo === 'IGUAL') return `É o mesmo que <input id="ifBusca" list="ifLista" placeholder="digite para buscar na base" autocomplete="off" oninput="ifBuscar(this.value)"
+      style="min-width:280px; padding:6px 8px; background:var(--surface); color:var(--tx-1); border:1px solid var(--line-2); border-radius:6px;">
+    <datalist id="ifLista">${IFB.achados.map((x) => `<option value="${trEscH(x.nome_base)}">${trEscH(x.subgrupo || '')}</option>`).join('')}</datalist>
+    <button class="preset-btn" onclick="ifGravar()">Gravar: é igual a este</button> <button class="preset-btn" onclick="ifAbrir(-1)">Cancelar</button>`;
+  return `Nome na base <input id="ifNome" value="${trEscH(String(l.nome_saipos || '').toUpperCase())}" autocomplete="off"
+      style="min-width:240px; padding:6px 8px; background:var(--surface); color:var(--tx-1); border:1px solid var(--line-2); border-radius:6px;">
+    grupo <select id="ifGrupo" style="padding:6px 8px; background:var(--surface); color:var(--tx-1); border:1px solid var(--line-2); border-radius:6px;">
+      <option value="">escolha…</option>${(IFB.grupos || []).map((g) => `<option>${trEscH(g)}</option>`).join('')}</select>
+    <button class="preset-btn" onclick="ifGravar()">Gravar item novo</button> <button class="preset-btn" onclick="ifAbrir(-1)">Cancelar</button>`;
+}
+function ifAbrir(i, modo) { IFB.aberto = i < 0 ? null : { i, modo }; IFB.achados = []; ifRender(); }
+function ifBuscar(t) {
+  clearTimeout(IFB.tBusca);
+  IFB.tBusca = setTimeout(async () => {
+    if (String(t || '').trim().length < 2) return;
+    const r = await trRpcSeguro('est_conf_item_base_busca', { p_texto: t });
+    if (!r.ok) return;
+    IFB.achados = await r.json();
+    const dl = document.getElementById('ifLista');
+    if (dl) dl.innerHTML = IFB.achados.map((x) => `<option value="${trEscH(x.nome_base)}">${trEscH(x.subgrupo || '')}</option>`).join('');
+  }, 250);
+}
+async function ifGravar() {
+  const ab = IFB.aberto; if (!ab) return;
+  const l = (IFB.linhas || [])[ab.i]; if (!l) return;
+  let nome = null, grupo = null;
+  if (ab.modo === 'IGUAL') { nome = ((document.getElementById('ifBusca') || {}).value || '').trim(); if (!nome) return avisoAcao('atencao', '! Escolha na lista o item da base que é igual.'); }
+  if (ab.modo === 'NOVO') {
+    nome = ((document.getElementById('ifNome') || {}).value || '').trim(); grupo = (document.getElementById('ifGrupo') || {}).value || '';
+    if (!nome) return avisoAcao('atencao', '! Escreva o nome do item novo.');
+    if (!grupo) return avisoAcao('atencao', '! Escolha o grupo do item novo.');
+  }
+  avisoAcao('enviando', `Gravando ${l.nome_saipos}: ${IF_RESP[ab.modo]}…`);
+  const r = await trRpcSeguro('est_conf_item_fora_responder', { p_nome_saipos: l.nome_saipos, p_resposta: ab.modo, p_nome_base: nome, p_subgrupo: grupo, p_quem: cnQuem() });
+  if (!r.ok) return avisoAcao('erro', `✗ ${l.nome_saipos} NÃO gravou: ${await trErroDe(r)}`, ifGravar);
+  avisoAcao('ok', `✓ ${l.nome_saipos}: ${IF_RESP[ab.modo]}${nome ? ' ' + nome : ''} — gravado às ${avisoHora()}. Entra na base na próxima rodada.`);
+  IFB.aberto = null;
+  await ifEntrar();
 }
 
 // ---- as abas de ficha (Receitas, Produtos, Bebidas): o mesmo preenchimento das páginas soltas, agora com login ----
