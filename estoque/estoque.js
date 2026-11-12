@@ -4383,6 +4383,7 @@ async function cfCarregar(c) {
     r: l.r, ru: l.ru, rs: l.rs, i: Array.isArray(l.itens) ? l.itens : [] }));
   CF.feita[c.aba] = new Map(feita.map((x) => [x.ficha, x]));
   if (c.aba === 'RECEITAS') await cfReceitasAoVivo(c);
+  await cfEstadoCarregar();
   // 12/11/2026 (dono, 06/10, livro pauta-da-semana/respostas/meta-lana: "30 produtos por semana, começando pelos que mais
   // saem"): a venda de 30 dias é a mesma da tela Preço alvo (vw_margem_produto.qtd_vendida), somada por nome da base.
   if (c.aba === 'PRODUTOS' && CF.venda === undefined) {
@@ -4430,8 +4431,25 @@ async function cfReceitasAoVivo(c) {
   });
   if (mexeu) { cfGuardar(c.chave + '_rascunho', rasc); cfGuardar(c.chave + '_respostas', resp); }
 }
-// o que aconteceu com o último envio: aplicado na ficha, travado (com o motivo) ou esperando a aplicação
-function cfEstadoEnvio(c, fe) {
+// 12/11/2026 (dono 19:31: "se nada aparecer eles acham que nada aconteceu e clicam novamente"): o estado de cada envio vem
+// de vw_ft_conferencia_estado (Estoque): ENTROU, NA_FILA, PARADO (com o motivo), SUBSTITUIDO. Vale o último envio da ficha.
+async function cfEstadoCarregar(ficha) {
+  const q = ficha ? `&ficha=eq.${encodeURIComponent(ficha)}` : '';
+  const L = await consultarTudo(`vw_ft_conferencia_estado?select=ficha,enviado_em,estado,mensagem,entrou_em${q}&order=ficha,enviado_em.desc`).catch(() => null);
+  if (!L) return;
+  if (!CF.estado || !ficha) CF.estado = new Map();
+  if (ficha) CF.estado.delete(ficha);
+  L.forEach((x) => { if (!CF.estado.has(x.ficha)) CF.estado.set(x.ficha, x); });
+}
+// a mensagem do banco em palavra de operador: sai a instrução técnica de quem resolve
+const cfMsgOperador = (m) => String(m || '').replace(/;\s*se estiver certo[^—]*/i, ' ').replace(/\s*\(grama no lugar[^)]*\)/i, '').replace(/alguem le antes:?\s*/i, '').replace(/:\s*—/, ' —').replace(/\s+/g, ' ').trim();
+// o que aconteceu com o último envio: entrou na ficha, parado (com o motivo) ou na fila
+function cfEstadoEnvio(c, fe, i) {
+  const est = CF.estado && i ? CF.estado.get(i.f || i.nb) : null;
+  if (est && est.estado !== 'SUBSTITUIDO') {
+    const cor = est.estado === 'ENTROU' ? 'var(--farol-ok)' : est.estado === 'PARADO' ? 'var(--farol-perto)' : 'var(--tx-3)';
+    return `<span style="font-size:12px; font-weight:700; color:${cor}; white-space:normal;">${trEscH(cfMsgOperador(est.mensagem))}</span>`;
+  }
   if (!fe || fe.nao_fazemos_mais) return '';
   const alvo = c.aba === 'RECEITAS' ? 'receita' : 'ficha';
   if (fe.aplicado) return `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ aplicada na ${alvo}${fe.aplicado_em ? ' ' + embQuando(fe.aplicado_em) : ''}</span>`;
@@ -4502,7 +4520,8 @@ function cfRender(id) {
       <span style="font-size:12px; color:var(--tx-4);"> · desde seg ${s.dm} · ${CF.venda ? 'os que mais vendem primeiro' : 'a venda não abriu, lista em ordem alfabética'}</span></div>`;
   }
   // 12/11/2026 (Estoque): o envio fica à vista; antes parecia que não tinha salvado e a Rita mandou 5 vezes
-  if (CF.enviada && CF.enviada.aba === c.aba) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ ${trEscH(CF.enviada.nb)} recebida às ${CF.enviada.hora}</b> — entra na ${id === 'receitas' ? 'receita' : 'ficha'} quando o Estoque aplicar; o cartão mostra "✓ aplicada" ou o motivo de não ter entrado. Não precisa enviar de novo.</div>`;
+  if (CF.enviada && CF.enviada.aba === c.aba) { const est = CF.estado && CF.estado.get(CF.enviada.f);
+    h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Recebido: ${trEscH(CF.enviada.nb)} às ${CF.enviada.hora}</b>${est && est.estado !== 'SUBSTITUIDO' && new Date(est.enviado_em) >= new Date(CF.enviada.quando) ? ' — ' + trEscH(cfMsgOperador(est.mensagem)) : ` — entra na ${id === 'receitas' ? 'receita' : 'ficha'} em até 30 minutos. Não precisa mandar de novo.`}</div>`; }
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
@@ -4520,7 +4539,7 @@ function cfRender(id) {
         <div><b style="font-size:14.5px;">${trEscH(i.nb)}</b>
           <div style="font-size:12px; color:var(--tx-4);">${trEscH([i.gr, i.fam].filter(Boolean).join(' · '))}${i.mot ? ' · ' + trEscH(i.mot) : ''}${i.f && i.f !== i.nb ? ' · ficha: ' + trEscH(i.f) : ''}</div></div>
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          ${fe ? `<span style="font-size:12px; font-weight:700; color:var(--tx-2);">${fe.nao_fazemos_mais ? '✓ não fazemos mais' : 'enviada'} · ${trEscH(estNome(fe.quem) || fe.quem || '')} · ${embQuando(fe.conferido_em)}</span> ${cfEstadoEnvio(c, fe)}`
+          ${fe ? `<span style="font-size:12px; font-weight:700; color:var(--tx-2);">${fe.nao_fazemos_mais ? '✓ não fazemos mais' : 'enviada'} · ${trEscH(estNome(fe.quem) || fe.quem || '')} · ${embQuando(fe.conferido_em)}</span> ${cfEstadoEnvio(c, fe, i)}`
                : com ? `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">começada, não enviada</span>`
                : `<span style="font-size:12px; color:var(--tx-3);">${trEscH(c.st[i.g] || i.g || '')}</span>`}
           ${ehProd && CF.venda ? `<span style="font-size:12px; color:var(--tx-3);">${cfVendeu(i).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} vendidos em 30 dias</span>` : ''}
@@ -4627,10 +4646,13 @@ async function cfEnviar(id, iid, naofaz) {
   const ra = cfRasc(c); Object.keys(ra).filter((k) => k.startsWith(i.id + '|')).forEach((k) => delete ra[k]); cfGuardar(c.chave + '_rascunho', ra);
   cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; delete x.removidos; });
   CF.aberto = null;
-  CF.enviada = { aba: c.aba, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora() };
+  CF.enviada = { aba: c.aba, f: i.f || i.nb, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora(), quando: new Date(Date.now() - 60000).toISOString() };
   avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} quando o Estoque aplicar.`);
   cfRender(id);
   confAbasPintar();
+  // o estado do envio que acabou de chegar (na fila, ou parado com o motivo), sem esperar recarregar a tela
+  await cfEstadoCarregar(i.f || i.nb);
+  if (CONF_ABA === id) cfRender(id);
 }
 
 // ==================================================================
