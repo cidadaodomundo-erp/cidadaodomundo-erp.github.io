@@ -255,10 +255,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261107a"></script>
-<script src="casca/paginas.js?v=20261112-reservas-goomer1"></script>
+<script src="casca/menu.js?v=20261112c"></script>
+<script src="casca/paginas.js?v=20261112-chegada1"></script>
 <script src="casca/modulos.js?v=20261112b"></script>
-<script src="casca/setores-fabio.js?v=20261112b"></script>
+<script src="casca/setores-fabio.js?v=20261112c"></script>
 <script src="casca/busca.js?v=20261112b"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -473,6 +473,8 @@ let VE_GESTAO = null;
 function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
+  // 12/11/2026 (Fabio): a Chegada dos motoboys usa a MESMA permissão do Delivery do dia (sem chave nova no painel_acesso)
+  if (chave === 'chegada') return visivel('delivery');
   // item de junção que não é tela (Motoboys): visível se o login abre alguma das abas
   if (JUNCOES[chave] && !abasJuncao(chave).includes(chave)) return abasJuncao(chave).some((k) => visivel(k));
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;

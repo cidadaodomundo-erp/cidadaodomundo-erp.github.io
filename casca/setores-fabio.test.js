@@ -100,7 +100,7 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
   assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento do Fábio');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
-  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery'], 'Delivery: só o Delivery do dia nativo');
+  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada'], 'Delivery: Delivery do dia e Chegada nativos');
   assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados'], 'Reservas e Pausados no Salão');
 });
 
@@ -134,10 +134,11 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   assert.doesNotMatch(casa, /data-chave="pcartao"/, 'sem página = sem botão ativo');
   assert.match(casa, /integração pendente · acesso ainda não conectado/);
   assert.doesNotMatch(casa + t.$('menu').innerHTML, /sem página/);
-  // setor Delivery: só o Delivery do dia; Chegada completa/Fila/Escala só como aviso em texto, sem botão nem link
+  // setor Delivery: Delivery do dia e Chegada; Fila/Escala só como aviso em texto, sem botão nem link
   const setorDl = casa.slice(casa.indexOf('Delivery<'), casa.indexOf('Salão<'));
-  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery']);
-  assert.match(setorDl, /class="setor-aviso">Em migração para este portal: Chegada completa dos motoboys, Fila de pedidos e edição da Escala\.</);
+  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada']);
+  assert.match(setorDl, /class="setor-aviso">Em migração para este portal: Fila de pedidos e edição da Escala\.</);
+  assert.doesNotMatch(setorDl, /Chegada completa/, 'Chegada não é mais pendência');
   assert.doesNotMatch(casa, /antigo:|github\.io|portal antigo|href=|<iframe|↗/i, 'agrupamento outras sem link para o portal antigo');
   assert.doesNotMatch(t.$('menu').innerHTML, /antigo:|portal antigo/i);
   ['antigo:chegada', 'antigo:fila', 'antigo:escala'].forEach((k) => t.ev(`abrir(${JSON.stringify(k)})`));
@@ -196,7 +197,9 @@ test('setores-fabio.js: só configuração (sem rede, timer, sessão ou token); 
 test('delivery/index.html: diz o que consulta e o que está em migração; não manda ao portal antigo; nada de garantido/refeição calculado; um timer só', () => {
   const html = ler('delivery', 'index.html');
   assert.match(html, /Já consultam dados neste portal:<\/strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia/);
-  assert.match(html, /Em migração, ainda sem tela neste portal:<\/strong> Chegada completa dos motoboys/);
+  assert.match(html, /Em migração, ainda sem tela neste portal:<\/strong> Fila de pedidos/);
+  assert.match(html, /Com página própria neste portal:<\/strong> Chegada dos motoboys/);
+  assert.match(html, /<button data-aba="chegada">Chegada do dia<\/button>/, 'aba Chegada sem selo Em construção');
   const bloco = (/<section class="dl-migracao"[\s\S]*?<\/section>/.exec(html) || [''])[0];
   assert.ok(bloco, 'bloco de migração presente');
   assert.doesNotMatch(bloco, /portal antigo|atalho|href=|<a\b|<button/i, 'só texto, sem mandar ao portal antigo');
@@ -206,4 +209,53 @@ test('delivery/index.html: diz o que consulta e o que está em migração; não 
   assert.equal((html.match(/data-aba=/g) || []).length, 7, 'abas do Delivery do dia iguais');
   assert.equal((html.match(/setInterval\(/g) || []).length, 1, 'nenhum polling novo');
   assert.doesNotMatch(html, /garantido_|refeicao_|direito_/i);
+});
+
+// ------------------------------------------------------------------------------- Chegada dos motoboys (12/11/2026)
+test('chegada: item do Fábio no grupo Entrega, rota delivery/chegada.html, por loja, cache-bust dos scripts da casca', () => {
+  const ent = C.CASCA_MENU.find((g) => g.id === 'gEntrega');
+  const it = ent.itens.find((i) => i.chave === 'chegada');
+  assert.ok(it, 'chegada no grupo Entrega');
+  assert.equal(it.origem, 'fabio');
+  assert.equal(C.CASCA_MENU.flatMap((g) => g.itens).filter((i) => i.chave === 'chegada').length, 1, 'uma chave chegada só');
+  assert.equal(C.CASCA_PAGINAS.chegada, 'delivery/chegada.html');
+  assert.ok(fs.existsSync(path.join(RAIZ, 'delivery', 'chegada.html')));
+  assert.ok(C.CASCA_TELAS_POR_LOJA.includes('chegada'));
+  assert.ok(!C.CASCA_TELAS_SEM_LOJA.includes('chegada'));
+  assert.match(SISTEMA, /casca\/menu\.js\?v=20261112c"/);
+  assert.match(SISTEMA, /casca\/paginas\.js\?v=20261112-chegada1"/);
+  assert.match(SISTEMA, /casca\/setores-fabio\.js\?v=20261112c"/);
+  assert.match(SISTEMA, /if \(chave === 'chegada'\) return visivel\('delivery'\);/);
+});
+
+test('chegada: visível com a permissão do Delivery; sem ela (mesmo com a chave chegada na lista), não', async () => {
+  const t = abrirCasca({ pode: ['delivery'] }); await settle();
+  assert.equal(t.ev("visivel('chegada')"), true);
+  assert.match(t.$('menu').innerHTML, /data-chave="chegada"/);
+  const t2 = abrirCasca({ pode: ['chegada'] }); await settle();
+  assert.equal(t2.ev("visivel('chegada')"), false, 'chegada segue a permissão delivery, não uma chave própria');
+  const t3 = abrirCasca({ pode: ['pao'] }); await settle();
+  assert.equal(t3.ev("visivel('chegada')"), false);
+  assert.doesNotMatch(t3.$('menu').innerHTML, /data-chave="chegada"/);
+});
+
+test('chegada: #chegada na casca abre delivery/chegada.html na moldura; nada do portal antigo', async () => {
+  const t = abrirCasca({ hash: '#chegada' }); await settle();
+  const molduras = t.$('vista').children.filter((c) => c.tagName === 'iframe').map((f) => f.src);
+  assert.deepEqual(molduras, ['delivery/chegada.html']);
+  assert.equal(t.abertas.length, 0);
+});
+
+test('delivery/index.html: aba Chegada e #chegada navegam para chegada.html na mesma moldura; demais abas intactas', () => {
+  const html = ler('delivery', 'index.html');
+  assert.match(html, /location\.replace\('chegada\.html'\)/);
+  assert.match(html, /location\.assign\('chegada\.html'\)/);
+  assert.match(html, /if \(ABA === 'chegada' && irParaChegada\(true\)\) ABA = 'placar';/);
+  assert.match(html, /if \(b\.dataset\.aba === 'chegada' && irParaChegada\(false\)\) return;/);
+  assert.match(html, /if \(nova === 'chegada' && irParaChegada\(true\)\) return;/);
+  ['placar', 'tempo', 'cancel', 'quali', 'escala', 'conferencia'].forEach((a) => assert.match(html, new RegExp('data-aba="' + a + '"')));
+  assert.doesNotMatch(html.replace(/<link[^>]*>/g, ''), /window\.open|target=|github\.io/);
+  const ch = ler('delivery', 'chegada.html');
+  assert.doesNotMatch(ch.replace(/<link[^>]*>/g, ''), /github\.io|<iframe|target=/i);
+  assert.match(ch, /chegada-modelo\.js\?v=\d{8}[a-z]"/);
 });
