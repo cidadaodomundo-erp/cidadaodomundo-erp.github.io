@@ -611,7 +611,7 @@ const CG_TELAS = {
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
   pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
-           abas: [['adt', 'Adiantamento · paga dia 20'], ['dez', 'Gratificações salão · fecha a partir do dia 25'], ['vtva', 'VT e VA · último dia útil'], ['bonif', 'Bonificação trimestral · mês fechado'], ['ffcalc', 'Cálculos por fora']] },
+           abas: [['adt', 'Adiantamento · dia 20'], ['dez', 'Gratificações · dia 25'], ['vtva', 'VT e VA · fim do mês'], ['bonif', 'Bonificação'], ['ffcalc', 'Por fora']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
   penvio: { titulo: 'Envio à contabilidade', leg: 'Os nossos cálculos + as horas da Flash: conferir e montar o que vai para a contabilidade.', abas: [['envio', 'Envio à contabilidade']] },
@@ -625,6 +625,8 @@ function cgEntrarTela(t) {
   CARGOS_F.tela = t;
   // pedido de outra tela (Contas a pagar → Pagamento por fora): vale uma vez
   try { const a = sessionStorage.getItem('pesAbaPedida'); if (a) { CG_ABA_PEDIDA = a; sessionStorage.removeItem('pesAbaPedida'); } } catch (e) {}
+  // 12/11/2026 (usabilidade, padm): "+ nova admissão" de Cargos já chega com o formulário aberto
+  try { if (t === 'padm' && sessionStorage.getItem('pesNovaAdm')) { sessionStorage.removeItem('pesNovaAdm'); CARGOS_F.formando = 0; CG_ADM = null; } } catch (e) {}
   const ok = CG_TELAS[t].abas.map(([k]) => k).concat(CG_TELAS[t].acomp ? CG_ACOMP.map(([k]) => k) : []);
   // 05/11/2026 (dono 19:52): o histórico do por fora voltou como "Cálculos por fora" (última aba dos Cálculos); o link antigo cai nela
   if (CG_ABA_PEDIDA === 'fora') CG_ABA_PEDIDA = 'ffcalc';
@@ -782,7 +784,7 @@ const CG_GUIAS = {
   cargos: ['pessoas', [
     { sel: '.card[onclick*="soConferir=true"]', texto: '<b>Com alerta</b>: toque para ver só quem tem diferença entre a Flash, o nosso cadastro e a tabela de cargos.' },
     { sel: '#tabelaCgPessoas td.cg-nome', texto: '<b>Clique no nome</b>: abre a pessoa — admissão, VT, VA, custo mês a mês — e o botão <b>Editar</b>.' },
-    { sel: 'a[onclick="mostrarModulo(\'padm\')"]', texto: 'Vai admitir alguém? <b>+ nova admissão</b> leva à tela de Admissões.' },
+    { sel: 'a[data-guia="nova-adm"]', texto: 'Vai admitir alguém? <b>+ nova admissão</b> leva à tela de Admissões.' },
     { sel: 'button[onclick="cargosAba(\'custo\')"]', texto: 'Nas abas do alto: <b>Custo do mês</b>, <b>Por setor</b> e <b>Tabela de cargos</b>.' },
     { sel: 'a[onclick^="CARGOS_F.desligados"]', texto: '<b>ver desligados</b> mostra quem já saiu da folha.' },
   ]],
@@ -791,7 +793,7 @@ const CG_GUIAS = {
     { sel: '#cgAdmAndamento', texto: '<b>Admissões em andamento</b>: fica aqui até a leitura dos documentos, a Flash e a contabilidade ficarem com ✓.' },
     { sel: 'button[onclick^="cgAdmEditar"]', texto: '<b>Editar</b>: enquanto falta alguma etapa ou documento, a admissão ainda se corrige aqui.' },
     { sel: 'button[onclick^="cgAdmTentar"]', texto: 'Deu erro no envio? <b>Tentar de novo</b> manda outra vez. Na contabilidade já enviada, <b>Reenviar</b> faz o mesmo.' },
-    { sel: '#tabelaCgAdm', texto: '<b>Últimas admissões</b>: as mais recentes, com a situação de cada etapa e o que falta anexar.' },
+    { sel: '#tabelaCgAdm', texto: '<b>Últimas admissões</b>: as já concluídas, com loja, cargo e o que falta anexar.' },
   ]],
 };
 function cgGuia() {
@@ -837,7 +839,7 @@ function cgAbaPessoas() {
       ${card(F.desligados ? 'Desligados' : 'Pessoas', base.length, !F.soConferir, 'CARGOS_F.soConferir=false;renderModuloCargos()', false)}
       ${card('Com alerta', nAl, F.soConferir, 'CARGOS_F.soConferir=true;renderModuloCargos()', nAl > 0)}
     </div>
-    <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;margin:-6px 0 8px;"><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-3);" onclick="mostrarModulo('padm')">+ nova admissão</a><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;margin:-6px 0 8px;"><a href="javascript:void(0)" data-guia="nova-adm" style="font-size:12px;color:var(--tx-3);" onclick="try{sessionStorage.setItem('pesNovaAdm','1')}catch(e){};mostrarModulo('padm')">+ nova admissão</a><a href="javascript:void(0)" style="font-size:12px;color:var(--tx-4);" onclick="CARGOS_F.desligados=!CARGOS_F.desligados;CARGOS_F.soConferir=false;renderModuloCargos()">${F.desligados ? 'ver quem está na folha' : 'ver desligados'}</a></div>
 `;
   h += `<div id="tabelaCgPessoas" class="cel-cartao"><table>
     <thead><tr><th>Nome</th>${comLoja ? '<th>Loja</th>' : ''}<th>Cargo</th><th>Setor</th><th>Turno</th><th>Jornada</th><th>Salário</th><th title="o que a pessoa custou de verdade em ${cgMesCustoFechado() ? cgMesRot(cgMesCustoFechado()) : 'o último mês fechado'} (contas a pagar, com encargos e rateios)">Custo no mês</th><th>Alerta / nota</th></tr></thead>
@@ -1058,7 +1060,7 @@ async function cgAdmCep(v) {
   } catch (e) { avisoAcao('atencao', '! Não consegui buscar o CEP agora: preencha o endereço à mão.'); }
 }
 function cgAdmDaPessoa(id) { return (CARGOS.adm || []).find((a) => a.pessoa_id === id) || null; }
-function cgFormAdmissao(a, id) {
+function cgFormAdmissao(a, id, parte) {   // parte: 'docs' (anexos, vão no topo), 'ficha' (o resto) ou as duas
   if (!CG_ADM || CG_ADM.id !== id) CG_ADM = { id, docs: (a.documentos || []).slice(), novos: [] };
   const campo = (rot, html) => `<label style="display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--tx-4);">${rot}${html}</label>`;
   const ctl = ([c, , t]) => {
@@ -1070,18 +1072,26 @@ function cgFormAdmissao(a, id) {
   const lido = a.lido_doc || {};
   const selo = (c) => lido[c] && lido[c].doc ? `<span style="font-size:10.5px;color:var(--farol-ok);font-weight:700;">✓ lido do ${cgEsc(lido[c].doc)} — conferir</span>`
     : CG_ADM_LEIT[c] ? `<span style="font-size:10.5px;color:var(--tx-5);">vem do documento (${CG_ADM_LEIT[c]})</span>` : '';
-  setTimeout(() => { (a.dependentes || []).forEach(cgAdmDepAdd); cgAdmDocsPintar(); });
-  return `<div id="cgAdmAlerta"></div>
-    ${titulo('Documentos anexos')}
-    <div class="caption-label" style="text-align:left;margin:0 0 6px;">Suba os documentos primeiro: o robô lê e preenche os campos marcados "vem do documento" (até 40 min). CPF, telefone, raça/cor e escolaridade a pessoa informa.</div>
+  if (parte !== 'ficha') setTimeout(() => { (a.dependentes || []).forEach(cgAdmDepAdd); cgAdmDocsPintar(); });
+  const docs = `<div id="cgAdmAlerta"></div>
+    <div style="font-size:13px;font-weight:800;color:var(--tx-1);margin:0 0 6px;">1 · Documentos anexos</div>
+    <div class="caption-label" style="text-align:left;margin:0 0 6px;">O robô lê os documentos e preenche os campos marcados (até 40 min).</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><select id="cgAdmDocTipo" style="max-width:100%;">${CG_ADM_DOCS_G.map(([g, L]) => `<optgroup label="${cgEsc(g)}">${L.map((d) => `<option>${cgEsc(d)}</option>`).join('')}</optgroup>`).join('')}</select>
       <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="max-width:100%;" onchange="cgAdmDocEscolher(this)"></div>
-    <div id="cgAdmDocs" style="margin-top:6px;font-size:12.5px;"></div>
-    ${CG_ADM_BLOCOS.map(([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1].replace(/^(Nascimento|Nome da mãe) \*$/, '$1 * (ou anexe RG/CNH)'), ctl(c) + selo(c[0]))).join('')}</div>`).join('')}
+    <div id="cgAdmDocs" style="margin-top:6px;font-size:12.5px;"></div>`;
+  if (parte === 'docs') return docs;
+  // 12/11/2026 (usabilidade, padm): o bloco com campo obrigatório fica aberto; o resto recolhe (abre sozinho se o robô já leu algo dele)
+  const bloco = ([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1].replace(/^(Nascimento|Nome da mãe) \*$/, '$1 * (ou anexe RG/CNH)'), ctl(c) + selo(c[0]))).join('')}</div>`;
+  const obrig = CG_ADM_BLOCOS.filter(([, cs]) => cs.some((c) => /\*/.test(c[1]))), resto = CG_ADM_BLOCOS.filter((b) => !obrig.includes(b));
+  const abreResto = resto.some(([, cs]) => cs.some((c) => lido[c[0]] && lido[c[0]].doc || (a.id && a[c[0]] != null && a[c[0]] !== ''))) || (a.dependentes || []).length || !!a.obs;
+  const ficha = `${obrig.map(bloco).join('')}
+    <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">▸ Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')}, dependentes)</span></summary>
+    ${resto.map(bloco).join('')}
     <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
     ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
-
+    </details>
     ${campo('<span style="margin-top:12px;">Observação para a contabilidade</span>', `<input id="cgA_obs" value="${cgEsc(a.obs || '')}" style="width:100%">`)}`;
+  return parte === 'ficha' ? ficha : `${docs}${ficha}`;
 }
 function cgAdmData(v) {
   const el = document.getElementById('cgAdmAlerta');
@@ -1167,9 +1177,12 @@ function cgAdmEtapas(a) {
     ${a.flash_aviso ? `<div style="color:var(--farol-perto);font-weight:700;white-space:normal;margin-top:4px;">${cgEsc(a.flash_aviso)}</div>` : ''}`;
 }
 // fica à vista enquanto faltar alguma etapa; nada some sozinho antes do ✓
+function cgAdmEmAndamento(a) {
+  return a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || !!a.flash_aviso
+    || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA';
+}
 function cgAdmAndamento() {
-  const L = (CARGOS.adm || []).filter((a) => a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || a.flash_aviso
-    || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA');
+  const L = (CARGOS.adm || []).filter(cgAdmEmAndamento);
   if (!L.length) return '';
   const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
   return `<div id="cgAdmAndamento" class="section-label" style="text-align:left;">Admissões em andamento</div>${L.map((a) => `<div class="contexto" style="text-align:left;margin:6px 0;"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><b>${cgEsc(cgNome(nome(a)))}</b>${cgAdmBotaoEditar(a)}</div><div style="margin-top:4px;font-size:13px;">${cgAdmEtapas(a)}</div></div>`).join('')}`;
@@ -1209,6 +1222,7 @@ function cgFormPessoa(p, soAdm) {   // soAdm: edição da admissão na tela Admi
   const ob = (rot) => p ? rot : rot + ' *';
   setTimeout(() => { cgSalarioConf(id); if (!p) cgObrigPintar(id); });
   return `<div ${p ? '' : `oninput="cgObrigPintar(${id})" onchange="cgObrigPintar(${id})"`} style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;">
+    ${adm && (!p || soAdm) ? `${cgFormAdmissao(adm, id, 'docs')}<div style="font-size:13px;font-weight:800;color:var(--tx-1);margin:14px 0 6px;">2 · Cadastro</div>` : ''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">
       ${campo(ob('Nome completo'), inp('nome', v.nome))}
       ${campo('Loja', sel('unidade', ['AGUA VERDE', 'AHU', 'SÃO BRAZ'], v.unidade).replace('<select ', `<select onchange="cgFormLoja(${id})" `))}
@@ -1231,7 +1245,7 @@ function cgFormPessoa(p, soAdm) {   // soAdm: edição da admissão na tela Admi
     </div>
     <div style="margin-top:8px;font-size:12px;">${chk('recebe_va', v.recebe_va, 'recebe VA')}${chk('pega_adiantamento', v.pega_adiantamento, 'pega adiantamento')}${chk('recebe_bonificacao', v.recebe_bonificacao, 'recebe bonificação')}${chk('usa_ponto', v.usa_ponto, 'bate ponto na Flash')}${chk('no_plano', v.no_plano, 'está no plano de cargos')}</div>
     <div id="cgSug_${id}" style="font-size:12px;color:var(--tx-4);margin-top:6px;"></div>
-    ${adm ? cgFormAdmissao(adm, id) : ''}
+    ${adm ? cgFormAdmissao(adm, id, !p || soAdm ? 'ficha' : undefined) : ''}
     <div style="margin-top:12px;display:flex;gap:8px;"><button type="button" class="preset-btn active" onclick="cgSalvar(${id})">${p ? 'Salvar' : 'Salvar e enviar à Flash e à contabilidade'}</button><button type="button" class="preset-btn" onclick="cgFormFechar()">Cancelar</button></div>
   </div>`;
 }
@@ -1506,27 +1520,25 @@ function cgAbaVtVa() {
   const dt = (k) => linhas.map((v) => v[k]).filter(Boolean).sort().pop();
   const ca = dt('calculado_em'), fe = dt('fechado_em'), en = dt('enviado_em');
   let h = `${cgSelPeriodo('Mês', [...meses].sort().map((m) => [m, cgMesRot(m)]), mes, "(v) => { CARGOS_F.mes = v; renderModuloCargos(); }")}
-    <h3 style="margin:8px 0 0;">VT e VA de ${cgMesRot(mes)} · fecha no último dia útil de ${cgMesRot(cgMesIso(0)).split(' ')[0]}</h3>
+    <h3 style="margin:8px 0 0;">VT e VA de ${cgMesRot(mes)} · fecha no último dia útil de ${cgMesRot((() => { const d = new Date(mes + 'T12:00:00'); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); })()).split(' ')[0]}</h3>
     ${cgPassos([['calculado', !!ca, cgDiaMes(ca)], ['fechado', !!fe, cgDiaMes(fe)], ['enviado', !!en, cgDiaMes(en)]])}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
       ${fechado ? cgBotaoPasso('reabrir', `cgVtFechar('${mes}', true)`, true)
         : `${cgBotaoPasso(linhas.length ? 'Recalcular' : 'Calcular', `cgVtCalcular('${mes}')`, linhas.length > 0)}${linhas.length ? cgBotaoPasso('Fechar o mês', `cgVtFechar('${mes}', false)`) : ''}`}
     </div>
-    <div class="cards" style="max-width:900px;">
-      <div class="card neutral"><div class="card-lbl">VT + VA</div><div class="card-val">${cgR(totVt + totVa)}</div><div class="card-pct">VT ${cgR(totVt)} · VA ${cgR(totVa)}</div></div>
-      <div class="card neutral"><div class="card-lbl">Pela Flash</div><div class="card-val">${cgR(totFlash)}</div><div class="card-pct">${nFlash} ${nFlash === 1 ? 'pessoa' : 'pessoas'}</div></div>
+    <div class="cards" style="max-width:520px;">
+      <div class="card neutral"><div class="card-lbl">VT + VA</div><div class="card-val">${cgR(totVt + totVa)}</div><div class="card-pct">VT ${cgR(totVt)} · VA ${cgR(totVa)} · ${linhas.length} ${linhas.length === 1 ? 'pessoa' : 'pessoas'}</div></div>
       <div class="card neutral"><div class="card-lbl">Por fora da Flash</div><div class="card-val">${cgR(totFora)}</div><div class="card-pct">${fora.map((v) => cgEsc(cgNome(v.nome || v.apelido).replace(/\s*\(.*$/, ''))).join(', ') || 'ninguém'}</div></div>
-      <div class="card neutral"><div class="card-lbl">Pessoas</div><div class="card-val">${linhas.length}</div></div>
     </div>`;
   if (!linhas.length) return h + cgFaltasFFHtml(mes, fechado, linhas);
   h += `<div id="tabelaCgVtVa"><table>
-    <thead><tr><th>Loja</th><th>Nome</th><th style="text-align:right;">Dias</th><th style="text-align:right;">Faltas</th><th style="text-align:right;">VT por dia</th><th style="text-align:right;">VT</th><th style="text-align:right;">VA</th><th style="text-align:right;">Total</th></tr></thead>
+    <thead><tr><th>Loja</th><th>Nome</th><th>Dias</th><th>Faltas</th><th>VT por dia</th><th>VT</th><th>VA</th><th>Total</th></tr></thead>
     <tbody>${linhas.map((v) => `<tr>
       <td>${cgEsc(v.unidade)}</td><td>${cgEsc(cgNome(v.nome))}${v.pago_fora_flash ? ` <div style="font-size:11px;color:var(--tx-2);white-space:normal;">por fora da Flash</div>` : ''}${v.editado ? ` <div style="font-size:11px;color:var(--farol-perto);white-space:normal;">ajustado${v.motivo ? ': ' + cgEsc(v.motivo) : ''}</div>` : ''}</td>
-      <td style="text-align:right;">${v.vt_dias}</td><td style="text-align:right;">${v.faltas}</td><td style="text-align:right;">${v.vt_por_dia}</td>
-      <td style="text-align:right;">${cgR(v.vt_valor)}</td><td style="text-align:right;">${cgR(v.va_valor)}</td>
-      <td style="text-align:right;font-weight:600;">${cgR(cgN(v.vt_valor) + cgN(v.va_valor))}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="sub"><td colspan="5">Total</td><td style="text-align:right;">${cgR(totVt)}</td><td style="text-align:right;">${cgR(totVa)}</td><td style="text-align:right;">${cgR(totVt + totVa)}</td></tr></tfoot>
+      <td>${v.vt_dias}</td><td>${v.faltas}</td><td>${v.vt_por_dia}</td>
+      <td>${cgR(v.vt_valor)}</td><td>${cgR(v.va_valor)}</td>
+      <td style="font-weight:600;">${cgR(cgN(v.vt_valor) + cgN(v.va_valor))}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="sub"><td colspan="5">Total</td><td>${cgR(totVt)}</td><td>${cgR(totVa)}</td><td>${cgR(totVt + totVa)}</td></tr></tfoot>
   </table></div>`;
   h += cgFaltasFFHtml(mes, fechado, linhas);
   return h;
@@ -1537,10 +1549,10 @@ function cgFaltasFFHtml(mes, fechado, linhas) {
   const L = (CARGOS.faltasFF || []).filter((x) => x.usa_ponto !== false && cgLista(x.conferencia).length && (!F.unidade || x.unidade === F.unidade));
   if (!(CARGOS.faltasFF || []).length) return '';
   return `<details ${L.length ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">Faltas: Flash × folha ${L.length ? `<span style="color:var(--farol-perto);">(${L.length} para olhar)</span>` : '<span style="color:var(--farol-ok);">— batem</span>'}</summary>
-    ${L.length ? `<div id="tabelaCgFaltasFF" style="overflow-x:auto;"><table><thead><tr><th>Mês</th><th>Nome</th><th style="text-align:right;">Flash</th><th style="text-align:right;">Folha</th><th>O que não bate</th></tr></thead><tbody>
+    ${L.length ? `<div id="tabelaCgFaltasFF" style="overflow-x:auto;"><table><thead><tr><th>Mês</th><th>Nome</th><th>Flash</th><th>Folha</th><th>O que não bate</th></tr></thead><tbody>
       ${L.map((x) => `<tr><td>${cgMesRot(x.mes)}</td><td>${cgEsc(cgNome(x.nome || x.apelido))}</td>
-          <td style="text-align:right;">${cgN(x.dias_flash)} ${cgN(x.dias_flash) === 1 ? 'dia' : 'dias'}</td>
-          <td style="text-align:right;">${cgN(x.dias_folha)} ${cgN(x.dias_folha) === 1 ? 'dia' : 'dias'}${cgN(x.valor_descontado_folha) ? ` <span style="color:var(--tx-4);">(${cgR(x.valor_descontado_folha)})</span>` : ''}</td>
+          <td>${cgN(x.dias_flash)} ${cgN(x.dias_flash) === 1 ? 'dia' : 'dias'}</td>
+          <td>${cgN(x.dias_folha)} ${cgN(x.dias_folha) === 1 ? 'dia' : 'dias'}${cgN(x.valor_descontado_folha) ? ` <span style="color:var(--tx-4);">(${cgR(x.valor_descontado_folha)})</span>` : ''}</td>
           <td style="font-size:12px;color:var(--farol-perto);white-space:normal;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</td></tr>`).join('')}
     </tbody></table></div>` : ''}</details>`;
 }
@@ -1922,22 +1934,29 @@ function cgAbaFfCalc() {
   if (!CARGOS.adtFora) return '<div class="contexto">Lendo os cálculos por fora…</div>';
   const F = CARGOS_F, M = CARGOS.adtFora.filter((x) => !x.futuro && (!F.unidade || x.unidade === F.unidade));
   if (!M.length) return `${cgFiltroUnidade(CARGOS.pessoas)}<div class="contexto">Ninguém por fora com mês calculado.</div>`;
-  const nc = CG_FF_COLS.length + 3;
-  let h = cgFiltroUnidade(CARGOS.pessoas);
-  [...new Set(M.map((x) => x.pessoa_id))].forEach((pid) => {
-    const P = M.filter((x) => x.pessoa_id === pid).sort((a, b) => String(a.mes).localeCompare(String(b.mes))), p0 = P[0];
-    const nm = String(p0.nome || '').trim().toUpperCase();
-    const Ls = P.map((ff) => { const mes = String(ff.mes).slice(0, 10);
-      const pg = (CARGOS.ffPag || []).find((y) => String(y.competencia).slice(0, 10) === mes && (y.pessoa_id === pid || String(y.nome || '').trim().toUpperCase() === nm));
-      return { ff, mes, V: cgFfValores(ff, pg ? pg.bonificacao : 0, pg ? pg.valor_a_pagar : null) }; });
-    h += `<div class="section-label" style="margin-top:14px;">${cgEsc(cgNome(p0.nome))} <span style="font-weight:400;color:var(--tx-4);">· ${cgEsc(p0.unidade || '')} · sem registro · sai da conta ${cgEsc(p0.conta || '–')}</span></div>
-      <div id="tabelaCgFfCalc${pid}" style="overflow-x:auto;"><table><thead><tr><th>Mês</th>${CG_FF_COLS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Pago</th><th>Recibo</th></tr></thead><tbody>
-      ${Ls.map(({ ff, mes, V }) => `<tr><td><b>${cgEsc(cgMesRot(mes))}</b></td>${cgFfCelulas(ff, V)}
-        <td style="font-size:11.5px;white-space:normal;min-width:150px;"><div>adiant.: ${ffSituacaoTxt(ff, 'ADIANTAMENTO')}</div><div>saldo: ${ffSituacaoTxt(ff, 'SALDO')}</div></td>
-        <td>${cgFfRecibos(ff, mes) || '<span style="color:var(--tx-5);">–</span>'}</td></tr>`).join('')}
-      </tbody><tfoot><tr class="liq"><td>Total · ${Ls.length} ${Ls.length === 1 ? 'mês' : 'meses'}</td>${cgFfTotais(Ls.map((l) => l.V))}<td colspan="2"></td></tr></tfoot></table></div>`;
-  });
-  return h;
+  const d10 = (v) => String(v || '').slice(0, 10);
+  // 12/11/2026 (usabilidade, pcalc): uma grade só do mês escolhido; clicar no nome abre o histórico da pessoa
+  const comV = (ff) => { const mes = d10(ff.mes), pid = ff.pessoa_id, nm = String(ff.nome || '').trim().toUpperCase();
+    const pg = (CARGOS.ffPag || []).find((y) => d10(y.competencia) === mes && (y.pessoa_id === pid || String(y.nome || '').trim().toUpperCase() === nm));
+    return { ff, mes, V: cgFfValores(ff, pg ? pg.bonificacao : 0, pg ? pg.valor_a_pagar : null) }; };
+  const pago = (ff) => `<td style="font-size:11.5px;white-space:normal;min-width:150px;"><div>adiant.: ${ffSituacaoTxt(ff, 'ADIANTAMENTO')}</div><div>saldo: ${ffSituacaoTxt(ff, 'SALDO')}</div></td>`;
+  const recibo = (ff, mes) => `<td>${cgFfRecibos(ff, mes) || '<span style="color:var(--tx-5);">–</span>'}</td>`;
+  const meses = [...new Set(M.map((x) => d10(x.mes)))].sort().reverse();
+  const mes = meses.includes(F.ffMes) ? F.ffMes : meses[0];
+  const Ls = M.filter((x) => d10(x.mes) === mes).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))).map(comV);
+  const aberta = F.ffPessoa != null && Ls.find((l) => String(l.ff.pessoa_id) === String(F.ffPessoa));
+  let h = `${cgFiltroUnidade(CARGOS.pessoas)}${cgSelPeriodo('Mês', meses.slice().sort().map((m) => [m, cgMesRot(m)]), mes, "(v) => { CARGOS_F.ffMes = v; CARGOS_F.ffPessoa = null; renderModuloCargos(); }")}
+    <div id="tabelaCgFfCalc" style="overflow-x:auto;"><table><thead><tr><th>Nome</th>${CG_FF_COLS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Pago</th><th>Recibo</th></tr></thead><tbody>
+    ${Ls.map(({ ff, mes: m, V }) => { const ab = aberta && aberta.ff === ff;
+      return `<tr><td style="cursor:pointer;" onclick="CARGOS_F.ffPessoa=${ab ? 'null' : `'${cgEsc(String(ff.pessoa_id))}'`};renderModuloCargos()"><b>${ab ? '▾' : '▸'} ${cgEsc(cgNome(ff.nome))}</b><div style="font-size:11px;color:var(--tx-4);">${cgEsc(ff.unidade || '')} · conta ${cgEsc(ff.conta || '–')}</div></td>${cgFfCelulas(ff, V)}${pago(ff)}${recibo(ff, m)}</tr>`; }).join('')}
+    </tbody><tfoot><tr class="liq"><td>Total · ${Ls.length} ${Ls.length === 1 ? 'pessoa' : 'pessoas'}</td>${cgFfTotais(Ls.map((l) => l.V))}<td colspan="2"></td></tr></tfoot></table></div>`;
+  if (!aberta) return h;
+  const pid = aberta.ff.pessoa_id;
+  const H = M.filter((x) => String(x.pessoa_id) === String(pid)).sort((a, b) => d10(a.mes).localeCompare(d10(b.mes))).map(comV);
+  return h + `<div class="section-label" style="margin-top:14px;">Histórico de ${cgEsc(cgNome(aberta.ff.nome))} <span style="font-weight:400;color:var(--tx-4);">· sem registro · sai da conta ${cgEsc(aberta.ff.conta || '–')}</span></div>
+    <div id="tabelaCgFfHist" style="overflow-x:auto;"><table><thead><tr><th>Mês</th>${CG_FF_COLS.map(([, r]) => `<th>${r}</th>`).join('')}<th>Pago</th><th>Recibo</th></tr></thead><tbody>
+    ${H.map(({ ff, mes: m, V }) => `<tr><td><b>${cgEsc(cgMesRot(m))}</b></td>${cgFfCelulas(ff, V)}${pago(ff)}${recibo(ff, m)}</tr>`).join('')}
+    </tbody><tfoot><tr class="liq"><td>Total · ${H.length} ${H.length === 1 ? 'mês' : 'meses'}</td>${cgFfTotais(H.map((l) => l.V))}<td colspan="2"></td></tr></tfoot></table></div>`;
 }
 function cgFolhaQuadroFora(comp) {
   const F = CARGOS_F, Rall = CARGOS.folha.pag;
@@ -2084,13 +2103,13 @@ function cgAbaDez() {
         : Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)) < 0.01 ? `<span style="color:var(--farol-ok);">✓ ${cgR(x.pago_na_folha)}</span>`
         : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgR(x.pago_na_folha)} (${cgN(x.pago_na_folha) > cgN(x.valor) ? '+' : '−'}${cgR(Math.abs(cgN(x.pago_na_folha) - cgN(x.valor)))})</span>`;
       h += `<tr style="${zero ? 'color:var(--tx-4);' : ''}"><td>${cgEsc(cgNome(x.nome || x.apelido))}</td>
-        <td>${frac ? `${cgN(x.dias_trabalhados)}/${cgN(x.dias_periodo)}` : ''}</td>
+        <td>${frac ? `${cgN(x.dias_trabalhados)}/${cgN(x.dias_periodo)}` : cgN(x.dias_periodo) ? `${cgN(x.dias_periodo)}/${cgN(x.dias_periodo)}` : 'todos'}</td>
         <td style="${zero ? '' : 'font-weight:700;'}">${cgR(x.valor)}</td><td>${pago}</td>
         <td style="white-space:normal;font-size:12px;color:var(--tx-3);">${cgEsc(x.observacao || '')}</td></tr>`;
     });
     h += `<tr class="sub"><td colspan="2">Subtotal ${cgEsc(u)}</td><td>${cgR(L.reduce((a, x) => a + cgN(x.valor), 0))}</td><td>${cgR(L.reduce((a, x) => a + cgN(x.pago_na_folha), 0))}</td><td></td></tr>`;
   });
-  return h + `</tbody></table></div>`;
+  return h + `</tbody><tfoot><tr class="liq"><td colspan="2">Total geral</td><td>${cgR(P.reduce((a, x) => a + cgN(x.valor), 0))}</td><td>${cgR(P.reduce((a, x) => a + cgN(x.pago_na_folha), 0))}</td><td></td></tr></tfoot></table></div>`;
 }
 
 // ---------- ENVIO À CONTABILIDADE (05/11/2026, proposta do RH de 29/10: contexto/propostas-telas/2026-10-29-rh-fechamento-folha.md) ----------
@@ -2624,8 +2643,9 @@ async function cgLembreteFeito(id, desfazer) {
 // ADMISSÕES (tela própria, 06/11/2026): a inclusão (+ Nova admissão) e o acompanhamento
 function cgAbaAdm() {
   const F = CARGOS_F;
-  const rec = (CARGOS.adm || []).slice(0, 15);
-  const nome = (a) => (CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {}).nome || '';
+  // 12/11/2026 (usabilidade, padm): quem está em andamento fica só na caixa de cima
+  const rec = (CARGOS.adm || []).filter((a) => !cgAdmEmAndamento(a)).slice(0, 15);
+  const pes = (a) => CARGOS.pessoas.find((p) => p.id === a.pessoa_id) || {};
   // 07/11/2026 (dono 11:54, chat RH): editar a admissão enquanto está em andamento ou falta documento obrigatório
   const pEd = F.formando ? CARGOS.pessoas.find((p) => p.id === F.formando) : null;
   const edita = pEd && cgAdmDaPessoa(pEd.id);
@@ -2633,8 +2653,8 @@ function cgAbaAdm() {
     ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Nova admissão</div>${cgFormPessoa(null)}` : ''}
     ${edita ? `<div id="cgAdmEditando" class="section-label" style="text-align:left;">Editar admissão · ${cgEsc(cgNome(pEd.nome))}</div>${cgFormPessoa(pEd, true)}` : ''}
     ${cgAdmAndamento()}`;
-  if (rec.length) h += `<div class="section-label" style="text-align:left;">Últimas admissões</div><div id="tabelaCgAdm" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Enviada em</th><th>Situação</th><th></th></tr></thead><tbody>
-    ${rec.map((a) => `<tr><td>${cgEsc(cgNome(nome(a)))}</td><td>${a.criado_em ? cgData(a.criado_em) : '–'}</td><td style="white-space:normal;">${cgAdmEtapas(a)}${cgAdmFaltaDocs(a).length ? `<div style="color:var(--farol-perto);font-weight:700;margin-top:4px;">! falta anexar: ${cgAdmFaltaDocs(a).join(', ')}</div>` : ''}</td><td>${cgAdmBotaoEditar(a)}</td></tr>`).join('')}</tbody></table></div>`;
+  if (rec.length) h += `<div class="section-label" style="text-align:left;">Últimas admissões</div><div id="tabelaCgAdm" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Loja</th><th>Cargo</th><th>Criada em</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+    ${rec.map((a) => `<tr><td>${cgEsc(cgNome(pes(a).nome || ''))}</td><td>${cgEsc(pes(a).unidade || '')}</td><td>${cgEsc(cgNome(pes(a).cargo || ''))}</td><td>${a.criado_em ? cgData(a.criado_em) : '–'}</td><td style="white-space:normal;">${cgAdmEtapas(a)}${cgAdmFaltaDocs(a).length ? `<div style="color:var(--farol-perto);font-weight:700;margin-top:4px;">! falta anexar: ${cgAdmFaltaDocs(a).join(', ')}</div>` : ''}</td><td>${cgAdmBotaoEditar(a)}</td></tr>`).join('')}</tbody></table></div>`;
   return h;
 }
 function cgAbaHoje() {
@@ -3197,16 +3217,16 @@ function cgAbaAdt() {
     </div>`;
   if (!linhas.length && !fora.length) return h;
   h += `<div id="tabelaCgAdt"><table>
-    <thead><tr><th>Loja</th><th>Nome</th><th>Cargo</th><th style="text-align:right;">Salário</th><th style="text-align:right;">Dias</th><th style="text-align:right;">Adiantamento</th></tr></thead>
+    <thead><tr><th>Loja</th><th>Nome</th><th>Cargo</th><th>Salário</th><th>Dias</th><th>Adiantamento</th></tr></thead>
     <tbody>${linhas.map((a) => `<tr>
       <td>${cgEsc(a.unidade)}</td><td>${cgEsc(cgNome(a.nome))}${a.editado ? ` <div style="font-size:11px;color:var(--farol-perto);white-space:normal;">ajustado${a.motivo ? ': ' + cgEsc(a.motivo) : ''}</div>` : ''}</td>
-      <td>${cgEsc(cgNome(a.cargo))}</td><td style="text-align:right;">${cgR(a.salario)}</td><td style="text-align:right;">${a.dias}/30</td>
-      <td style="text-align:right;font-weight:600;">${cgR(a.valor)}</td></tr>`).join('')}
+      <td>${cgEsc(cgNome(a.cargo))}</td><td>${cgR(a.salario)}</td><td>${a.dias}/30</td>
+      <td style="font-weight:600;">${cgR(a.valor)}</td></tr>`).join('')}
     ${fora.map((x) => `<tr><td>${cgEsc(x.unidade || '')}</td><td>${cgEsc(cgNome(x.nome))} <span title="sem registro: sai da conta ${cgEsc(x.conta || '')}, não pela folha" style="font-size:11px;font-weight:700;border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;color:var(--tx-2);">por fora</span>
         <div style="font-size:11px;color:var(--tx-4);">${ffSituacaoTxt(x, 'ADIANTAMENTO')}</div></td>
-      <td>–</td><td style="text-align:right;">${cgR(x.salario)}</td><td style="text-align:right;">${x.dias != null ? x.dias + '/30' : ''}</td>
-      <td style="text-align:right;font-weight:600;">${cgR(x.adiantamento)}${x.adiantamento_pago_em ? ` <button type="button" class="preset-btn" style="margin-left:6px;" onclick="ffReciboAbrir(${x.pessoa_id},'${String(x.mes).slice(0, 10)}','ADIANTAMENTO')">🧾 Recibo</button>` : ''}</td></tr>`).join('')}</tbody>
-    <tfoot><tr class="sub"><td colspan="5">Total${fora.length ? ' (com quem é por fora)' : ''}</td><td style="text-align:right;">${cgR(tot)}</td></tr></tfoot>
+      <td>–</td><td>${cgR(x.salario)}</td><td>${x.dias != null ? x.dias + '/30' : ''}</td>
+      <td style="font-weight:600;">${cgR(x.adiantamento)}${x.adiantamento_pago_em ? ` <button type="button" class="preset-btn" style="margin-left:6px;" onclick="ffReciboAbrir(${x.pessoa_id},'${String(x.mes).slice(0, 10)}','ADIANTAMENTO')">🧾 Recibo</button>` : ''}</td></tr>`).join('')}</tbody>
+    <tfoot><tr class="sub"><td colspan="5">Total${fora.length ? ' (com quem é por fora)' : ''}</td><td>${cgR(tot)}</td></tr></tfoot>
   </table></div>`;
   return h;
 }
@@ -3304,6 +3324,8 @@ function cgAbaBonif() {
       return `<div class="card neutral"><div class="card-lbl">${cgEsc(cgEmpresaCurta(e))}</div><div class="card-val">${cgR0(soma(l))}</div><div class="card-pct">${np} ${np === 1 ? 'pessoa' : 'pessoas'}</div></div>`; }).join('')}
       <div class="card blue"><div class="card-lbl">Total geral</div><div class="card-val">${cgR0(soma(doPag))}</div><div class="card-pct">paga ${cgData(pag)}</div></div></div>
     ${cgFiltroUnidade(CARGOS.pessoas)}
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 8px;font-size:12px;color:var(--tx-3);">${Object.entries(CG_BON_COR).map(([k, [c, r]]) =>
+      `<span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c};border:1px solid var(--line);vertical-align:-2px;margin-right:4px;"></span>${r}</span>`).join('')}</div>
     <div id="tabelaCgBonifMes" style="overflow-x:auto;"><table><thead><tr><th>Nome</th>
       ${meses.map((m) => `<th>${mesRot(m)} <span style="font-weight:400;color:var(--tx-4);">${cgDiaMes(d10(m.periodo_ini))}–${cgDiaMes(d10(m.periodo_fim))}</span></th>`).join('')}<th>Total</th></tr></thead><tbody>`;
   emps.forEach((e) => {
@@ -3317,9 +3339,7 @@ function cgAbaBonif() {
     });
     h += `<tr class="sub"><td>Subtotal ${cgEsc(cgEmpresaCurta(e))}</td>${meses.map((m) => `<td>${cgR(soma(l.filter((x) => Number(x.n) === Number(m.n))))}</td>`).join('')}<td>${cgR(soma(l))}</td></tr>`;
   });
-  h += `</tbody><tfoot><tr class="liq"><td>Total geral</td>${meses.map((m) => `<td>${cgR(soma(doPag.filter((x) => Number(x.n) === Number(m.n))))}</td>`).join('')}<td>${cgR(soma(doPag))}</td></tr></tfoot></table></div>
-    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--tx-3);">${Object.entries(CG_BON_COR).map(([k, [c, r]]) =>
-      `<span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c};border:1px solid var(--line);vertical-align:-2px;margin-right:4px;"></span>${r}</span>`).join('')}</div>`;
+  h += `</tbody><tfoot><tr class="liq"><td>Total geral</td>${meses.map((m) => `<td>${cgR(soma(doPag.filter((x) => Number(x.n) === Number(m.n))))}</td>`).join('')}<td>${cgR(soma(doPag))}</td></tr></tfoot></table></div>`;
   return h;
 }
 function cgBonifDetalhe(x) {
@@ -3366,8 +3386,7 @@ function cgAbaBonifCiclo() {
   const falta = (hh) => cgN(hh) ? `<div style="font-size:11px;color:var(--tx-4);">falta ${String(Math.round(cgN(hh) * 10) / 10).replace('.', ',')} h</div>` : '';
   const mesCel = (v, hh) => `<td>${cgR(v)}${falta(hh)}</td>`;
   const naoRecebem = CARGOS.pessoas.filter(p => p.ativo && p.contrato === 'CLT' && (!F.unidade || p.unidade === F.unidade) && !linhas.some(b => b.pessoa_id === p.id));
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">${ciclos.map(c =>
-      `<button type="button" class="preset-btn ${c === ciclo ? 'active' : ''}" onclick="cargosCiclo('${c}')">${nomeCiclo(c)}</button>`).join('')}</div>
+  let h = `${cgSelPeriodo('Trimestre', ciclos.map(c => [c, nomeCiclo(c)]), ciclo, "(v) => cargosCiclo(v)")}
     ${cgFiltroUnidade(doCiclo)}
     <div class="cards">
       ${unids.map(u => { const l = doCiclo.filter(b => b.unidade === u); return `<div class="card neutral"><div class="card-lbl">${cgEsc(u)}</div><div class="card-val">${cgR0(soma(l))}</div><div class="card-pct">${l.length} ${l.length === 1 ? 'pessoa' : 'pessoas'}</div></div>`; }).join('')}
