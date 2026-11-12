@@ -499,7 +499,12 @@ function orcEquipeHtml() {
 // ---------------------------------------------------------------- Lojinha por empresa (gestão)
 // 30/10/2026 (dono no chat Atacado, 23:45): cada empresa tem link próprio, preço e frete. Proposta: contexto/propostas-telas/2026-10-30-lojinha-substituir-epadoca.md, seção 7b.
 // Só DONO e FINANCEIRO. Ligar empresa real é decisão do dono: o botão sempre pede confirmação e diz o efeito.
-const LG = { papel: undefined, aba: 'empresas', emp: null, prod: null, preco: null, erro: null, busca: '', filtro: null, confirma: null, empresa: '', bprod: '' };
+// 12/11/2026 (dono, 00:25; proposta contexto/propostas-telas/2026-11-12-loja-online.md): tabela que a empresa segue, pessoas que entram
+// (convite) e áreas de entrega. O código do convite só aparece na resposta do loja_usuario_convidar e fica só na memória desta tela.
+const LG = { papel: undefined, aba: 'empresas', emp: null, prod: null, preco: null, erro: null, busca: '', filtro: null, confirma: null, empresa: '', bprod: '',
+             modelos: [], usuarios: null, erroUsu: null, areas: null, erroAreas: null, minimoGeral: null, aberto: null, convite: null, confirmaU: null, areaEd: null };
+const LG_USU = 'loja_usuario?select=id,empresa_id,nome,email,celular,ativo,bloqueado_ate,ultimo_acesso,convite_expira&order=nome';
+const LG_AREAS = 'loja_area_entrega?select=id,canal,unidade,cidade,bairro,frete,minimo,ativa,origem&order=canal,cidade,bairro.nullsfirst';
 const lgEl = () => document.getElementById('view-lojaempresas');
 const lgNum = (t) => { t = String(t).trim(); return Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); };
 const LG_PAGINA = new URL('../lojinha.html', document.currentScript.src).href;   // pelo script: este arquivo roda em atacado/index.html e em dashboard.html
@@ -513,16 +518,22 @@ async function entrarLojaEmpresas() {
   LG.papel = r.ok ? await r.json() : null;
   if (!ORC_PAPEIS.includes(LG.papel)) { v.innerHTML = '<div class="contexto">Nada para mostrar — este login não cuida da lojinha.</div>'; return; }
   try {
-    const [emp, prod, preco, config] = await Promise.all([
-      consultarTudo('loja_empresa?select=id,nome,situacao_portal,chave,ativa,frete&modelo=eq.false&order=nome'),
+    const [emp, prod, preco, config, modelos, minimo] = await Promise.all([
+      consultarTudo('loja_empresa?select=id,nome,situacao_portal,chave,ativa,frete,tabela_id&modelo=eq.false&order=nome'),
       consultarTudo('loja_produto?select=id,nome_vitrine,un_vitrine,un,ativo,ordem&tipo=eq.ATACADO&order=ordem,nome_vitrine'),
       consultarTudo('loja_preco?select=empresa_id,produto_id,preco'),
-      consultarTudo('loja_config?select=aberta').catch(() => [])]);
-    Object.assign(LG, { emp, prod, preco, aberta: config[0] ? config[0].aberta : null, erro: null });
+      consultarTudo('loja_config?select=aberta').catch(() => []),
+      consultarTudo('loja_empresa?select=id,nome&modelo=is.true&order=nome').catch(() => []),
+      consultarTudo('loja_config?select=minimo_empresa').catch(() => [])]);
+    Object.assign(LG, { emp, prod, preco, modelos, aberta: config[0] ? config[0].aberta : null, minimoGeral: minimo[0] ? minimo[0].minimo_empresa : null, erro: null });
   } catch (e) { LG.erro = e.message; }
+  // pessoas e áreas à parte: se faltar, só a parte delas mostra o erro
+  await Promise.all([lgLerUsuarios(), lgLerAreas()]);
   lgRender();
 }
-function lgAba(a) { LG.aba = a; LG.confirma = null; lgRender(); }
+async function lgLerUsuarios() { try { LG.usuarios = await consultarTudo(LG_USU); LG.erroUsu = null; } catch (e) { LG.usuarios = null; LG.erroUsu = e.message; } }
+async function lgLerAreas() { try { LG.areas = await consultarTudo(LG_AREAS); LG.erroAreas = null; } catch (e) { LG.areas = null; LG.erroAreas = e.message; } }
+function lgAba(a) { LG.aba = a; LG.confirma = null; LG.confirmaU = null; LG.convite = null; LG.areaEd = null; lgRender(); }
 function lgRender() {
   const v = lgEl(); if (!v) return;
   if (LG.erro) { v.innerHTML = `<h2>Lojinha por empresa</h2><div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler: ${trEscH(LG.erro)}</div>`; return; }
@@ -530,8 +541,8 @@ function lgRender() {
   const situacao = LG.aberta === true ? '<b style="color:var(--farol-ok);">Aberta</b>' : LG.aberta === false ? '<b style="color:var(--tx-3);">Fechada: quem abrir vê "Em breve"</b>' : '';
   v.innerHTML = `<h2 style="margin:0 0 10px;">Lojinha por empresa</h2>
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;"><b>Link da lojinha</b> <a href="${trEscH(LG_PAGINA)}" target="_blank" rel="noopener" style="overflow-wrap:anywhere;color:var(--tx-1);">${trEscH(LG_PAGINA)}</a> <a class="preset-btn" href="${trEscH(LG_PAGINA)}" target="_blank" rel="noopener" style="text-decoration:none;">Abrir</a> <button type="button" class="preset-btn" onclick="lgCopiarGeral()">Copiar</button> ${situacao}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;">${aba('empresas', 'Empresas')}${aba('precos', 'Preços por empresa')}${aba('produtos', 'Produtos')}</div>
-    <div id="lgCorpo">${LG.aba === 'empresas' ? lgEmpresasHtml() : LG.aba === 'precos' ? lgPrecosHtml() : lgProdutosHtml()}</div>`;
+    <div style="display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:0 0 12px;">${aba('empresas', 'Empresas')}${aba('precos', 'Preços por empresa')}${aba('produtos', 'Produtos')}${aba('areas', 'Áreas de entrega')}</div>
+    <div id="lgCorpo">${LG.aba === 'empresas' ? lgEmpresasHtml() : LG.aba === 'precos' ? lgPrecosHtml() : LG.aba === 'areas' ? lgAreasHtml() : lgProdutosHtml()}</div>`;
 }
 function lgEmpresasHtml() {
   const lig = LG.emp.filter((e) => e.ativa), des = LG.emp.filter((e) => !e.ativa), b = orcNorm(LG.busca);
@@ -540,15 +551,20 @@ function lgEmpresasHtml() {
   const nPreco = (id) => LG.preco.filter((x) => x.empresa_id === id).length;
   return `<div class="cards">${card('ligadas', 'Link ligado', lig.length)}${card('desligadas', 'Link desligado', des.length)}</div>
     <input id="lgBusca" type="search" placeholder="Buscar empresa" value="${trEscH(LG.busca)}" style="width:260px;margin:0 0 10px;" oninput="LG.busca=this.value;lgRender();const i=document.getElementById('lgBusca');i.focus();i.setSelectionRange(i.value.length,i.value.length)">
-    <div id="tabelaLgEmpresas" style="overflow-x:auto;"><table><thead><tr><th>Empresa</th><th>No ePadoca</th><th style="text-align:right;">Preços</th><th>Frete</th><th>Link</th><th>Situação</th></tr></thead><tbody>
+    <div id="tabelaLgEmpresas" style="overflow-x:auto;"><table><thead><tr><th>Empresa</th><th>No ePadoca</th><th style="text-align:right;">Preços</th><th>Tabela que segue</th><th>Pessoas que entram</th><th>Frete</th><th>Link</th><th>Situação</th></tr></thead><tbody>
     ${L.map((e) => { const c = LG.confirma;
-      const alerta = c && c.id === e.id ? `<tr><td colspan="6" style="white-space:normal;"><b style="color:var(--farol-perto);">${c.tipo === 'ligar' ? `Ligar ${trEscH(e.nome)}: quem tiver o link passa a fazer pedidos de verdade.` : `Trocar o link de ${trEscH(e.nome)}: o link antigo para de funcionar.`}</b>
+      const tabela = `<select onchange="lgTabela(${e.id},this.value)" aria-label="Tabela de ${trEscH(e.nome)}"><option value="">Só a lista própria</option>${LG.modelos.map((m) => `<option value="${m.id}"${e.tabela_id === m.id ? ' selected' : ''}>${trEscH(m.nome)}</option>`).join('')}</select>`;
+      const nUsu = LG.usuarios ? LG.usuarios.filter((u) => u.empresa_id === e.id).length : null;
+      const pessoas = `<button type="button" class="preset-btn${LG.aberto === e.id ? ' active' : ''}" onclick="LG.aberto=LG.aberto===${e.id}?null:${e.id};LG.convite=null;LG.confirmaU=null;lgRender()">${nUsu == null ? 'Ver' : nUsu ? `${nUsu} ${nUsu === 1 ? 'pessoa' : 'pessoas'}` : 'Convidar'}</button>`;
+      const ficha = LG.aberto === e.id ? `<tr><td colspan="8" style="white-space:normal;background:var(--surface-2);">${lgPessoasHtml(e)}</td></tr>` : '';
+      const alerta = c && c.id === e.id ? `<tr><td colspan="8" style="white-space:normal;"><b style="color:var(--farol-perto);">${c.tipo === 'ligar' ? `Ligar ${trEscH(e.nome)}: quem tiver o link passa a fazer pedidos de verdade.` : `Trocar o link de ${trEscH(e.nome)}: o link antigo para de funcionar.`}</b>
           <button type="button" class="preset-btn active" style="margin-left:8px;" onclick="${c.tipo === 'ligar' ? `lgAjustar(${e.id},{p_ativa:true},'Link ligado')` : `lgAjustar(${e.id},{p_trocar_chave:true},'Link trocado')`}">Confirmar</button>
           <button type="button" class="preset-btn" onclick="LG.confirma=null;lgRender()">Voltar</button></td></tr>` : '';
       return `<tr><td style="white-space:normal;">${trEscH(e.nome)}</td><td>${trEscH(e.situacao_portal || '')}</td><td style="text-align:right;">${nPreco(e.id)}</td>
+        <td style="white-space:nowrap;">${tabela}</td><td style="white-space:nowrap;">${pessoas}</td>
         <td style="white-space:nowrap;"><input id="lgFrete${e.id}" type="text" inputmode="decimal" value="${lgDin(e.frete)}" style="width:70px;text-align:right;"> <button type="button" class="preset-btn" onclick="lgGravarFrete(${e.id})">Gravar</button></td>
         <td style="white-space:nowrap;"><button type="button" class="preset-btn" onclick="lgCopiar(${e.id})">Copiar link</button> <button type="button" class="preset-btn" onclick="LG.confirma={id:${e.id},tipo:'trocar'};lgRender()">Trocar</button></td>
-        <td style="white-space:nowrap;"><b style="color:${e.ativa ? 'var(--farol-ok)' : 'var(--tx-3)'};">${e.ativa ? 'Ligado' : 'Desligado'}</b> ${e.ativa ? `<button type="button" class="preset-btn" onclick="lgAjustar(${e.id},{p_ativa:false},'Link desligado')">Desligar</button>` : `<button type="button" class="preset-btn" onclick="LG.confirma={id:${e.id},tipo:'ligar'};lgRender()">Ligar</button>`}</td></tr>${alerta}`; }).join('')}
+        <td style="white-space:nowrap;"><b style="color:${e.ativa ? 'var(--farol-ok)' : 'var(--tx-3)'};">${e.ativa ? 'Ligado' : 'Desligado'}</b> ${e.ativa ? `<button type="button" class="preset-btn" onclick="lgAjustar(${e.id},{p_ativa:false},'Link desligado')">Desligar</button>` : `<button type="button" class="preset-btn" onclick="LG.confirma={id:${e.id},tipo:'ligar'};lgRender()">Ligar</button>`}</td></tr>${alerta}${ficha}`; }).join('')}
     </tbody></table></div>`;
 }
 async function lgCopiarGeral() {
@@ -574,6 +590,113 @@ function lgGravarFrete(id) {
   const t = (document.getElementById('lgFrete' + id) || {}).value, v = lgNum(t);
   if (!String(t || '').trim() || !Number.isFinite(v) || v < 0) return avisoAcao('erro', '✗ Não gravou: digite o valor do frete.');
   return lgAjustar(id, { p_frete: v }, 'Frete gravado');
+}
+// tabela de preço que a empresa segue (preço próprio vale por cima dela); vazio = só a lista própria
+async function lgTabela(id, v) {
+  const e = LG.emp.find((x) => x.id === id); if (!e) return;
+  const tab = v === '' ? null : Number(v), nomeTab = tab ? ((LG.modelos.find((m) => m.id === tab) || {}).nome || '') : '';
+  avisoAcao('enviando', 'Gravando a tabela…');
+  const r = await trRpcSeguro('loja_empresa_tabela', { p_empresa: id, p_tabela: tab });
+  if (!r.ok) { const m = await trErroDe(r); lgRender(); return avisoAcao('erro', `✗ Não gravou: ${m}.`, () => lgTabela(id, v)); }
+  e.tabela_id = tab; lgRender();
+  avisoAcao('ok', `✓ ${e.nome} ${tab ? `segue a tabela ${nomeTab}` : 'fica só com a lista própria'} — às ${avisoHora()}.`);
+}
+// ficha das pessoas que entram na lojinha por esta empresa (login do cliente; nunca é login do painel)
+function lgPessoasHtml(e) {
+  if (!LG.usuarios) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as pessoas: ${trEscH(LG.erroUsu || '')}</div>`;
+  const L = LG.usuarios.filter((u) => u.empresa_id === e.id), cv = LG.convite && LG.convite.empresa === e.id ? LG.convite : null;
+  const link = cv ? `<div style="margin:0 0 10px;padding:10px;border:1px solid var(--farol-ok);border-radius:8px;"><b style="color:var(--farol-ok);">✓ Convite criado para ${trEscH(cv.nome)}: copie o link e mande para a pessoa.</b>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"><input readonly value="${trEscH(cv.link)}" style="flex:1;min-width:260px;" onfocus="this.select()"> <button type="button" class="preset-btn active" onclick="lgCopiarConvite()">Copiar link</button></div>
+      <div style="color:var(--tx-3);margin-top:4px;">Vale 7 dias, só uma vez (até ${orcHora(cv.expira)}). Este link não aparece de novo: se perder, mande um novo convite.</div></div>` : '';
+  const linha = (u) => { const conf = LG.confirmaU === u.id;
+    return `<tr><td style="white-space:normal;">${trEscH(u.nome)}</td><td>${trEscH(u.email || '')}</td><td>${trEscH(orcFone(u.celular || ''))}</td>
+      <td>${u.ultimo_acesso ? orcHora(u.ultimo_acesso) : 'nunca entrou'}</td><td>${u.convite_expira ? orcHora(u.convite_expira) : ''}</td>
+      <td style="white-space:nowrap;"><b style="color:${u.ativo ? 'var(--farol-ok)' : 'var(--tx-3)'};">${u.ativo ? 'Entra' : 'Desligada'}</b>
+        <button type="button" class="preset-btn" onclick="lgUsuarioAtivar(${u.id},${!u.ativo})">${u.ativo ? 'Desligar' : 'Religar'}</button>
+        <button type="button" class="preset-btn" onclick="LG.confirmaU=${u.id};LG.convite=null;lgRender()">Mandar novo convite</button></td></tr>
+      ${conf ? `<tr><td colspan="6" style="white-space:normal;"><b style="color:var(--farol-perto);">Novo convite para ${trEscH(u.nome)}: a senha atual para de valer e a pessoa sai de todos os aparelhos até criar outra.</b>
+        <button type="button" class="preset-btn active" style="margin-left:8px;" onclick="lgConvidar(${e.id},${u.id})">Confirmar</button> <button type="button" class="preset-btn" onclick="LG.confirmaU=null;lgRender()">Voltar</button></td></tr>` : ''}`; };
+  return `<b>Pessoas que entram por ${trEscH(e.nome)}</b>${link}
+    ${L.length ? `<div style="overflow-x:auto;margin:6px 0 10px;"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Celular</th><th>Último acesso</th><th>Convite vence</th><th>Situação</th></tr></thead><tbody>${L.map(linha).join('')}</tbody></table></div>`
+      : '<div class="contexto" style="margin:6px 0 10px;">Ninguém entra por esta empresa ainda.</div>'}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><b>Convidar pessoa</b>
+      <input id="lgCvNome" placeholder="Nome" maxlength="80" style="width:180px;"> <input id="lgCvEmail" type="email" placeholder="E-mail" maxlength="120" style="width:200px;">
+      <input id="lgCvCel" inputmode="tel" placeholder="Celular com DDD" maxlength="20" style="width:150px;">
+      <button type="button" class="preset-btn active" onclick="lgConvidar(${e.id},null)">Convidar</button></div>`;
+}
+async function lgConvidar(emp, usuario) {
+  const u = usuario ? (LG.usuarios || []).find((x) => x.id === usuario) : null;
+  const val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+  const nome = u ? u.nome : val('lgCvNome'), email = u ? u.email : val('lgCvEmail'), cel = u ? u.celular : val('lgCvCel');
+  if (!u && nome.length < 2) return avisoAcao('erro', '✗ Não criou: digite o nome da pessoa.');
+  if (!u && !email && !cel) return avisoAcao('erro', '✗ Não criou: digite o e-mail ou o celular.');
+  avisoAcao('enviando', 'Criando o convite…');
+  const r = await trRpcSeguro('loja_usuario_convidar', { p_empresa: emp, p_nome: nome, p_email: email || null, p_celular: cel || null });
+  if (!r.ok) return avisoAcao('erro', `✗ Não criou: ${await trErroDe(r)}.`, () => lgConvidar(emp, usuario));
+  const d = await r.json();
+  LG.convite = { empresa: emp, nome, link: LG_PAGINA + '?convite=' + encodeURIComponent(d.convite), expira: d.expira };
+  LG.confirmaU = null;
+  await lgLerUsuarios();
+  lgRender();
+  avisoAcao('ok', `✓ Convite criado para ${nome}, copie o link — às ${avisoHora()}.`);
+}
+async function lgCopiarConvite() {
+  if (!LG.convite) return;
+  try { await navigator.clipboard.writeText(LG.convite.link); avisoAcao('ok', `✓ Link do convite de ${LG.convite.nome} copiado — às ${avisoHora()}.`); }
+  catch (x) { avisoAcao('erro', '✗ Não copiou: selecione o link na caixa e copie à mão.'); }
+}
+async function lgUsuarioAtivar(id, ativo) {
+  const u = (LG.usuarios || []).find((x) => x.id === id);
+  avisoAcao('enviando', 'Gravando…');
+  const r = await trRpcSeguro('loja_usuario_ativar', { p_usuario: id, p_ativo: ativo });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}.`, () => lgUsuarioAtivar(id, ativo));
+  if (u) u.ativo = ativo;
+  lgRender();
+  avisoAcao('ok', `✓ ${u ? u.nome : 'Pessoa'} ${ativo ? 'religada: volta a entrar' : 'desligada: não entra mais e saiu dos aparelhos'} — às ${avisoHora()}.`);
+}
+// ---- áreas de entrega: onde a lojinha entrega e quanto cobra (bairro vazio = a cidade toda; mínimo vazio = o geral)
+function lgAreasHtml() {
+  if (!LG.areas) return `<div class="contexto" style="color:var(--farol-fora);">✗ Não consegui ler as áreas: ${trEscH(LG.erroAreas || '')}</div>`;
+  const geral = LG.minimoGeral != null ? `o geral (${orcR(LG.minimoGeral)})` : 'o geral';
+  const editor = (a) => { a = a || { id: null, canal: 'ATACADO', cidade: '', bairro: '', frete: '', minimo: null, ativa: true, unidade: null };
+    return `<tr><td><select id="lgArCanal">${['ATACADO', 'VAREJO'].map((c) => `<option${a.canal === c ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
+      <td><input id="lgArCidade" value="${trEscH(a.cidade)}" placeholder="Cidade" maxlength="80" style="width:160px;"></td>
+      <td><input id="lgArBairro" value="${trEscH(a.bairro || '')}" placeholder="vazio = cidade toda" maxlength="80" style="width:150px;"></td>
+      <td><input id="lgArFrete" inputmode="decimal" value="${a.frete === '' ? '' : lgDin(a.frete)}" style="width:70px;text-align:right;"></td>
+      <td><input id="lgArMinimo" inputmode="decimal" value="${a.minimo == null ? '' : lgDin(a.minimo)}" placeholder="geral" style="width:70px;text-align:right;"></td>
+      <td colspan="2" style="white-space:nowrap;"><button type="button" class="preset-btn active" onclick="lgAreaSalvar(${a.id == null ? 'null' : a.id})">Gravar</button> <button type="button" class="preset-btn" onclick="LG.areaEd=null;lgRender()">Voltar</button></td></tr>`; };
+  const linha = (a) => LG.areaEd === a.id ? editor(a) : `<tr><td>${trEscH(a.canal)}</td><td style="white-space:normal;">${trEscH(a.cidade)}</td><td>${a.bairro ? trEscH(a.bairro) : 'cidade toda'}</td>
+      <td style="text-align:right;">${orcR(a.frete)}</td><td style="text-align:right;">${a.minimo == null ? geral : orcR(a.minimo)}</td>
+      <td style="white-space:nowrap;"><b style="color:${a.ativa ? 'var(--farol-ok)' : 'var(--tx-3)'};">${a.ativa ? 'Entrega' : 'Desligada'}</b>
+        <button type="button" class="preset-btn" onclick="LG.areaEd=${a.id};lgRender()">Editar</button> <button type="button" class="preset-btn" onclick="lgAreaLigar(${a.id},${!a.ativa})">${a.ativa ? 'Desligar' : 'Ligar'}</button></td>
+      <td style="white-space:normal;color:var(--tx-3);">${trEscH(a.origem || '')}</td></tr>`;
+  return `<div style="margin:0 0 10px;"><button type="button" class="preset-btn active" onclick="LG.areaEd='novo';lgRender()">Nova área</button></div>
+    <div id="tabelaLgAreas" style="overflow-x:auto;"><table><thead><tr><th>Canal</th><th>Cidade</th><th>Bairro</th><th style="text-align:right;">Frete</th><th style="text-align:right;">Pedido mínimo</th><th>Situação</th><th>Origem</th></tr></thead><tbody>
+    ${LG.areaEd === 'novo' ? editor(null) : ''}${LG.areas.map(linha).join('') || (LG.areaEd === 'novo' ? '' : '<tr><td colspan="7">Nenhuma área cadastrada.</td></tr>')}</tbody></table></div>`;
+}
+async function lgAreaGravar(id, campos, feito) {
+  avisoAcao('enviando', 'Gravando a área…');
+  const r = await trRpcSeguro('loja_area_salvar', Object.assign({ p_id: id }, campos));
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}.`, () => lgAreaGravar(id, campos, feito));
+  LG.areaEd = null;
+  await lgLerAreas();
+  lgRender();
+  avisoAcao('ok', `✓ ${feito}: ${campos.p_cidade}${campos.p_bairro ? ' · ' + campos.p_bairro : ''} — às ${avisoHora()}.`);
+}
+function lgAreaSalvar(id) {
+  const val = (k) => String((document.getElementById(k) || {}).value || '').trim();
+  const a = id == null ? null : (LG.areas || []).find((x) => x.id === id);
+  const tf = val('lgArFrete'), tm = val('lgArMinimo'), frete = lgNum(tf), minimo = tm === '' ? null : lgNum(tm);
+  if (!val('lgArCidade')) return avisoAcao('erro', '✗ Não gravou: digite a cidade.');
+  if (!tf || !Number.isFinite(frete) || frete < 0) return avisoAcao('erro', '✗ Não gravou: digite o frete (0 = grátis).');
+  if (minimo !== null && !(Number.isFinite(minimo) && minimo >= 0)) return avisoAcao('erro', '✗ Não gravou: o pedido mínimo é um valor, ou vazio para o geral.');
+  return lgAreaGravar(id, { p_canal: val('lgArCanal'), p_cidade: val('lgArCidade'), p_bairro: val('lgArBairro') || null, p_frete: frete, p_minimo: minimo,
+    p_ativa: a ? a.ativa : true, p_unidade: a ? a.unidade : null }, id == null ? 'Área criada' : 'Área gravada');
+}
+function lgAreaLigar(id, ativa) {
+  const a = (LG.areas || []).find((x) => x.id === id); if (!a) return;
+  return lgAreaGravar(id, { p_canal: a.canal, p_cidade: a.cidade, p_bairro: a.bairro, p_frete: Number(a.frete), p_minimo: a.minimo == null ? null : Number(a.minimo), p_ativa: ativa, p_unidade: a.unidade },
+    ativa ? 'Área ligada' : 'Área desligada');
 }
 function lgPrecosHtml() {
   const id = Number(LG.empresa), b = orcNorm(LG.bprod);

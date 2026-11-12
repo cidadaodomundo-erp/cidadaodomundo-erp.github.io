@@ -9,7 +9,10 @@
 <link rel="icon" id="icone" href="data:,">
 <!-- LOJINHA PÚBLICA DOS ORÇAMENTOS (30/10/2026, pedido 9 do Ajuda; proposta contexto/propostas-telas/2026-10-30-loja-online.md).
      Sem login, sem casca: só chama loja_catalogo e loja_pedir com a chave anônima. Preço e custo são do banco; a tela nunca manda preço.
-     Abrir a loja é o loja_config.aberta, decisão do dono. Quem mexe: o chat "Telas do painel". -->
+     Abrir a loja é o loja_config.aberta, decisão do dono. Quem mexe: o chat "Telas do painel".
+     12/11/2026 (dono, 00:25; proposta contexto/propostas-telas/2026-11-12-loja-online.md): login do cliente, convite (?convite=) e área de entrega.
+     Liga sozinho com a etapa 1b do banco: a página pede loja_catalogo/loja_pedir com p_sessao; se o banco ainda não conhece o parâmetro
+     (PGRST202), cai no jeito antigo e não mostra login nem área. Só o token da sessão fica no navegador (localStorage 'lojaSessao'). -->
 <style>
   :root { --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#45443f; --tx-1:#fff; --tx-2:#c3c2b7; --tx-3:#a5a49a;
           --marca-amarelo:#f6c63e; --marca-laranja:#ee8a3c; --ok:#3fb950; --erro:#ff6b6b;
@@ -80,10 +83,18 @@
   .qtd { display:flex; align-items:center; gap:4px; }
   .qtd button { flex:none; width:38px; height:42px; font-size:20px; font-weight:700; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1); cursor:pointer; }
   .qtd input { flex:1; width:100%; min-width:0; height:42px; padding:0; text-align:center; }
-  input, textarea { font:inherit; color:var(--tx-1); background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px; }
-  input:focus, textarea:focus, button:focus-visible { outline:2px solid var(--marca-amarelo); outline-offset:1px; }
+  input, textarea, select { font:inherit; color:var(--tx-1); background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  input:focus, textarea:focus, select:focus, button:focus-visible { outline:2px solid var(--marca-amarelo); outline-offset:1px; }
   label.campo { display:block; margin-bottom:10px; font-size:14px; color:var(--tx-2); }
-  label.campo input, label.campo textarea { display:block; width:100%; margin-top:4px; }
+  label.campo input, label.campo textarea, label.campo select { display:block; width:100%; margin-top:4px; }
+  .entrar { max-width:420px; margin:40px auto 0; }
+  .entrar h2 { font-size:22px; color:var(--tx-1); margin:0 0 14px; }
+  .entrar .enviar { width:100%; margin-top:4px; }
+  .entrar .msg { padding:10px 0 0; }
+  .areas { width:100%; border-collapse:collapse; font-size:14px; margin-top:8px; }
+  .areas th, .areas td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .areas th { color:var(--tx-2); }
+  .fora { color:var(--erro); font-weight:700; }
   .opcoes { display:flex; gap:8px; margin-bottom:10px; }
   .opcoes button { flex:1; height:44px; font:inherit; font-weight:700; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--tx-2); cursor:pointer; }
   .opcoes button.on { border-color:var(--marca-amarelo); color:var(--tx-1); background:var(--surface-2); }
@@ -100,6 +111,7 @@
   .msg { margin:0 auto; max-width:1040px; padding:10px 16px 0; font-size:14px; font-weight:700; }
   .msg.erro { color:var(--erro); }
   .msg.envio { color:var(--tx-2); }
+  .msg.ok { color:var(--ok); }
   .feito { text-align:center; padding:60px 8px; }
   .feito b { display:block; font-size:22px; color:var(--ok); margin-bottom:10px; }
   .simples { display:block; margin:18px auto 0; height:44px; padding:0 22px; font:inherit; font-weight:700; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1); cursor:pointer; }
@@ -108,6 +120,7 @@
 <body>
 <div class="topo" id="topo" hidden></div>
 <main>
+  <div class="msg" id="aviso" role="status"></div>
   <div id="corpo"><p class="sub">Abrindo…</p></div>
 </main>
 <div class="rodape" id="rodape" hidden>
@@ -124,26 +137,38 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const reais = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const numero = (t) => { const n = Number(String(t).trim().replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : 0; };
-const CHAVE = new URLSearchParams(location.search).get('c') || '';   // link próprio de uma empresa
+const PARAMS = new URLSearchParams(location.search);
+const CHAVE = PARAMS.get('c') || '';   // link próprio de uma empresa
+const CONVITE = PARAMS.get('convite') || '';   // convite da equipe: criar a senha
 let CAT = null, FORMA = null, ENVIANDO = false, BUSCA = '', CATEG = '', ABA = 'produtos';
+// LIGADO = o banco já tem a etapa 1b (loja_catalogo aceita p_sessao); sem ela não aparece login nem área de entrega
+let LIGADO = false, AREAS = [], CIDADE = '', BAIRRO = '', TOKEN = lerToken();
 const QTD = {};               // id do produto → quantidade
 const KIT = new Set();        // ids marcados do kit
 
+// só o token da sessão fica no navegador; navegador que não deixa guardar = entra de novo da próxima vez
+function lerToken() { try { return localStorage.getItem('lojaSessao') || ''; } catch (e) { return ''; } }
+function gravarToken(t) { TOKEN = t || ''; try { if (TOKEN) localStorage.setItem('lojaSessao', TOKEN); else localStorage.removeItem('lojaSessao'); } catch (e) {} }
 async function rpc(nome, corpo) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nome}`, {
     method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify(corpo || {}) });
   let d = null; try { d = await r.json(); } catch (e) {}
-  if (!r.ok) throw new Error((d && d.message) || 'sem resposta do servidor');
+  if (!r.ok) { const e = new Error((d && d.message) || 'sem resposta do servidor'); e.code = d && d.code; throw e; }
   return d;
 }
+// o banco ainda não tem a função com esses parâmetros (antes da etapa 1b): nada foi gravado, pode chamar do jeito antigo
+const semParametro = (e) => !!e && (e.code === 'PGRST202' || /Could not find the function/i.test(String(e.message || '')));
+const EMP = () => !!CHAVE || (LIGADO && !!TOKEN && !!(CAT && CAT.empresa));   // pedido de empresa: pelo link ?c= ou pelo login
+const usaArea = () => LIGADO && AREAS.length > 0;
+function aviso(tipo, txt) { const a = $('aviso'); a.className = 'msg' + (tipo ? ' ' + tipo : ''); a.textContent = txt || ''; }
 // o motivo vem do banco; item indisponível traz o nome interno, que não aparece aqui
 function motivo(e) {
   const m = String((e && e.message) || '');
   if (/^Item indisponivel/.test(m)) return 'Algum item não está disponível no momento.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Sem conexão com a internet.';
   return m.replace(/\besta\b/g, 'está').replace(/nao/g, 'não').replace(/invalido/g, 'inválido').replace(/minimo/g, 'mínimo')
-    .replace(/disponivel/g, 'disponível').replace(/pagina/g, 'página');
+    .replace(/disponivel/g, 'disponível').replace(/pagina/g, 'página').replace(/\bja\b/g, 'já').replace(/\bPeca\b/g, 'Peça');
 }
 function kg(p) { return String(p.un || '').trim().toLowerCase() === 'kg'; }   // kg aceita quebrado; pacote, número inteiro
 // o nome da vitrine é longo: antes do primeiro " - " vai o título, o resto vira detalhe. Só na tela; o nome não muda.
@@ -156,11 +181,24 @@ const naRevisao = () => location.hash === '#pedido';
 
 async function abrir() {
   $('corpo').innerHTML = '<p class="sub">Abrindo…</p>';
-  try { CAT = await rpc('loja_catalogo', CHAVE ? { p_chave: CHAVE } : {}); }
-  catch (e) {
+  $('rodape').hidden = true;
+  const chave = CHAVE ? { p_chave: CHAVE } : {};
+  try {
+    try { CAT = await rpc('loja_catalogo', Object.assign({ p_sessao: TOKEN || null }, chave)); LIGADO = true; }
+    catch (e) {
+      if (semParametro(e)) { LIGADO = false; CAT = await rpc('loja_catalogo', chave); }   // banco antes da etapa 1b: como sempre foi
+      else if (TOKEN && /sess/i.test(String(e.message || ''))) {   // sessão vencida ou desligada: volta para Entrar
+        gravarToken(''); aviso('erro', '✗ Sua sessão terminou. Entre de novo.');
+        CAT = await rpc('loja_catalogo', Object.assign({ p_sessao: null }, chave)); LIGADO = true;
+        marca(); telaEntrar(); return;
+      } else throw e;
+    }
+  } catch (e) {
     $('corpo').innerHTML = `<div class="feito"><p>✗ Não consegui abrir: ${esc(motivo(e))}</p><button type="button" class="simples" onclick="abrir()">Tentar de novo</button></div>`;
     return;
   }
+  AREAS = [];
+  if (LIGADO) { try { const a = await rpc('loja_areas', { p_canal: 'ATACADO' }); AREAS = Array.isArray(a) ? a : []; } catch (e) {} }
   marca();
   if (!CAT.aberta) { $('corpo').innerHTML = `<div class="breve">${CHAVE ? 'Link indisponível. Fale com a gente.' : 'Em breve'}</div>`; $('rodape').hidden = true; return; }
   desenhar();
@@ -175,22 +213,29 @@ function marca() {
   const situacao = invalido ? '' : CAT.aberta ? '<div class="sit aberto">Aberto<i></i></div><div class="aberto">disponível para encomendas</div>' : '<div class="sit fechado">Fechado</div>';
   const minimo = Number(CAT.minimo) ? `<div class="cab-min"><b>Valor mínimo para encomendas</b><br>a partir de ${reais(CAT.minimo)}</div>` : '';
   const aba = (k, r) => `<button type="button" data-aba="${k}" onclick="trocarAba('${k}')">${r}</button>`;
+  // Entrar só com a etapa 1b no banco (antes dela o login não muda o catálogo); Sair sempre que houver sessão guardada
+  const conta = TOKEN ? '<button type="button" onclick="sair()">Sair</button>' : LIGADO && !CHAVE ? '<button type="button" onclick="telaEntrar()">Entrar</button>' : '';
   $('topo').innerHTML = `<div class="capa">${CAT.fundo ? `<img src="${esc(CAT.fundo)}" alt="" onerror="this.remove()">` : ''}</div>
     <div class="topo-dentro"><div class="cab${situacao || minimo ? '' : ' so-um'}">
       ${CAT.logo ? `<img class="cab-logo" src="${esc(CAT.logo)}" alt="" onerror="this.remove()">` : ''}
       <div class="cab-esq"><h1>${esc(nome || '')}</h1>
         ${local ? `<div class="cab-end">${esc(local)}</div>` : ''}
-        ${CHAVE && CAT.empresa ? `<div class="cab-end">Pedido de ${esc(CAT.empresa)}</div>` : ''}
-        ${CAT.aberta ? `<div class="abas">${aba('produtos', 'Produtos')}${aba('entrega', 'Área de Entrega')}${CAT.telefone ? aba('contato', 'Contato') : ''}</div>` : ''}</div>
+        ${EMP() && CAT.empresa ? `<div class="cab-end">Pedido de ${esc(CAT.empresa)}</div>` : ''}
+        ${CAT.aberta ? `<div class="abas">${aba('produtos', 'Produtos')}${aba('entrega', 'Área de Entrega')}${CAT.telefone ? aba('contato', 'Contato') : ''}${conta}</div>` : ''}</div>
       ${situacao || minimo ? `<div class="cab-dir">${situacao}${minimo}</div>` : ''}
     </div></div>`;
   $('topo').hidden = false;
 }
-function trocarAba(a) { ABA = a; mostrar(); }
+function trocarAba(a) { ABA = a; aviso(''); mostrar(); }
 function desenhar() {
   const P = CAT.produtos || [], K = CAT.kit || [];
   const frete = Number(CAT.frete || 0);
-  const entrega = !CHAVE ? 'Retirada ou entrega · frete combinado depois' : frete ? `Retirada ou entrega · frete ${reais(frete)}` : 'Retirada ou entrega';
+  FORMA = null; CIDADE = ''; BAIRRO = '';   // a revisão é redesenhada vazia (ex.: depois de entrar)
+  const entrega = usaArea() ? 'Retirada sem frete, ou entrega nestes lugares:' : !EMP() ? 'Retirada ou entrega · frete combinado depois' : frete ? `Retirada ou entrega · frete ${reais(frete)}` : 'Retirada ou entrega';
+  // a tabela das áreas sai de loja_areas (banco); bairro vazio = a cidade inteira
+  const areas = usaArea() ? `<div style="overflow-x:auto;"><table class="areas"><thead><tr><th>Cidade</th><th>Bairro</th><th>Frete</th><th>Pedido mínimo</th></tr></thead><tbody>${AREAS.map((a) =>
+      `<tr><td>${esc(a.cidade)}</td><td>${a.bairro ? esc(a.bairro) : 'cidade toda'}</td><td>${Number(a.frete) ? reais(a.frete) : 'grátis'}</td><td>${Number(a.minimo) ? reais(a.minimo) : '—'}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const cidades = [...new Set(AREAS.map((a) => a.cidade))];
   const retirada = [CAT.endereco, CAT.cidade].filter(Boolean).join(', ');
   // o filtro de categoria só aparece quando o catálogo trouxer a categoria
   const cats = [...new Set(P.map((p) => p.categoria).filter(Boolean))];
@@ -201,15 +246,18 @@ function desenhar() {
     h += `<div id="caixaKit"><h2>Kit burger</h2>${CAT.kit_foto ? `<img src="${esc(CAT.kit_foto)}" alt="" loading="lazy" style="display:block;width:100%;max-width:360px;border-radius:12px;margin-bottom:10px;" onerror="this.remove()">` : ''}<label class="campo">Pessoas (mínimo ${Number(CAT.kit_minimo)})<input id="kitPessoas" inputmode="numeric" oninput="atualizar()"></label>`
       + K.map((k) => `<label class="ingr"><input type="checkbox" onchange="marcar(${k.id},this.checked)"><span>${esc(k.nome)}</span><span>${reais(k.preco_por_pessoa)} por pessoa</span></label>`).join('') + '</div>';
   }
-  h += `</section><section id="painelEntrega" class="painel" hidden><p>${esc(entrega)}</p>${CAT.endereco ? `<p>Retirada: ${esc(retirada)}</p>` : ''}</section>
+  h += `</section><section id="painelEntrega" class="painel" hidden><p>${esc(entrega)}</p>${areas}${CAT.endereco ? `<p>Retirada: ${esc(retirada)}</p>` : ''}</section>
     ${CAT.telefone ? `<section id="painelContato" class="painel" hidden><a href="tel:+55${esc(String(CAT.telefone).replace(/\D/g, ''))}">${esc(CAT.telefone)}</a></section>` : ''}
     <section id="revisao" class="revisao" hidden>
     <button type="button" class="voltar" onclick="location.hash=''">← Continuar comprando</button>
     <h2>Seu pedido</h2><div id="itens"></div>
     <h2>Seus dados</h2>
-    ${CHAVE ? '' : '<label class="campo">Nome<input id="nome" maxlength="80" autocomplete="name"></label>'}
-    <label class="campo">Telefone com DDD${CHAVE ? ' (opcional)' : ''}<input id="contato" maxlength="30" inputmode="tel" autocomplete="tel"></label>
+    ${EMP() ? '' : '<label class="campo">Nome<input id="nome" maxlength="80" autocomplete="name"></label>'}
+    <label class="campo">Telefone com DDD${EMP() ? ' (opcional)' : ''}<input id="contato" maxlength="30" inputmode="tel" autocomplete="tel"></label>
     <div class="opcoes"><button type="button" id="fRET" onclick="forma('RETIRADA')">Retirada</button><button type="button" id="fENT" onclick="forma('ENTREGA')">Entrega</button></div>
+    <div id="caixaArea" hidden><label class="campo">Cidade da entrega<select id="cidade" onchange="escolherCidade(this.value)"><option value="">Escolha a cidade</option>${cidades.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}<option value="__fora">Outra cidade</option></select></label>
+      <label class="campo" id="caixaBairro" hidden>Bairro<select id="bairro" onchange="escolherBairro(this.value)"></select></label>
+      <p class="fora" id="foraArea" hidden>Ainda não entregamos aí. Escolha retirada.</p></div>
     <label class="campo" id="caixaLocal" hidden>Endereço da entrega<input id="local" maxlength="200" autocomplete="street-address"></label>
     <label class="campo">Quando<input id="quando" type="datetime-local"></label>
     <label class="campo">Observação<textarea id="obs" rows="2" maxlength="500"></textarea></label>
@@ -291,16 +339,41 @@ function forma(f) {
   FORMA = f;
   $('fRET').classList.toggle('on', f === 'RETIRADA'); $('fENT').classList.toggle('on', f === 'ENTREGA');
   $('caixaLocal').hidden = f !== 'ENTREGA';
+  $('caixaArea').hidden = !(f === 'ENTREGA' && usaArea());
   atualizar();
+}
+// área de entrega (etapa 1b): a cidade, e o bairro quando a cidade tiver bairro na lista; o frete sai da linha escolhida
+function escolherCidade(v) {
+  CIDADE = v; BAIRRO = '';
+  const L = AREAS.filter((a) => a.cidade === v), bairros = L.filter((a) => a.bairro), toda = L.some((a) => !a.bairro);
+  $('caixaBairro').hidden = !bairros.length;
+  $('bairro').innerHTML = `<option value="">${toda ? 'Outro bairro' : 'Escolha o bairro'}</option>${bairros.map((a) => `<option value="${esc(a.bairro)}">${esc(a.bairro)}</option>`).join('')}${toda ? '' : '<option value="__fora">Outro bairro</option>'}`;
+  atualizar();
+}
+function escolherBairro(v) { BAIRRO = v; atualizar(); }
+function areaEscolhida() {
+  if (!CIDADE || CIDADE === '__fora' || BAIRRO === '__fora') return null;
+  const L = AREAS.filter((a) => a.cidade === CIDADE);
+  return BAIRRO ? L.find((a) => a.bairro === BAIRRO) || null : L.find((a) => !a.bairro) || null;
+}
+const foraDaArea = () => usaArea() && FORMA === 'ENTREGA' && (CIDADE === '__fora' || BAIRRO === '__fora');
+function freteAtual() {
+  if (FORMA !== 'ENTREGA') return 0;   // retirada: sem frete
+  if (usaArea()) { const a = areaEscolhida(); return a ? Number(a.frete || 0) : 0; }
+  return CHAVE ? Number(CAT.frete || 0) : 0;   // antes da etapa 1b: com link de empresa o frete é fixo e soma aqui
 }
 function pessoas() { const e = $('kitPessoas'); return e ? Math.floor(numero(e.value)) : 0; }
 function atualizar() {
   const t = (CAT.produtos || []).reduce((s, p) => s + subtotal(p), 0) + totalKit();
-  const frete = CHAVE && FORMA === 'ENTREGA' ? Number(CAT.frete || 0) : 0;   // com link de empresa o frete é fixo e soma aqui
+  const frete = freteAtual(), fora = foraDaArea(), area = usaArea() && FORMA === 'ENTREGA';
   const nItens = (CAT.produtos || []).filter((p) => QTD[p.id] > 0).length + (pessoas() || KIT.size ? 1 : 0), rev = naRevisao();
   $('total').textContent = reais(t + (rev ? frete : 0));
-  $('totalNota').textContent = !rev ? `${nItens} ${nItens === 1 ? 'item' : 'itens'}` : !CHAVE && FORMA === 'ENTREGA' ? 'frete combinado depois' : frete ? `inclui frete ${reais(frete)}` : '';
+  $('totalNota').textContent = !rev ? `${nItens} ${nItens === 1 ? 'item' : 'itens'}`
+    : area ? (fora ? 'fora da área de entrega' : !areaEscolhida() ? 'escolha onde entregar' : frete ? `inclui frete ${reais(frete)}` : 'frete grátis')
+    : !EMP() && FORMA === 'ENTREGA' ? 'frete combinado depois' : frete ? `inclui frete ${reais(frete)}` : '';
+  if ($('foraArea')) $('foraArea').hidden = !fora;
   $('enviar').textContent = rev ? 'Enviar pedido' : 'Ver pedido';
+  $('enviar').disabled = ENVIANDO || (rev && fora);   // fora da área o envio fica parado
   $('rodape').hidden = !rev && !nItens;
 }
 function erro(txt) { const m = $('msg'); m.className = 'msg erro'; m.textContent = '✗ Não enviou: ' + txt; }
@@ -309,17 +382,20 @@ async function enviar() {
   if ($('site').value) return;   // campo escondido preenchido: robô
   const itens = (CAT.produtos || []).filter((p) => QTD[p.id] > 0).map((p) => ({ id: p.id, qtd: QTD[p.id] }));
   const np = pessoas(), kit = [...KIT];
-  const nome = CHAVE ? '' : $('nome').value.trim(), contato = $('contato').value.trim(), local = $('local').value.trim(), quando = $('quando').value;
+  const emp = EMP(), area = usaArea() && FORMA === 'ENTREGA' ? areaEscolhida() : null;
+  const nome = emp ? '' : $('nome').value.trim(), contato = $('contato').value.trim(), local = $('local').value.trim(), quando = $('quando').value;
   if (!itens.length && !np) return erro('escolha pelo menos um item.');
-  // o mínimo é sobre os produtos, sem frete; o banco também barra
-  const soma = (CAT.produtos || []).reduce((s, p) => s + subtotal(p), 0);
-  if (CHAVE && Number(CAT.minimo) && soma < Number(CAT.minimo)) return erro(`o valor mínimo para encomendas é ${reais(CAT.minimo)}.`);
+  // o mínimo é sobre os produtos, sem frete; com área de entrega vale o mínimo da área; o banco também barra
+  const soma = (CAT.produtos || []).reduce((s, p) => s + subtotal(p), 0), minimo = (area && Number(area.minimo)) || Number(CAT.minimo);
+  if (emp && minimo && soma < minimo) return erro(`o valor mínimo para encomendas é ${reais(minimo)}.`);
   if (np && np < Number(CAT.kit_minimo)) return erro(`o kit burger tem mínimo de ${Number(CAT.kit_minimo)} pessoas.`);
   if (np && !kit.length) return erro('escolha os ingredientes do kit.');
   if (!np && kit.length) return erro('diga para quantas pessoas é o kit.');
-  if (!CHAVE && !nome) return erro('informe o seu nome.');
-  if ((!CHAVE || contato) && contato.replace(/\D/g, '').length < 10) return erro('informe um telefone com DDD.');
+  if (!emp && !nome) return erro('informe o seu nome.');
+  if ((!emp || contato) && contato.replace(/\D/g, '').length < 10) return erro('informe um telefone com DDD.');
   if (!FORMA) return erro('escolha retirada ou entrega.');
+  if (foraDaArea()) return erro('ainda não entregamos aí. Escolha retirada.');
+  if (usaArea() && FORMA === 'ENTREGA' && !area) return erro(CIDADE ? 'escolha o bairro da entrega.' : 'escolha a cidade da entrega.');
   if (FORMA === 'ENTREGA' && !local) return erro('informe o endereço da entrega.');
   if (!quando) return erro('informe quando você quer o pedido.');
   const data = new Date(quando);
@@ -328,18 +404,90 @@ async function enviar() {
   const m = $('msg'); m.className = 'msg envio'; m.textContent = 'Enviando…';
   try {
     const base = { p_contato: contato || null, p_itens: itens, p_entrega_forma: FORMA, p_entrega_quando: data.toISOString(), p_entrega_local: FORMA === 'ENTREGA' ? local : null, p_obs: $('obs').value.trim() || null };
-    const d = await rpc('loja_pedir', CHAVE ? Object.assign(base, { p_nome: null, p_chave: CHAVE }) : Object.assign(base, { p_nome: nome, p_kit_pessoas: np || null, p_kit_itens: np ? kit : [] }));
+    const corpo = CHAVE ? Object.assign(base, { p_nome: null, p_chave: CHAVE })
+      : emp ? Object.assign(base, { p_nome: null }, np ? { p_kit_pessoas: np, p_kit_itens: kit } : {})
+      : Object.assign(base, { p_nome: nome, p_kit_pessoas: np || null, p_kit_itens: np ? kit : [] });
+    let d;
+    if (LIGADO) {   // etapa 1b: quem pede (sessão) e onde entrega; o frete é o banco que calcula
+      const extra = { p_sessao: TOKEN || null, p_cidade: area ? area.cidade : null, p_bairro: area ? area.bairro || null : null };
+      try { d = await rpc('loja_pedir', Object.assign({}, corpo, extra)); }
+      catch (e) { if (!semParametro(e)) throw e; d = await rpc('loja_pedir', corpo); }   // loja_pedir ainda antiga: nada foi gravado na 1ª chamada
+    } else d = await rpc('loja_pedir', corpo);
+    const comFrete = !!CHAVE || (LIGADO && d.total_com_frete != null);
     $('rodape').hidden = true; $('topo').hidden = true;
-    $('corpo').innerHTML = `<div class="feito"><b>✓ Pedido nº ${Number(d.numero)} recebido</b>Total ${reais(CHAVE ? d.total_com_frete : d.total)}${CHAVE ? (Number(d.frete) ? `, com frete de ${reais(d.frete)}` : '') : FORMA === 'ENTREGA' ? ', frete combinado depois' : ''}.<br>${CHAVE ? 'Vamos confirmar com você.' : 'Vamos confirmar pelo telefone.'}</div>`;
+    $('corpo').innerHTML = `<div class="feito"><b>✓ Pedido nº ${Number(d.numero)} recebido</b>Total ${reais(comFrete ? d.total_com_frete : d.total)}${comFrete ? (Number(d.frete) ? `, com frete de ${reais(d.frete)}` : '') : FORMA === 'ENTREGA' ? ', frete combinado depois' : ''}.<br>${emp ? 'Vamos confirmar com você.' : 'Vamos confirmar pelo telefone.'}</div>`;
     window.scrollTo(0, 0);
   } catch (e) {
     m.className = 'msg erro'; m.textContent = `✗ Não enviou: ${motivo(e)} Toque em Enviar pedido para tentar de novo.`;
   } finally { ENVIANDO = false; $('enviar').disabled = false; }
 }
 $('enviar').addEventListener('click', () => { if (naRevisao()) enviar(); else location.hash = 'pedido'; });
-window.addEventListener('hashchange', mostrar);
+window.addEventListener('hashchange', () => { aviso(''); mostrar(); });
+// ---- login do cliente (12/11/2026). Senha nunca fica na página: vai ao banco e o campo é limpo; só o token volta e é guardado.
+function telaEntrar() {
+  $('topo').hidden = true; $('rodape').hidden = true;
+  $('corpo').innerHTML = `<form class="entrar painel" onsubmit="entrar(event)"><h2>Entrar</h2>
+    <label class="campo">E-mail ou celular<input id="login" maxlength="120" autocomplete="username" required></label>
+    <label class="campo">Senha<input id="senha" type="password" maxlength="72" autocomplete="current-password" required></label>
+    <button type="submit" class="enviar" id="btEntrar">Entrar</button><div class="msg" id="msgEntrar" role="status"></div>
+    <p class="sub" style="margin-top:14px;">Esqueceu a senha? Fale com a gente pelo <a href="tel:+554130157017" style="font-size:inherit;">(41) 3015-7017</a> que mandamos um novo convite.</p>
+    <button type="button" class="voltar" onclick="aviso('');abrir()">← Voltar aos produtos</button></form>`;
+  $('login').focus();
+}
+function msgForm(id, tipo, txt) { const m = $(id); if (m) { m.className = 'msg ' + tipo; m.textContent = txt; } }
+async function entrar(ev) {
+  ev.preventDefault();
+  if (ENVIANDO) return;
+  const login = $('login').value.trim(), senha = $('senha').value;
+  if (!login || !senha) return msgForm('msgEntrar', 'erro', '✗ Informe login e senha.');
+  ENVIANDO = true; $('btEntrar').disabled = true; msgForm('msgEntrar', 'envio', 'Entrando…');
+  try {
+    const d = await rpc('loja_entrar', { p_login: login, p_senha: senha });
+    $('senha').value = '';
+    if (!d || !d.ok || !d.token) { msgForm('msgEntrar', 'erro', '✗ ' + ((d && d.erro) || 'Não entrou.')); return; }
+    gravarToken(d.token);
+    aviso('ok', `✓ Você entrou${d.nome ? ', ' + d.nome : ''}${d.empresa ? ' · ' + d.empresa : ''}.`);
+    ENVIANDO = false; abrir();
+  } catch (e) { $('senha').value = ''; msgForm('msgEntrar', 'erro', '✗ Não entrou: ' + motivo(e)); }
+  finally { ENVIANDO = false; if ($('btEntrar')) $('btEntrar').disabled = false; }
+}
+async function sair() {
+  const t = TOKEN;
+  gravarToken('');   // sai na hora neste aparelho, mesmo sem internet
+  if (t) { try { await rpc('loja_sair', { p_token: t }); } catch (e) {} }
+  aviso('ok', '✓ Você saiu.');
+  abrir();
+}
+function telaConvite() {
+  $('topo').hidden = true; $('rodape').hidden = true;
+  $('corpo').innerHTML = `<form class="entrar painel" onsubmit="criarSenha(event)"><h2>Crie sua senha</h2>
+    <label class="campo">Senha (de 8 a 72 caracteres)<input id="senha1" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+    <label class="campo">Repita a senha<input id="senha2" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></label>
+    <button type="submit" class="enviar" id="btSenha">Criar senha e entrar</button><div class="msg" id="msgSenha" role="status"></div></form>`;
+  $('senha1').focus();
+}
+async function criarSenha(ev) {
+  ev.preventDefault();
+  if (ENVIANDO) return;
+  const s1 = $('senha1').value, s2 = $('senha2').value;
+  if (s1.length < 8 || s1.length > 72) return msgForm('msgSenha', 'erro', '✗ A senha precisa ter de 8 a 72 caracteres.');
+  if (s1 !== s2) return msgForm('msgSenha', 'erro', '✗ As duas senhas não são iguais.');
+  ENVIANDO = true; $('btSenha').disabled = true; msgForm('msgSenha', 'envio', 'Criando…');
+  try {
+    const d = await rpc('loja_senha_definir', { p_convite: CONVITE, p_senha: s1 });
+    $('senha1').value = ''; $('senha2').value = '';
+    gravarToken(d && d.token);
+    // tira o ?convite= do endereço (o convite só vale uma vez); o ?c= fica
+    const p = new URLSearchParams(location.search); p.delete('convite');
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+    aviso('ok', `✓ Senha criada. Você entrou${d && d.nome ? ', ' + d.nome : ''}${d && d.empresa ? ' · ' + d.empresa : ''}.`);
+    ENVIANDO = false; abrir();
+  } catch (e) { msgForm('msgSenha', 'erro', '✗ Não criou: ' + motivo(e)); }
+  finally { ENVIANDO = false; if ($('btSenha')) $('btSenha').disabled = false; }
+}
+
 if (location.hash) history.replaceState(null, '', location.pathname + location.search);   // recarregou na revisão: o carrinho zerou, volta à vitrine
-abrir();
+if (CONVITE) telaConvite(); else abrir();
 </script>
 </body>
 </html>
