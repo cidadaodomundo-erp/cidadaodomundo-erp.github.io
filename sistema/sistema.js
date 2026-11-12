@@ -534,9 +534,13 @@ let TELAS_CAMADA_FILTRO = null;   // segundo recorte, ao lado do destino: a cama
 const TELAS_DESTINOS = [
   ['equipe',      'passa',       'var(--farol-ok)'],
   ['consultoria', 'consultoria', 'var(--info)'],
-  ['morre',       'morre',       '#8a897e'],
+  ['morre',       'morre',       'var(--tx-4)'],
   ['a definir',   'a definir',   ''],
 ];
+// 12/11/2026 (usabilidade, telas): a consultoria acabou em 15/10 — o botão só aparece se alguma tela ainda estiver nele
+function telasDestinos() {
+  return TELAS_DESTINOS.filter(([v]) => v !== 'consultoria' || (TELAS || []).some((t) => t.destino === 'consultoria'));
+}
 
 // CAMADA — decidida pelo dono em 12/09/2026, nas 44 linhas da revisao dos modulos.
 // Nao e' botao: ja esta decidido, e o que a tela faz e' MOSTRAR a decisao para nao se
@@ -554,7 +558,7 @@ async function entrarTelas() {
   const alvo = document.getElementById('view-telas');
   if (!alvo) return;
   if (!rmbSessao()) {
-    alvo.innerHTML = '<div class="contexto">Entre pelo <b>Plano</b> para ver esta tela — ela usa o mesmo login.</div>';
+    alvo.innerHTML = '<div class="contexto">Entre no painel para ver esta tela.</div>';
     return;
   }
   if (TELAS === null) {
@@ -575,16 +579,25 @@ async function telasGravar(chave, campos) {
     atualizado_em: new Date().toISOString(),
     atualizado_por: (rmbSessao() || {}).email || ''
   });
-  const r = await fetch(SUPABASE_URL + '/rest/v1/painel_telas?chave=eq.' + encodeURIComponent(chave), {
-    method: 'PATCH',
-    headers: Object.assign({}, rmbHeaders(), { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
-    body: JSON.stringify(corpo)
-  });
-  if (!r.ok) { alert('Nao consegui gravar (' + r.status + ').'); return null; }
+  // 12/11/2026 (usabilidade): enviando → ✓/✗ na barra do núcleo, no lugar do alert e da borda verde que sumia
+  const tela = (TELAS.find(t => t.chave === chave) || {}).rotulo || chave;
+  const deNovo = () => telasGravar(chave, campos).then((v) => { if (v) renderModuloTelas(); });
+  avisoAcao('enviando', 'Salvando ' + tela + '…');
+  let r;
+  try {
+    r = await fetch(SUPABASE_URL + '/rest/v1/painel_telas?chave=eq.' + encodeURIComponent(chave), {
+      method: 'PATCH',
+      headers: Object.assign({}, rmbHeaders(), { 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify(corpo)
+    });
+  } catch (e) { avisoAcao('erro', '✗ ' + tela + ' NÃO foi salva: sem conexão.', deNovo); return null; }
+  if (!r.ok) { avisoAcao('erro', '✗ ' + tela + ' NÃO foi salva (' + r.status + ').', deNovo); return null; }
   const volta = await r.json();
   const i = TELAS.findIndex(t => t.chave === chave);
   if (i >= 0 && volta.length) TELAS[i] = volta[0];
-  return volta[0] || null;
+  if (!volta.length) { avisoAcao('erro', '✗ ' + tela + ' NÃO foi salva (sem permissão).', deNovo); return null; }
+  avisoAcao('ok', '✓ ' + tela + ' salva às ' + avisoHora() + '.');
+  return volta[0];
 }
 
 async function telasDestino(chave, destino) {
@@ -593,18 +606,14 @@ async function telasDestino(chave, destino) {
 }
 
 // Salva ao sair do campo, e NAO redesenha: quem edita uma linha costuma editar a de
-// baixo em seguida, e redesenhar a tabela rouba o foco. O aviso e' a borda verde.
+// baixo em seguida, e redesenhar a tabela rouba o foco. O aviso e' a barra do nucleo (✓/✗, nao some sozinho).
 async function telasCampo(chave, campo, el) {
   const atual = TELAS.find(t => t.chave === chave);
   const txt = el.value.trim();
   if (!atual || (atual[campo] || '') === txt) return;
   const d = {};
   d[campo] = txt || null;
-  const volta = await telasGravar(chave, d);
-  if (volta) {
-    el.style.borderColor = '#3fb950';
-    setTimeout(function () { el.style.borderColor = ''; }, 900);
-  }
+  await telasGravar(chave, d);
 }
 
 function telasFiltrar(d) {
@@ -645,12 +654,12 @@ function renderModuloTelas() {
       grupo = t.grupo;
       cab = '<tr class="telas-grupo"><td colspan="6">' + esc(grupo) + '</td></tr>';
     }
-    const dest = TELAS_DESTINOS.map(([v, rot, cor]) =>
+    const dest = telasDestinos().map(([v, rot, cor]) =>
       '<button class="' + (t.destino === v ? 'sel' : '') + '" '
       + 'style="' + (t.destino === v && cor ? 'color:' + cor + ';border-color:' + cor + ';' : '') + '" '
       + 'onclick="telasDestino(&#39;' + esc(t.chave) + '&#39;,&#39;' + v + '&#39;)">' + rot + '</button>').join('');
     const carimbo = t.atualizado_em
-      ? '<div style="font-size:10px;color:#6f6e64;margin-top:3px;">'
+      ? '<div style="font-size:10px;color:var(--tx-4);margin-top:3px;">'
         + esc((t.atualizado_por || '').split('@')[0]) + ' · '
         + new Date(t.atualizado_em).toLocaleDateString('pt-BR') + '</div>'
       : '';
@@ -679,7 +688,7 @@ function renderModuloTelas() {
   // senao o chip aceso vira "12 de 12" e some o caminho de volta.
   const porCamada = TELAS_CAMADA_FILTRO ? TELAS.filter(t => t.camada === TELAS_CAMADA_FILTRO) : TELAS;
   const porDestino = TELAS_FILTRO ? TELAS.filter(t => t.destino === TELAS_FILTRO) : TELAS;
-  const chips = TELAS_DESTINOS.map(([v, rot]) => {
+  const chips = telasDestinos().map(([v, rot]) => {
     const n = porCamada.filter(t => t.destino === v).length;
     return '<button class="preset-btn ' + (TELAS_FILTRO === v ? 'active' : '') + '" '
          + 'onclick="telasFiltrar(&#39;' + v + '&#39;)">' + rot + ' ' + n + '</button>';
@@ -694,10 +703,7 @@ function renderModuloTelas() {
 
   alvo.innerHTML =
       '<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Telas do painel</div>'
-    + '<div class="caption-label" style="text-align:center;" title="Uma linha por tela: o que ela responde, quem olha, com que frequencia — e para onde ela vai quando o Neto sair.">O Plano diz o que <b>fazer</b>; esta tela diz o que <b>existe</b>. '
-    + 'Escrever num campo salva sozinho.</div>'
-    + '<div class="caption-label" style="text-align:center;">Embaixo do nome vem a <b>camada</b>, decidida na revisão dos módulos de 12/09. '
-    + 'Camada é o desenho do painel; <b>destino</b> é a sucessão, e continua sendo escolha do Neto — os dois recortes se somam.</div>'
+    + '<div class="caption-label" style="text-align:center;">Escolha o <b>destino</b> de cada tela; o campo salva ao sair dele.</div>'
     + '<div class="plano-barra">'
     + '<div class="plano-contagem"><b>' + decididas + '</b> de ' + TELAS.length + ' com destino definido'
     + (semBase ? ' <span style="color:var(--farol-perto);" title="São as linhas marcadas em âmbar na tabela: sem o que a tela responde, ou sem quem olha.">· ' + semBase + ' sem o básico preenchido</span>' : '')
@@ -709,8 +715,8 @@ function renderModuloTelas() {
     + '<span style="display:inline-block; width:16px;"></span>'
     + '<button class="preset-btn ' + (TELAS_CAMADA_FILTRO ? '' : 'active') + '" onclick="telasCamada(null)">todas as camadas</button> '
     + chipsCamada + '</div>'
-    + '<div class="telas-rolo"><table class="telas-tab"><thead><tr>'
-    + '<th>Tela</th><th>O que responde</th><th>Quem olha</th><th>Cadencia</th><th>Destino</th><th>Nota</th>'
+    + '<div id="tabelaTelas" class="telas-rolo"><table class="telas-tab"><thead><tr>'
+    + '<th>Tela</th><th>O que responde</th><th>Quem olha</th><th>Cadência</th><th>Destino</th><th>Nota</th>'
     + '</tr></thead><tbody>' + linhas + '</tbody></table></div>';
 }
 

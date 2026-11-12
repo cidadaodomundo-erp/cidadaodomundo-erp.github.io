@@ -697,7 +697,7 @@ async function fichaSalvar() {
       seria ignorada. Use outro nome, ou corrija direto na planilha.`, 'var(--farol-fora)');
   }
 
-  diz('Salvando...', '#f6c63e');
+  diz('Salvando…', 'var(--line)');
   try {
     // troca por completo: apaga o que havia com esse nome e regrava
     const alvo = FICHA_EDIT.original || nome;
@@ -782,17 +782,26 @@ async function fichaDesfazer() {
           : `<b>${d.novo}</b> foi desfeita: não existia antes deste salvamento e voltou a não existir.`);
     await entrarFichas();
   } catch (e) {
-    alert('Não deu para desfazer: ' + e.message);
+    // 12/11/2026 (usabilidade, fichas): barra do núcleo no lugar do alert
+    avisoAcao('erro', '✗ Não deu para desfazer: ' + e.message + '. Confira a ficha ' + d.nome + '.');
   }
 }
 
+// 12/11/2026 (usabilidade, fichas): a confirmação é uma linha na própria ficha (FICHA_APAGAR) e o retorno é a barra
+// do núcleo (enviando → ✓/✗), no lugar do confirm/alert
+let FICHA_APAGAR = null;
 async function fichaExcluir(nome) {
-  if (!confirm(`Apagar a ficha "${nome}"? Isso não mexe na planilha — só na ficha criada aqui.`)) return;
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/ft_fichas_manual?nome=eq.${encodeURIComponent(nome)}`,
-                        { method: 'DELETE', headers: rmbHeaders({ Prefer: 'return=minimal' }) });
-  if (!r.ok) { alert('Não deu para apagar (' + r.status + ').'); return; }
+  FICHA_APAGAR = null;
+  avisoAcao('enviando', 'Apagando a ficha ' + nome + '…');
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/rest/v1/ft_fichas_manual?nome=eq.${encodeURIComponent(nome)}`,
+                    { method: 'DELETE', headers: rmbHeaders({ Prefer: 'return=minimal' }) });
+  } catch (e) { avisoAcao('erro', '✗ A ficha ' + nome + ' NÃO foi apagada: sem conexão.', () => fichaExcluir(nome)); return; }
+  if (!r.ok) { avisoAcao('erro', '✗ A ficha ' + nome + ' NÃO foi apagada (' + r.status + ').', () => fichaExcluir(nome)); return; }
   FICHAS = null; FICHA_ABERTA = null; FICHA_EDIT = null;
-  FICHA_MSG = `<b>${nome}</b> apagada. A planilha não foi tocada.`;
+  FICHA_MSG = `<b>${nome}</b> apagada.`;
+  avisoAcao('ok', '✓ Ficha ' + nome + ' apagada às ' + avisoHora() + '.');
   await entrarFichas();
 }
 
@@ -988,7 +997,11 @@ function renderModuloFichas() {
       ${(lista.find(f => f.ficha === nome) || {}).fonte === 'MANUAL' ? `
         <div style="margin-top:10px;">
           <button class="preset-btn" onclick="fichaEditar('${esc(nome)}')">Editar esta ficha</button>
-          <button class="preset-btn" onclick="fichaExcluir('${esc(nome)}')" style="margin-left:8px;">Apagar</button>
+          ${FICHA_APAGAR === nome
+            ? `<span style="margin-left:8px; color:var(--farol-fora); font-weight:700;">Apagar esta ficha criada aqui? O CMV deixa de usá-la.</span>
+               <button class="preset-btn" onclick="fichaExcluir('${esc(nome)}')" style="margin-left:6px; border-color:var(--farol-fora);">Sim, apagar</button>
+               <button class="preset-btn" onclick="FICHA_APAGAR=null; renderModuloFichas();" style="margin-left:6px;">cancelar</button>`
+            : `<button class="preset-btn" onclick="FICHA_APAGAR='${esc(nome)}'; renderModuloFichas();" style="margin-left:8px;">Apagar</button>`}
         </div>` : ''}`;
   }
 

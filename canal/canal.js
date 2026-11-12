@@ -685,13 +685,8 @@ function blocoFreteGratis() {
     </tr>`;
   }).join('');
 
-  const emp = por.get('Frete grátis empilhado em outro desconto');
-  const avulso = por.get('Frete grátis avulso');
-  const alerta = (emp && avulso && avulso.ped)
-    ? `<div class="contexto" style="border-color:var(--farol-fora); margin-top:10px;">
-        <b>Empilhamento:</b> ${emp.ped.toLocaleString('pt-BR')} pedidos com frete grátis em cima de outro desconto nosso
-        (Campanha Inteligente, Cupom ou Clube); só o frete custou cerca de <b>R$ ${fmt(avulso.invL / avulso.ped * emp.ped)}</b>.
-      </div>` : '';
+  // 12/11/2026 (usabilidade, promocoes): o aviso de empilhamento subiu para o topo da tela (promoDecisaoTopo)
+  const T = [...por.values()].reduce((s, o) => ({ ped: s.ped + o.ped, vendas: s.vendas + o.vendas, invI: s.invI + o.invI }), { ped: 0, vendas: 0, invI: 0 });
 
   // 12/11/2026 (auditoria lote 3, canal-41): legenda de uma linha
   return `
@@ -701,9 +696,24 @@ function blocoFreteGratis() {
     <table>
       <tr><th>Como foi entregue</th><th>Pedidos</th><th>Nós (R$)</th><th>% da verba</th><th>iFood (R$)</th><th>Alavancagem</th><th>Nosso R$/pedido</th><th>Ticket médio</th></tr>
       ${tr}
+      <tr class="liq"><td><b>TOTAL</b></td><td>${T.ped.toLocaleString('pt-BR')}</td><td>R$ ${fmt(totL)}</td><td>100%</td><td>R$ ${fmt(T.invI)}</td>
+        <td>${alavTxt(totL > 0.005 ? T.invI / totL : 0)}</td><td>R$ ${fmt(T.ped ? totL / T.ped : 0)}</td><td>R$ ${fmt(T.ped ? T.vendas / T.ped : 0)}</td></tr>
     </table>
-  </div>
-  ${alerta}`;
+  </div>`;
+}
+
+// 12/11/2026 (usabilidade, promocoes): a decisão abre a tela — o que cortar, tirado do mesmo cálculo do frete grátis
+function promoDecisaoTopo() {
+  if (!PROMO_FRETE || !PROMO_FRETE.length) return '';
+  const activeL = activeLojas();
+  const linhas = PROMO_FRETE.filter(r =>
+    periodoDaPromoContido(r.periodo_ini, r.periodo_fim) && activeL.has(LOJAS.indexOf(r.nome_loja)));
+  const soma = (g) => linhas.filter(r => r.grupo_frete === g).reduce((s, r) => ({ ped: s.ped + r.pedidos, invL: s.invL + Number(r.investimento_loja || 0) }), { ped: 0, invL: 0 });
+  const emp = soma('Frete grátis empilhado em outro desconto'), avulso = soma('Frete grátis avulso');
+  if (!emp.ped || !avulso.ped) return '';
+  return `<div class="contexto" style="text-align:left; border-color:var(--farol-fora); margin-bottom:12px;">
+    <b>Cortar: frete grátis empilhado custou cerca de R$ ${fmt(avulso.invL / avulso.ped * emp.ped)}</b>
+    <span style="color:var(--tx-3);"> · ${emp.ped.toLocaleString('pt-BR')} pedidos com frete grátis em cima de outro desconto nosso</span></div>`;
 }
 
 // Alavancagem loja a loja — é por aqui que acompanhamos o teste: as lojas em teste
@@ -883,7 +893,7 @@ Alavancagem = R$ do iFood para cada R$ 1 nosso; meta acima de 1,00x.</div>
 
 function moduloPromocoes() {
   const r = resumoPromocoes();
-  const teste = blocoTestePromos();
+  const teste = promoDecisaoTopo() + blocoTestePromos();
 
   // Os blocos que dependem do relatório MENSAL de promoções (decomposição por
   // mecânica e recorte de frete) só existem nos meses importados. Os que vêm dos
@@ -893,14 +903,9 @@ function moduloPromocoes() {
     const disp = periodosPromoDisponiveis();
     // 12/11/2026 (auditoria lote 3, canal-34): a "Alavancagem por loja" repetia a tabela do teste (agora com a linha REDE)
     return teste + `
-    <div class="contexto" style="border-color:var(--farol-perto); margin-top:16px;">
-      <b>Detalhe por tipo de promoção indisponível neste período.</b><br>
-      A quebra por mecânica (Hits, Campanha Inteligente, Clube, Frete grátis) vem do
-      <b>relatório de promoções</b> do portal, que chega em recortes fechados. Os blocos acima
-      usam os pedidos diários e estão sempre atualizados.<br>
-      ${disp.length
-        ? `Recortes já importados — escolha um período que contenha um deles:<br><b>${disp.join('</b> · <b>')}</b>`
-        : 'Nenhum recorte importado ainda.'}
+    <div class="contexto" style="text-align:left; border-color:var(--farol-perto); margin-top:16px;">
+      <b>Quebra por promoção só nos períodos do relatório do iFood.</b>
+      ${disp.length ? `Escolha um que contenha: <b>${disp.join('</b> · <b>')}</b>` : 'Nenhum relatório importado ainda.'}
     </div>`;
   }
 
@@ -940,7 +945,8 @@ function moduloPromocoes() {
     <div class="card neutral"><div class="card-lbl">Investido por pedido</div><div class="card-val">R$ ${fmt(invPorPedidoGeral)}</div></div>
   </div>
 
-  <div class="section-label">Para onde vai a verba</div>
+  <details ontoggle="if (this.open) renderChartsPromocoes();" style="margin-top:14px;">
+  <summary class="section-label" style="cursor:pointer;">▸ Relatório mensal do iFood: verba por estratégia e por loja</summary>
   <div class="chart-grid">
     <div class="chart-box" style="height:320px;">
       <div class="chart-title">Investimento da loja por estratégia (R$)</div>
@@ -959,6 +965,8 @@ function moduloPromocoes() {
       <tr><th>Estratégia (verbas combinadas)</th><th>Pedidos</th><th>Investido</th><th>% da verba</th>
           <th>R$ por pedido</th><th>Ticket médio</th><th>iFood banca</th></tr>
       ${linhasTabela}
+      <tr class="liq"><td><b>TOTAL</b></td><td>${r.totalPedidos.toLocaleString('pt-BR')}</td><td>R$ ${fmt(r.totalInv)}</td><td>100%</td>
+        <td>R$ ${fmt(invPorPedidoGeral)}</td><td>R$ ${fmt(r.totalPedidos ? r.totalVendas / r.totalPedidos : 0)}</td><td>${pct(pctIfoodGeral)}%</td></tr>
     </table>
   </div>
 
@@ -968,8 +976,11 @@ function moduloPromocoes() {
     <table>
       <tr><th>Loja</th><th>Pedidos</th><th>Investido</th><th>R$ por pedido</th><th>Ticket médio</th></tr>
       ${linhasLojas}
+      ${(() => { const t = porLoja.reduce((s, x) => ({ ped: s.ped + x.ped, invL: s.invL + x.invL, v: s.v + x.ticket * x.ped }), { ped: 0, invL: 0, v: 0 });
+        return `<tr class="liq"><td><b>TOTAL</b></td><td>${t.ped.toLocaleString('pt-BR')}</td><td>R$ ${fmt(t.invL)}</td><td>R$ ${fmt(t.ped ? t.invL / t.ped : 0)}</td><td>R$ ${fmt(t.ped ? t.v / t.ped : 0)}</td></tr>`; })()}
     </table>
-  </div>`;
+  </div>
+  </details>`;
 }
 
 function renderChartsPromocoes() {
@@ -3555,6 +3566,10 @@ const SITE_MEDIDAS = [
 // Guarda o ultimo recorte desenhado, para o CSV e o resumo sairem exatamente
 // iguais ao que esta na tela — relatorio que discorda da tela vira discussao.
 let SITE_ULTIMO = null;
+let SITE_TUDO = false;
+let SITE_CLI_ABERTO = false;   // o bloco "Clientes e campanhas" continua aberto ao redesenhar     // 12/11/2026 (usabilidade, site): "ver todas" nos cupons e nas campanhas, em vez do corte calado
+// 12/11/2026 (usabilidade, site): o tipo da UTM em palavra de operador (o valor cru do link fica no title)
+const SITE_TIPO_UTM = { paid: 'pago', cpc: 'pago', ppc: 'pago', referral: 'link', organic: 'orgânico', social: 'rede social', email: 'e-mail', none: 'direto', '(none)': 'direto' };
 
 async function entrarSite() {
   const alvo = document.getElementById('view-site');
@@ -3698,7 +3713,7 @@ function renderModuloSite() {
   // passou a separar as duas datas (ate = fronteira da importacao;
   // ultima_venda_canal = ultimo pedido pelo site) e aqui cada uma diz o que e.
   const avisoVenda = vendaAtrasada.length ? `
-    <div class="contexto" style="border-color:#c8102e; margin-bottom:10px;">
+    <div class="contexto" style="border-color:var(--farol-fora); margin-bottom:10px;">
       <b>A importação da venda está atrasada — não mande relatório antes de conferir.</b><br>
       ${vendaAtrasada.map(a => `${a.loja}: até <b>${ddmm(a.ate)}</b> (${siteDias(a.ate, fimISO)} dias atrás, fonte ${a.fonte})`).join(' · ')}<br>
       <span style="font-size:12px; color:var(--tx-3);">Onde a fonte é o Saipos, o problema é a importação diária das APIs (08:00). Onde é a Accon, é o cookie do portal.</span>
@@ -3732,7 +3747,7 @@ function renderModuloSite() {
       <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Site próprio</div>
       ${avisoVenda}${notaSemPedido}${avisoCliente}
       ${siteBarraPeriodo()}
-      <div class="contexto" style="border-color:#c8102e;">Sem pedido do site nesta janela e nestas unidades.</div>`;
+      <div class="contexto" style="border-color:var(--farol-fora);">Sem pedido do site nesta janela e nestas unidades.</div>`;
     return;
   }
 
@@ -3815,7 +3830,8 @@ function renderModuloSite() {
     const o = cupons.get(c.cupom);
     o.pedidos += Number(c.pedidos || 0); o.desc += Number(c.descontos || 0); o.fat += Number(c.faturamento || 0);
   });
-  const listaCupons = [...cupons.values()].sort((a, b) => b.pedidos - a.pedidos).slice(0, 8);
+  const todosCupons = [...cupons.values()].sort((a, b) => b.pedidos - a.pedidos);
+  const listaCupons = SITE_TUDO ? todosCupons : todosCupons.slice(0, 8);
 
   const coorte = SITE.coorte.slice(0, 12);
 
@@ -3877,26 +3893,30 @@ function renderModuloSite() {
   <div class="caption-label" style="text-align:center;">Cupom e campanha (UTM) até <b>${ddmm(corteCupom)}</b>.</div>
   ${avisoVenda}${notaSemPedido}${avisoCliente}
   ${siteBarraPeriodo()}
+  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0;">
+    <span style="font-size:12px; color:var(--tx-3);">Para a equipe de tráfego (só número agregado):</span>
+    <button class="preset-btn" onclick="siteBaixarCSV()">Baixar CSV (semana × loja)</button>
+    <button class="preset-btn" id="btnSiteResumo" onclick="siteCopiarResumo()">Copiar resumo do período</button>
+  </div>
   ${(SITE_F.loja || SITE_F.canal) ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
     ${SITE_F.loja ? `<button class="preset-btn active" onclick="siteFiltrar('loja','${SITE_F.loja}')">loja ${SITE_F.loja} ✕</button>` : ''}
     ${SITE_F.canal ? `<button class="preset-btn active" onclick="siteFiltrar('canal','${SITE_F.canal}')">${SITE_F.canal} ✕</button>` : ''}
     <button class="preset-btn" onclick="siteLimparFiltros()">limpar</button>
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Coorte, recência, base de clientes, campanhas e cupons não seguem este recorte.</div>
   </div>` : ''}
 
   <div class="cards">
-    <div class="card pos"><div class="card-lbl">Pedidos no site</div><div class="card-val">${num(V.pedidos)}</div>
+    <div class="card neutral"><div class="card-lbl">Pedidos no site</div><div class="card-val">${num(V.pedidos)}</div>
       <div class="card-pct">${ddmm(iniISO)} a ${ddmm(fimISO)}</div></div>
-    <div class="card pos"><div class="card-lbl">Faturamento</div><div class="card-val">${reais(V.fat)}</div>
+    <div class="card neutral"><div class="card-lbl">Faturamento</div><div class="card-val">${reais(V.fat)}</div>
       <div class="card-pct">venda do canal no período</div></div>
-    <div class="card neutral"><div class="card-lbl">Ticket médio</div><div class="card-val">${reais(V.ticket)}</div>
-      <div class="card-pct">no iFood, ${reais(ifood.ticket)} no mesmo período</div></div>
-    <div class="card ${difTicket >= 0 ? 'pos' : 'neg'}"><div class="card-lbl">Diferença de ticket</div>
-      <div class="card-val">${difTicket >= 0 ? '+' : '−'}${reais(Math.abs(difTicket))}</div>
-      <div class="card-pct">por pedido que vem para cá em vez do iFood</div></div>
-    <div class="card pos"><div class="card-lbl">Clientes novos</div><div class="card-val">${num(C.novos)}</div>
+    <div class="card ${difTicket >= 0 ? 'pos' : 'neg'}"><div class="card-lbl">Ticket médio</div><div class="card-val">${reais(V.ticket)}</div>
+      <div class="card-pct">${difTicket >= 0 ? '+' : '−'}${reais(Math.abs(difTicket))} por pedido vs iFood (${reais(ifood.ticket)})</div></div>
+    <div class="card neutral"><div class="card-lbl">Clientes novos</div><div class="card-val">${num(C.novos)}</div>
       <div class="card-pct">${pct(C.pedidos ? C.pedNovos / C.pedidos * 100 : 0)}% dos pedidos até ${ddmm(corteCliente)}</div></div>
+  </div>
+  <details style="margin:4px 0 10px;"><summary style="cursor:pointer; font-size:12.5px; color:var(--tx-3);">▸ mais do período: quem já conhecia, cupom de 1ª compra, frete</summary>
+  <div class="cards">
     <div class="card neutral"><div class="card-lbl">Pedidos de quem já conhecia</div>
       <div class="card-val">${num(C.pedidos - C.pedNovos)}</div>
       <div class="card-pct">de ${num(C.pedidos)} pedidos com cliente identificado</div></div>
@@ -3905,10 +3925,7 @@ function renderModuloSite() {
     <div class="card neutral"><div class="card-lbl">Pedidos que pagam frete</div>
       <div class="card-val">${pct(C.pedidos ? C.comFrete / C.pedidos * 100 : 0)}%</div>
       <div class="card-pct">${reais(C.frete)} cobrados de frete</div></div>
-  </div>
-  <div class="caption-label" title="Isso é venda, não lucro: comparar resultado depende das taxas de cada canal e mora na DRE. Os cartões de cliente contam os pedidos com cliente identificado até ${ddmm(corteCliente)} — nas lojas do Saipos, todos. O cupom é o único que só conta os pedidos que a Accon exportou (até ${ddmm(corteCupom)}).">
-    O ticket do site está ${difTicket >= 0 ? 'acima' : 'abaixo'} do ticket do iFood em ${reais(Math.abs(difTicket))} por pedido.
-  </div>
+  </div></details>
 
   <div class="section-label">Semana a semana</div>
   <div class="periodo-presets">
@@ -3934,13 +3951,6 @@ function renderModuloSite() {
     A semana começa na segunda; <b>"—" quer dizer que o dado de cliente ainda não chegou</b>.
   </div>
 
-  <div class="section-label">Relatório para a equipe de tráfego</div>
-  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:10px 0;">
-    <button class="preset-btn" onclick="siteBaixarCSV()">Baixar CSV (semana × loja)</button>
-    <button class="preset-btn" id="btnSiteResumo" onclick="siteCopiarResumo()">Copiar resumo do período</button>
-  </div>
-  <div class="caption-label">Só número agregado, nenhum dado de cliente; abre direto no Excel.</div>
-
   <div class="section-label">Por loja</div>
   <div class="caption-label" style="text-align:center;"><b>Clique numa loja para recortar a tela por ela.</b></div>
   <div id="tabelaSiteLojas"><table>
@@ -3950,6 +3960,8 @@ function renderModuloSite() {
       <td>${reais(l.fat)}</td><td>${reais(l.pedidos ? l.fat / l.pedidos : 0)}</td>
       <td>${num(novosPorLoja.get(l.chave) || 0)}</td>
       <td>${[...l.fontes].map(f => f === 'saipos' ? 'Saipos' : 'Accon').join(' + ')}</td></tr>`; }).join('')}
+    ${(() => { const p = porLoja.reduce((a, l) => a + l.pedidos, 0), f = porLoja.reduce((a, l) => a + l.fat, 0), n = porLoja.reduce((a, l) => a + (novosPorLoja.get(l.chave) || 0), 0);
+      return `<tr class="liq"><td>TOTAL</td><td>${num(p)}</td><td>${reais(f)}</td><td>${reais(p ? f / p : 0)}</td><td>${num(n)}</td><td></td></tr>`; })()}
   </table></div>
 
   <div class="section-label">Entrega e retirada</div>
@@ -3960,8 +3972,12 @@ function renderModuloSite() {
       return `<tr onclick="siteFiltrar('canal','${c.chave}')" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o recorte' : 'clique para ver só ' + c.chave}"><td>${sel ? '<b>' : ''}${c.chave}${sel ? '</b> ✕' : ''}</td><td>${num(c.pedidos)}</td>
       <td>${pct(totPedCanal ? c.pedidos / totPedCanal * 100 : 0)}%</td>
       <td>${reais(c.fat)}</td><td>${reais(c.pedidos ? c.fat / c.pedidos : 0)}</td></tr>`; }).join('')}
+    ${(() => { const f = porCanal.reduce((a, c) => a + c.fat, 0);
+      return `<tr class="liq"><td>TOTAL</td><td>${num(totPedCanal)}</td><td>100%</td><td>${reais(f)}</td><td>${reais(totPedCanal ? f / totPedCanal : 0)}</td></tr>`; })()}
   </table></div>
 
+  <details style="margin-top:14px;" ${SITE_CLI_ABERTO ? 'open' : ''} ontoggle="SITE_CLI_ABERTO=this.open">
+  <summary class="section-label" style="cursor:pointer;">▸ Clientes e campanhas · cupons, retorno, base e UTM (rede inteira, não segue o recorte)</summary>
   <div class="section-label">Cupons usados no período</div>
   <div id="tabelaSiteCupons"><table>
     <tr><th>Cupom</th><th>Pedidos</th><th>Desconto dado</th><th>Faturamento</th><th>Ticket</th><th>Desconto por pedido</th></tr>
@@ -3969,7 +3985,8 @@ function renderModuloSite() {
       <td>${reais(c.fat)}</td><td>${reais(c.pedidos ? c.fat / c.pedidos : 0)}</td>
       <td>${reais(c.pedidos ? c.desc / c.pedidos : 0)}</td></tr>`).join('')}
   </table></div>
-  <div class="caption-label">Por mês inteiro, sem recorte no dia; vai até: <b>${ativas.filter(a => a.o_que === 'cupom').map(a => `${a.loja} ${ddmm(a.ate)}`).join(' · ')}</b>.</div>
+  ${todosCupons.length > 8 ? `<div style="font-size:12px; margin:4px 0;"><a href="javascript:void(0)" onclick="SITE_TUDO=!SITE_TUDO; renderModuloSite();">${SITE_TUDO ? 'ver só os 8 maiores' : 'ver todos os ' + todosCupons.length + ' cupons'}</a></div>` : ''}
+  <div class="caption-label">Por mês inteiro; vai até: <b>${ativas.filter(a => a.o_que === 'cupom').map(a => `${a.loja} ${ddmm(a.ate)}`).join(' · ')}</b>.</div>
 
   <div class="section-label">Quem estreou em cada mês voltou?</div>
   <div id="tabelaSiteCoorte"><table>
@@ -3983,9 +4000,7 @@ function renderModuloSite() {
         <td>${reais(c.receita_total)}</td></tr>`;
     }).join('')}
   </table></div>
-  <div class="caption-label" title="É a pergunta que decide se o tráfego pago se paga: trazer cliente que compra uma vez só custa caro. Mês recente teve menos tempo de voltar, então a queda no fim da lista é esperada.">
-    Da rede inteira (uma pessoa = um telefone); não segue o filtro de unidades.
-  </div>
+  <div class="caption-label">Uma pessoa = um telefone; mês recente teve menos tempo de voltar.</div>
 
   <div class="section-label">Base de clientes hoje</div>
   <div class="cards">
@@ -4003,27 +4018,24 @@ function renderModuloSite() {
     ${SITE.recencia.map(r => `<tr><td>${r.faixa}</td><td>${num(r.clientes)}</td>
       <td>${pct(totalBase ? Number(r.clientes) / totalBase * 100 : 0)}%</td><td>${num(r.pedidos_total)}</td></tr>`).join('')}
   </table></div>
-  <div class="caption-label">
-    A base é <b>da rede</b>: o cadastro (e-mail, pedidos de vida) vem do portal da Accon, e uma pessoa é uma linha só.
-    Desde 15/10 as compras do site que o Saipos registra depois do último export da Accon entram na conta — a recência e os pedidos ficam em dia sem renovar cookie;
-    quem comprou pela primeira vez depois disso entra na base sem e-mail.
-    Por isso esta parte não muda quando você filtra unidade.
-  </div>
+  <div class="caption-label" title="O cadastro (e-mail, pedidos de vida) vem do portal da Accon; desde 15/10 as compras que o Saipos registra depois do último export entram na conta, e quem estreou depois entra sem e-mail.">Uma pessoa é uma linha só; cliente novo depois do último export da Accon vem sem e-mail.</div>
 
   <div class="section-label">De onde veio o cliente (UTM)</div>
   <div id="tabelaSiteUtm"><table>
     <tr><th>Origem</th><th>Tipo</th><th>Campanha</th><th>Pessoas captadas</th><th>Compraram</th><th title="De quem chegou por este link, quantos fizeram pelo menos um pedido.">Parte que comprou</th><th>Pedidos</th></tr>
-    ${campanhas.slice(0, 12).map(c => `<tr${utmCara(c) ? ` style="color:var(--farol-fora);" title="Captou ${num(c.clientes)} pessoas, acima da média de ${num(Math.round(mediaCaptados))} por campanha, e converteu ${pct(taxaUtm(c))}%, abaixo dos ${pct(convGeral)}% do conjunto."` : ''}><td>${c.source}</td><td>${c.medium}</td><td>${c.campanha}</td>
+    ${(SITE_TUDO ? campanhas : campanhas.slice(0, 12)).map(c => `<tr${utmCara(c) ? ` style="color:var(--farol-fora);" title="Captou ${num(c.clientes)} pessoas, acima da média de ${num(Math.round(mediaCaptados))} por campanha, e converteu ${pct(taxaUtm(c))}%, abaixo dos ${pct(convGeral)}% do conjunto."` : ''}><td>${c.source}</td><td title="${c.medium || ''}">${SITE_TIPO_UTM[String(c.medium || '').toLowerCase()] || c.medium || '—'}</td><td>${c.campanha}</td>
       <td>${num(c.clientes)}</td><td>${num(c.conv)}</td>
       <td>${pct(taxaUtm(c))}%</td><td>${num(c.pedidos)}</td></tr>`).join('')}
   </table></div>
+  ${campanhas.length > 12 ? `<div style="font-size:12px; margin:4px 0;"><a href="javascript:void(0)" onclick="SITE_TUDO=!SITE_TUDO; renderModuloSite();">${SITE_TUDO ? 'ver só as 12 primeiras' : 'ver todas as ' + campanhas.length + ' campanhas'}</a></div>` : ''}
   <div class="caption-label" title="A ordem é pela parte que comprou, entre as campanhas com pelo menos ${PISO_UTM} pessoas captadas — sem esse piso, campanha de uma pessoa que comprou marca 100% e sobe ao topo. Abaixo do piso a lista segue pelo tamanho, no fim. A média de captados é simples: total dividido pelo número de campanhas (${num(Math.round(mediaCaptados))} por campanha).">
     Em <span style="color:var(--farol-fora);">vermelho</span>, a campanha que captou acima da média e converteu abaixo do conjunto (${pct(convGeral)}%).
   </div>
   <div class="caption-label" title="O rastreio funciona e já grava o id da campanha do Meta, mas o volume é pequeno. A maior parte do que aparece aqui é o próprio link da Accon (accon_links / referral), que não é campanha. Isto é a linha de base: serve para comparar daqui pra frente, não para julgar o trabalho de agora.">
     <b>${num(clientesPagos)} pessoas</b> chegaram por link marcado como pago desde nov/2025 e <b>${num(convPagos)}</b> delas compraram.
-    A campanha (UTM) só existe no cadastro do portal da Accon: quem se cadastrou pelas três lojas próprias depois do último export (${ddmm(corteCupom)}) ainda não aparece aqui.
-  </div>`;
+    Campanha até ${ddmm(corteCupom)}.
+  </div>
+  </details>`;
 
   // O grafico so depois do innerHTML — Chart.js mede zero em container escondido.
   // UMA serie so, na cor de dado (--info): a identidade vem do rotulo do eixo e da
@@ -4126,11 +4138,9 @@ function siteCopiarResumo() {
   ].join('\n');
   const btn = document.getElementById('btnSiteResumo');
   navigator.clipboard.writeText(texto).then(() => {
-    if (btn) {
-      btn.textContent = 'Copiado';
-      setTimeout(() => { btn.textContent = 'Copiar resumo do período'; }, 2000);
-    }
-  }).catch(() => { if (btn) btn.textContent = 'Não consegui copiar — selecione o texto na tela'; });
+    // 12/11/2026 (usabilidade, site): o ✓ fica com a hora, não some em 2 s
+    if (btn) btn.textContent = '✓ Copiado às ' + avisoHora() + ' · copiar de novo';
+  }).catch(() => { if (btn) btn.textContent = '✗ Não copiou — clique para tentar de novo'; });
 }
 
 // ------------------------------------------------------------------
@@ -4537,6 +4547,9 @@ let LOGFIN = null; // { ini, fim, rows } — cache da janela buscada
 let LOGFIN_UNIDADE = 'TODAS'; // filtro proprio (Foody cobre as 4 unidades desde 15/08)
 
 function logfinUnidade(u) { LOGFIN_UNIDADE = u; renderModuloLogfin(); }
+// 12/11/2026 (usabilidade, logfin): a grade por entregador abre com 6 colunas; as outras 5 a um clique
+let LOGFIN_ENT_TUDO = false;
+function logfinEntTudo() { LOGFIN_ENT_TUDO = !LOGFIN_ENT_TUDO; renderModuloLogfin(); }
 
 let LOGFIN_DIARIA = 50;   // diaria por turno de escala — padrao R$50, editavel
 
@@ -4814,35 +4827,37 @@ function renderModuloLogfin() {
     <div class="card"><div class="card-lbl">Entregas no período</div><div class="card-val">${entregas.toLocaleString('pt-BR')}</div><div class="card-pct">média de ${n1(dias ? entregas / dias : null)} por dia, em ${dias} dia(s) com entrega</div></div>
     <div class="card neutral"><div class="card-lbl">Pago em corridas</div><div class="card-val">R$ ${fmt(corridas)}</div><div class="card-pct">média de R$ ${fmt(entregas ? corridas / entregas : 0)} por entrega</div></div>
     <div class="card ${complemento > corridas * 0.05 ? 'neg' : 'neutral'}"><div class="card-lbl">Custo total estimado</div><div class="card-val">R$ ${fmt(custoTotal)}</div><div class="card-pct">corridas + R$ ${fmt(complemento)} de complemento do garantido</div></div>
-    <div class="card pos"><div class="card-lbl">Custo líquido do frete</div><div class="card-val">R$ ${fmt(custoLiquido)}</div><div class="card-pct">o frete cobrado do cliente acima de 3 km (R$ ${fmt(abate)} em ${acima3.length.toLocaleString('pt-BR')} corridas) abate o custo</div></div>
+    <div class="card neutral"><div class="card-lbl">Custo líquido do frete</div><div class="card-val">R$ ${fmt(custoLiquido)}</div><div class="card-pct">o frete cobrado do cliente acima de 3 km (R$ ${fmt(abate)} em ${acima3.length.toLocaleString('pt-BR')} corridas) abate o custo</div></div>
   </div>
   <div class="caption-label" style="text-align:center;" title="Corridas = soma do valor pago por entrega registrado no sistema de entrega (TrackEat). Complemento = quanto o garantido por hora paga além das corridas, calculado turno a turno; os valores vêm da regra de pagamento cadastrada. Até 3 km o frete do cliente é subsidiado na promoção (a verba está no módulo de promoções), por isso só o frete acima de 3 km abate aqui.">Garantido por hora: R$ ${fmt(logfinPisoSemana())} de segunda a sexta e R$ ${fmt(logfinPisoFds())} no fim de semana; só o frete acima de 3 km abate o custo.</div>
 
   <div class="section-label">Por turno (janelas do iFood: almoço 10h–14h · café 15h–16h · jantar 17h–23h · madrugada 0h–1h)</div>
   <div id="tabelaLogfinTurno"><table>
-    <tr><th></th><th>Entregas</th><th>Corridas</th><th>R$ por entrega</th><th>Horas estimadas</th><th>Entregas por hora</th><th>R$ por hora</th><th>Complemento</th></tr>
+    <tr><th>Turno</th><th>Entregas</th><th>Corridas</th><th>R$ por entrega</th><th>Horas estimadas</th><th>Entregas por hora</th><th>R$ por hora</th><th>Complemento</th></tr>
     ${turnos.map(t => linhaTurno(t === '—' ? '— (fora das faixas)' : t, lista.filter(g => g.turno === t))).join('')}
     ${linhaTurno('TOTAL', lista, 'liq')}
   </table></div>
 
-  <div class="section-label" title="O complemento é o quanto o garantido por hora paga além das corridas, turno a turno. Quem aparece com traço fechou o turno só com as corridas e não custou nada a mais. Entre dois com o mesmo complemento, o de mais entregas vem primeiro.">Por entregador — a conta de cada um (maior complemento do garantido primeiro)</div>
+  <div class="section-label" title="O complemento é o quanto o garantido por hora paga além das corridas, turno a turno. Quem aparece com traço fechou o turno só com as corridas e não custou nada a mais. Entre dois com o mesmo complemento, o de mais entregas vem primeiro.">Estimativa por entregador (maior complemento do garantido primeiro)</div>
   <div id="tabelaLogfinEntregador"><table>
-    <tr><th>Entregador</th><th>Tipo</th><th>Dias</th><th>Turnos</th><th>Entregas</th><th>Corridas</th><th>Complemento</th><th>Total</th><th>Horas</th><th>Entregas/h</th><th>R$/h</th></tr>
-    ${entregadores.map(e => `<tr><td>${e.nome}</td><td>${e.tipo === 'internal' ? 'próprio' : e.tipo === 'external' ? 'externo' : '—'}</td>
-      <td>${e.dias}</td><td>${e.turnos}</td><td>${e.n.toLocaleString('pt-BR')}</td>
-      <td>R$ ${fmt(e.ganho)}</td><td>${e.comp > 0 ? 'R$ ' + fmt(e.comp) : '—'}</td><td><b>R$ ${fmt(e.ganho + e.comp)}</b></td>
-      <td>${e.h.horas === null ? '—' : n1(e.h.horas)}</td>
-      <td>${e.h.entregasHora === null ? '—' : n1(e.h.entregasHora)}</td>
-      <td>${e.h.reaisHora === null ? '—' : 'R$ ' + fmt(e.h.reaisHora)}</td></tr>`).join('')}
-    ${(() => { const t = entregadores.reduce((a, e) => ({ turnos: a.turnos + e.turnos, n: a.n + e.n,
+    ${(() => { const X = LOGFIN_ENT_TUDO;   // X = as 5 colunas extras (Tipo, Dias, Turnos, Horas, Entregas/h)
+      const t = entregadores.reduce((a, e) => ({ turnos: a.turnos + e.turnos, n: a.n + e.n,
         ganho: a.ganho + e.ganho, comp: a.comp + e.comp, horas: a.horas + (e.h.horas || 0) }),
         { turnos: 0, n: 0, ganho: 0, comp: 0, horas: 0 });
-      return `<tr class="liq"><td>TOTAL</td><td>—</td><td>—</td><td>${t.turnos}</td><td>${t.n.toLocaleString('pt-BR')}</td>
+      return `<tr><th>Entregador</th>${X ? '<th>Tipo</th><th>Dias</th><th>Turnos</th>' : ''}<th>Entregas</th><th>Corridas</th><th>Complemento</th><th>Total</th>${X ? '<th>Horas</th><th>Entregas/h</th>' : ''}<th>R$/h</th></tr>`
+      + entregadores.map(e => `<tr><td>${e.nome}</td>${X ? `<td>${e.tipo === 'internal' ? 'próprio' : e.tipo === 'external' ? 'externo' : '—'}</td>
+        <td>${e.dias}</td><td>${e.turnos}</td>` : ''}<td>${e.n.toLocaleString('pt-BR')}</td>
+        <td>R$ ${fmt(e.ganho)}</td><td>${e.comp > 0 ? 'R$ ' + fmt(e.comp) : '—'}</td><td><b>R$ ${fmt(e.ganho + e.comp)}</b></td>
+        ${X ? `<td>${e.h.horas === null ? '—' : n1(e.h.horas)}</td>
+        <td>${e.h.entregasHora === null ? '—' : n1(e.h.entregasHora)}</td>` : ''}
+        <td>${e.h.reaisHora === null ? '—' : 'R$ ' + fmt(e.h.reaisHora)}</td></tr>`).join('')
+      + `<tr class="liq"><td>TOTAL</td>${X ? `<td>—</td><td>—</td><td>${t.turnos}</td>` : ''}<td>${t.n.toLocaleString('pt-BR')}</td>
         <td>R$ ${fmt(t.ganho)}</td><td>R$ ${fmt(t.comp)}</td><td><b>R$ ${fmt(t.ganho + t.comp)}</b></td>
-        <td>${t.horas ? n1(t.horas) : '—'}</td><td>${t.horas ? n1(t.n / t.horas) : '—'}</td>
+        ${X ? `<td>${t.horas ? n1(t.horas) : '—'}</td><td>${t.horas ? n1(t.n / t.horas) : '—'}</td>` : ''}
         <td>${t.horas ? 'R$ ' + fmt((t.ganho + t.comp) / t.horas) : '—'}</td></tr>`; })()}
   </table></div>
-  <div class="caption-label" style="text-align:center;">R$/h perto do garantido (R$ ${fmt(logfinPisoSemana())} na semana, R$ ${fmt(logfinPisoFds())} no fim de semana) = é o garantido que está pagando essa pessoa. Horas, entregas/h e R$/h contam só os turnos com horário confiável.</div>
+  <div style="font-size:12px; margin:4px 0;"><a href="javascript:void(0)" onclick="logfinEntTudo()">${LOGFIN_ENT_TUDO ? 'ver só as 6 colunas principais' : 'ver também tipo, dias, turnos, horas e entregas por hora'}</a></div>
+  <div class="caption-label" style="text-align:center;" title="Horas e R$/h contam só os turnos com horário confiável.">R$/h perto do garantido (R$ ${fmt(logfinPisoSemana())} semana, R$ ${fmt(logfinPisoFds())} fim de semana) = o garantido paga essa pessoa.</div>
 
   <div class="section-label">Semana a semana (seg–dom)</div>
   <div id="tabelaLogfinSemana"><table>

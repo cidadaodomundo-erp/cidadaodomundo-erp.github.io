@@ -4060,7 +4060,16 @@ const CONF_FICHA = {
   bebidas: { aba: 'BEBIDAS', chave: 'conferencia_bebidas', escala: null, rende: false, naofaz: true,
              st: { vende: 'vendeu nos últimos 90 dias' } },
 };
-const CF = { fila: {}, feita: {}, nomes: null, aberto: null, filtro: 'falta', busca: '' };
+const CF = { fila: {}, feita: {}, nomes: null, aberto: null, filtro: 'falta', busca: '', ordem: 'venda', venda: undefined };
+const CF_META_LANA = 30;   // dono, 06/10 (livro pauta-da-semana/respostas/meta-lana)
+// venda de 30 dias do produto (rede), pelo nome da base e, se não achar, pelo nome da ficha
+function cfVendeu(i) { if (!CF.venda) return 0; return CF.venda.get(i.nb) || CF.venda.get(i.f) || 0; }
+// segunda-feira desta semana, meia-noite de Curitiba
+function cfSegunda() {
+  const p = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).split('-').map(Number);
+  const d = new Date(Date.UTC(p[0], p[1] - 1, p[2])); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return { quando: new Date(d.toISOString().slice(0, 10) + 'T00:00:00-03:00'), dm: d.toISOString().slice(8, 10) + '/' + d.toISOString().slice(5, 7) };
+}
 const cfFmt = (v) => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3, useGrouping: false });
 const cfNum = (t) => { const s = String(t == null ? '' : t).trim(); if (s === '') return null; if (!/^\d+([.,]\d+)?$/.test(s)) return NaN; return Number(s.replace(',', '.')); };
 function cfUn(u) {
@@ -4088,6 +4097,13 @@ async function cfCarregar(c) {
   CF.fila[c.aba] = fila.map((l) => Object.assign({}, l.cartao_completo || {}, { id: l.id, nb: l.nb, f: l.f, gr: l.gr, fam: l.fam, g: l.g, mot: l.mot,
     r: l.r, ru: l.ru, rs: l.rs, i: Array.isArray(l.itens) ? l.itens : [] }));
   CF.feita[c.aba] = new Map(feita.map((x) => [x.ficha, x]));
+  // 12/11/2026 (dono, 06/10, livro pauta-da-semana/respostas/meta-lana: "30 produtos por semana, começando pelos que mais
+  // saem"): a venda de 30 dias é a mesma da tela Preço alvo (vw_margem_produto.qtd_vendida), somada por nome da base.
+  if (c.aba === 'PRODUTOS' && CF.venda === undefined) {
+    const v = await consultarTudo('vw_margem_produto?select=nome_base,produto,qtd_vendida').catch(() => null);
+    if (!v) CF.venda = null;
+    else { CF.venda = new Map(); v.forEach((x) => { const k = x.nome_base || x.produto; if (k) CF.venda.set(k, (CF.venda.get(k) || 0) + (Number(x.qtd_vendida) || 0)); }); }
+  }
   if (!CF.nomes) {
     const [a, b] = await Promise.all([consultarTudo('ft_item_base?select=nome_base&order=nome_base').catch(() => []),
                                       consultarTudo('ft_receita_base?select=nome_base&order=nome_base').catch(() => [])]);
@@ -4134,18 +4150,29 @@ function cfRender(id) {
   const feitas = L.filter((i) => cfFeito(c, i)).length;
   const comecadas = L.filter((i) => cfComecada(c, i, rasc, resp));
   const b = CF.busca.toLowerCase();
-  const lista = L.filter((i) => (CF.filtro === 'todas' || (CF.filtro === 'feitas') === !!cfFeito(c, i)) && (!b || (i.nb || '').toLowerCase().includes(b)));
+  let lista = L.filter((i) => (CF.filtro === 'todas' || (CF.filtro === 'feitas') === !!cfFeito(c, i)) && (!b || (i.nb || '').toLowerCase().includes(b)));
+  const ehProd = id === 'produtos', porVenda = ehProd && CF.venda && CF.ordem === 'venda';
+  if (porVenda) lista = [...lista].sort((x, y) => cfVendeu(y) - cfVendeu(x));
   const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px;';
   const J = (v) => trEscH(JSON.stringify(v));
   let h = `<div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px;">
       <b style="font-size:16px; color:${feitas === L.length && L.length ? 'var(--farol-ok)' : 'var(--tx-1)'};">${feitas} de ${L.length} conferidas</b>
       <span style="font-size:12px; color:var(--tx-4);">quem conferiu e quando vêm do login de cada uma</span></div>
     <div style="height:8px; background:var(--surface-2); border-radius:6px; overflow:hidden; margin:6px 0 10px;"><div style="height:100%; width:${L.length ? Math.round(feitas / L.length * 100) : 0}%; background:var(--farol-ok);"></div></div>`;
+  if (ehProd) {
+    const s = cfSegunda();
+    const semana = L.filter((i) => { const fe = cfFeito(c, i); return fe && /lana/i.test(fe.quem || '') && fe.conferido_em && new Date(fe.conferido_em) >= s.quando; }).length;
+    const ok = semana >= CF_META_LANA;
+    h += `<div class="contexto" style="text-align:left; border-color:${ok ? 'var(--farol-ok)' : 'var(--farol-perto)'};">
+      <b style="color:${ok ? 'var(--farol-ok)' : 'var(--tx-1)'};">Meta da Lana: ${semana} de ${CF_META_LANA} nesta semana${ok ? ' ✓' : ''}</b>
+      <span style="font-size:12px; color:var(--tx-4);"> · desde seg ${s.dm} · ${CF.venda ? 'os que mais vendem primeiro' : 'a venda não abriu, lista em ordem alfabética'}</span></div>`;
+  }
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
   h += `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
       ${[['falta', 'falta conferir', L.length - feitas], ['feitas', 'conferidas', feitas], ['todas', 'todas', L.length]].map(([k, r, n]) => `<button class="preset-btn${CF.filtro === k ? ' active' : ''}" onclick="CF.filtro='${k}'; cfRender('${id}');">${r} · ${n}</button>`).join('')}
+      ${ehProd && CF.venda ? `<button class="preset-btn" onclick="CF.ordem=CF.ordem==='venda'?'az':'venda'; cfRender('${id}');">ordem: ${porVenda ? 'mais vendidos' : 'A–Z'} ⇅</button>` : ''}
       <input id="cfBusca" placeholder="buscar pelo nome" value="${trEscH(CF.busca)}" oninput="cfBuscar('${id}', this.value)" style="flex:1 1 200px; ${campo}"></div>
     <datalist id="cfNomes">${(CF.nomes || []).map((n) => `<option value="${trEscH(n)}">`).join('')}</datalist>`;
   if (!lista.length) h += `<div class="contexto" style="border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">${CF.filtro === 'falta' && !b ? '✓ Nada falta conferir aqui.' : 'Nada com esse filtro.'}</b></div>`;
@@ -4160,6 +4187,7 @@ function cfRender(id) {
           ${fe ? `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ ${fe.nao_fazemos_mais ? 'não fazemos mais' : 'conferida'} · ${trEscH(estNome(fe.quem) || fe.quem || '')} · ${embQuando(fe.conferido_em)}</span>`
                : com ? `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">começada, não enviada</span>`
                : `<span style="font-size:12px; color:var(--tx-3);">${trEscH(c.st[i.g] || i.g || '')}</span>`}
+          ${ehProd && CF.venda ? `<span style="font-size:12px; color:var(--tx-3);">${cfVendeu(i).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} vendidos em 30 dias</span>` : ''}
           <span style="font-size:12px; color:var(--tx-4);">${i.i.length} ${i.i.length === 1 ? 'ingrediente' : 'ingredientes'} ${ab ? '▾' : '▸'}</span></div></div>`;
     if (ab) {
       const saipos = c.rende && i.g !== 'sem_lote';
