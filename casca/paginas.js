@@ -40,7 +40,7 @@ window.CASCA_PAGINAS = {
   phoje: 'pessoas/index.html#phoje',
   pao: 'pessoas/index.html#pao',   // 12/11/2026: Ponto ao Vivo (RH), leitura de rh_flash_batida
   padm: 'pessoas/index.html#padm',
-  atividades: 'atividades/index.html',
+  // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
   agenda: 'agenda/index.html',
   notasfaltam: 'notas/index.html',   // 12/11/2026: notas sem conta / sem entrada (tarefas 30 e 82 da Rita)
   cargos: 'pessoas/index.html#cargos',

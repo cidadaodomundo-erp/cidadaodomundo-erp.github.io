@@ -484,11 +484,6 @@ window.CASCA_MENU = [
     "icone": "✅"
    },
    {
-    "chave": "atividades",
-    "rotulo": "Controle das atividades",
-    "icone": "📋"
-   },
-   {
     "chave": "agenda",
     "rotulo": "Minha agenda",
     "icone": "🗓️"

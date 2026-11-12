@@ -74,9 +74,9 @@ window.CASCA_BUSCA = {
   listasfin: ['lista financeiro', 'cobranca entre lojas', 'acerto entre lojas'],
   relatorios: ['resumo semanal', 'relatorio'],
   conciliacao: ['base', 'conferencia da base', 'auditoria'],
-  atividades: ['atividades da equipe', 'tarefas', 'whatsapp', 'avisos', 'quem fez'],
   agenda: ['agenda', 'minha agenda', 'o que fazer', 'pendencias', 'depende de mim', 'hoje',
-    'plano', 'plano de acao', 'em desenvolvimento', 'desenvolvimentos', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'prioridades'],   // 12/11: o Plano entrou na agenda
+    'plano', 'plano de acao', 'em desenvolvimento', 'desenvolvimentos', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'prioridades',
+    'atividades da equipe', 'controle das atividades', 'tarefas', 'whatsapp', 'avisos', 'quem fez', 'equipe', 'travada'],   // 12/11 16:55: as atividades entraram na agenda   // 12/11: o Plano entrou na agenda
   notasfaltam: ['notas', 'nota fiscal', 'nf', 'sem conta', 'sem entrada', 'entrada no estoque', 'conta a pagar da nota', 'compras'],
   rotinas: ['rotina', 'robo', 'mini pc', 'automacao'],
   telas: ['telas', 'menu', 'uso do painel'],

@@ -231,7 +231,7 @@ function agDesenhar() {
   agRolarAteItem();
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
-  agEquipeMontar().then(agGuia);
+  agEquipeMontar().then(agGuia).then(() => agAtivMontar());
   agPlanoMontar();
 }
 function agFiltrar(k) { AG.soNovos = false; try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
@@ -436,15 +436,19 @@ async function agPlanoMontar(reler) {
 // com ?aba=desenvolvimentos e a tela rola até o bloco. O cartão mostra uma linha; o detalhe (o que é, andamento de hoje,
 // depende de, prova do pronto) abre ao clicar. Colunas andamento/andamento_em/dependencia/evidencia: aparecem quando a view tiver.
 let AG_DESENV_IR = (() => { try { return new URLSearchParams(location.search).get('aba') === 'desenvolvimentos'; } catch (e) { return false; } })();
+// 12/11/2026 (dono 16:55): idem para #atividades, que abre o bloco Equipe (agAtiv)
+let AG_ATIV_IR = (() => { try { return new URLSearchParams(location.search).get('aba') === 'atividades'; } catch (e) { return false; } })();
 // a casca abre a página escondida e só depois mostra: espera estar à vista (até ~6 s) e rola de novo 1 s depois (a agenda cresce)
-function agIrDesenv(n) {
-  n = n || 0; const el = document.getElementById('agDesenv');
+function agIrDesenv(n) { return agIrBloco('agDesenv', n); }
+function agIrAtiv(n) { return agIrBloco('agAtiv', n); }
+function agIrBloco(id, n) {
+  n = n || 0; const el = document.getElementById(id);
   let oculta = false; try { oculta = !!(window.frameElement && window.frameElement.hidden); } catch (e) {}
-  if (!el && n === 0) { AG_DESENV_IR = true; return; }
-  if ((!el || oculta) && n < 15) { setTimeout(() => agIrDesenv(n + 1), 400); return; }
+  if (!el && n === 0) { if (id === 'agAtiv') AG_ATIV_IR = true; else AG_DESENV_IR = true; return; }
+  if ((!el || oculta) && n < 15) { setTimeout(() => agIrBloco(id, n + 1), 400); return; }
   if (!el) return;
   el.scrollIntoView({ block: 'start' });
-  if (n < 100) setTimeout(() => { const e2 = document.getElementById('agDesenv'); if (e2) e2.scrollIntoView({ block: 'start' }); }, 1000);
+  if (n < 100) setTimeout(() => { const e2 = document.getElementById(id); if (e2) e2.scrollIntoView({ block: 'start' }); }, 1000);
 }
 function agDevDet(d) {
   const quando = (t) => t ? agDm(String(t).slice(0, 10)) : '';
@@ -637,6 +641,66 @@ async function agEquipeVer(email) {
     lista.innerHTML = `<div class="ag-bloco">Agenda de ${agE(pes.pessoa || email)} <span class="f">· só leitura: os botões são dela</span></div>`
       + (L.length ? agPessoaHtml(L, true) : '<div class="contexto">Nenhuma atividade aberta para esta pessoa nos próximos 7 dias.</div>');
   } catch (e) { lista.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ ${agE(e.message)}</div>`; }
+}
+
+// =====================================================================================================================
+// BLOCO "EQUIPE" (dono 12/11/2026 16:55: "pode pedir ao telas o Agora conforme sugeriu"). O antigo "Controle das atividades"
+// (docs/atividades, de 02/11) entrou aqui: o que está com cada pessoa pelo WhatsApp do robô e o estado. Só o dono: o bloco só
+// é montado para souODono() e a vw_wa_atividade só devolve linhas ao login do dono. #atividades na casca abre a agenda aqui.
+// =====================================================================================================================
+const AGA_ABERTOS = ['Travada', 'Respondeu', 'Enviada', 'A enviar'];
+const AGA_ORDEM = AGA_ABERTOS.concat(['Feita', 'Cancelada']);
+const AGA_COR = { Travada: 'var(--farol-fora)', Respondeu: 'var(--farol-perto)', Enviada: 'var(--tx-1)', 'A enviar': 'var(--tx-3)', Feita: 'var(--farol-ok)', Cancelada: 'var(--tx-4)' };
+const AGA = { linhas: null, filtro: null, fechadas: false, erro: null, lidoEm: 0 };
+async function agAtivMontar(reler) {
+  const alvo = document.getElementById('view-agenda');
+  if (!alvo || !souODono()) return;
+  if (reler || AGA.linhas === null || Date.now() - AGA.lidoEm > 60000) {
+    try { AGA.linhas = await consultarTudo('vw_wa_atividade?select=*&order=pessoa,id.desc'); AGA.erro = null; }
+    catch (e) { AGA.erro = e.message; if (!Array.isArray(AGA.linhas)) AGA.linhas = []; }
+    AGA.lidoEm = Date.now();
+  }
+  let box = document.getElementById('agAtiv');
+  if (!box) { box = document.createElement('div'); box.id = 'agAtiv'; box.className = 'ag-eq'; alvo.appendChild(box); }
+  agAtivDesenhar();
+  if (AG_ATIV_IR) { AG_ATIV_IR = false; agIrAtiv(); }
+}
+function agAtivFiltrar(e) { AGA.filtro = AGA.filtro === e ? null : e; agAtivDesenhar(); }
+function agAtivDesenhar() {
+  const box = document.getElementById('agAtiv'); if (!box) return;
+  const dia = (t) => (t ? new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null);
+  const hoje = agHoje();
+  const dias = (x) => { const d = dia(x.enviada_em); if (!d || ['A enviar', 'Feita', 'Cancelada'].includes(x.estado)) return '–';
+    const n = Math.round((Date.parse(hoje) - Date.parse(d)) / 86400000); return n <= 0 ? 'hoje' : `${n} ${n === 1 ? 'dia' : 'dias'}`; };
+  const falta = (x) => x.falta_agora == null && x.falta_inicial == null ? '–'
+    : x.falta_inicial == null ? String(x.falta_agora) : `${x.falta_agora == null ? '?' : x.falta_agora} de ${x.falta_inicial}`;
+  const L0 = Array.isArray(AGA.linhas) ? AGA.linhas : [];
+  let h = `<div class="ag-bloco" style="margin-top:0;">Equipe <span class="f">· o que o robô passou a cada pessoa pelo WhatsApp e em que pé está; quem muda o estado é o robô</span></div>`;
+  if (AGA.erro) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler as atividades da equipe: ${agE(AGA.erro)} <button type="button" class="preset-btn" onclick="agAtivMontar(true)">Tentar de novo</button></div>`;
+  if (!L0.length) { box.innerHTML = h + (AGA.erro ? '' : '<div class="contexto" style="text-align:left;">Nenhuma atividade com a equipe.</div>'); return; }
+  const n = (e) => L0.filter((x) => x.estado === e).length;
+  h += `<div class="cards">${AGA_ABERTOS.map((e) => `<div class="card ${e === 'Travada' && n(e) ? 'highlight' : 'neutral'}" style="cursor:pointer;${AGA.filtro === e ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agAtivFiltrar('${e}')"><div class="card-lbl">${e}</div><div class="card-val">${n(e)}</div></div>`).join('')}</div>`;
+  const nFech = n('Feita') + n('Cancelada');
+  const vis = L0.filter((x) => (AGA.filtro ? x.estado === AGA.filtro : AGA.fechadas || AGA_ABERTOS.includes(x.estado)));
+  const ordem = (x) => { const i = AGA_ORDEM.indexOf(x.estado); return i < 0 ? 99 : i; };
+  const pessoas = [...new Set(vis.map((x) => x.pessoa))].sort((a, b) => {
+    const m = (p) => Math.min(...vis.filter((x) => x.pessoa === p).map(ordem));
+    return m(a) - m(b) || String(a).localeCompare(String(b), 'pt-BR');
+  });
+  if (!vis.length) h += '<div class="contexto" style="text-align:left;">Nada neste estado.</div>';
+  pessoas.forEach((p, i) => {
+    const L = vis.filter((x) => x.pessoa === p).sort((a, b) => ordem(a) - ordem(b));
+    h += `<div style="margin:14px 2px 4px;color:var(--tx-1);font-size:14px;font-weight:800;">${agE(p)} <span style="font-size:11.5px;font-weight:400;color:var(--tx-4);">(${L.length})</span></div>
+      <div id="tabelaAgAt${i}" style="overflow-x:auto;"><table><thead><tr><th>Atividade</th><th>Estado</th><th>Enviada em</th><th>Há quantos dias</th><th>Falta</th><th>Resposta</th></tr></thead><tbody>
+      ${L.map((x) => `<tr><td style="white-space:normal;">${agE(x.atividade || '')}</td>
+        <td style="color:${AGA_COR[x.estado] || 'var(--tx-3)'};font-weight:700;">${agE(x.estado || '')}</td>
+        <td>${x.estado === 'A enviar' ? (x.previsto_em ? 'previsto ' + agDm(dia(x.previsto_em)) : '–') : (agDm(dia(x.enviada_em)) || '–')}</td>
+        <td>${dias(x)}</td><td>${agE(falta(x))}</td>
+        <td style="white-space:normal;">${agE(x.resposta || '')}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  });
+  if (!AGA.filtro && nFech) h += `<div style="margin:12px 2px;font-size:13px;"><a href="javascript:void(0)" style="color:var(--tx-3);" onclick="AGA.fechadas=!AGA.fechadas;agAtivDesenhar()">${AGA.fechadas ? 'esconder' : 'ver'} feitas e canceladas (${nFech})</a></div>`;
+  box.innerHTML = h;
 }
 
 // =====================================================================================================================

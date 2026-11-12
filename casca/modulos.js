@@ -32,7 +32,7 @@ window.CASCA_MODULOS_CFG = {
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'vendasagora', 'atividades'] },   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'vendasagora'] },   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
