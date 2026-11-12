@@ -6,6 +6,10 @@
 // Modulo Rotinas: o que esta rodando agora e como terminou da ultima vez.
 // As rotinas gravam inicio/fim em rotinas_execucao (ver rotinas/REGISTRO-EXECUCAO.md),
 // entao o painel responde "ja rodou?" sem precisar perguntar no chat.
+// 12/11/2026 (auditoria de usabilidade): a LISTA da tela vem do banco — toda rotina que gravou em rotinas_execucao nos
+// últimos 35 dias (o mini PC tem 29 do Claude). Esta constante só dá NOME e HORÁRIO às conhecidas; rotina nova aparece
+// sozinha com o nome do registro. Horários: contexto/project_cronograma_rotinas.md.
+const ROTINAS_JANELA_DIAS = 35;
 const ROTINAS_CONHECIDAS = [
   // Grade vigente (24/08/2026) — fonte: contexto/project_cronograma_rotinas.md
   { id: 'manutencao-mensal-banco',           nome: 'Manutenção do banco',    quando: 'Dia 1º, 03:20' },
@@ -13,13 +17,13 @@ const ROTINAS_CONHECIDAS = [
   // Lembrete, nao execucao: avisa o dono de trocar Anuncios e Campanha Inteligente.
   // Nao toca o portal, por isso pode rodar antes das 10:00 sem ferir a regra do dono.
   { id: 'alerta-troca-promocoes',            nome: 'Aviso de troca de promos', quando: 'Seg e sex 09:00' },
-  { id: 'extracao-diaria-pedidos',           nome: 'Extração de pedidos',    quando: 'Todo dia 10:00' },
+  { id: 'extracao-diaria-pedidos',           nome: 'Extração de pedidos',    quando: 'desligada desde 30/10' },
   { id: 'contestacao-diaria-cancelamentos',  nome: 'Contestação',            quando: 'Todo dia 11:30' },
   // 01/09/2026: o id estava em 'conciliacao-bancaria-diaria', rotina REVOGADA em
   // 28/08 quando ela e a de lançamento viraram uma só. Resultado: a linha da
   // conciliação aparecia como "nunca registrada" e a rotina que roda de verdade
   // não aparecia — cinco dias de execuções invisíveis nesta tela.
-  { id: 'conciliacao-e-lancamento-diario',   nome: 'Conciliação e lançamento', quando: 'Seg–sex, 20 em 20 min das 09:00 às 16:40 (mini PC)' },
+  { id: 'conciliacao-e-lancamento-diario',   nome: 'Conciliação e lançamento', quando: 'Seg–sex, de 10 em 10 min' },
   { id: 'extracao-diaria-promocoes',         nome: 'Extração de promoções',  quando: 'Todo dia 12:30' },
   // 08/10/2026: exporta do Saipos a Movimentacao de estoque das 3 lojas e carrega no banco
   // (rotinas/extracao-diaria-estoque-saipos.md). Sem esta linha, PARCIAL e PULADA dela nao
@@ -30,7 +34,12 @@ const ROTINAS_CONHECIDAS = [
   { id: 'extracao-semanal-relatorios-rede',  nome: 'Relatórios da rede',     quando: 'Terça 14:00' },
   { id: 'extracao-semanal-conciliacao',      nome: 'Conciliação iFood',      quando: 'Quinta 14:00' },
   { id: 'extracao-mensal-clientes',          nome: 'Extração de clientes',   quando: 'Dia 03, 13:30' },
+  { id: 'boletim-rotinas',                   nome: 'Boletim das rotinas',    quando: 'Todo dia 13:00 e 18:00' },
 ];
+// nome da rotina: o da lista acima ou o id do registro em português corrido ("extracao-semanal-x" → "Extracao semanal x")
+const rotNome = (id) => (ROTINAS_CONHECIDAS.find((r) => r.id === id) || {}).nome
+  || String(id || '').replace(/[-_]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+let ROT_SO_PROBLEMAS = false;
 
 let ROTINAS_TIMER = null;
 
@@ -62,6 +71,12 @@ async function carregarRotinas() {
 function renderModuloRotinas(status, historico, batimento = []) {
   const alvo = document.getElementById('view-rotinas');
   const porId = Object.fromEntries(status.map(r => [r.rotina, r]));
+  // a lista: o que rodou na janela (ou está rodando), problema primeiro, depois pelo nome
+  const limite = Date.now() - ROTINAS_JANELA_DIAS * 86400000;
+  const PESO = { TRAVADA: 0, FALHOU: 1, PARCIAL: 2, PULADA: 3, RODANDO: 4 };
+  const lista = status.filter(r => r.status === 'RODANDO' || (r.inicio && Date.parse(r.inicio) >= limite))
+    .map(r => ({ id: r.rotina, nome: rotNome(r.rotina), quando: (ROTINAS_CONHECIDAS.find(c => c.id === r.rotina) || {}).quando || '—' }))
+    .sort((a, b) => (PESO[porId[a.id].status] ?? 9) - (PESO[porId[b.id].status] ?? 9) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const porBatimento = Object.fromEntries(batimento.map(b => [b.rotina, b]));
 
   const dtHora = (v) => v ? new Date(v).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
@@ -72,23 +87,22 @@ function renderModuloRotinas(status, historico, batimento = []) {
   // Dois numeros no alto (12/09/2026): a tabela ja tem tudo, mas obriga a ler 11
   // linhas para saber se o dia foi bem. Estes dois respondem de cara.
   const hojeLocal = diaLocal(new Date());
-  const situacoes = ROTINAS_CONHECIDAS.map(r => porId[r.id]).filter(Boolean);
+  const situacoes = lista.map(r => porId[r.id]).filter(Boolean);
   const okHoje = situacoes.filter(x => x.status === 'OK' && diaLocal(x.inicio) === hojeLocal).length;
-  // O denominador e' quem RODOU hoje, nunca as 12 conhecidas: 7 das 12 sao semanais
-  // ou mensais, e num dia perfeito "5 de 12" leria como 7 rotinas com problema.
+  // O denominador e' quem RODOU hoje, nunca a lista toda: parte e' semanal ou mensal.
   const rodaramHoje = situacoes.filter(x => diaLocal(x.inicio) === hojeLocal).length;
   const pedemAtencao = situacoes.filter(x => ['FALHOU', 'TRAVADA', 'PARCIAL', 'PULADA'].includes(x.status)).length;
   const badge = (st) => ({
     RODANDO:  '<span style="color:var(--farol-perto); font-weight:bold;">● rodando agora</span>',
     OK:       '<span style="color:var(--farol-ok); font-weight:bold;">✔ concluída</span>',
     FALHOU:   '<span style="color:var(--farol-fora); font-weight:bold;">✖ falhou</span>',
-    PULADA:   '<span style="color:#8a897e; font-weight:bold;">— pulada</span>',
+    PULADA:   '<span style="color:var(--tx-4); font-weight:bold;">— pulada</span>',
     // PARCIAL (01/09/2026): fez o trabalho mas não deixou a prova no banco —
     // rastro, aviso ou conferência faltando. Quem grava é fechar_execucao.py,
     // que rebaixa o OK em vez de aceitar a palavra da rotina.
     PARCIAL:  '<span style="color:var(--farol-perto); font-weight:bold;">◐ sem prova completa</span>',
     TRAVADA:  '<span style="color:var(--farol-fora); font-weight:bold;">✖ não finalizou</span>',
-  }[st] || `<span style="color:#8a897e;">${st}</span>`);
+  }[st] || `<span style="color:var(--tx-4);">${st}</span>`);
 
   // Coluna "o que fazer" (12/09/2026): situacao ruim sem a acao ao lado obriga a
   // lembrar o conserto de cabeca. Duas regras, as duas com conserto conhecido:
@@ -98,12 +112,13 @@ function renderModuloRotinas(status, historico, batimento = []) {
   // vw_rotinas_status ja a devolve como TRAVADA.
   const oQueFazer = (s) => {
     const txt = `${s.resumo || ''} ${s.detalhe || ''}`.toLowerCase();
-    if (s.status === 'TRAVADA') return 'não finalizou por reinício — rodar <b>script/faxina_rotinas_orfas.py</b> no mini PC';
-    if (s.status === 'PULADA' && txt.includes('dono logar')) return 'o dono precisa logar no Chrome do mini PC e reexecutar';
+    // 12/11/2026 (auditoria): ação de operador, sem comando técnico — a faxina roda sozinha antes de cada fila (§A6)
+    if (s.status === 'TRAVADA') return 'parou num reinício do mini PC — o robô limpa sozinho na próxima rodada';
+    if (s.status === 'PULADA' && txt.includes('dono logar')) return 'logar o Chrome do mini PC (o boletim avisa quando)';
     return '';
   };
 
-  const rodando = ROTINAS_CONHECIDAS.filter(r => porId[r.id] && porId[r.id].status === 'RODANDO');
+  const rodando = lista.filter(r => porId[r.id] && porId[r.id].status === 'RODANDO');
 
   // O batimento normal e' silencio. Situacoes de repouso (rotinas_batimento):
   // FIM = pegou o dia e fechou; SAIU = acordou e nao tinha trabalho; RODANDO =
@@ -126,15 +141,12 @@ function renderModuloRotinas(status, historico, batimento = []) {
 
   alvo.innerHTML = `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Rotinas automáticas</div>
-  <div class="caption-label" style="text-align:center;">
-    Atualiza sozinho a cada 30 segundos. Cada rotina grava início e fim ao rodar —
-    se aparecer <b>rodando agora</b>, ela está acontecendo neste momento.
-  </div>
+  <div class="caption-label" style="text-align:center;">atualiza a cada 30 s · as ${lista.length} que rodaram nos últimos ${ROTINAS_JANELA_DIAS} dias</div>
 
   <div class="cards">
     <div class="card ${rodaramHoje && okHoje === rodaramHoje ? 'pos' : 'neutral'}"><div class="card-lbl">Terminaram bem hoje</div>
       <div class="card-val">${okHoje}</div>
-      <div class="card-pct" title="Rotinas cuja última execução começou hoje (horário de São Paulo) e terminou em OK. O total ao lado é quantas rodaram hoje — das ${ROTINAS_CONHECIDAS.length} conhecidas, 7 são semanais ou mensais e não rodam todo dia.">de ${rodaramHoje} que rodaram hoje</div></div>
+      <div class="card-pct" title="Rotinas cuja última execução começou hoje e terminou bem, de quantas rodaram hoje (as semanais e mensais não rodam todo dia).">de ${rodaramHoje} que rodaram hoje</div></div>
     <div class="card ${pedemAtencao ? 'neg' : 'pos'}"><div class="card-lbl">Pedindo atenção agora</div>
       <div class="card-val">${pedemAtencao}</div>
       <div class="card-pct" title="Última execução em FALHOU, TRAVADA (não finalizou), PARCIAL (sem prova completa) ou PULADA.">${pedemAtencao ? 'na tabela abaixo' : 'nada pendente'}</div></div>
@@ -156,20 +168,17 @@ function renderModuloRotinas(status, historico, batimento = []) {
     <ul style="margin:6px 0 0 0;">
       ${batimento.map(b => `<li style="font-size:12px;">
         <b>${b.rotina}</b> — ${b.situacao} em ${dtHora(b.acordou_em)}
-        <span style="color:${Number(b.ha_seg) > 86400 ? 'var(--farol-fora)' : '#8a897e'};">
+        <span style="color:${Number(b.ha_seg) > 86400 ? 'var(--farol-fora)' : 'var(--tx-4)'};">
           (há ${dur(Number(b.ha_seg))})</span>
-        ${b.motivo ? `<br><span style="color:#8a897e;">${b.motivo}</span>` : ''}
+        ${b.motivo ? `<br><span style="color:var(--tx-4);">${b.motivo}</span>` : ''}
       </li>`).join('')}
     </ul></details>
   </div>` : ''}
 
   <div id="tabelaRotinas"><table>
-    <tr><th>Rotina</th><th>Agenda</th><th>Situação</th><th>Última execução</th><th>Duração</th><th>Resultado</th><th>O que fazer</th></tr>
-    ${ROTINAS_CONHECIDAS.map(r => {
+    <thead><tr><th>Rotina</th><th>Agenda</th><th>Situação</th><th>Última execução</th><th>Duração</th><th>Resultado</th><th>O que fazer</th></tr></thead><tbody>
+    ${lista.map(r => {
       const s = porId[r.id];
-      if (!s) return `<tr><td>${r.nome}</td><td style="font-size:11.5px;">${r.quando}</td>
-        <td style="color:#8a897e;">nunca registrada</td><td>—</td><td>—</td>
-        <td style="font-size:11px; color:#8a897e;">passa a registrar na próxima execução</td><td>—</td></tr>`;
       const fazer = oQueFazer(s);
       return `<tr>
         <td>${r.nome}</td>
@@ -177,25 +186,25 @@ function renderModuloRotinas(status, historico, batimento = []) {
         <td>${badge(s.status)}${Number(s.falhas_30d) ? ` <span style="font-size:10px; color:var(--farol-fora);">(${s.falhas_30d} falha(s) em 30d)</span>` : ''}</td>
         <td>${dtHora(s.inicio)}</td>
         <td>${dur(s.duracao_seg)}</td>
-        <td style="font-size:11.5px;">${s.resumo || '—'}${s.detalhe ? `<br><span style="font-size:10.5px; color:#8a897e;">${s.detalhe}</span>` : ''}</td>
+        <td style="font-size:11.5px;">${s.resumo || '—'}${s.detalhe ? `<br><span style="font-size:11px; color:var(--tx-4);">${s.detalhe}</span>` : ''}</td>
         <td style="font-size:11.5px;${fazer ? ' color:var(--farol-perto);' : ''}" title="O conserto conhecido dessa situação. Vazio quer dizer que não há ação fixa: leia o resultado ao lado.">${fazer || '—'}</td>
       </tr>`;
     }).join('')}
-  </table></div>
+  </tbody></table></div>
 
   <div class="section-label">Histórico</div>
-  ${historico.length ? `<div id="tabelaRotinasHist"><table>
-    <tr><th>Quando</th><th>Rotina</th><th>Situação</th><th>Resultado</th></tr>
-    ${historico.map(h => `<tr>
+  ${historico.length ? `<div style="margin:4px 2px 6px; font-size:13px;">
+    <button type="button" class="preset-btn ${ROT_SO_PROBLEMAS ? '' : 'active'}" onclick="ROT_SO_PROBLEMAS=false; carregarRotinas();">todas</button>
+    <button type="button" class="preset-btn ${ROT_SO_PROBLEMAS ? 'active' : ''}" onclick="ROT_SO_PROBLEMAS=true; carregarRotinas();">só problemas</button></div>
+  <div id="tabelaRotinasHist"><table>
+    <thead><tr><th>Quando</th><th>Rotina</th><th>Situação</th><th>Resultado</th></tr></thead><tbody>
+    ${(ROT_SO_PROBLEMAS ? historico.filter(h => ['FALHOU', 'TRAVADA', 'PARCIAL', 'PULADA'].includes(h.status)) : historico).map(h => `<tr>
       <td>${dtHora(h.inicio)}</td>
-      <td style="font-size:11.5px;">${(ROTINAS_CONHECIDAS.find(r => r.id === h.rotina) || {}).nome || h.rotina}</td>
+      <td style="font-size:11.5px;">${rotNome(h.rotina)}</td>
       <td>${badge(h.status)}</td>
-      <td style="font-size:11.5px;">${h.resumo || '—'}${h.detalhe ? `<br><span style="font-size:10.5px; color:#8a897e;">${h.detalhe}</span>` : ''}</td>
-    </tr>`).join('')}
-  </table></div>` : '<div class="contexto">Nenhuma execução registrada ainda.</div>'}
-
-  <div class="caption-label" style="text-align:center;">A contestação só roda se a extração do dia tiver completado —
-  se aparecer <b>pulada</b>, foi essa trava agindo, e basta rodar a extração antes.</div>`;
+      <td style="font-size:11.5px;">${h.resumo || '—'}${h.detalhe ? `<br><span style="font-size:11px; color:var(--tx-4);">${h.detalhe}</span>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="4">nenhum problema nas últimas 40 execuções</td></tr>'}
+  </tbody></table></div>` : '<div class="contexto">Nenhuma execução registrada ainda.</div>'}`;
 }
 
 // ============ PLANO ============
