@@ -91,6 +91,11 @@
   .mi.on { background:var(--brand); color:var(--tx-1); }
   .mi:focus-visible, .grp:focus-visible, .btn:focus-visible, .card:focus-visible { outline:2px solid var(--marca-amarelo); outline-offset:1px; }
   .mi .ic { width:18px; text-align:center; flex-shrink:0; font-size:13px; }
+  /* 12/11/2026: setores dentro do "Sistema operacional do Fábio" (casca/setores-fabio.js); tela com integração pendente fica sem botão ativo */
+  .sub-setor { color:var(--tx-6); font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; padding:8px 12px 2px; }
+  .mi[disabled] { opacity:.5; cursor:default; }
+  .mi[disabled]:hover { background:none; color:var(--tx-2); }
+  .mi .obs { margin-left:auto; font-size:10.5px; font-weight:600; color:var(--tx-5); }
   .sinal { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; background:var(--farol-fora); color:var(--bg); font-size:11px; font-weight:700; line-height:18px; text-align:center; flex-shrink:0; }
   .grp .sinal { margin-left:8px; }
   .grp { display:flex; align-items:center; width:100%; background:none; border:none; border-top:1px solid var(--line);
@@ -250,8 +255,9 @@
 </div>
 
 <script src="casca/menu.js?v=20261107a"></script>
-<script src="casca/paginas.js?v=20261112a"></script>
+<script src="casca/paginas.js?v=20261112b"></script>
 <script src="casca/modulos.js?v=20261112b"></script>
+<script src="casca/setores-fabio.js?v=20261112a"></script>
 <script src="casca/busca.js?v=20261112b"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -281,6 +287,10 @@ ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliaçõe
 const MOD_CFG = window.CASCA_MODULOS_CFG || {};
 Object.entries(MOD_CFG.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
 Object.entries(MOD_CFG.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
+// 12/11/2026 (Fabio): setores e atalhos do portal antigo do agrupamento "Sistema operacional do Fábio" (casca/setores-fabio.js).
+// Atalho = link externo https, sem tela nem dado aqui; entra na sobra (não está em módulo nenhum) e cai no setor dele.
+const SETORES_CFG = window.CASCA_SETORES_FABIO || {};
+Object.entries(SETORES_CFG.atalhos || {}).forEach(([k, v]) => { if (!ITENS[k] && /^https:\/\//.test(String(v.link || ''))) ITENS[k] = Object.assign({ grupo: null }, v); });
 // JUNÇÕES (dono 12/11/2026 00:32): um item no menu, as telas antigas viram abas dele (casca/modulos.js, juncoes). A aba que
 // não é o próprio item sai do menu e da busca (FORA_DO_MENU), mas o endereço dela continua abrindo a aba.
 const JUNCOES = MOD_CFG.juncoes || {};
@@ -296,8 +306,28 @@ const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []
 (function outrasTelas() {
   const usadas = new Set(MODULOS.flatMap((m) => [...(m.lancar || []), ...(m.acompanhar || [])]));
   const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k) && !FORA_DO_MENU.has(k));
-  if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Sistema operacional do Fábio', icone: '📁', lancar: [], acompanhar: sobra });
+  if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Sistema operacional do Fábio', icone: '📁', lancar: [], acompanhar: sobra, setores: setoresDe(sobra) });
 })();
+// 12/11/2026 (Fabio): os setores só ARRUMAM a sobra para mostrar; a lista do agrupamento (acompanhar) continua a sobra inteira.
+// Cada tela entra em um setor só; o que não estiver em setor nenhum vai para "Demais telas".
+function setoresDe(sobra) {
+  const ja = new Set();
+  const lista = (SETORES_CFG.setores || []).map((s) => {
+    const chaves = (s.chaves || []).filter((k) => sobra.includes(k) && !ja.has(k));
+    chaves.forEach((k) => ja.add(k));
+    return { id: s.id, nome: s.nome, icone: s.icone, chaves };
+  }).filter((s) => s.chaves.length);
+  const resto = sobra.filter((k) => !ja.has(k));
+  const d = SETORES_CFG.demais || { id: 'demais', nome: 'Demais telas', icone: '📁' };
+  if (resto.length) lista.push({ id: d.id, nome: d.nome, icone: d.icone, chaves: resto });
+  return lista;
+}
+// tela do agrupamento do Fábio com integração pendente (sem rota em casca/paginas.js, mesmo que o arquivo exista): sem botão ativo, nunca abre a moldura
+// do painel antigo (dashboard.html virou redirecionamento e, numa moldura, só mostra "esta tela mudou de lugar")
+function semPagina(k) {
+  const it = ITENS[k], o = MODULOS.find((m) => m.id === 'outras');
+  return !!(it && o && o.acompanhar.includes(k) && !it.link && !JUNCOES[k] && !PAGINAS[k]);
+}
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';
 function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && alvoMenu(k)); }
 let PODE = null;                        // null = vê tudo (regra do painel_acesso)
@@ -452,7 +482,9 @@ function visivel(chave) {
   // devolve o que é da própria pessoa, então ela não depende da lista de telas do painel_acesso (nenhum login restrito a tinha)
   if (chave === 'agenda') return true;
   if (!PODE) return true;
-  if (it.link) return false;                     // atalhos também somem para acesso restrito (igual ao painel)
+  // atalhos também somem para acesso restrito (igual ao painel). 12/11/2026: atalho do portal antigo (casca/setores-fabio.js)
+  // só aparece se a PRÓPRIA chave dele estiver na lista do login — nunca por ter outra chave (ex.: 'delivery')
+  if (it.link) return !!it.autorizavelPorChave && PODE.includes(chave);
   return PODE.includes(chave);
 }
 let GRUPOS_ABERTOS = {};
@@ -474,9 +506,15 @@ function desenharMenu() {
     const tem = itens.some((i) => emItem(i.chave));
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
     h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}${aberto ? '' : sinalHtml(itens.reduce((a, i) => a + (SINAIS[i.chave] || 0), 0))}<span class="seta">▶</span></button>`;
-    h += '<div class="itens">' + itens.map((i) =>
-      `<button class="mi${emItem(i.chave) ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`
-    ).join('') + '</div>';
+    const botao = (i) => semPagina(i.chave)
+      ? `<button class="mi" type="button" disabled title="Integração pendente: acesso ainda não conectado nesta casca"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}<span class="obs">integração pendente</span></button>`
+      : `<button class="mi${emItem(i.chave) ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`;
+    // 12/11/2026: o agrupamento do Fábio mostra as telas por setor (mesmas telas, mesma ordem dentro do setor)
+    const corpo = g.setores
+      ? g.setores.map((s) => { const ks = s.chaves.filter((k) => itens.some((i) => i.chave === k));
+          return ks.length ? `<div class="sub-setor">${esc(s.icone)} ${esc(s.nome)}</div>` + ks.map((k) => botao(itens.find((i) => i.chave === k))).join('') : ''; }).join('')
+      : itens.map(botao).join('');
+    h += '<div class="itens">' + corpo + '</div>';
   });
   $('menu').innerHTML = h;
   $('miInicio').classList.toggle('on', ATUAL === null);
@@ -514,6 +552,7 @@ $('abasJuncao').addEventListener('click', (e) => { const b = e.target.closest('[
 // Acha TELA pelo nome, pelo grupo, pelas palavras de casca/busca.js e pela descrição da tela (painel_telas.responde, em DESC).
 // Sem acento, sem maiúscula. Só o que o login pode abrir (visivel). Enter abre a primeira (ou a marcada com as setas).
 const BUSCA_SIN = window.CASCA_BUSCA || {};
+Object.entries(SETORES_CFG.busca || {}).forEach(([k, v]) => { if (!BUSCA_SIN[k] && Array.isArray(v)) BUSCA_SIN[k] = v; });   // 12/11: só o que faltava
 const buscaNorm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9%]+/g, ' ').trim();
 const BUSCA_PARADAS = new Set(['a', 'o', 'as', 'os', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'para', 'pra', 'por', 'com', 'que', 'tela', 'ver', 'onde', 'como', 'qual', 'meu', 'minha']);
 let BUSCA_SEL = 0, BUSCA_ACHOU = [];
@@ -622,7 +661,9 @@ function abrir(chave, deDentro) {
   if (JUNCOES[chave]) { const a = alvoMenu(chave); if (a && a !== chave) { abrir(a, deDentro); return; } }
   const it = ITENS[chave];
   if (!it || !visivel(chave)) { inicio(); return; }
-  if (it.link) { window.open(it.link, '_blank', 'noopener'); return; }
+  // link: outra aba, sem referência à casca e sem levar token (12/11/2026: + noreferrer)
+  if (it.link) { window.open(it.link, '_blank', 'noopener,noreferrer'); return; }
+  if (semPagina(chave)) { inicio(); abrirModulo('outras'); return; }   // integração pendente (sem rota): mostra o agrupamento, com o aviso
   ATUAL = chave;
   $('titulo').textContent = it.icone + ' ' + it.rotulo;
   atualizarFaixaLoja();
@@ -748,9 +789,19 @@ function abrirModulo(id, aba) {
   let h = `<div class="home-cab"><button class="voltar" type="button" data-inicio="1">← Início</button><h1>${esc(m.icone)} ${esc(m.nome)}</h1></div>
     <div class="abas"${semAbas ? ' style="display:none;"' : ''}>${['lancar', 'acompanhar'].map((a) => `<button class="aba${a === ABA_ATUAL ? ' on' : ''}" type="button" data-aba="${a}">${a === 'lancar' ? 'Lançar' : 'Acompanhar'} (${telasDo(m, a).length})</button>`).join('')}</div>
     <div class="cards">`;
-  h += lista.length ? lista.map((k) => { const i = ITENS[k];
+  const cartao = (k) => { const i = ITENS[k];
+    // 12/11/2026: tela do agrupamento do Fábio com acesso ainda não conectado (sem rota) = cartão sem botão ativo, com o aviso
+    if (semPagina(k)) return `<div class="card vazio" aria-disabled="true"><span class="t"><span>${esc(i.icone)}</span>${esc(i.rotulo)}</span><span class="n">integração pendente · acesso ainda não conectado</span></div>`;
+    const d = DESC[k] || i.nota;
     return `<button class="card" type="button" data-chave="${esc(k)}"><span class="t"><span>${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}</span>` +
-      (DESC[k] ? `<span class="d">${esc(DESC[k])}</span>` : '') + '</button>'; }).join('')
+      (d ? `<span class="d">${esc(d)}</span>` : '') + '</button>'; };
+  // 12/11/2026 (Fabio): o agrupamento do Fábio separa as telas por setor (as mesmas telas da lista, nenhuma a mais)
+  const porSetor = m.setores && lista.length
+    ? m.setores.map((s) => { const ks = s.chaves.filter((k) => lista.includes(k)); if (!ks.length) return '';
+        const ativo = ks.some((k) => !semPagina(k));
+        return `<div class="gh">${esc(s.icone)} ${esc(s.nome)}${ativo ? '' : ' · em construção'}</div>` + ks.map(cartao).join(''); }).join('')
+    : null;
+  h += porSetor !== null ? porSetor : lista.length ? lista.map(cartao).join('')
     : `<div class="gh" style="text-transform:none; letter-spacing:0;">${semAbas ? 'Nenhuma tela neste módulo.' : ABA_ATUAL === 'lancar' ? 'Nada para lançar neste módulo.' : 'Nada para acompanhar neste módulo.'}</div>`;
   h += '</div>';
   casa.innerHTML = h;
@@ -870,7 +921,7 @@ async function montar() {
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
-  const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link);
+  const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link && !semPagina(k));
   if (pedido && alvoMenu(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
   else if (PODE && minhas.length) abrir(minhas[0]);     // acesso restrito abre direto no que é dele, como o painel
   // 07/11/2026 (dono, pelo Organizador: "a tela inicial poderia abrir já na tela da agenda"): por ora só o dono;
