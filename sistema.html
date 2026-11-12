@@ -296,7 +296,7 @@ const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []
 (function outrasTelas() {
   const usadas = new Set(MODULOS.flatMap((m) => [...(m.lancar || []), ...(m.acompanhar || [])]));
   const sobra = Object.keys(ITENS).filter((k) => !usadas.has(k) && !FORA_DO_MENU.has(k));
-  if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Outras telas', icone: '📁', lancar: [], acompanhar: sobra });
+  if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Sistema operacional do Fábio', icone: '📁', lancar: [], acompanhar: sobra });
 })();
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';
 function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && alvoMenu(k)); }
@@ -892,3 +892,4 @@ async function montar() {
 <script src="nucleo/ajuda.js?v=20261030b"></script>
 </body>
 </html>
+

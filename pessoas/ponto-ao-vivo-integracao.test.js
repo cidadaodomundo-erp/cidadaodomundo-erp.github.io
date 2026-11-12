@@ -30,6 +30,12 @@ test('rota pao registrada na casca (menu, página, módulo, busca, por loja) com
   assert.equal(g('CASCA_PAGINAS').pao, 'pessoas/index.html#pao');
   assert.ok(g('CASCA_TELAS_POR_LOJA').includes('pao'));
   assert.ok(g('CASCA_BUSCA').pao.length > 0);
-  assert.ok(g('CASCA_MODULOS').find((m) => m.id === 'pessoas').lancar.includes('pao'));
+  // ordem expressa 12/11: fora do módulo Pessoas e de qualquer módulo fixo; cai no agrupamento de sobra (sistema.html)
+  const mods = g('CASCA_MODULOS');
+  assert.ok(!mods.some((m) => (m.lancar || []).includes('pao') || (m.acompanhar || []).includes('pao')));
+  const sis = ler('sistema.html');
+  assert.match(sis, /nome: 'Sistema operacional do Fábio'/);
+  assert.doesNotMatch(sis, /nome: 'Outras telas'/);
 });
+
 

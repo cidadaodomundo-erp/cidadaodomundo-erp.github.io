@@ -50,7 +50,7 @@ test('prestadores é SEM_LOJA (diretório geral); manutencao é POR_LOJA; nenhum
 test('módulos e telas vizinhos continuam como estavam (Compras, Pessoas/Freelas, Reunião, Delivery, Fabio)', () => {
   const mod = (id) => C.CASCA_MODULOS.find((m) => m.id === id);
   preservaOriginais(mod('compras').acompanhar, ['comprateto'], 'Compras');
-  preservaOriginais(mod('pessoas').lancar, ['phoje', 'pcartao', 'pao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos', 'freelas'], 'Pessoas');
+  preservaOriginais(mod('pessoas').lancar, ['phoje', 'pcartao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos', 'freelas'], 'Pessoas');
   preservaOriginais(mod('fabio').acompanhar, ['delivery', 'reservas', 'pausados', 'atrasos', 'atendimento', 'link:portal-qualidade'], 'Operação do Fabio');
   preservaOriginais(mod('resultado').acompanhar, ['placar', 'semana', 'reuniao', 'dre', 'indicadores', 'evolucao', 'lucrouni', 'despesas'], 'Resultado');
   ['freelas', 'reuniao', 'delivery', 'reservas', 'pausados'].forEach((k) => assert.ok(C.CASCA_TELAS_POR_LOJA.includes(k), k));
@@ -125,3 +125,4 @@ test('o portal não carrega manifesto, regras internas, caderno, memória nem cr
     assert.ok(!/MANIFESTO|NOVO_ERP|kqvoatdprjwxyadhvtdd|rtmgzsikwglsvpopbfbw|codex|coordenador|supervisor independente|caderno|memória pessoal/i.test(src), arq);
   });
 });
+
