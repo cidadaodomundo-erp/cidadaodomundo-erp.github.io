@@ -191,7 +191,7 @@ function agDesenhar() {
     const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
     const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
-    const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${p.id})">Tenho dúvida</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
+    const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
     return `<div class="ag-lin ${x.tipo}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
@@ -391,9 +391,8 @@ function agPessoaHtml(L, soLeitura) {
       const bts = AG_FEITO.includes(x.estado) ? abrir
         : [abrir,
            bt('Feito', `agPessoaConcluir(${id})`, 'avisar que já fez (o robô confere)'),
-           bt('Responder', `agPessoaForm(${id},'resp')`, 'responder no próprio item'),
-           bt('⏱ Preciso de mais tempo', `agPessoaForm(${id},'prazo')`, 'pedir 1, 2 ou 3 dias'),
-           bt('🙋 Preciso de ajuda', `agPessoaForm(${id},'ajuda')`, 'contar o que travou')].join('');
+           bt('Responder', `agPessoaForm(${id},'resp')`, 'responder, perguntar ou pedir ajuda no próprio item'),
+           bt('⏱ Preciso de mais tempo', `agPessoaForm(${id},'prazo')`, 'pedir 1, 2 ou 3 dias')].join('');   // 12/11 01:56 (dono): só o Responder, que faz o papel da dúvida/ajuda
       // o contexto do item e a conversa (Feito, respostas e retornos), como na agenda do dono
       const fio = Array.isArray(x.fio) ? x.fio : [];
       const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
