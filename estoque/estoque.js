@@ -4454,7 +4454,7 @@ function cfEstadoEnvio(c, fe, i) {
   const alvo = c.aba === 'RECEITAS' ? 'receita' : 'ficha';
   if (fe.aplicado) return `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ aplicada na ${alvo}${fe.aplicado_em ? ' ' + embQuando(fe.aplicado_em) : ''}</span>`;
   if (fe.trava_motivo) return `<span style="font-size:12px; font-weight:700; color:var(--farol-fora); white-space:normal;">✗ não entrou: ${trEscH(fe.trava_motivo)} — já avisamos</span>`;
-  return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">⏳ recebida, entra na ${alvo} quando o Estoque aplicar</span>`;
+  return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">⏳ recebida, entra na ${alvo} na próxima passada (até 2 h)</span>`;
 }
 async function cfEntrar(id) {
   const c = CONF_FICHA[id], alvo = document.getElementById('cfCorpo');
@@ -4521,7 +4521,7 @@ function cfRender(id) {
   }
   // 12/11/2026 (Estoque): o envio fica à vista; antes parecia que não tinha salvado e a Rita mandou 5 vezes
   if (CF.enviada && CF.enviada.aba === c.aba) { const est = CF.estado && CF.estado.get(CF.enviada.f);
-    h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Recebido: ${trEscH(CF.enviada.nb)} às ${CF.enviada.hora}</b>${est && est.estado !== 'SUBSTITUIDO' && new Date(est.enviado_em) >= new Date(CF.enviada.quando) ? ' — ' + trEscH(cfMsgOperador(est.mensagem)) : ` — entra na ${id === 'receitas' ? 'receita' : 'ficha'} em até 30 minutos. Não precisa mandar de novo.`}</div>`; }
+    h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Recebido: ${trEscH(CF.enviada.nb)} às ${CF.enviada.hora}</b>${est && est.estado !== 'SUBSTITUIDO' && new Date(est.enviado_em) >= new Date(CF.enviada.quando) ? ' — ' + trEscH(cfMsgOperador(est.mensagem)) : ` — entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h). Não precisa mandar de novo.`}</div>`; }
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
@@ -4647,7 +4647,7 @@ async function cfEnviar(id, iid, naofaz) {
   cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; delete x.removidos; });
   CF.aberto = null;
   CF.enviada = { aba: c.aba, f: i.f || i.nb, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora(), quando: new Date(Date.now() - 60000).toISOString() };
-  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} quando o Estoque aplicar.`);
+  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h).`);
   cfRender(id);
   confAbasPintar();
   // o estado do envio que acabou de chegar (na fila, ou parado com o motivo), sem esperar recarregar a tela
