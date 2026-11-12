@@ -4377,11 +4377,12 @@ function cfComecada(c, i, rasc, resp) {
 async function cfCarregar(c) {
   const [fila, feita] = await Promise.all([
     consultarTudo(`vw_ft_conferencia_fila?select=*&aba=eq.${c.aba}&order=ordem`),
-    consultarTudo(`vw_ft_conferencia_feita?select=ficha,escala,quem,conferido_em,nao_fazemos_mais,observacao,linhas,envios&escala=${c.escala ? 'eq.' + c.escala : 'is.null'}`),
+    consultarTudo(`vw_ft_conferencia_feita?select=*&escala=${c.escala ? 'eq.' + c.escala : 'is.null'}&order=ficha`),
   ]);
   CF.fila[c.aba] = fila.map((l) => Object.assign({}, l.cartao_completo || {}, { id: l.id, nb: l.nb, f: l.f, gr: l.gr, fam: l.fam, g: l.g, mot: l.mot,
     r: l.r, ru: l.ru, rs: l.rs, i: Array.isArray(l.itens) ? l.itens : [] }));
   CF.feita[c.aba] = new Map(feita.map((x) => [x.ficha, x]));
+  if (c.aba === 'RECEITAS') await cfReceitasAoVivo(c);
   // 12/11/2026 (dono, 06/10, livro pauta-da-semana/respostas/meta-lana: "30 produtos por semana, começando pelos que mais
   // saem"): a venda de 30 dias é a mesma da tela Preço alvo (vw_margem_produto.qtd_vendida), somada por nome da base.
   if (c.aba === 'PRODUTOS' && CF.venda === undefined) {
@@ -4394,6 +4395,48 @@ async function cfCarregar(c) {
                                       consultarTudo('ft_receita_base?select=nome_base&order=nome_base').catch(() => [])]);
     CF.nomes = [...new Set([...a, ...b].map((x) => x.nome_base).filter(Boolean))].sort();
   }
+}
+// 12/11/2026 (dono 19:30: "Quando ela altera e aperta conferir de novo, deve alterar, ou avisar porque não alterou"): a aba
+// Receitas mostra a ficha que está VALENDO — lote (qtd_receita) e rendimento lidos ao vivo de vw_ft_conferencia_receita_viva,
+// o mesmo número que o aplicar_conferencia_equipe.py compara — e não o cartão gerado em 29/10. Ingrediente agrupado pelo
+// nome padrão, como o aplicador agrupa. Se a lista de ingredientes mudou, o rascunho do aparelho (guardado por linha) era da
+// ficha velha e é descartado; a observação fica.
+async function cfReceitasAoVivo(c) {
+  const L = CF.fila[c.aba] || [], fs = [...new Set(L.map((i) => i.f).filter(Boolean))];
+  if (!fs.length) return;
+  const q = fs.map((n) => '"' + String(n).replace(/"/g, '') + '"').join(',');
+  const rows = await consultarTudo(`vw_ft_conferencia_receita_viva?select=ficha,materia_prima,materia_prima_nome_base,un_uso,qtd_receita,rendimento&ficha=in.(${encodeURIComponent(q)})&order=ficha,materia_prima`).catch(() => null);
+  if (!rows) return;   // sem a leitura ao vivo, fica o cartão gerado
+  const por = new Map(); rows.forEach((l) => { if (!por.has(l.ficha)) por.set(l.ficha, []); por.get(l.ficha).push(l); });
+  const rasc = cfRasc(c), resp = cfResp(c); let mexeu = false;
+  L.forEach((i) => {
+    const R = por.get(i.f); if (!R || !R.length) return;
+    const velhos = i.i || [], grupos = new Map();
+    R.forEach((l) => { const nb = l.materia_prima_nome_base || l.materia_prima, g = grupos.get(nb) || { nb, orig: [], lote: 0, un: l.un_uso };
+      g.orig.push(l.materia_prima); g.lote += Number(l.qtd_receita) || 0; grupos.set(nb, g); });
+    const novos = [...grupos.values()].map((g) => {
+      const v = velhos.find((it) => it.mp === g.nb || (it.orig || []).some((o) => g.orig.includes(o))) || null;
+      const uv = v ? cfUn(v.un) : '', U = String(g.un || '').toUpperCase(), mil = (uv === 'g' && U === 'KG') || (uv === 'ml' && U === 'LT');
+      return { mp: g.nb, orig: g.orig, un: mil ? v.un : (g.un || (v && v.un)), qf: +(mil ? g.lote * 1000 : g.lote).toFixed(3), qs: v ? v.qs : null, ix: v ? velhos.indexOf(v) : 999 };
+    }).sort((a, b) => a.ix - b.ix);
+    novos.forEach((x) => { delete x.ix; });
+    const mudou = novos.map((x) => x.mp).join('|') !== velhos.map((x) => x.mp).join('|');
+    i.i = novos; i.r = Number(R[0].rendimento) || i.r;
+    if (mudou) {
+      Object.keys(rasc).filter((k) => k.startsWith(i.id + '|') && k !== i.id + '|o').forEach((k) => { delete rasc[k]; mexeu = true; });
+      const r = resp[i.id];
+      if (r && (r.removidos || r.itens || r.rende != null)) { delete r.removidos; delete r.itens; delete r.rende; mexeu = true; }
+    }
+  });
+  if (mexeu) { cfGuardar(c.chave + '_rascunho', rasc); cfGuardar(c.chave + '_respostas', resp); }
+}
+// o que aconteceu com o último envio: aplicado na ficha, travado (com o motivo) ou esperando a aplicação
+function cfEstadoEnvio(c, fe) {
+  if (!fe || fe.nao_fazemos_mais) return '';
+  const alvo = c.aba === 'RECEITAS' ? 'receita' : 'ficha';
+  if (fe.aplicado) return `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ aplicada na ${alvo}${fe.aplicado_em ? ' ' + embQuando(fe.aplicado_em) : ''}</span>`;
+  if (fe.trava_motivo) return `<span style="font-size:12px; font-weight:700; color:var(--farol-fora); white-space:normal;">✗ não entrou: ${trEscH(fe.trava_motivo)} — já avisamos</span>`;
+  return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">⏳ recebida, entra na ${alvo} quando o Estoque aplicar</span>`;
 }
 async function cfEntrar(id) {
   const c = CONF_FICHA[id], alvo = document.getElementById('cfCorpo');
@@ -4459,7 +4502,7 @@ function cfRender(id) {
       <span style="font-size:12px; color:var(--tx-4);"> · desde seg ${s.dm} · ${CF.venda ? 'os que mais vendem primeiro' : 'a venda não abriu, lista em ordem alfabética'}</span></div>`;
   }
   // 12/11/2026 (Estoque): o envio fica à vista; antes parecia que não tinha salvado e a Rita mandou 5 vezes
-  if (CF.enviada && CF.enviada.aba === c.aba) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ ${trEscH(CF.enviada.nb)} enviada às ${CF.enviada.hora}</b> — entra na ${id === 'receitas' ? 'receita' : 'ficha'} depois de aplicada. Não precisa enviar de novo.</div>`;
+  if (CF.enviada && CF.enviada.aba === c.aba) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ ${trEscH(CF.enviada.nb)} recebida às ${CF.enviada.hora}</b> — entra na ${id === 'receitas' ? 'receita' : 'ficha'} quando o Estoque aplicar; o cartão mostra "✓ aplicada" ou o motivo de não ter entrado. Não precisa enviar de novo.</div>`;
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
@@ -4477,7 +4520,7 @@ function cfRender(id) {
         <div><b style="font-size:14.5px;">${trEscH(i.nb)}</b>
           <div style="font-size:12px; color:var(--tx-4);">${trEscH([i.gr, i.fam].filter(Boolean).join(' · '))}${i.mot ? ' · ' + trEscH(i.mot) : ''}${i.f && i.f !== i.nb ? ' · ficha: ' + trEscH(i.f) : ''}</div></div>
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          ${fe ? `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ ${fe.nao_fazemos_mais ? 'não fazemos mais' : 'conferida'} · ${trEscH(estNome(fe.quem) || fe.quem || '')} · ${embQuando(fe.conferido_em)}</span>`
+          ${fe ? `<span style="font-size:12px; font-weight:700; color:var(--tx-2);">${fe.nao_fazemos_mais ? '✓ não fazemos mais' : 'enviada'} · ${trEscH(estNome(fe.quem) || fe.quem || '')} · ${embQuando(fe.conferido_em)}</span> ${cfEstadoEnvio(c, fe)}`
                : com ? `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">começada, não enviada</span>`
                : `<span style="font-size:12px; color:var(--tx-3);">${trEscH(c.st[i.g] || i.g || '')}</span>`}
           ${ehProd && CF.venda ? `<span style="font-size:12px; color:var(--tx-3);">${cfVendeu(i).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} vendidos em 30 dias</span>` : ''}
@@ -4582,10 +4625,10 @@ async function cfEnviar(id, iid, naofaz) {
   if (volta && volta[0]) CF.feita[c.aba].set(volta[0].ficha, volta[0]);
   // o aparelho esquece o rascunho do que já chegou ao banco (e a página solta passa a ver "feito")
   const ra = cfRasc(c); Object.keys(ra).filter((k) => k.startsWith(i.id + '|')).forEach((k) => delete ra[k]); cfGuardar(c.chave + '_rascunho', ra);
-  cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; });
+  cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; delete x.removidos; });
   CF.aberto = null;
   CF.enviada = { aba: c.aba, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora() };
-  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: enviada às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} depois de aplicada.`);
+  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} quando o Estoque aplicar.`);
   cfRender(id);
   confAbasPintar();
 }
