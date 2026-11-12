@@ -88,8 +88,10 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   // 09/11/2026: o que o fato já resolveu (ex.: rotina logou depois do pedido) fecha antes de ler
   await trRpcSeguro('dono_pendencia_conferir', {}).catch(() => {});
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
-  const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal] = await Promise.all([
-    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+  // 12/11/2026 (dono 01:09): o que o robô conferiu nas últimas 24 h aparece como "✓ conferido"
+  const ontem = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf] = await Promise.all([
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
@@ -97,12 +99,13 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
     ler('vw_rmb_pedidos?select=id,pessoa,valor,descricao,situacao,so_o_dono&situacao=eq.PEDIDO&so_o_dono=is.true&order=id'),
     ler('vw_fin_conciliado_ate?select=conta,conciliado_ate&order=conta'),
     ler('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
-    ler('rh_folha_validada?select=competencia')]);
-  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal };
+    ler('rh_folha_validada?select=competencia'),
+    ler(`dono_pendencia?select=id,frente,o_que,resolvido_em&resolvido_por=like.conferido*&resolvido_em=gte.${ontem}&order=resolvido_em.desc`)]);
+  AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf };
   agDesenhar();
 }
 function agDesenhar() {
-  const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal } = AG.dados;
+  const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf } = AG.dados;
   // 07/11/2026 (dono: "sempre espere o tempo de conciliação nas baixas do a pagar do painel"): conta vencida só é "vencida"
   // depois que o extrato daquela conta já cobre o dia do vencimento; antes disso, "aguardando conciliação"
   // fonte única do Financeiro: até que dia cada conta está conciliada (vw_fin_conciliado_ate)
@@ -116,12 +119,17 @@ function agDesenhar() {
   const ok = (x, rot) => { if (x && x.erro) { falhou.push(rot); return false; } return Array.isArray(x); };
   // 1) o que depende de mim (os chats gravam)
   if (ok(pend, 'o que depende de você')) pend.forEach((p) => {
-    if (!p.resposta && (!p.prazo || p.prazo <= hoje)) AG.sinal++;   // respondido = aguardando aplicar: sai do número
+    const espera = !!(p.resposta || p.feito_em);   // respondido (aguardando aplicar) ou feito (conferindo): sai do número
+    if (!espera && (!p.prazo || p.prazo <= hoje)) AG.sinal++;
     const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
-    add({ dep: !p.resposta, dia, txt: `${agE(p.o_que)}${p.prazo && p.prazo < hoje ? ` <span class="f">desde ${agDm(p.prazo)}</span>` : ''}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: p.resposta ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p });
+    // 12/11/2026 (dono 01:30): "desde dd/mm (N dias)" e "prazo dd/mm" com farol em cada cartão
+    add({ dep: !espera, dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
+      desde: String(p.desde || '').slice(0, 10), prazo: p.prazo || '' });
   });
+  // 12/11/2026 (dono 01:09): o que o robô conferiu na fonte e fechou (últimas 24 h)
+  if (Array.isArray(conf)) conf.forEach((c) => add({ dia: hoje, txt: `<span style="color:var(--farol-ok);">✓ conferido ${agHm(c.resolvido_em)}:</span> ${agE(c.o_que)}`, frente: c.frente }));
   // 2) reembolso que só eu aprovo (o da Hellen)
   if (ok(rmb, 'reembolsos')) rmb.forEach((g) => (AG.sinal++, add({ dep: true, dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' })));
   // 3) contas a pagar: vencidas hoje, e o total de cada dia
@@ -164,28 +172,33 @@ function agDesenhar() {
   const alvo = document.getElementById('view-agenda');
   const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
   const ordemTipo = { atraso: 0, alerta: 1, '': 2 };
-  let h = '<h2>Minha agenda</h2>';
+  let h = '<h2>Minha agenda</h2>' + agOrdemHtml(true);
   if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
   const linha = (x) => {
     const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
-    const feito = x.id ? `<button type="button" class="preset-btn" title="tirar da agenda" onclick="agFeito(${x.id})">✓</button>` : '';
+    // 12/11/2026 (dono 01:09): "Feito" não fecha — fica "feito por você — conferindo" e o robô confere na fonte
+    const feito = x.id && !(x.pend && x.pend.feito_em) ? `<button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${x.id})">Feito</button>` : '';
     // 12/11/2026 (dono, pelo Organizador): o contexto do item à vista, e responder ou tirar dúvida ali mesmo
     const p = x.pend;
     if (!p) return `<div class="ag-lin ${x.tipo}"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${feito}</div>`;
-    const resp = p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — respondido, aguardando aplicar: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>` : '';
+    const feitoTx = p.feito_em ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ feito por você ${agQuando(p.feito_em)} —${p.confere
+        ? `conferindo: o robô fecha ${agE(agConfereTxt(p.confere))}`
+        : `sem conferência automática: a frente ${agE(p.frente || '')} confere${p.conferencia_nota ? ' · ' + agE(p.conferencia_nota) : ''}`}
+      <a href="javascript:void(0)" onclick="agFeito(${p.id},true)">desfazer</a></div>` : '';
+    const resp = p.resposta ?`<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — respondido, aguardando aplicar: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>` : '';
     // 12/11/2026 (Organizador): a frente devolve ao dono ("↩ resposta para você"); o fio guarda a conversa
     const fio = Array.isArray(p.fio) ? p.fio : [];
     const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
-    const volta = !p.resposta && p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
+    const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
-    const bts = p.resposta ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${p.id})">Tenho dúvida</button>`;
+    const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" onclick="agDuvidaForm(${p.id})">Tenho dúvida</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
     return `<div class="ag-lin ${x.tipo}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
     let b = '';
     dias.forEach((d) => {
-      const L = lista.filter((x) => x.dia === d).sort((a, b2) => ordemTipo[a.tipo] - ordemTipo[b2.tipo]);
+      const L = lista.filter((x) => x.dia === d).sort((a, b2) => agOrdenar(a, b2) || ordemTipo[a.tipo] - ordemTipo[b2.tipo]);
       if (!L.length && (d !== hoje || !vazio)) return;
       b += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
       b += L.length ? L.map(linha).join('') : `<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">${vazio}</span></div>`;
@@ -207,12 +220,63 @@ function agDesenhar() {
 function agGuia() {
   guiaRegistrar('agenda', [
     { sel: '.ag-bloco', texto: '<b>Depende de você</b>: só o que pede uma ação sua, de hoje e dos próximos dias. É isto que conta no número vermelho do menu.' },
-    { sel: '.ag-lin button[title="tirar da agenda"]', texto: 'Resolveu? Toque no <b>✓</b> e a linha sai da agenda (e do número do menu).' },
+    { sel: '.ag-lin button[onclick^="agFeito"]', texto: 'Fez? Toque em <b>Feito</b>: sai do número do menu e o robô confere na fonte. Conferido, fecha com "✓ conferido"; se faltar algo, volta para você dizendo o quê.' },
     { sel: '.ag-lin .preset-btn[onclick^="agIr"]', texto: '<b>abrir</b> leva direto à tela onde se resolve aquilo.' },
     { sel: 'details.ag-saber > summary', texto: '<b>Para saber</b>: o que não pede nada de você (aguardando conciliação, contas dos próximos dias). Fica fechado; toque para abrir.' },
     { sel: '#tabelaAgEquipe', texto: '<b>Agenda da equipe</b>: clique na pessoa para ver a agenda dela, do jeito que ela vê.' },
   ]);
   guiaTalvez('agenda');
+}
+function agQuando(t) { return t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(t)}` : ''; }
+// como o robô confere (a lista fechada de dono_pendencia.confere; quem grava escolhe a regra)
+function agConfereTxt(r) {
+  const [tipo, arg] = [String(r || '').split(':')[0], String(r || '').split(':').slice(1).join(':')];
+  if (tipo === 'rotina_ok') return `quando a rotina ${arg} rodar certo depois do seu "Feito"`;
+  if (tipo === 'contagem_fechada') return 'quando a contagem estiver fechada no sistema';
+  if (tipo === 'reembolso_pedido') return `quando o pedido de reembolso de R$ ${arg.replace('.', ',')} aparecer`;
+  return 'pela regra ' + r;
+}
+// 12/11/2026 (dono 01:30): datas do cartão — desde (há quantos dias) e prazo com farol (vermelho vencido, amarelo hoje)
+function agDatas(desde, prazo, semFarol) {
+  const hoje = agHoje(), d = desde ? String(desde).slice(0, 10) : '', p = prazo ? String(prazo).slice(0, 10) : '';
+  const nDias = d ? Math.round((new Date(hoje + 'T12:00:00') - new Date(d + 'T12:00:00')) / 86400000) : null;
+  const cor = semFarol || !p ? 'var(--tx-4)' : p < hoje ? 'var(--farol-fora)' : p === hoje ? 'var(--farol-perto)' : 'var(--tx-4)';
+  return `<span class="f">${d ? `desde ${agDm(d)} (${nDias} ${nDias === 1 ? 'dia' : 'dias'})` : ''}${d && p ? ' · ' : ''}${p
+    ? `<b style="color:${cor};">prazo ${agDm(p)}${!semFarol && p < hoje ? ' · vencido' : !semFarol && p === hoje ? ' · vence hoje' : ''}</b>` : ''}</span>`;
+}
+// ordenar (preferência visual, guardada no navegador): por prazo (padrão), mais antigos primeiro, por frente
+function agOrdemLer() { try { return localStorage.getItem('agOrdem') || 'prazo'; } catch (e) { return 'prazo'; } }
+function agOrdemHtml(comFrente) {
+  const o = agOrdemLer(), op = [['prazo', 'por prazo'], ['antigos', 'mais antigos primeiro']].concat(comFrente ? [['frente', 'por frente']] : []);
+  return `<div class="ag-ordem" style="margin:4px 2px 0;font-size:12px;color:var(--tx-3);">ordenar:
+    <select onchange="agOrdemMudar(this.value)" style="background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:inherit;">${op.map(([v, r]) =>
+    `<option value="${v}"${v === o ? ' selected' : ''}>${r}</option>`).join('')}</select></div>`;
+}
+function agOrdemMudar(v) {
+  try { localStorage.setItem('agOrdem', v); } catch (e) {}
+  if (AG.dados && souODono()) agDesenhar(); else agPessoaRedesenhar();
+}
+function agOrdenar(a, b) {
+  const o = agOrdemLer(), s = (v) => String(v || '9999');
+  if (o === 'antigos') return s(a.desde).localeCompare(s(b.desde));
+  if (o === 'frente') return String(a.frente || '~').localeCompare(String(b.frente || '~'), 'pt-BR');
+  return s(a.prazo).localeCompare(s(b.prazo));
+}
+function agAdiarForm(id) {
+  const box = document.getElementById('agForm_' + id); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  const am = agMais(agHoje(), 1), ate = agMais(agHoje(), 90);
+  box.innerHTML = `<div class="ag-form"><span>Adiar para</span><input type="date" id="agAdiarDia_${id}" min="${am}" max="${ate}" value="${am}" style="background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;">
+    <button type="button" class="preset-btn active" onclick="agAdiar(${id})">Adiar</button><button type="button" class="preset-btn" onclick="agAdiarForm(${id})">Cancelar</button></div>`;
+}
+async function agAdiar(id) {
+  const dia = ((document.getElementById('agAdiarDia_' + id) || {}).value || '').trim();
+  if (!dia) return avisoAcao('atencao', '! Escolha o dia.');
+  avisoAcao('enviando', '… adiando');
+  const r = await trRpcSeguro('dono_pendencia_adiar', { p_id: id, p_dia: dia });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agAdiar(id));
+  await entrarAgenda(true);
+  avisoAcao('ok', `✓ Adiado para ${agSem(dia)} ${agDm(dia)} (${avisoHora()}). O item continua aberto.`);
 }
 function agPend(id) { return ((AG.dados && Array.isArray(AG.dados.pend)) ? AG.dados.pend : []).find((p) => p.id === id) || {}; }
 function agRespForm(id) {
@@ -251,24 +315,34 @@ async function agDuvida(id) {
   avisoAcao('ok', `✓ Dúvida enviada às ${avisoHora()}. A resposta vem pelo WhatsApp do robô.`);
   const box = document.getElementById('agForm_' + id); if (box) box.innerHTML = '';
 }
-async function agFeito(id) {
-  avisoAcao('enviando', '… tirando da agenda');
-  const r = await trRpcSeguro('dono_pendencia_resolver', { p_id: id });
-  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agFeito(id));
-  await entrarAgenda();
-  avisoAcao('ok', `✓ Feito às ${avisoHora()}.`);
+// 12/11/2026 (dono 01:09): "Feito" não fecha o item; o robô confere na fonte e fecha ("✓ conferido") ou devolve com o que falta
+async function agFeito(id, desfazer) {
+  const p = agPend(id);
+  avisoAcao('enviando', desfazer ? '… desfazendo o "Feito"' : '… marcando como feito');
+  const r = await trRpcSeguro('dono_pendencia_feito', desfazer ? { p_id: id, p_desfazer: true } : { p_id: id });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agFeito(id, desfazer));
+  await entrarAgenda(true);
+  avisoAcao('ok', desfazer ? `✓ "Feito" desfeito às ${avisoHora()}: o item voltou para você.`
+    : p.confere ? `✓ Marcado como feito às ${avisoHora()}. O robô confere e fecha ${agConfereTxt(p.confere)}.`
+    : `✓ Marcado como feito às ${avisoHora()}. Sem conferência automática: a frente ${p.frente || ''} confere e fecha.`);
 }
 
 // =====================================================================================================================
 // A AGENDA DE CADA PESSOA (07/11/2026, dono 03:11 no Organizador; plano aprovado pelo Organizador).
 // Fonte: minha_agenda() — as atividades do robô (wa_tarefa) com o e-mail do login. Três botões gravam em agenda_acao
-// (o Avisos lê de lá): ✓ Concluí, ⏱ Preciso de mais tempo (1 a 3 dias), 🙋 Preciso de ajuda (vai para a Ajuda do painel).
+// (o Avisos lê de lá): Feito (desde 12/11 não fecha: o robô confere), Responder, ⏱ Preciso de mais tempo (1 a 3 dias),
+// 🙋 Preciso de ajuda (vai para a Ajuda do painel).
 // "abrir" leva à tela da atividade e registra que a pessoa abriu. O dono vê a de cada um pelo "ver como" (só leitura).
 // =====================================================================================================================
 const AGENDA_TODOS = true;   // ligado 07/11/2026 12:15: "manda" do dono no chat Avisos (12:09); comunicado sai seg 09/11 08:00
 const AGP = { linhas: [], verComo: null, form: null, pessoas: null, veEquipe: null };
-const AG_ESTADO = { 'A fazer': '', 'Atrasada': 'atraso', 'Travada': 'atraso', 'Mais tempo': '', 'Pediu ajuda': 'alerta', 'Concluí': 'feito' };
-const AG_ORDEM = ['Travada', 'Atrasada', 'Pediu ajuda', 'A fazer', 'Mais tempo', 'Concluí'];
+// 12/11/2026 (dono 01:09, "a mesma regra para todos"): "Feito" não fecha — Conferindo (o robô confere pela prova),
+// Falta (a prova conferiu depois e ainda falta), Feito sem conferência (sem prova: quem passou a atividade confere),
+// Conferido (fechada nas últimas 24 h), Voltou (a frente devolveu com o que falta), Respondido (a pessoa respondeu no item)
+const AG_ESTADO = { 'A fazer': '', 'Atrasada': 'atraso', 'Travada': 'atraso', 'Mais tempo': '', 'Pediu ajuda': 'alerta', 'Falta': 'alerta', 'Voltou': 'alerta',
+  'Respondido': '', 'Conferindo': 'feito', 'Feito sem conferência': 'feito', 'Conferido': 'feito' };
+const AG_ORDEM = ['Voltou', 'Falta', 'Travada', 'Atrasada', 'Pediu ajuda', 'A fazer', 'Respondido', 'Mais tempo', 'Conferindo', 'Feito sem conferência', 'Conferido'];
+const AG_FEITO = ['Conferindo', 'Feito sem conferência', 'Conferido'];
 const agHm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
 
 async function agPessoaLer(verComo) {
@@ -289,16 +363,24 @@ async function agPessoaEntrar(verComo) {
 function agPessoaHtml(L, soLeitura) {
   const hoje = agHoje();
   const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
-  const diaDe = (x) => (x.estado === 'Concluí' && x.dia < hoje) || x.dia < hoje ? hoje : x.dia;   // o que passou aparece em hoje
+  const diaDe = (x) => x.estado === 'Conferido' || x.dia < hoje ? hoje : x.dia;   // o que passou (e o conferido) aparece em hoje
   let h = '';
   dias.forEach((d) => {
-    const doDia = L.filter((x) => diaDe(x) === d).sort((a, b) => AG_ORDEM.indexOf(a.estado) - AG_ORDEM.indexOf(b.estado));
+    const antigos = agOrdemLer() === 'antigos';   // 12/11 (dono 01:30): "mais antigos primeiro"; o padrão é por prazo
+    const doDia = L.filter((x) => diaDe(x) === d).sort((a, b) => (antigos ? String(a.dia_original || '').localeCompare(String(b.dia_original || '')) : 0)
+      || AG_ORDEM.indexOf(a.estado) - AG_ORDEM.indexOf(b.estado) || String(a.dia || '').localeCompare(String(b.dia || '')));
     if (!doDia.length && d !== hoje) return;
     h += `<div class="ag-dia${d === hoje ? ' hoje' : ''}">${d === hoje ? 'Hoje · ' : ''}${agSem(d)} ${agDm(d)}</div>`;
     if (!doDia.length) h += '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada para hoje</span></div>';
     doDia.forEach((x) => {
       const id = Number(x.tarefa_id);
-      const nota = x.estado === 'Concluí' ? `✓ marcado às ${agHm(x.concluiu_em)} · o robô confere`
+      const falta = Number(x.falta_agora) > 0 ? Number(x.falta_agora).toLocaleString('pt-BR') : '';
+      const nota = x.estado === 'Conferindo' ? `feito por você ${agQuando(x.concluiu_em)} — conferindo: o robô confere sozinho na tela`
+        : x.estado === 'Feito sem conferência' ? `feito por você ${agQuando(x.concluiu_em)} — sem conferência automática: quem passou a atividade confere${x.nota ? ' · ' + agE(x.nota) : ''}`
+        : x.estado === 'Conferido' ? '<span style="color:var(--farol-ok);">✓ conferido</span>'
+        : x.estado === 'Falta' ? `<span style="color:var(--info);font-weight:700;">↩ o robô conferiu ${agQuando(x.conferido_em)} e ainda ${falta === '1' ? 'falta 1' : 'faltam ' + (falta || 'itens')}.</span> Termine e toque em Feito de novo`
+        : x.estado === 'Voltou' ? `<span style="color:var(--info);font-weight:700;">↩ resposta para você${x.retorno_em ? ' (' + agQuando(x.retorno_em) + ')' : ''}:</span> <span style="color:var(--tx-1);">${agE(x.retorno)}</span>`
+        : x.estado === 'Respondido' ? `<span style="color:var(--farol-ok);">✓ resposta enviada ${agQuando(x.resposta_em)}</span> — aguardando quem passou a atividade`
         : x.estado === 'Atrasada' ? `atrasada desde ${agDm(x.dia)}`
         : x.estado === 'Travada' ? 'travada: sem resposta ao robô'
         : x.estado === 'Mais tempo' ? `novo prazo ${agSem(x.dia)} ${agDm(x.dia)}${x.prazo_motivo ? ' · ' + agE(x.prazo_motivo) : ''}`
@@ -306,12 +388,18 @@ function agPessoaHtml(L, soLeitura) {
         : '';
       const bt = (rot, fn, tit) => `<button type="button" class="preset-btn" title="${tit}" onclick="${soLeitura ? 'agSoLeitura()' : fn}">${rot}</button>`;
       const abrir = x.tela ? bt('abrir', `agPessoaAbrir(${id})`, 'ir para a tela desta atividade') : '';
-      const bts = x.estado === 'Concluí' ? abrir
+      const bts = AG_FEITO.includes(x.estado) ? abrir
         : [abrir,
-           bt('✓ Concluí', `agPessoaConcluir(${id})`, 'avisar que já fez'),
+           bt('Feito', `agPessoaConcluir(${id})`, 'avisar que já fez (o robô confere)'),
+           bt('Responder', `agPessoaForm(${id},'resp')`, 'responder no próprio item'),
            bt('⏱ Preciso de mais tempo', `agPessoaForm(${id},'prazo')`, 'pedir 1, 2 ou 3 dias'),
            bt('🙋 Preciso de ajuda', `agPessoaForm(${id},'ajuda')`, 'contar o que travou')].join('');
-      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}"><span class="t">${agE(x.atividade)}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span></div>`;
+      // o contexto do item e a conversa (Feito, respostas e retornos), como na agenda do dono
+      const fio = Array.isArray(x.fio) ? x.fio : [];
+      const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
+        `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
+      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" style="flex-wrap:wrap;"><span class="t">${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
+        ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}</div>`;
       if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
     });
   });
@@ -320,14 +408,15 @@ function agPessoaHtml(L, soLeitura) {
 function agSoLeitura() { avisoAcao('atencao', 'Você está vendo a agenda de outra pessoa: os botões são dela e não gravam daqui.'); }
 function agPessoaRedesenhar() {
   const v = document.getElementById('view-agenda');
-  v.innerHTML = '<h2>Minha agenda</h2>' + (AGP.linhas.length ? agPessoaHtml(AGP.linhas, false)
+  v.innerHTML = '<h2>Minha agenda</h2>' + (AGP.linhas.length ? agOrdemHtml(false) + agPessoaHtml(AGP.linhas, false)
     : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada na sua agenda nos próximos 7 dias</span></div>');
-  avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AGP.linhas.filter((x) => ['Atrasada', 'Travada'].includes(x.estado) || (x.estado === 'A fazer' && x.dia <= agHoje())).length });
+  avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AGP.linhas.filter((x) => ['Atrasada', 'Travada', 'Falta', 'Voltou'].includes(x.estado) || (x.estado === 'A fazer' && x.dia <= agHoje())).length });
 }
 function agPessoaForm(id, tipo) { AGP.form = AGP.form && AGP.form.id === id && AGP.form.tipo === tipo ? null : { id, tipo }; agPessoaRedesenhar(); }
 function agPessoaFormHtml(id, tipo) {
   if (tipo === 'prazo') return `<div class="ag-form"><span>Quantos dias a mais?</span>${[1, 2, 3].map((n) =>
     `<button type="button" class="preset-btn" onclick="agPessoaPrazo(${id},${n})">${n} ${n === 1 ? 'dia' : 'dias'}</button>`).join('')}<input type="text" id="agMotivo" maxlength="300" placeholder="motivo (se quiser)"></div>`;
+  if (tipo === 'resp') return `<div class="ag-form"><textarea id="agRespPessoaTx" rows="2" maxlength="2000" placeholder="Sua resposta (quem passou a atividade lê e responde aqui)"></textarea><button type="button" class="preset-btn" onclick="agPessoaResponder(${id})">Enviar resposta</button></div>`;
   return `<div class="ag-form"><textarea id="agAjudaTx" rows="2" maxlength="2000" placeholder="O que travou? Escreva com as suas palavras."></textarea><button type="button" class="preset-btn" onclick="agPessoaAjuda(${id})">Enviar pedido de ajuda</button></div>`;
 }
 function agPessoaAbrir(id) {
@@ -346,7 +435,14 @@ async function agPessoaGravar(fn, args, ok, refazer) {
   avisoAcao('ok', `✓ ${ok(v)} (${avisoHora()}).`);
 }
 function agPessoaConcluir(id) {
-  agPessoaGravar('agenda_concluir', { p_tarefa: id }, () => 'Marcado como concluído; o robô confere', () => agPessoaConcluir(id));
+  const x = AGP.linhas.find((l) => Number(l.tarefa_id) === id) || {};
+  agPessoaGravar('agenda_concluir', { p_tarefa: id }, () => x.tem_prova ? 'Marcado como feito; o robô confere na tela e fecha'
+    : 'Marcado como feito; sem conferência automática, quem passou a atividade confere', () => agPessoaConcluir(id));
+}
+function agPessoaResponder(id) {
+  const t = ((document.getElementById('agRespPessoaTx') || {}).value || '').trim();
+  if (!t) return avisoAcao('atencao', '! Escreva a resposta.');
+  agPessoaGravar('agenda_responder', { p_tarefa: id, p_texto: t }, () => 'Resposta enviada; a resposta de volta aparece aqui', () => agPessoaResponder(id));
 }
 function agPessoaPrazo(id, n) {
   const m = ((document.getElementById('agMotivo') || {}).value || '').trim();
