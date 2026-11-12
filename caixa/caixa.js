@@ -1993,6 +1993,8 @@ async function descCarregar() {
   if (corpo()) corpo().innerHTML = descHtml();
 }
 function descFiltrar(f) { DESC.filtro = DESC.filtro === f ? null : f; const c = document.getElementById('descCorpo'); if (c) c.innerHTML = descHtml(); }
+// 12/11/2026: o nome do garçom vem de saipos_pessoa_id em maiúsculas ("YAIMAR"): na tela, "Yaimar"
+const descNome = (t) => String(t || '').replace(/\p{Lu}{2,}/gu, (w) => w.charAt(0) + w.slice(1).toLocaleLowerCase('pt-BR'));
 function descHtml() {
   if (DESC.erro) return `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os descontos: ${trEscH(DESC.erro)} <button type="button" class="preset-btn" onclick="DESC.chave=null;descCarregar()">Tentar de novo</button></div>`;
   if (!DESC.linhas) return '<div class="contexto">Lendo os descontos…</div>';
@@ -2018,7 +2020,7 @@ function descHtml() {
   if (semM.length) al.push(`<a href="javascript:void(0)" onclick="descFiltrar('semMotivo')" style="color:var(--farol-perto); font-weight:700;">${F === 'semMotivo' ? '✓ ' : ''}${semM.length} descontos sem motivo (${R(semM.reduce((a, x) => a + (+x.desconto || 0), 0))})</a>`);
   if (alto.length) al.push(`<a href="javascript:void(0)" onclick="descFiltrar('alto')" style="color:var(--farol-perto); font-weight:700;">${F === 'alto' ? '✓ ' : ''}${alto.length} descontos de 50% ou mais</a>`);
   // "caixa nº" é o computador da frente de caixa, não uma pessoa: concentrar nele não diz nada
-  DESC.conc.filter((c) => !/^caixa n/i.test(c.pessoa || '')).forEach((c) => al.push(`<span style="color:var(--farol-perto);">${trEscH(c.pessoa)} concentra ${pctF(c.pct_da_loja)} dos descontos ${c.eixo === 'PARA QUEM' ? 'recebidos' : 'dados'} ${L(c.unidade) ? 'em ' + trEscH(L(c.unidade)) : ''} em ${ddm(c.mes).slice(3)} (${c.descontos}, ${R(c.valor)})</span>`));
+  DESC.conc.filter((c) => !/^caixa n/i.test(c.pessoa || '')).forEach((c) => al.push(`<span style="color:var(--farol-perto);">${trEscH(descNome(c.pessoa))} concentra ${pctF(c.pct_da_loja)} dos descontos ${c.eixo === 'PARA QUEM' ? 'recebidos' : 'dados'} ${L(c.unidade) ? 'em ' + trEscH(L(c.unidade)) : ''} em ${ddm(c.mes).slice(3)} (${c.descontos}, ${R(c.valor)})</span>`));
   if (al.length) h += `<div style="display:flex; flex-direction:column; gap:3px; margin:8px 0;">${al.join('')}</div>`;
   h += `<div style="font-size:12px; color:var(--tx-4); margin:4px 0 10px;">O Saipos não informa se usou a senha de autorização nem quem autorizou.</div>`;
   // lista por dia
@@ -2026,7 +2028,7 @@ function descHtml() {
   h += `<div class="section-label" style="text-align:left;">Por dia</div>`;
   h += linhas.length ? `<div id="tabelaDescDia" style="overflow-x:auto; max-height:320px;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Canal</th><th>Quem</th><th>Motivo</th><th style="text-align:right;">Descontos</th><th style="text-align:right;">Valor</th><th style="text-align:right;">% da venda</th></tr></thead><tbody>
     ${linhas.map((x) => `<tr style="cursor:pointer;${F === chaveL(x) ? ' background:var(--surface-2);' : ''}" onclick="descFiltrar(${trEscH(JSON.stringify(chaveL(x)))})" title="clique para ver as vendas deste dia">
-      <td>${ddm(x.dia)}</td><td>${trEscH(L(x.unidade))}</td><td>${trEscH(x.canal === 'SALÃO' ? 'Salão' : 'Balcão')}</td><td>${trEscH(x.quem || '')}</td>
+      <td>${ddm(x.dia)}</td><td>${trEscH(L(x.unidade))}</td><td>${trEscH(x.canal === 'SALÃO' ? 'Salão' : 'Balcão')}</td><td>${trEscH(descNome(x.quem))}</td>
       <td style="${x.sem_motivo > 0 ? 'color:var(--farol-perto);' : ''}">${trEscH(x.motivo_classe || (x.sem_motivo > 0 ? 'sem motivo' : ''))}</td>
       <td style="text-align:right;">${x.descontos}</td><td style="text-align:right;">${R(x.valor_desconto)}</td><td style="text-align:right;">${pctF(x.pct_da_venda_do_canal)}</td></tr>`).join('')}</tbody></table></div>`
     : '<div style="color:var(--farol-ok);">✓ Nenhum desconto no salão e no balcão neste período.</div>';
@@ -2039,7 +2041,7 @@ function descHtml() {
       <td style="text-align:right;">${R(x.bruto)}</td><td style="text-align:right;">${R(x.desconto)}<div style="font-size:11px;color:var(--tx-4);">${pctF(x.pct)}</div></td>
       <td style="white-space:normal;${x.motivo ? '' : ' color:var(--farol-perto); font-weight:700;'}">${x.motivo ? trEscH(x.motivo) : 'sem motivo'}</td>
       <td style="white-space:normal;">${trEscH(x.para_quem || '')}${x.funcionario_nome ? `<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.funcionario_nome)}</div>` : ''}</td>
-      <td>${trEscH(x.quem || '')}<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.quem_fonte || '')}</div></td>
+      <td>${trEscH(descNome(x.quem))}<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.quem_fonte || '')}</div></td>
       <td style="white-space:normal; color:var(--tx-4); font-size:12px;">${trEscH(x.parece || '')}</td></tr>`;
   const rotF = F === 'semMotivo' ? ' · só sem motivo' : F === 'alto' ? ' · só 50% ou mais' : F ? ' · ' + ddm(F.split('|')[1]) : '';
   h += `<div class="section-label" style="text-align:left; margin-top:14px;">Vendas com desconto${rotF}${F ? ` <a href="javascript:void(0)" onclick="descFiltrar(null)" style="font-size:12px;">mostrar todas</a>` : ''}</div>`;
