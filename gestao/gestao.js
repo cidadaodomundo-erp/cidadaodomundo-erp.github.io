@@ -2394,7 +2394,7 @@ function renderModuloEvolucao() {
     ${tabela('Por faixa de horário', 'A faixa sai da hora da venda registrada no Saipos, não do turno do cadastro.' + (!ITEM && !EVOL_F.canal ? ' O valor médio por faixa aparece ao escolher um canal.' : ''), 'tabelaEvolFaixa', porFaixa, 'faixa', totFaixa,
       ITEM ? undefined : EVOL_F.canal ? { rot: EVOL_F.canal === 'IFOOD' ? '(do caixa)' : '', th: 'A faixa de horário não tem a promoção paga pela loja: aqui o valor médio é o do caixa (Saipos).' } : { semTk: true })}
     ${matriz}
-    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, escolha a loja no topo.' + (!ITEM && !EVOL_F.canal ? ' O valor médio por loja aparece ao escolher um canal.' : ''), 'tabelaEvolLoja', porLoja, undefined,
+    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, escolha a loja no topo.' + (!ITEM && !EVOL_F.canal ? ' O valor médio por loja aparece ao escolher um canal.' : ''), 'tabelaEvolLoja', porLoja, undefined, undefined,
       ITEM ? undefined : EVOL_F.canal ? (TKR.length ? { total: tkDe(Object.values(tkLoja).reduce((a, o) => ({ f: a.f + o.f, p: a.p + o.p }), { f: 0, p: 0 })) } : undefined) : { semTk: true }) : ''}
     ${blocoItens}
 
