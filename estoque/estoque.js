@@ -2565,9 +2565,10 @@ async function plpManCarregar() {
   const u = encodeURIComponent(PLP.unidade);
   const [cat, itens] = await Promise.all([
     M.cat ? Promise.resolve(M.cat) : consultarTudo(`vw_est_plano_receitas?select=nome_base,grupo_receita,familia,un&order=nome_base`),
-    consultarTudo(`vw_est_plano_itens?select=id_plano,situacao_plano,nome_base,planejado,un&unidade=eq.${u}&data_para=eq.${M.data}`),
+    consultarTudo(`vw_est_plano_itens?select=id_plano,situacao_plano,nome_base,planejado,un,forma,insumo_mp,qtd_mp,un_mp&unidade=eq.${u}&data_para=eq.${M.data}`),
     estFilaCarregar(PLP.unidade),
   ]);
+  plpMpCarregar();
   M.cat = cat || [];
   M.itens = new Map((itens || []).map((i) => [i.nome_base, i]));
   const um = (itens || []).find((i) => i.id_plano);
@@ -2658,12 +2659,17 @@ function plpManRender() {
       const salvo = it && it.planejado != null ? plpQtd(it.planejado) : '';
       const v = M.dig[k] !== undefined ? M.dig[k] : salvo;
       const un = (it && it.un) || r.un || '';
-      h += `<tr><td>${trEscH(k)}</td><td style="color:var(--tx-3);">${trEscH(plpManNomeF(r.familia))}</td>
+      const temMp = !fechado && M.mp && M.mp.has(k), mpAb = temMp && M.mpAberto && M.mpAberto[k];
+      const pelaMp = salvo && it && it.forma === 'MATERIA_PRIMA' && it.qtd_mp != null
+        ? ` <span style="font-size:11px; color:var(--tx-4);">pelos ${trEscH(plpQtd(it.qtd_mp))} ${trEscH(String(it.un_mp || '').toLowerCase())} de ${trEscH(it.insumo_mp || '')}</span>` : '';
+      h += `<tr><td>${trEscH(k)}${temMp ? `<div><button type="button" class="preset-btn${mpAb ? ' active' : ''}" style="font-size:11.5px; padding:2px 8px; margin-top:3px;" onclick="plpMpAbrir(${js(k)})"
+            title="Quando você sabe quanto tem de matéria-prima e não quanto vai render">${mpAb ? '× fechar' : 'Tenho X kg de matéria-prima ›'}</button></div>` : ''}</td><td style="color:var(--tx-3);">${trEscH(plpManNomeF(r.familia))}</td>
         <td style="white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" value="${trEscH(v)}" ${fechado ? 'disabled' : ''}
             oninput="PLP.man.dig[${js(k)}]=this.value; plpManPintar();" onchange="plpManSalvarUm(${js(k)})"
             style="${campo} border:1px solid ${salvo ? 'var(--farol-ok)' : 'var(--info)'};">
           <span style="color:var(--tx-4); font-size:11px;">${trEscH(un)}</span>
-          <span id="${plpIdK('m' + k)}" style="font-size:11px; color:${salvo ? 'var(--farol-ok)' : 'var(--tx-5)'};">${salvo ? 'no plano' : ''}</span></td></tr>`;
+          <span id="${plpIdK('m' + k)}" style="font-size:11px; color:${salvo ? 'var(--farol-ok)' : 'var(--tx-5)'};">${salvo ? 'no plano' : ''}</span>${pelaMp}</td></tr>`;
+      if (mpAb) h += plpMpLinhaHtml(k);
     });
   });
   h += `</tbody></table></div>`;
@@ -2720,6 +2726,139 @@ async function plpManFechar() {
   const n = plpManNoPlano().length;
   if (!M.idPlano || !n) { avisoAcao('atencao', '! Digite a quantidade de ao menos uma receita antes de fechar.'); return; }
   await plpFecharGerar(M.idPlano, M.data, n);
+}
+
+// PLANEJAR PELA MATÉRIA-PRIMA (dono, qui 12/11/2026 03:05: "às vezes ela tem só X kg de acém e não sabe quanto vai render";
+// livro chat-frente-estoque/respostas/plano-pela-materia-prima; proposta contexto/propostas-telas/2026-11-12-plano-pela-materia-prima.md).
+// "Tenho X kg de [insumo ▾]": o rendimento aparece na hora (est_plano_pela_mp) e grava por est_plano_salvar_pela_mp.
+// Os insumos de cada receita vêm de vw_est_plano_receita_mp, lida uma vez (≈2 s) sem segurar a tela.
+function plpMpCarregar() {
+  const M = PLP && PLP.man;
+  if (!M || M.mp || M.mpLendo) return;
+  M.mpLendo = consultarTudo('vw_est_plano_receita_mp?select=nome_base,insumo,un_insumo,posicao,e_principal,principal_clara,rende_por_un_insumo,un_receita&order=nome_base,posicao')
+    .then((rows) => {
+      const mp = new Map();
+      (rows || []).forEach((x) => { if (!mp.has(x.nome_base)) mp.set(x.nome_base, []); mp.get(x.nome_base).push(x); });
+      M.mp = mp;
+    })
+    .catch(() => { M.mp = new Map(); })
+    .then(() => {
+      M.mpLendo = null;
+      // não tirar o foco de quem está digitando: redesenha no próximo desenho
+      const a = document.activeElement;
+      if (a && a.closest && a.closest('#tabelaPlanoManual')) return;
+      if (PLP.manual) plpManRender();
+    });
+}
+function plpMpEstado(k) {
+  const M = PLP.man;
+  M.mpDig = M.mpDig || {};
+  if (!M.mpDig[k]) {
+    const ops = M.mp.get(k) || [];
+    const p = ops.find((o) => o.e_principal);
+    const clara = ops.length && ops.every((o) => o.principal_clara !== false);
+    M.mpDig[k] = { qtd: '', insumo: clara && p ? p.insumo : '', res: null, erro: null };
+  }
+  return M.mpDig[k];
+}
+function plpMpAbrir(k) {
+  const M = PLP.man;
+  M.mpAberto = M.mpAberto || {};
+  M.mpAberto[k] = !M.mpAberto[k];
+  plpManRender();
+  if (M.mpAberto[k]) { const i = document.getElementById(plpIdK('mpq' + k)); if (i) i.focus(); }
+}
+function plpMpLinhaHtml(k) {
+  const M = PLP.man, s = plpMpEstado(k), ops = M.mp.get(k) || [];
+  const js = (v) => trEscH(JSON.stringify(v));
+  const op = ops.find((o) => o.insumo === s.insumo);
+  const unMp = op ? String(op.un_insumo || '').toLowerCase() : 'kg';
+  const sel = `<select id="${plpIdK('mps' + k)}" onchange="plpMpDig(${js(k)}, 'insumo', this.value)"
+      style="background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); color:var(--p-ink, var(--tx-1)); border-radius:6px; padding:5px 8px; max-width:260px;">
+      ${s.insumo ? '' : '<option value="">escolha a matéria-prima</option>'}
+      ${ops.map((o) => `<option value="${trEscH(o.insumo)}"${o.insumo === s.insumo ? ' selected' : ''}>${trEscH(o.insumo)}${o.e_principal && o.principal_clara !== false ? ' (principal)' : ''}</option>`).join('')}</select>`;
+  return `<tr class="plp-mp"><td colspan="3" style="background:var(--surface-2); border-left:3px solid var(--info); padding:8px 10px;">
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <b>Tenho</b>
+        <input id="${plpIdK('mpq' + k)}" type="number" step="0.001" min="0" inputmode="decimal" value="${trEscH(s.qtd)}"
+          oninput="plpMpDig(${js(k)}, 'qtd', this.value)"
+          style="width:84px; background:var(--p-paper, var(--surface-2)); border:1px solid var(--info); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:5px 8px; font-weight:700;">
+        <span id="${plpIdK('mpu' + k)}" style="color:var(--tx-4);">${trEscH(unMp)}</span> de ${sel}
+        <button type="button" class="preset-btn active" onclick="plpMpSalvar(${js(k)})">Pôr no plano</button>
+      </div>
+      <div id="${plpIdK('mpr' + k)}" style="margin-top:6px; text-align:left;">${plpMpResHtml(k)}</div></td></tr>`;
+}
+function plpMpResHtml(k) {
+  const M = PLP.man, s = plpMpEstado(k);
+  if (s.erro) return `<span style="color:var(--farol-fora);">${trEscH(s.erro)}</span>`;
+  if (!s.insumo) return `<span style="color:var(--farol-perto);">Esta receita tem dois insumos quase do mesmo peso: escolha qual matéria-prima você tem.</span>`;
+  if (!s.res) return `<span style="color:var(--tx-4);">${s.lendo ? 'Calculando…' : 'Digite quanto você tem: o rendimento aparece aqui.'}</span>`;
+  const L = s.res, l0 = L[0] || {};
+  const un = String(l0.un_receita || '').toUpperCase();
+  const q = (v, u) => `${Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${String(u || '').toLowerCase()}`;
+  const rende = un === 'KG' || un === 'L' ? q(l0.planejar, un) : `${Math.floor(Number(l0.planejar || 0))} ${un.toLowerCase()}`;
+  let h = `<b style="color:var(--farol-ok);">Rende ${trEscH(rende)} de ${trEscH(k)}.</b>`;
+  const outros = L.filter((x) => !x.e_a_mp && Number(x.qtd_ingrediente) > 0);
+  // a principal, quando a matéria-prima escolhida não é ela
+  const ops = M.mp.get(k) || [], p = ops.find((o) => o.e_principal);
+  const princ = !l0.mp_e_a_principal && p ? outros.find((x) => x.ingrediente === p.insumo) : null;
+  if (princ) h += ` <span>Vai pedir <b>${trEscH(q(princ.qtd_ingrediente, princ.un_ingrediente))} de ${trEscH(princ.ingrediente)}</b>.</span>`;
+  const resto = outros.filter((x) => x !== princ);
+  if (resto.length) h += `<div style="font-size:12.5px; color:var(--tx-3); margin-top:3px;">Vai pedir também: ${resto.map((x) => `${trEscH(x.ingrediente)} ${trEscH(q(x.qtd_ingrediente, x.un_ingrediente))}`).join(' · ')}</div>`;
+  if (l0.rendimento_real != null) {
+    const n = Number(l0.apontamentos_reais || 0);
+    h += `<div style="font-size:12px; color:var(--tx-4); margin-top:3px;">Pela ficha, 1 ${trEscH(String(l0.un_mp || '').toLowerCase())} rende ${trEscH(q(l0.rendimento_ficha, un))} · nas últimas ${n} ${n === 1 ? 'produção' : 'produções'} rendeu ${trEscH(q(l0.rendimento_real, un))}</div>`;
+  }
+  return h;
+}
+function plpMpPintar(k) {
+  const el = document.getElementById(plpIdK('mpr' + k)); if (el) el.innerHTML = plpMpResHtml(k);
+  const s = plpMpEstado(k), op = (PLP.man.mp.get(k) || []).find((o) => o.insumo === s.insumo);
+  const u = document.getElementById(plpIdK('mpu' + k)); if (u) u.textContent = op ? String(op.un_insumo || '').toLowerCase() : 'kg';
+}
+function plpMpDig(k, campo, v) {
+  const s = plpMpEstado(k);
+  s[campo] = v; s.res = null; s.erro = null;
+  clearTimeout(s.t);
+  const qtd = Number(String(s.qtd).replace(',', '.'));
+  if (!s.insumo || !(qtd > 0)) { plpMpPintar(k); return; }
+  s.lendo = true; plpMpPintar(k);
+  s.t = setTimeout(async () => {
+    const pedido = (s.pedido || 0) + 1; s.pedido = pedido;
+    const r = await trRpcSeguro('est_plano_pela_mp', { p_nome_base: k, p_qtd_mp: qtd, p_insumo: s.insumo });
+    if (pedido !== s.pedido) return;   // já digitou outro número
+    s.lendo = false;
+    if (r.ok) s.res = await r.json().catch(() => []); else s.erro = await trErroDe(r);
+    plpMpPintar(k);
+  }, 300);
+}
+function plpMpSalvar(k) {
+  const M = PLP.man;
+  M.fila = (M.fila || Promise.resolve()).then(() => plpMpGravar(k)).catch(() => {});
+  return M.fila;
+}
+async function plpMpGravar(k) {
+  const M = PLP.man, s = plpMpEstado(k);
+  const qtd = Number(String(s.qtd).replace(',', '.'));
+  if (!s.insumo) { avisoAcao('atencao', `! ${k}: escolha qual matéria-prima você tem.`); return; }
+  if (!(qtd > 0)) { avisoAcao('atencao', `! ${k}: digite quanto você tem de ${s.insumo}.`); return; }
+  avisoAcao('enviando', `Gravando ${k} pelos ${plpQtd(qtd)} de ${s.insumo}…`);
+  const r = await trRpcSeguro('est_plano_salvar_pela_mp', { p_unidade: PLP.unidade, p_data_para: M.data, p_nome_base: k, p_qtd_mp: qtd,
+                                                            p_insumo: s.insumo, p_quem: ((rmbSessao() || {}).email || '') });
+  if (!r.ok) {
+    const erro = await trErroDe(r);
+    s.erro = erro; plpMpPintar(k);
+    avisoAcao('erro', `✗ ${k} NÃO foi para o plano: ${erro}. O número continua na tela — tente de novo.`, () => plpMpSalvar(k));
+    return;
+  }
+  const g = ((await r.json().catch(() => [])) || [])[0] || {};
+  if (g.id_plano) M.idPlano = g.id_plano;
+  if (!M.sit) M.sit = 'ABERTO';
+  M.itens.set(k, { id_plano: M.idPlano, situacao_plano: M.sit, nome_base: k, planejado: g.planejado, un: g.un,
+                   forma: 'MATERIA_PRIMA', insumo_mp: g.insumo_mp || s.insumo, qtd_mp: g.qtd_mp != null ? g.qtd_mp : qtd, un_mp: g.un_mp });
+  delete M.dig[k]; delete M.mpDig[k]; if (M.mpAberto) delete M.mpAberto[k];
+  avisoAcao('ok', `✓ ${k}: ${plpQtd(g.planejado)} ${g.un || ''} no plano de ${plpDm(M.data).slice(0, 5)}, pelos ${plpQtd(qtd)} de ${s.insumo} — às ${avisoHora()}.`);
+  plpManRender();
 }
 
 // A folha impressa segue o molde da folha de contagem: grupo por grupo, na ordem em que se
