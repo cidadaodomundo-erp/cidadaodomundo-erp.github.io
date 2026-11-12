@@ -196,16 +196,6 @@ let RH = null;
 // de novo solta. A lista de nomes fica INTEIRA de proposito: e por ela que se troca
 // de pessoa. Mesmo mecanismo do modulo evolucao.
 let RH_PESSOA = null;
-// O nome vai por INDICE, nunca como string dentro do onclick: nome com apostrofo
-// quebraria o atributo em silencio.
-let RH_NOMES = [];
-function rhFixar(i) {
-  const nome = RH_NOMES[i];
-  if (!nome) return;
-  RH_PESSOA = (RH_PESSOA === nome) ? null : nome;
-  renderModuloRh();
-}
-function rhSoltar() { RH_PESSOA = null; renderModuloRh(); }
 
 
 // ===== PAGAMENTO FORA DA FOLHA (04/09/2026) =====
@@ -3406,6 +3396,8 @@ const CG_SAIPOS_MOTIVO = { SEM_PROVISAO: 'o robô abre a provisão', PROVISAO_SO
   PAGO_DIFERENTE: 'já pago com outro valor: o robô não mexe em título pago', SEM_TITULO_VENCIDO: 'venceu sem provisão: o robô não abre (pagaria em dobro)' };
 const cgSaiposExcluir = (s) => s.acao === 'PARE' && /SOBRANDO$/.test(s.motivo_codigo || '');
 const cgSaiposAchar = (s) => [s.conta, cgData(s.vencimento), String(s.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''), cgR(s.valor_saipos)].filter(Boolean).join(' · ');
+// 12/11/2026 (usabilidade, pacertos): os cartões filtram a grade; abre em 'Excluir' quando há o que excluir
+function cgSaiposFiltrar(k) { CARGOS_F.saiposFiltro = CARGOS_F.saiposFiltro === k ? 'todas' : k; renderModuloCargos(); }
 function cgAbaSaipos() {
   const F = CARGOS_F;
   const todas = (CARGOS.saipos || []).filter(s => !F.unidade || s.unidade_pagadora === F.unidade);
@@ -3424,25 +3416,32 @@ function cgAbaSaipos() {
   const nParado = linhas.filter(s => s.acao === 'PARE' && !cgSaiposExcluir(s) && s.motivo_codigo !== 'NAO_FECHADO').length;
   const rot = { FOLHA_ADIANTAMENTO: 'Adiantamento', FOLHA_VT: 'Vale-transporte', FOLHA_VA: 'Vale-alimentação', FOLHA_BONIFICACAO: 'Bonificação', FORA_DA_FOLHA: 'Salário por fora', FOLHA_SALARIO: 'Salário' };
   const ordem = (s) => cgSaiposExcluir(s) ? 0 : s.acao === 'PARE' && s.motivo_codigo !== 'NAO_FECHADO' ? 1 : s.acao === 'ALTERAR' ? 2 : s.acao === 'ABRIR' ? 3 : 4;
-  const ord = [...linhas].sort((a, b) => ordem(a) - ordem(b) || String(a.vencimento).localeCompare(String(b.vencimento)));
+  const grupoDe = (s) => cgSaiposExcluir(s) ? 'excluir' : s.acao === 'PARE' ? (s.motivo_codigo === 'NAO_FECHADO' ? 'espera' : 'parado') : s.acao === 'ALTERAR' ? 'trocar' : s.acao === 'ABRIR' ? 'abrir' : 'outro';
+  if (!F.saiposFiltro) F.saiposFiltro = nExcl ? 'excluir' : 'todas';
+  const filtro = F.saiposFiltro;
+  const ord = [...linhas].filter(s => filtro === 'todas' || grupoDe(s) === filtro)
+    .sort((a, b) => ordem(a) - ordem(b) || String(a.vencimento).localeCompare(String(b.vencimento)));
+  const cartao = (k, classe, lbl, val, pct) => `<div class="card ${filtro === k ? 'highlight' : classe}" style="cursor:pointer;" onclick="cgSaiposFiltrar('${k}')" title="${filtro === k ? 'clique para ver todas' : 'clique para ver só estas'}"><div class="card-lbl">${lbl}${filtro === k ? ' ✕' : ''}</div><div class="card-val">${val}</div><div class="card-pct">${pct}</div></div>`;
   return cgFiltroUnidade(linhas.map(s => ({ unidade: s.unidade_pagadora }))) + `
     <div class="cards">
-      <div class="card ${n('ALTERAR') ? 'highlight' : 'neutral'}"><div class="card-lbl">Trocar o valor</div><div class="card-val">${n('ALTERAR')}</div><div class="card-pct">provisão com valor velho; o robô faz</div></div>
-      <div class="card neutral"><div class="card-lbl">Abrir a provisão</div><div class="card-val">${nAbrir}</div><div class="card-pct">o robô abre</div></div>
-      <div class="card ${nExcl ? 'highlight' : 'neutral'}"><div class="card-lbl">Excluir no Saipos</div><div class="card-val">${nExcl}</div><div class="card-pct">a Hellen exclui — o robô avisa</div></div>
-      ${nParado ? `<div class="card highlight"><div class="card-lbl">Parado</div><div class="card-val">${nParado}</div><div class="card-pct">o robô não mexe: conferir</div></div>` : ''}
-      <div class="card neutral"><div class="card-lbl">Esperando fechar</div><div class="card-val">${n('PARE', 'NAO_FECHADO')}</div><div class="card-pct">VT e VA do mês seguinte</div></div>
+      ${cartao('excluir', nExcl ? 'neg' : 'neutral', 'Excluir no Saipos', nExcl, 'a Hellen exclui — o robô avisa')}
+      ${nParado ? cartao('parado', 'neg', 'Parado', nParado, 'o robô não mexe: conferir') : ''}
+      ${cartao('trocar', 'neutral', 'Trocar o valor', n('ALTERAR'), 'o robô troca')}
+      ${cartao('abrir', 'neutral', 'Abrir a provisão', nAbrir, 'o robô abre')}
+      ${cartao('espera', 'neutral', 'Esperando fechar', n('PARE', 'NAO_FECHADO'), 'VT e VA do mês seguinte')}
     </div>
+    ${filtro !== 'todas' ? `<div style="margin:0 0 8px;"><button type="button" class="preset-btn" onclick="cgSaiposFiltrar('todas')">ver todas (${linhas.length})</button></div>` : ''}
     <div id="tabelaCgSaipos" style="overflow-x:auto;"><table>
-      <thead><tr><th>Vence</th><th>O quê</th><th>Loja</th><th>Quem</th><th>No painel</th><th>No Saipos</th><th>Situação</th></tr></thead>
-      <tbody>${ord.map(s => `<tr>
+      <thead><tr><th>Vence</th><th>O quê</th><th>Loja</th><th>Quem</th><th>No painel</th><th>No Saipos</th><th>Quem faz</th><th>Situação</th></tr></thead>
+      <tbody>${ord.length ? '' : '<tr><td colspan="8">Nada neste cartão.</td></tr>'}${ord.map(s => `<tr>
         <td>${cgData(s.vencimento)}</td><td>${cgEsc(rot[s.tipo] || s.tipo)}</td><td>${cgEsc(s.unidade_pagadora)}</td><td>${cgEsc(cgNome(s.quem))}</td>
         <td>${cgR(s.valor_painel)}</td><td style="color:var(--tx-4);">${s.valor_saipos != null ? cgR(s.valor_saipos) : '–'}</td>
+        <td>${cgSaiposExcluir(s) ? '<b>Hellen</b>' : (s.acao === 'ALTERAR' || s.acao === 'ABRIR') ? 'robô' : s.acao === 'PARE' && s.motivo_codigo !== 'NAO_FECHADO' ? 'conferir' : '—'}</td>
         <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : s.acao === 'ALTERAR' ? 'o robô troca o valor' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? (junto.has(s)
           ? `<div style="margin-top:3px;color:var(--tx-3);">sai junto com a de ${cgData(junto.get(s).vencimento)} (mesma recorrência)</div>`
           : `<div style="margin-top:3px;color:var(--tx-2);" title="título ${cgEsc(s.id_titulo || '')}">No Saipos: <b>${cgEsc(cgSaiposAchar(s))}</b>${temMais.has(s) ? ` — excluir "este e os próximos"` : ''}</div>`) : ''}</td></tr>`).join('')}</tbody>
     </table></div>
-    <div class="caption-label" style="text-align:left;margin-top:8px;">${nCerto ? `${nCerto} lançamentos já certos · ` : ''}o painel mostra a troca do Saipos umas 2 h depois.</div>`;
+    <div class="caption-label" style="text-align:left;margin-top:8px;">O robô troca e abre; excluir é com a Hellen. O painel atualiza ~2 h depois.${nCerto ? ` · ${nCerto} lançamentos já certos` : ''}</div>`;
 }
 
 // ---------- CORREÇÕES NA FLASH (também a tela 'flash', da Arissa) ----------
@@ -3624,7 +3623,7 @@ function renderModuloRh() {
     <button type="button" class="preset-btn ${RH_ABA === 'hist' ? 'active' : ''}" onclick="rhIr('aba','hist')">Histórico (saíram) · ${histC.length}</button>
     <span style="margin-left:auto;font-size:12px;">${lida}</span></div>
     ${P ? `<div style="margin:0 0 10px;"><button type="button" class="preset-btn active" onclick="rhIr('pessoa',null)">${cgEsc(cgNome(cP.nome_completo || P))} ✕</button></div>` : ''}`;
-  const titulo = '<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;">Descontos em folha</div>';
+  const titulo = '<h2 style="margin-top:0;">Descontos em folha</h2>';
 
   if (RH_ABA === 'hist') {
     const H = RH.hist, tot = histC.reduce((a, c) => a + n(c.a_descontar_historico), 0);
@@ -3681,7 +3680,7 @@ function renderModuloRh() {
     <div id="tabelaRhFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>O quê</th><th>Parcela</th><th>Valor</th><th>Sai de</th><th>No pagamento</th><th>Confere</th></tr></thead><tbody>
     ${doDia.map((r) => { const c = confDe(r), pri = !visto.has(r.colaborador); visto.add(r.colaborador);
       const okTxt = !c ? '<span style="color:var(--tx-5);">–</span>' : c.situacao === 'CONFERE' ? '<span style="color:var(--farol-ok);">✓</span>' : c.situacao === 'DIFERENTE' ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${R(c.diferenca)}</span>` : '<span style="color:var(--tx-4);">previsto</span>';
-      return `<tr><td>${pri ? NC(r) : ''}</td><td>${cgEsc(r.descricao || '')}${r.credor && r.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(r.credor))}</span>` : ''}</td>
+      return `<tr><td${pri ? '' : ' style="color:var(--tx-4);"'}>${NC(r)}</td><td>${cgEsc(r.descricao || '')}${r.credor && r.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(r.credor))}</span>` : ''}</td>
         <td>${r.parcela_n ? `${r.parcela_n} de ${r.parcelas_total}` : '—'}</td><td>${R(r.valor)}</td><td>${r.onde === 'POR FORA' ? 'por fora' : cgEsc(r.onde || '—')}</td>
         <td>${pri && c && c.situacao !== 'PREVISTO' ? R(c.no_pagamento) : ''}</td><td>${pri ? okTxt : ''}</td></tr>`; }).join('') || '<tr><td colspan="7">Nada nesta folha.</td></tr>'}
     </tbody><tfoot><tr class="liq"><td>Total · ${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}</td><td></td><td></td><td>${R(totDia)}</td><td></td><td>${confDia.some((x) => x.situacao !== 'PREVISTO') ? R(confDia.reduce((a, x) => a + n(x.no_pagamento), 0)) : ''}</td><td></td></tr></tfoot></table></div>`;
@@ -3721,8 +3720,9 @@ function renderModuloRh() {
     </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td></tr></tfoot></table></div>`;
 
   // Bloco 4: depósitos da Rita (Vales Cidadão) — ela deposita na conta, não sai da folha
-  if (depAll.length) h += `<div class="section-label">Depósitos da Rita (Vales Cidadão)</div><div id="tabelaRhDeposito" style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Nome completo</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
-    ${depAll.map((d) => `<tr><td>${cgData(d.data_deposito)}</td><td>${NC(d)}</td><td>${R(d.valor)}</td><td>${d.status === 'PAGO' ? '<span style="color:var(--farol-ok);">✓ depositou</span>' : (String(d.data_deposito).slice(0, 10) < hoje ? '<span style="color:var(--farol-perto);font-weight:700;">aguardando (passou da data)</span>' : 'aguardando')}</td></tr>`).join('')}</tbody></table></div>`;
+  // 12/11/2026 (usabilidade): sem deposito em aberto, o bloco fica recolhido
+  if (depAll.length) h += `<details${depAb.length ? ' open' : ''}><summary class="section-label" style="cursor:pointer;">Depósitos da Rita (Vales Cidadão)${depAb.length ? '' : ' · nada em aberto'}</summary><div id="tabelaRhDeposito" style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Nome completo</th><th>Valor</th><th>Situação</th></tr></thead><tbody>
+    ${depAll.map((d) => `<tr><td>${cgData(d.data_deposito)}</td><td>${NC(d)}</td><td>${R(d.valor)}</td><td>${d.status === 'PAGO' ? '<span style="color:var(--farol-ok);">✓ depositou</span>' : (String(d.data_deposito).slice(0, 10) < hoje ? '<span style="color:var(--farol-perto);font-weight:700;">aguardando (passou da data)</span>' : 'aguardando')}</td></tr>`).join('')}</tbody><tfoot><tr class="liq"><td>Total</td><td>${depAll.length} ${depAll.length === 1 ? 'depósito' : 'depósitos'}</td><td>${R(depAll.reduce((a, d) => a + n(d.valor), 0))}</td><td>${depAb.length ? R(depAb.reduce((a, d) => a + n(d.valor), 0)) + ' aguardando' : ''}</td></tr></tfoot></table></div></details>`;
 
   // Bloco 5: devolver a quem emprestou (só quando há o que devolver; o detalhe abre no clique)
   if (credor.length && !P) h += `<div class="section-label">A repassar a quem emprestou</div><div id="tabelaRhCredor" style="overflow-x:auto;"><table><thead><tr><th>Quem emprestou</th><th>Emprestado</th><th>A repassar (conforme desconta)</th></tr></thead><tbody>
@@ -3731,7 +3731,7 @@ function renderModuloRh() {
       if (ab) t += `<tr><td colspan="3"><table style="font-size:12.5px;"><thead><tr><th>Funcionário</th><th>O quê</th><th>Falta descontar (a repassar)</th></tr></thead><tbody>
         ${RH.credorDet.filter((d) => d.credor === c.credor && n(d.a_reembolsar) > 0).map((d) => { const pc = RH.colab.find((x) => x.colaborador === d.colaborador) || d;
           return `<tr><td>${NC(pc)}</td><td>${cgEsc(d.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgData(d.data_concessao)}</span></td><td>${R(d.a_reembolsar)}</td></tr>`; }).join('')}</tbody></table></td></tr>`;
-      return t; }).join('')}</tbody></table></div>`;
+      return t; }).join('')}</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(credor.reduce((a, c) => a + n(c.emprestado), 0))}</td><td>${R(devolver)}</td></tr></tfoot></table></div>`;
   alvo.innerHTML = h;
 }
 
