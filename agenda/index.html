@@ -225,7 +225,7 @@ function agDesenhar() {
   const novos = itens.filter((x) => x.pend && agRetNovo(x.pend));
   if (!novos.length) AG.soNovos = false;
   if (novos.length) h += `<div id="agRetCont" style="margin:6px 2px 0;"><a href="javascript:void(0)" onclick="agSoNovos(${AG.soNovos ? 'false' : 'true'})" style="color:var(--farol-fora);font-weight:700;text-decoration:none;">● ${novos.length} ${novos.length === 1 ? 'resposta nova' : 'respostas novas'}</a>${AG.soNovos ? ' <a href="javascript:void(0)" onclick="agSoNovos(false)" class="f">· ver tudo</a>' : ''}</div>`;
-  if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, 'nenhuma resposta nova');
+  if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, '');
   else h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
   alvo.innerHTML = h;
   agRolarAteItem();
