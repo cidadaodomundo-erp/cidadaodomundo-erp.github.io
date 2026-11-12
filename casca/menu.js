@@ -143,7 +143,7 @@ window.CASCA_MENU = [
    },
    {
     "chave": "clientes",
-    "rotulo": "Clientes",
+    "rotulo": "Clientes do iFood",
     "icone": "👥"
    }
   ]

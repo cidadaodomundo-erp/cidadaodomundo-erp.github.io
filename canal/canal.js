@@ -2380,24 +2380,24 @@ function renderModuloRelatorios(idSelecionado, abaIdx = 0) {
   const segPassada = new Date(domPassado); segPassada.setDate(segPassada.getDate() - 6);
   const isoD = (d) => d.toISOString().slice(0, 10);
 
+  // 12/11/2026 (usabilidade): o gerador desceu para um <details> no fim; abrem os resumos.
   const gerador = `
-  <div class="contexto" style="text-align:left;">
-    <b>Gerar relatório de qualquer período</b> — números e alertas calculados na hora, com os filtros de
-    unidade/marca atuais. <span style="color:var(--tx-4);">(A análise interpretada e as ações recomendadas
-    continuam vindo do resumo automático de segunda-feira.)</span>
+  <details style="margin-top:18px;"${document.getElementById('relatorioAdHoc') && document.getElementById('relatorioAdHoc').innerHTML ? ' open' : ''}>
+    <summary style="cursor:pointer; font-weight:600;">▸ Gerar de outro período</summary>
+    <div class="caption-label">Números e alertas na hora, com a loja e a marca escolhidas; a análise vem do resumo de segunda.</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px;">
       <label style="font-size:12px; color:var(--tx-3);">De <input type="date" id="relIni" value="${isoD(segPassada)}"
-        style="background:#111110; border:1px solid #34332f; color:#fff; border-radius:6px; padding:5px 8px;"></label>
+        style="background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); border-radius:6px; padding:5px 8px;"></label>
       <label style="font-size:12px; color:var(--tx-3);">Até <input type="date" id="relFim" value="${isoD(domPassado)}"
-        style="background:#111110; border:1px solid #34332f; color:#fff; border-radius:6px; padding:5px 8px;"></label>
+        style="background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); border-radius:6px; padding:5px 8px;"></label>
       <button class="preset-btn" onclick="gerarRelatorioAdHoc()">Gerar relatório</button>
     </div>
-  </div>
-  <div id="relatorioAdHoc"></div>`;
+    <div id="relatorioAdHoc"></div>
+  </details>`;
 
   if (!RELATORIOS.length) {
     alvo.innerHTML = `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Relatórios</div>
+    <h2 style="margin-top:0;">Resumos semanais</h2>
     ${gerador}
     <div class="contexto" style="border-color:#c8102e;">
       Ainda não há resumos semanais publicados.<br>
@@ -2424,16 +2424,18 @@ function renderModuloRelatorios(idSelecionado, abaIdx = 0) {
     corpoSel = secoes[abaIdx].innerHTML;
   }
 
+  // RELATORIOS vem do mais novo para o mais antigo: anterior = indice + 1.
+  const iSel = RELATORIOS.indexOf(sel), relAnt = RELATORIOS[iSel + 1], relProx = RELATORIOS[iSel - 1];
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Relatórios</div>
-  ${gerador}
-  <div class="section-label">Resumos semanais</div>
+  <h2 style="margin-top:0;">Resumos semanais</h2>
   <div class="periodo-presets">
-    ${RELATORIOS.map(r => `<button class="preset-btn ${r.id === sel.id ? 'active' : ''}"
-      onclick="renderModuloRelatorios(${r.id})">${formatarDataCurta(r.semana_ini)} – ${formatarDataCurta(r.semana_fim)}</button>`).join('')}
+    <button class="preset-btn" ${relAnt ? `onclick="renderModuloRelatorios(${relAnt.id})"` : 'disabled'}>‹ semana anterior</button>
+    <button class="preset-btn active">${formatarDataCurta(sel.semana_ini)} – ${formatarDataCurta(sel.semana_fim)}</button>
+    <button class="preset-btn" ${relProx ? `onclick="renderModuloRelatorios(${relProx.id})"` : 'disabled'}>próxima ›</button>
   </div>
   ${barraAbas}
-  <div class="relatorio-corpo">${corpoSel}</div>`;
+  <div class="relatorio-corpo">${corpoSel}</div>
+  ${gerador}`;
 }
 
 // Relatorio sob demanda: mesmos numeros validados do painel, para o periodo escolhido,
@@ -2497,20 +2499,25 @@ async function gerarRelatorioAdHoc() {
     title="Abre ${tela}. A tela usa a janela de datas padrão dela, não o período deste relatório.">${txt}
     <span style="font-size:11px; color:var(--tx-5);">abrir ${tela} →</span></li>`;
   if (negSem > 0) alertas.push(alerta(`<b style="color:var(--farol-fora);">${negSem} negociações sem resposta</b> (${pct(negResp ? negSem / negResp * 100 : 0)}% das ${negResp} que dependem da loja) — resposta evita cancelamento automático.`, 'negociacoes', 'Negociações'));
-  if (negs.length && negAtraso / negs.length > 0.4) alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(negAtraso / negs.length * 100)}% das negociações por atraso</b> — olhar preparo/despacho no pico.`, 'negociacoes', 'Negociações'));
-  if (notaMedia !== null && notaMedia < 4.6) alertas.push(alerta(`<b style="color:var(--farol-fora);">Nota média ${notaMedia.toFixed(2).replace('.', ',')}</b> abaixo do padrão da rede (4,6+).`, 'avaliacoes', 'Avaliações'));
+  // 12/11/2026 (usabilidade): os cortes saem de metas_kpi (o mesmo farol do Placar); sem a meta, vale o corte antigo.
+  const kpiFora = (chave, v, socorro) => { const k = (METAS_KPI || []).find(x => x.chave === chave);
+    return k ? farolKpi(k, v)[1] === 'fora' : socorro; };
+  const metaTxt = (chave) => { const k = (METAS_KPI || []).find(x => x.chave === chave); return k ? ' — meta: ' + fmtMeta(k) : ''; };
+  const pctAtrasoNeg = negs.length ? negAtraso / negs.length * 100 : null;
+  if (pctAtrasoNeg !== null && kpiFora('neg_atraso_pct', pctAtrasoNeg, pctAtrasoNeg > 40)) alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(pctAtrasoNeg)}% das negociações por atraso</b>${metaTxt('neg_atraso_pct')} — olhar preparo/despacho no pico.`, 'negociacoes', 'Negociações'));
+  if (notaMedia !== null && kpiFora('nota_media', notaMedia, notaMedia < 4.6)) alertas.push(alerta(`<b style="color:var(--farol-fora);">Nota média ${notaMedia.toFixed(2).replace('.', ',')}</b>${metaTxt('nota_media')}.`, 'avaliacoes', 'Avaliações'));
   // Notas ruins: quem decide e' o farol do indicador (metas_kpi), o mesmo do card e do Placar.
   // Aqui nao ha numero solto (ate 06/10/2026 era um "mais de 5%" escrito a mao).
   if (avs.length && kRuins && farolKpi(kRuins, pctRuins)[1] === 'fora') alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(pctRuins)}% de ${NOTA_RUIM_ROT}</b> no período (${ruinsRel.n.toLocaleString('pt-BR')} de ${avs.length.toLocaleString('pt-BR')} avaliações) — meta: até ${fmtKpi(kRuins.unidade, Number(kRuins.meta))}.`, 'avaliacoes', 'Avaliações'));
-  if (m.valorCanceladoPct > 1.2) alertas.push(alerta(`<b style="color:var(--farol-fora);">Cancelamentos em ${pct(m.valorCanceladoPct)}% do bruto</b> — acima do normal (~0,9%).`, 'cancelamentos', 'Cancelamentos'));
+  if (kpiFora('taxa_cancelamento', m.nFullPct, m.valorCanceladoPct > 1.2)) alertas.push(alerta(`<b style="color:var(--farol-fora);">Cancelamento total em ${pct(m.nFullPct)}% dos pedidos</b>${metaTxt('taxa_cancelamento')}.`, 'cancelamentos', 'Cancelamentos'));
   if (!alertas.length) alertas.push('<li>Nenhum alerta pelas regras automáticas — período dentro dos padrões.</li>');
 
   alvo.innerHTML = `<div class="relatorio-corpo" style="margin-top:12px;">
     <h2>Relatório de ${formatarDataCurta(ini)} a ${formatarDataCurta(fim)} (${dias} dias)</h2>
     <p style="color:var(--tx-4);" title="Números do banco, sem análise interpretada. Recorte atual de unidades e marcas aplicado.">Comparação: ${temAnterior ? `${formatarDataCurta(iniAnt)} a ${formatarDataCurta(fimAnt)}` : 'sem período anterior disponível'}.</p>
     <h3>Resultado</h3>
-    <table>
-      <tr><th>Indicador</th><th>Período</th><th>Anterior</th><th>Variação</th></tr>
+    <div id="tabelaRelAdHoc"><table>
+      <thead><tr><th>Indicador</th><th>Período</th><th>Anterior</th><th>Variação</th></tr></thead>
       ${linha('Pedidos', m.totalPedidos, a && a.totalPedidos, 'int')}
       ${linha('Faturamento bruto (venda cheia, com frete)', m.bruto, a && a.bruto, 'moeda')}
       ${linha('Ticket médio', m.ticketMedio, a && a.ticketMedio, 'moeda')}
@@ -2519,7 +2526,7 @@ async function gerarRelatorioAdHoc() {
       ${linha('Líquido', m.liquido, a && a.liquido, 'moeda')}
       ${linha('Custo iFood (% do bruto)', m.custoIfoodPct, a && a.custoIfoodPct, 'pct', 'menorMelhor')}
       ${linha('Valor cancelado', m.valorCancelado, a && a.valorCancelado, 'moeda', 'menorMelhor')}
-    </table>
+    </table></div>
     <h3>Qualidade e pós-venda</h3>
     <ul>
       <li>Avaliações: <b>${avs.length}</b>${notaMedia !== null ? ` — nota média <b>${notaMedia.toFixed(2).replace('.', ',')}</b>, ${pct(pctRuins)}% de ${NOTA_RUIM_ROT} (${ruinsRel.n})` : ''}</li>
@@ -3290,43 +3297,47 @@ function renderModuloClientes(mesSel) {
   const rotuloMes = (() => { const [a, m2] = mes.split('-'); return `${MESES_ABREV[Number(m2) - 1]}/${a}`; })();
 
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Clientes — canal iFood</div>
-  <div class="caption-label" style="text-align:center;">
-    Retrato mensal do Portal de Redes (seletor abaixo — não segue o filtro de datas do topo).
-    <b>Novo</b> = primeiro pedido no mês · <b>Frequente</b> = mais de um pedido · <b>Recuperado</b> = voltou após 30+ dias sem comprar.
-  </div>
+  <h2 style="margin-top:0;">Clientes do iFood</h2>
+  <div class="caption-label" style="text-align:center;">Retrato do mês no Portal de Redes · passe o mouse no cartão para ver a definição.</div>
   <div class="periodo-presets">
-    ${meses.map(m2 => { const [a2, mm] = m2.split('-'); return `<button class="preset-btn ${m2 === mes ? 'active' : ''}"
-      onclick="renderModuloClientes('${m2}')">${MESES_ABREV[Number(mm) - 1]}/${a2}</button>`; }).join('')}
+    ${(() => { const i = meses.indexOf(mes), ant = meses[i + 1], prox = meses[i - 1];
+      return `<button class="preset-btn" ${ant ? `onclick="renderModuloClientes('${ant}')"` : 'disabled'}>‹ mês anterior</button>
+      <button class="preset-btn active">${rotuloMes}</button>
+      <button class="preset-btn" ${prox ? `onclick="renderModuloClientes('${prox}')"` : 'disabled'}>próximo ›</button>`; })()}
   </div>
   <div class="cards">
     ${ordemTipos.map(t => { const o = porTipo.get(t) || { cli: 0, ped: 0, vendas: 0 };
       // Ticket medio do tipo = vendas DO TIPO divididas por pedidos DO TIPO, somados
       // antes de dividir. Nunca a media dos ticket_medio das linhas: media de media
       // pesa loja pequena igual a loja grande.
-      const tk = o.ped ? o.vendas / o.ped : 0; return `
-      <div class="card ${t === 'Novos' ? 'pos' : 'neutral'}"><div class="card-lbl">${t}</div>
+      const tk = o.ped ? o.vendas / o.ped : 0;
+      const def = { Novos: 'Novo: primeiro pedido no mês.', Frequentes: 'Frequente: mais de um pedido no mês.',
+        Recuperados: 'Recuperado: voltou depois de 30+ dias sem comprar.' }[t] || ''; return `
+      <div class="card ${t === 'Novos' ? 'pos' : 'neutral'}" title="${def}"><div class="card-lbl">${t}</div>
       <div class="card-val">${o.cli.toLocaleString('pt-BR')}</div>
       <div class="card-pct">${o.ped.toLocaleString('pt-BR')} pedidos · R$ ${fmt(o.vendas)}</div>
       <div class="card-delta" title="Ticket médio deste tipo no mês selecionado: R$ ${fmt(o.vendas)} de vendas divididos pelos ${o.ped.toLocaleString('pt-BR')} pedidos do tipo.">ticket R$ ${fmt(tk)}</div></div>`; }).join('')}
-    <div class="card neg"><div class="card-lbl">Inativos (30+ dias sem pedir)</div><div class="card-val">${inativos.toLocaleString('pt-BR')}</div><div class="card-pct">base parada — alvo de reativação</div></div>
+    <div class="card neg" title="Inativo: 30 dias ou mais sem pedir."><div class="card-lbl">Inativos (30+ dias sem pedir)</div><div class="card-val">${inativos.toLocaleString('pt-BR')}</div><div class="card-pct">base parada — alvo de reativação</div></div>
   </div>
 
   <div class="section-label">Por loja (${rotuloMes}) — menos frequentes por novo primeiro</div>
   <div id="tabelaClientesLojas">
     <table>
-      <tr><th>Loja</th><th>Novos</th><th>Frequentes</th><th>Recuperados</th><th>Total ativos</th><th title="Quantos clientes frequentes a loja tem para cada cliente novo do mês. Loja com muitos novos e poucos frequentes conquista mas não retém; o contrário indica base fiel com pouca atração.">Frequentes por novo</th><th title="Total de clientes ativos contra o mês anterior, no mesmo recorte de lojas.">vs mês anterior</th></tr>
-      ${lojas.map(x => `<tr><td>${x.nome}</td><td>${x.Novos || 0}</td><td>${x.Frequentes || 0}</td>
+      <thead><tr><th>Loja</th><th>Novos</th><th>Frequentes</th><th>Recuperados</th><th>Total ativos</th><th title="Quantos clientes frequentes a loja tem para cada cliente novo do mês. Em vermelho: abaixo da média da rede (conquista, mas não retém).">Frequentes por novo</th><th title="Total de clientes ativos contra o mês anterior, no mesmo recorte de lojas.">vs mês anterior</th></tr></thead><tbody>
+      ${(() => { const tn = lojas.reduce((s, x) => s + (x.Novos || 0), 0), tf = lojas.reduce((s, x) => s + (x.Frequentes || 0), 0);
+        const media = tn ? tf / tn : null;
+        return lojas.map(x => `<tr><td>${x.nome}</td><td>${x.Novos || 0}</td><td>${x.Frequentes || 0}</td>
         <td>${x.Recuperados || 0}</td><td><b>${x.total}</b></td>
-        <td>${x.ret === null ? '<span style="color:var(--tx-5);">—</span>' : x.ret.toFixed(1).replace('.', ',')}</td>
-        <td>${variacaoSpan(x.total, x.totalAnt)}</td></tr>`).join('')}
+        <td>${x.ret === null ? '<span style="color:var(--tx-5);">—</span>' : `<span${media !== null && x.ret < media ? ' style="color:var(--farol-fora);font-weight:700;"' : ''}>${x.ret.toFixed(1).replace('.', ',')}</span>`}</td>
+        <td>${variacaoSpan(x.total, x.totalAnt)}</td></tr>`).join(''); })()}
+      </tbody>
       ${(() => { const t = lojas.reduce((a, x) => ({ n: a.n + (x.Novos || 0), f: a.f + (x.Frequentes || 0),
           r: a.r + (x.Recuperados || 0), tot: a.tot + (x.total || 0) }), { n: 0, f: 0, r: 0, tot: 0 });
         const totAnt = aCli ? [...aCli.lojasM.values()].reduce((s, v) => s + v, 0) : null;
-        return `<tr class="liq"><td>TOTAL</td><td>${t.n.toLocaleString('pt-BR')}</td><td>${t.f.toLocaleString('pt-BR')}</td>
+        return `<tfoot><tr class="liq"><td>TOTAL</td><td>${t.n.toLocaleString('pt-BR')}</td><td>${t.f.toLocaleString('pt-BR')}</td>
           <td>${t.r.toLocaleString('pt-BR')}</td><td><b>${t.tot.toLocaleString('pt-BR')}</b></td>
           <td>${t.n ? (t.f / t.n).toFixed(1).replace('.', ',') : '—'}</td>
-          <td>${variacaoSpan(t.tot, totAnt)}</td></tr>`; })()}
+          <td>${variacaoSpan(t.tot, totAnt)}</td></tr></tfoot>`; })()}
     </table>
   </div>
   `;
@@ -4403,12 +4414,21 @@ function renderModuloAtrasos() {
       : p > 10 ? 'var(--farol-fora)' : 'var(--farol-ok)';
     return `<span style="color:${cor}; font-weight:600;">${p === null ? '—' : n1(p) + '%'}</span><span class="dre-av">${g.n.toLocaleString('pt-BR')} entregas</span>`;
   };
+  // 12/11/2026 (usabilidade): as tabelas "Por turno" e "Por dia" sairam; preparo,
+  // bancada e rua passam a morar no title da celula e no total da matriz.
+  const temposTit = (g) => 'preparo ' + n1(g.preparo) + ' min · bancada ' + n1(g.bancada) + ' min · rua ' + n1(g.rua) + ' min';
+  const celTot = (g) => `<td title="${temposTit(g)}">${celTxt(g)}</td>`;
+  const turnoTh = (t) => { const sel = ATRASOS_F.turno === t;
+    return `<td onclick="atrasosFiltrar('turno','${t}')" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o recorte' : 'clique para ver só o ' + String(t).toLowerCase() + ' · ' + (HORAS_TURNO[t] || '')}">${sel ? '<b>' + t + '</b> ✕' : '▸ ' + t}</td>`; };
+  const dowTh = (d) => { const sel = ATRASOS_F.dow === d;
+    return `<th onclick="atrasosFiltrar('dow',${d})" data-ordem-propria style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o recorte' : 'clique para ver só ' + DOW[d]}">${DOW[d]}${sel ? ' ✕' : ''}</th>`; };
+  const HORAS_TURNO = { 'ALMOÇO': '10h–14h', 'CAFÉ DA TARDE': '15h–16h', 'JANTAR': '17h–23h', 'MADRUGADA': '0h–1h' };
   const celulaMat = (t, d) => {
     const g = resumo(baseMat.filter(r => r.turno === t && r.dia_semana === d));
     const sel = ATRASOS_F.turno === t && ATRASOS_F.dow === d;
-    const tit = sel ? 'clique para soltar o recorte'
+    const tit = (sel ? 'clique para soltar o recorte'
       : 'clique para ver só ' + DOW[d] + ' no ' + String(t).toLowerCase()
-        + ' · ' + g.fora + ' de ' + g.medidos + ' entregas medidas fora do prazo';
+        + ' · ' + g.fora + ' de ' + g.medidos + ' entregas medidas fora do prazo') + ' · ' + temposTit(g);
     const clic = g.n ? ` onclick="atrasosMatriz('${t}',${d})" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${tit}"` : '';
     return `<td${clic}>${celTxt(g)}</td>`;
   };
@@ -4421,10 +4441,10 @@ function renderModuloAtrasos() {
   };
 
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Atrasos e turnos — entregas próprias${ATRASOS_UNIDADE !== 'TODAS' ? ' · ' + ATRASOS_UNIDADE : ''}, ${ddmm(ATRASOS.ini)} a ${ddmm(ATRASOS.fim)}</div>
+  <h2 style="margin-top:0;">Atrasos e turnos${ATRASOS_UNIDADE !== 'TODAS' ? ' · ' + ATRASOS_UNIDADE : ''} <span style="font-size:13px; font-weight:400; color:var(--tx-3);">${ddmm(ATRASOS.ini)} a ${ddmm(ATRASOS.fim)}</span></h2>
   ${chips}
   ${foodyCobertura(ATRASOS.rows)}
-  <div class="contexto" style="border-color:var(--farol-perto);" title="O prazo usado aqui é o horário prometido ao cliente no iFood, não o prazo padrão de 60 min do Foody. Os tempos são apontados por pessoas: veja a caixa Qualidade do apontamento, no fim da tela, antes de tirar conclusão fina. No TrackEat os horários de cada etapa só existem de 29/09/2026 em diante; antes disso a entrega conta, mas sem os tempos.">Fonte: TrackEat (Água Verde, Ahú e São Braz; antes de out/26 parte vinha do Foody) — só entrega com motoboy próprio; a entrega feita pelo iFood fica fora.</div>
+  <div class="caption-label" title="Só entrega com motoboy próprio; a entrega feita pelo iFood fica fora. O prazo é o horário prometido ao cliente no iFood, não o padrão de 60 min do Foody. Os tempos de cada etapa só existem de 29/09/2026 em diante.">Entregas próprias · TrackEat + Foody</div>
 
   ${(ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador) ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -4432,7 +4452,7 @@ function renderModuloAtrasos() {
     ${ATRASOS_F.dow ? `<button class="preset-btn active" onclick="atrasosFiltrar('dow',${ATRASOS_F.dow})">${DOW[ATRASOS_F.dow]} ✕</button>` : ''}
     ${ATRASOS_F.entregador ? `<button class="preset-btn active" onclick="atrasosFiltrar('entregador',null)">entregador ${ATRASOS_F.entregador.split('|')[1]} ✕</button>` : ''}
     <button class="preset-btn" onclick="atrasosLimparFiltros()">limpar</button>
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cartões, as tabelas e a caixa de qualidade estão neste recorte. A matriz não se recorta por turno nem por dia, e a dimensão que você fixou continua mostrando todas as suas opções — é por elas que se troca de escolha.</div>
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Cartões e listas seguem o recorte; a matriz continua mostrando todas as opções.</div>
   </div>` : ''}
 
   <div class="cards">
@@ -4444,58 +4464,40 @@ function renderModuloAtrasos() {
   <div class="caption-label" style="text-align:center;">Prazo = o horário prometido ao cliente no iFood, com 5 minutos de tolerância. "Atraso médio" conta só as entregas que saíram do prazo; preparo, bancada e rua são tempos médios de todas.</div>
 
   <div class="section-label">Onde o atraso acontece — turno por dia da semana</div>
-  <div class="caption-label" style="text-align:center;" title="A célula é a parte das entregas MEDIDAS (as que têm horário prometido) que chegou fora do prazo; embaixo vai quantas entregas o cruzamento teve. Acima de 10% fora do prazo é o mesmo corte do cartão Dentro do prazo, lá em cima. Menos de 30 entregas fica em cinza: o número existe, mas oscila demais para decidir em cima dele.">Quanto de cada cruzamento saiu do prazo. <b>Clique numa célula para fixar o turno e o dia de uma vez.</b></div>
+  <div class="caption-label" style="text-align:center;" title="A célula é a parte das entregas com horário prometido que chegou fora do prazo. Acima de 10% fica vermelho; menos de 30 entregas fica cinza (oscila demais). Passe o mouse para ver preparo, bancada e rua.">% fora do prazo. <b>Clique na célula, no turno ou no dia para filtrar.</b></div>
   <div id="tabelaAtrasosMatriz"><table>
-    <tr><th>Turno</th>${dowsMat.map(d => `<th>${DOW[d]}</th>`).join('')}<th>Todos os dias</th></tr>
-    ${turnosMat.map(t => `<tr><td>${t}</td>${dowsMat.map(d => celulaMat(t, d)).join('')}<td>${celTxt(resumo(baseMat.filter(r => r.turno === t)))}</td></tr>`).join('')}
-    <tr class="liq"><td>TODOS OS TURNOS</td>${dowsMat.map(d => `<td>${celTxt(resumo(baseMat.filter(r => r.dia_semana === d)))}</td>`).join('')}<td>${celTxt(resumo(baseMat))}</td></tr>
+    <thead><tr><th data-ordem-propria>Turno</th>${dowsMat.map(d => dowTh(d)).join('')}<th data-ordem-propria>Todos os dias</th></tr></thead><tbody>
+    ${turnosMat.map(t => `<tr>${turnoTh(t)}${dowsMat.map(d => celulaMat(t, d)).join('')}${celTot(resumo(baseMat.filter(r => r.turno === t)))}</tr>`).join('')}
+    </tbody><tfoot><tr class="liq"><td>TODOS OS TURNOS</td>${dowsMat.map(d => celTot(resumo(baseMat.filter(r => r.dia_semana === d)))).join('')}${celTot(resumo(baseMat))}</tr>
+    <tr class="sub"><td>preparo · bancada · rua</td>${dowsMat.map(d => { const g = resumo(baseMat.filter(r => r.dia_semana === d)); return `<td style="font-size:11px;">${n1(g.preparo)} · ${n1(g.bancada)} · ${n1(g.rua)} min</td>`; }).join('')}<td style="font-size:11px;">${n1(resumo(baseMat).preparo)} · ${n1(resumo(baseMat).bancada)} · ${n1(resumo(baseMat).rua)} min</td></tr></tfoot>
   </table></div>
 
-  <div class="section-label">Por turno (turnos do iFood: almoço 10h–14h · café 15h–16h · jantar 17h–23h · madrugada 0h–1h)</div>
-  <div id="tabelaAtrasosTurno"><table>
-    ${cabecalho}
-    ${turnos.map(t => t === null
-      ? linhaResumo('— (fora das faixas)', resumo(rows.filter(r => r.turno === null && passaF(r, 'turno'))))
-      : linhaClic(t, resumo(rows.filter(r => r.turno === t && passaF(r, 'turno'))), 'turno', t)).join('')}
-    ${linhaResumo('TOTAL', resumo(rows.filter(r => passaF(r, 'turno'))), 'liq')}
-  </table></div>
-
-  <div class="section-label">Por dia da semana</div>
-  <div id="tabelaAtrasosDow"><table>
-    ${cabecalho}
-    ${[1, 2, 3, 4, 5, 6, 7].map(d => rows.some(r => r.dia_semana === d)
-      ? linhaClic(DOW[d], resumo(rows.filter(r => r.dia_semana === d && passaF(r, 'dow'))), 'dow', d)
-      : '').join('')}
-    ${linhaResumo('TOTAL', resumo(rows.filter(r => passaF(r, 'dow'))), 'liq')}
-  </table></div>
+  ${piores10.length ? `<div class="section-label">Os 10 que mais atrasaram${ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador ? ' — neste recorte' : ''}</div>
+  <div class="caption-label" style="text-align:center;">Procure o código no portal do iFood; sem código, vai o nº do pedido no sistema de entrega.</div>
+  <div id="tabelaAtrasosPiores"><table>
+    <thead><tr><th>Dia</th>${multiUnidade ? '<th>Loja</th>' : ''}<th>Turno</th><th>Entregador</th><th>Atrasou</th><th>Na rua</th><th>Código</th></tr></thead><tbody>
+    ${piores10.map(r => `<tr>
+      <td>${ddmm(r.data_local)}</td>${multiUnidade ? `<td>${r.unidade || '—'}</td>` : ''}<td>${r.turno || '—'}</td>
+      <td>${r.entregador || '(sem apontamento)'}</td>
+      <td style="color:var(--farol-fora); font-weight:600;">${n1(r.atraso_min)} min</td>
+      <td title="${r.dist_km === null || r.dist_km === undefined ? '' : n1(r.dist_km) + ' km'}">${r.rua_min === null || r.rua_min === undefined ? '—' : n1(r.rua_min) + ' min'}</td>
+      <td>${r.localizador_ifood ? r.localizador_ifood : (r.numero ? 'nº ' + r.numero : '—')}</td></tr>`).join('')}
+  </tbody></table></div>` : ''}
 
   <div class="section-label">Por entregador — piores primeiro (mínimo 10 entregas no período)</div>
   <div class="caption-label" style="text-align:center;"><b>Clique numa linha para deixar a tela inteira falando daquele entregador.</b></div>
   <div id="tabelaAtrasosEntregador"><table>
-    <tr><th>Entregador</th><th>Tipo</th><th>Entregas</th><th>Dentro do prazo</th><th>Fora do prazo</th><th>Atraso médio</th><th>Rua</th><th>Distância média</th></tr>
+    <thead><tr><th>Entregador</th><th>Tipo</th><th>Entregas</th><th>Dentro do prazo</th><th>Fora do prazo</th><th>Atraso médio</th><th>Rua</th><th>Distância média</th></tr></thead><tbody>
     ${(() => { ATRASOS_LISTA_ENT = entregadores.map(e => e.chave);
       return entregadores.map((e, i) => { const sel = ATRASOS_F.entregador === e.chave;
       return `<tr onclick="atrasosFiltrarEnt(${i})" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o recorte' : 'clique para filtrar a tela por este entregador'}"><td>${sel ? '<b>' : ''}${e.nome}${sel ? '</b> ✕' : ''}</td><td>${e.tipo === 'internal' ? 'próprio' : e.tipo === 'external' ? 'externo' : e.tipo}</td>
       <td>${e.g.n}</td><td>${pctTxt(e.g.medidos - e.g.fora, e.g.medidos)}</td><td>${e.g.fora}</td><td>${e.g.atrasoMedio === null ? '—' : n1(e.g.atrasoMedio) + ' min'}</td><td>${n1(e.g.rua)} min</td><td>${n1(e.dist)} km</td></tr>`; }).join(''); })()}
-    <tr class="liq"><td>TODAS AS ENTREGAS</td><td>—</td>
+    </tbody><tfoot><tr class="liq"><td>TODAS AS ENTREGAS</td><td>—</td>
       <td>${geralEnt.n.toLocaleString('pt-BR')}</td><td>${pctTxt(geralEnt.medidos - geralEnt.fora, geralEnt.medidos)}</td><td>${geralEnt.fora.toLocaleString('pt-BR')}</td>
       <td>${geralEnt.atrasoMedio === null ? '—' : n1(geralEnt.atrasoMedio) + ' min'}</td><td>${n1(geralEnt.rua)} min</td>
-      <td>${n1(mediaDe(rowsEnt.map(r => r.dist_km)))} km</td></tr>
+      <td>${n1(mediaDe(rowsEnt.map(r => r.dist_km)))} km</td></tr></tfoot>
   </table></div>
   ${foraRanking ? `<div class="caption-label" style="text-align:center;">${foraRanking} entregador(es) com menos de 10 entregas no período ficaram fora do ranking.</div>` : ''}
-
-  ${piores10.length ? `<div class="section-label">Os 10 que mais atrasaram${ATRASOS_F.turno || ATRASOS_F.dow || ATRASOS_F.entregador ? ' — neste recorte' : ''}</div>
-  <div class="caption-label" style="text-align:center;">O código do iFood é o que se procura no portal; quando não tem, a entrega não veio de lá e aparece o número do pedido no sistema de entrega.</div>
-  <div id="tabelaAtrasosPiores"><table>
-    <tr><th>Dia</th><th>Turno</th><th>Entregador</th><th>Atrasou</th><th>Na rua</th><th>Distância</th><th>Código</th></tr>
-    ${piores10.map(r => `<tr>
-      <td>${ddmm(r.data_local)}</td><td>${r.turno || '—'}</td>
-      <td>${r.entregador || '(sem apontamento)'}</td>
-      <td style="color:var(--farol-fora); font-weight:600;">${n1(r.atraso_min)} min</td>
-      <td>${r.rua_min === null || r.rua_min === undefined ? '—' : n1(r.rua_min) + ' min'}</td>
-      <td>${r.dist_km === null || r.dist_km === undefined ? '—' : n1(r.dist_km) + ' km'}</td>
-      <td>${r.localizador_ifood ? r.localizador_ifood : (r.numero ? 'nº ' + r.numero : '—')}</td></tr>`).join('')}
-  </table></div>` : ''}
 
   <div class="section-label" title="Sem o pronto marcado, preparo e bancada daquelas entregas não existem. Pronto marcado junto do despacho, a menos de 1 min, é cheiro de correção atrasada: o pedido esperou na estufa e alguém marcou tudo de uma vez. Sem horário prometido nas observações, a entrega fica fora da conta de prazo. Quanto maiores esses números, menos dá pra confiar no preparo e na bancada; o prazo continua confiável, porque a entrega é apontada pelo motoboy na porta do cliente.">Qualidade do apontamento — o quanto dá pra confiar nos tempos</div>
   <div class="contexto">${semSentido ? `Tempos sem sentido, fora das contas: <b>${pctTxt(semSentido, geral.n)}</b> (${semSentido}) — ex.: entrega apontada 1h30 antes do horário prometido ou mais de 2h de rua; provável erro de apontamento.
