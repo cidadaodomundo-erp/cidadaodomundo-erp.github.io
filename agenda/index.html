@@ -195,7 +195,7 @@ function agDesenhar() {
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
     return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''} <span class="f" title="número do item (os chats citam por ele)">#${p.id}</span></span>${acao}${bts}${feito}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
     let b = '';
@@ -296,12 +296,15 @@ function agRespForm(id) {
   if (box.innerHTML) { box.innerHTML = ''; return; }
   const p = agPend(id);
   box.innerHTML = `<div class="ag-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin-top:6px;"><textarea id="agRespTx_${id}" rows="2" maxlength="2000" style="flex:1 1 260px;" placeholder="Sua resposta (a frente aplica e o item fecha sozinho)">${agE(p.resposta || '')}</textarea>
-    <button type="button" class="preset-btn active" onclick="agResponder(${id})">Enviar resposta</button><button type="button" class="preset-btn" onclick="agRespForm(${id})">Cancelar</button></div>`;
+    ${agAnxCampo('agArq_' + id)}<button type="button" class="preset-btn active" onclick="agResponder(${id})">Enviar resposta</button><button type="button" class="preset-btn" onclick="agRespForm(${id})">Cancelar</button></div>`;
   const t = document.getElementById('agRespTx_' + id); if (t) t.focus();
 }
 async function agResponder(id) {
   const t = document.getElementById('agRespTx_' + id), txt = t ? t.value.trim() : '';
-  if (!txt) return avisoAcao('atencao', '! Escreva a resposta.');
+  const arqs = agAnxArquivos('agArq_' + id);
+  if (!txt && !arqs.length) return avisoAcao('atencao', '! Escreva a resposta ou anexe um arquivo.');
+  if (arqs.length && !(await agAnxEnviar('pendencia', id, arqs, () => agResponder(id)))) return;
+  if (!txt) { avisoAcao('ok', `✓ ${arqs.length === 1 ? 'Anexo enviado' : arqs.length + ' anexos enviados'} às ${avisoHora()}. A frente vê no item.`); return entrarAgenda(true); }
   avisoAcao('enviando', 'Enviando a resposta…');
   const r = await trRpcSeguro('dono_pendencia_responder', { p_id: id, p_texto: txt });
   if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => agResponder(id));
@@ -374,7 +377,7 @@ async function agPlanoMontar(reler) {
       : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
     return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''} <span class="f">#${p.id}</span></span>${bts}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   let h = '';
   if (AGPL.pend && AGPL.pend.erro) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li as pendências: ${agE(AGPL.pend.erro)}</div>`;
@@ -464,7 +467,7 @@ function agPessoaHtml(L, soLeitura) {
       const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
         `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
       h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" id="agItem_${id}" style="flex-wrap:wrap;"><span class="t"><span class="f" style="float:right;" title="número do item">#${id}</span>${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
-        ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}</div>`;
+        ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}${agAnxLugar('tarefa', id)}</div>`;
       if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
     });
   });
@@ -497,7 +500,7 @@ function agPessoaForm(id, tipo) { AGP.form = AGP.form && AGP.form.id === id && A
 function agPessoaFormHtml(id, tipo) {
   if (tipo === 'prazo') return `<div class="ag-form"><span>Quantos dias a mais?</span>${[1, 2, 3].map((n) =>
     `<button type="button" class="preset-btn" onclick="agPessoaPrazo(${id},${n})">${n} ${n === 1 ? 'dia' : 'dias'}</button>`).join('')}<input type="text" id="agMotivo" maxlength="300" placeholder="motivo (se quiser)"></div>`;
-  if (tipo === 'resp') return `<div class="ag-form"><textarea id="agRespPessoaTx" rows="2" maxlength="2000" placeholder="Sua resposta (quem passou a atividade lê e responde aqui)"></textarea><button type="button" class="preset-btn" onclick="agPessoaResponder(${id})">Enviar resposta</button></div>`;
+  if (tipo === 'resp') return `<div class="ag-form"><textarea id="agRespPessoaTx" rows="2" maxlength="2000" placeholder="Sua resposta (quem passou a atividade lê e responde aqui)"></textarea>${agAnxCampo('agArqP_' + id)}<button type="button" class="preset-btn" onclick="agPessoaResponder(${id})">Enviar resposta</button></div>`;
   return `<div class="ag-form"><textarea id="agAjudaTx" rows="2" maxlength="2000" placeholder="O que travou? Escreva com as suas palavras."></textarea><button type="button" class="preset-btn" onclick="agPessoaAjuda(${id})">Enviar pedido de ajuda</button></div>`;
 }
 function agPessoaAbrir(id) {
@@ -520,9 +523,13 @@ function agPessoaConcluir(id) {
   agPessoaGravar('agenda_concluir', { p_tarefa: id }, () => x.tem_prova ? 'Marcado como feito; o robô confere na tela e fecha'
     : 'Marcado como feito; sem conferência automática, quem passou a atividade confere', () => agPessoaConcluir(id));
 }
-function agPessoaResponder(id) {
+async function agPessoaResponder(id) {
   const t = ((document.getElementById('agRespPessoaTx') || {}).value || '').trim();
-  if (!t) return avisoAcao('atencao', '! Escreva a resposta.');
+  const arqs = agAnxArquivos('agArqP_' + id);
+  if (!t && !arqs.length) return avisoAcao('atencao', '! Escreva a resposta ou anexe um arquivo.');
+  if (arqs.length && !(await agAnxEnviar('tarefa', id, arqs, () => agPessoaResponder(id)))) return;
+  if (!t) { AGP.form = null; try { AGP.linhas = await agPessoaLer(null); } catch (e) {} agPessoaRedesenhar();
+    return avisoAcao('ok', `✓ ${arqs.length === 1 ? 'Anexo enviado' : arqs.length + ' anexos enviados'} (${avisoHora()}). Quem passou a atividade vê no item.`); }
   agPessoaGravar('agenda_responder', { p_tarefa: id, p_texto: t }, () => 'Resposta enviada; a resposta de volta aparece aqui', () => agPessoaResponder(id));
 }
 function agPessoaPrazo(id, n) {
@@ -569,6 +576,118 @@ async function agEquipeVer(email) {
       + (L.length ? agPessoaHtml(L, true) : '<div class="contexto">Nenhuma atividade aberta para esta pessoa nos próximos 7 dias.</div>');
   } catch (e) { lista.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ ${agE(e.message)}</div>`; }
 }
+
+// =====================================================================================================================
+// ANEXO NA RESPOSTA (dono 12/11/2026 11:30; livro chat-frente-telas/respostas/agenda-anexo-na-resposta). O Responder do dono,
+// do Fabio e de cada pessoa aceita até 5 arquivos (foto, PDF, planilha; 20 MB cada). Bucket privado agenda-anexos, na pasta do
+// e-mail de quem envia; a linha vai para agenda_anexo (agenda_anexo_gravar), que só deixa ver quem pode (RLS). Os anexos aparecem
+// no item com "abrir" e "baixar" (link assinado de 1 h, pedido em lote); quem mandou pode "tirar".
+// =====================================================================================================================
+const AGX = { lista: null, links: {}, feitos: {}, lendo: false };
+const AGX_MAX = 5, AGX_MB = 20;
+const AGX_EXT = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
+  gif: 'image/gif', csv: 'text/csv', txt: 'text/plain', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ods: 'application/vnd.oasis.opendocument.spreadsheet', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const agAnxExt = (f) => String(f.name || '').toLowerCase().split('.').pop();
+const agAnxMime = (f) => AGX_EXT[agAnxExt(f)] || (/^image\//.test(f.type) ? f.type : '');
+const agAnxEu = () => String((rmbSessao() || {}).email || '').toLowerCase();
+const agAnxTam = (b) => !b ? '' : b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' MB';
+function agAnxLugar(tipo, id) { return `<div class="ag-ctx ag-anx" data-t="${tipo}" data-i="${Number(id)}"></div>`; }
+function agAnxCampo(campo) {
+  return `<label class="preset-btn" style="cursor:pointer;" title="foto, PDF ou planilha; até ${AGX_MAX} arquivos de ${AGX_MB} MB">📎 Anexar<input type="file" id="${campo}" multiple
+    accept="image/*,.pdf,.csv,.txt,.xls,.xlsx,.ods,.doc,.docx" style="display:none;" onchange="agAnxEscolheu('${campo}')"></label><span id="${campo}_lista" class="f" style="align-self:center;"></span>`;
+}
+function agAnxEscolheu(campo) {
+  const fs = agAnxArquivos(campo), alvo = document.getElementById(campo + '_lista'); if (!alvo) return;
+  alvo.textContent = fs.length ? fs.map((f) => `${f.name} (${agAnxTam(f.size)})`).join(' · ') : '';
+}
+function agAnxArquivos(campo) { const i = document.getElementById(campo); return i && i.files ? Array.from(i.files) : []; }
+async function agAnxFetch(url, op) {
+  const faz = () => fetch(url, Object.assign({}, op, { headers: Object.assign(rmbHeaders(), (op || {}).headers || {}) }));
+  let r = await faz();
+  if (await rmbRenovarSeExpirado(r)) r = await faz();
+  return r;
+}
+// sobe e grava cada arquivo; o que já foi não sobe de novo no "Tentar de novo". Devolve true se todos foram.
+async function agAnxEnviar(tipo, id, arqs, refazer) {
+  const eu = agAnxEu();
+  if (!eu) { avisoAcao('erro', '✗ Entre com o seu login para anexar.'); return false; }
+  if (arqs.length > AGX_MAX) { avisoAcao('atencao', `! No máximo ${AGX_MAX} arquivos por vez.`); return false; }
+  for (const f of arqs) {
+    if (!agAnxMime(f)) { avisoAcao('atencao', `! ${f.name}: só foto, PDF, planilha, texto ou Word.`); return false; }
+    if (f.size > AGX_MB * 1048576) { avisoAcao('atencao', `! ${f.name} passa de ${AGX_MB} MB. Mande um menor.`); return false; }
+  }
+  let i = 0;
+  for (const f of arqs) {
+    i++;
+    const chave = `${tipo}:${id}:${f.name}:${f.size}:${f.lastModified}`;
+    if (AGX.feitos[chave]) continue;
+    avisoAcao('enviando', `Enviando ${arqs.length > 1 ? `anexo ${i} de ${arqs.length}` : 'o anexo'}: ${f.name}…`);
+    try {
+      const limpo = f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '-').slice(-80) || 'arquivo';
+      const caminho = `${eu}/${tipo}-${Number(id)}/${Date.now()}-${limpo}`;
+      const up = await agAnxFetch(`${SUPABASE_URL}/storage/v1/object/agenda-anexos/${caminho}`, { method: 'POST', headers: { 'Content-Type': agAnxMime(f) }, body: f });
+      if (!up.ok) { const d = await up.json().catch(() => ({})); throw new Error(d.message || d.error || `o arquivo não subiu (${up.status})`); }
+      const sg = await agAnxFetch(`${SUPABASE_URL}/storage/v1/object/sign/agenda-anexos/${caminho}`, { method: 'POST', body: JSON.stringify({ expiresIn: 2592000 }) });
+      const d = sg.ok ? await sg.json().catch(() => ({})) : {};
+      const r = await trRpcSeguro('agenda_anexo_gravar', { p_tipo: tipo, p_item: Number(id), p_caminho: caminho, p_nome: f.name, p_tamanho: f.size,
+        p_mime: agAnxMime(f), p_url: d.signedURL ? `${SUPABASE_URL}/storage/v1${d.signedURL}` : null });
+      if (!r.ok) throw new Error(await trErroDe(r));
+      AGX.feitos[chave] = true;
+    } catch (e) {
+      avisoAcao('erro', `✗ ${f.name} não foi: ${e.message || e}`, refazer);
+      AGX.lista = null; agAnxPintar(true);
+      return false;
+    }
+  }
+  AGX.lista = null;
+  return true;
+}
+// lê a lista (a RLS já filtra) e os links de 1 h em lote; pinta os lugares que estiverem na tela
+async function agAnxPintar(reler) {
+  const lugares = document.querySelectorAll('#view-agenda .ag-anx'); if (!lugares.length) return;
+  if ((reler || AGX.lista === null || Date.now() - (AGX.lidoEm || 0) > 120000) && !AGX.lendo) {
+    AGX.lendo = true; AGX.lidoEm = Date.now();
+    try {
+      AGX.lista = await consultarTudo('agenda_anexo?select=id,item_tipo,item_id,caminho,nome,tamanho,por,criado_em&order=id');
+      const falta = AGX.lista.map((a) => a.caminho).filter((c) => !AGX.links[c]);
+      if (falta.length) {
+        const r = await agAnxFetch(`${SUPABASE_URL}/storage/v1/object/sign/agenda-anexos`, { method: 'POST', body: JSON.stringify({ expiresIn: 3600, paths: falta }) });
+        const L = r.ok ? await r.json().catch(() => []) : [];
+        (Array.isArray(L) ? L : []).forEach((x) => { if (x && x.signedURL && x.path) AGX.links[x.path] = `${SUPABASE_URL}/storage/v1${x.signedURL}`; });
+      }
+    } catch (e) { AGX.lista = AGX.lista || []; }
+    AGX.lendo = false;
+  }
+  const L = Array.isArray(AGX.lista) ? AGX.lista : [], eu = agAnxEu();
+  document.querySelectorAll('#view-agenda .ag-anx').forEach((el) => {
+    const meus = L.filter((a) => a.item_tipo === el.dataset.t && Number(a.item_id) === Number(el.dataset.i));
+    const html = meus.length ? '📎 ' + meus.map((a) => {
+      const u = AGX.links[a.caminho];
+      return `<span style="white-space:nowrap;"><b style="color:var(--tx-1);">${agE(a.nome)}</b> <span class="f">${agAnxTam(a.tamanho)}${a.por !== eu ? ' · ' + agE(String(a.por).split('@')[0]) : ''}</span>
+        ${u ? `<a href="${agE(u)}" target="_blank" rel="noopener">abrir</a> · <a href="${agE(u)}&download=${encodeURIComponent(a.nome)}">baixar</a>` : '<span class="f">(link indisponível)</span>'}${a.por === eu ? ` · <a href="javascript:void(0)" onclick="agAnxTirar(${a.id})" title="tira este anexo do item">tirar</a>` : ''}</span>`;
+    }).join(' &nbsp;·&nbsp; ') : '';
+    if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; }
+    el.style.display = html ? '' : 'none';
+  });
+}
+async function agAnxTirar(id) {
+  const a = (AGX.lista || []).find((x) => x.id === id); if (!a) return;
+  if (!confirm(`Tirar o anexo "${a.nome}" deste item?`)) return;
+  avisoAcao('enviando', '… tirando o anexo');
+  const r = await trRpcSeguro('agenda_anexo_tirar', { p_id: id });
+  if (!r.ok) return avisoAcao('erro', `✗ Não tirou: ${await trErroDe(r)}`, () => agAnxTirar(id));
+  const caminho = await r.json().catch(() => a.caminho);
+  await agAnxFetch(`${SUPABASE_URL}/storage/v1/object/agenda-anexos`, { method: 'DELETE', body: JSON.stringify({ prefixes: [caminho] }) }).catch(() => {});
+  AGX.lista = null; await agAnxPintar(true);
+  avisoAcao('ok', `✓ Anexo tirado (${avisoHora()}).`);
+}
+// qualquer redesenho da agenda (dono, Fabio, equipe, "ver como") ganha os anexos sem mexer em cada função de desenho
+(function () {
+  const v = document.getElementById('view-agenda'); if (!v || !window.MutationObserver) return;
+  let t = null;
+  new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => agAnxPintar(false), 150); }).observe(v, { childList: true, subtree: true });
+})();
 
 const TELA = 'agenda';
 let MODULO_ATUAL = 'agenda';
