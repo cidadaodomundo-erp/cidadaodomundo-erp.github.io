@@ -246,8 +246,8 @@ function trHistSituacao(r) {
   const temCob = r.cobranca_total != null;
   const aberto = temCob && falta > 0.005;
   let sit, cls = '';
-  if (r.cobranca_status === 'EM VALIDACAO') { sit = 'fechado · esperando validação'; cls = 'tr-tag'; }
-  else if (r.sem_fechar) { sit = 'SEM FECHAR'; cls = 'negativo'; }
+  // 12/11/2026 (dono, agenda #26: "Pode"): sem etapa de validar — fechado já é pronto
+  if (r.sem_fechar) { sit = 'SEM FECHAR'; cls = 'negativo'; }
   else if (!temCob) sit = 'fechado';
   else if (!aberto) sit = 'fechado · pago' + (r.data_pagamento ? ' em ' + dm(r.data_pagamento) : '');
   else if (pago > 0) sit = 'fechado · pago em parte';
@@ -2593,8 +2593,7 @@ async function trTelaContas() {
   const falta = c => c.saldo != null ? Number(c.saldo) : Number(c.valor_total || 0);
   window._trContas = contas;
   alvo.innerHTML = `
-    <div class="caption-label">Só entra aqui o fechamento que a Rita já validou.
-      ${TR_OP.papel === 'SEPARACAO' || dono ? 'O que está esperando validação fica em <b>Fechamento do mês</b>.' : ''}
+    <div class="caption-label">O mês fechado em <b>Fechamento do mês</b> entra aqui na hora.
       A filial pode pagar aos poucos. <b>O pagamento entra sozinho pelo Saipos</b>: a entrada lançada na Água Verde como
       “LISTA AHU 09/2026” (filial e mês da lista) baixa a cobrança na carga seguinte, e o que falta é calculado aqui.
       ${entradas.length ? 'Entrada que não baixou sozinha está no quadro de baixo.' : ''}
@@ -2602,7 +2601,7 @@ async function trTelaContas() {
       <span id="trContasMsg" style="font-size:12px; margin-left:6px;"></span></div>
     ${trContasDocBloco(contas)}
     <div id="tabelaTrOpContas"><table>
-      <tr><th>Quem deve</th><th>Para quem</th><th>Tipo</th><th>Referência</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Já pago</th><th>Falta</th><th>Vencimento</th><th>Status</th><th>Validou</th>${dono ? '<th>Lançar pagamento</th>' : ''}</tr>
+      <tr><th>Quem deve</th><th>Para quem</th><th>Tipo</th><th>Referência</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Já pago</th><th>Falta</th><th>Vencimento</th><th>Status</th><th>Fechou</th>${dono ? '<th>Lançar pagamento</th>' : ''}</tr>
       ${contas.map(c => `<tr>
         <td>${c.unidade}</td><td>${c.credor === 'MICHIRO' ? '🛵 MICHIRO' : c.credor || 'AGUA VERDE'}</td><td>${c.tipo}</td>
         <td>${c.id_lista ? 'lista #' + c.id_lista : (c.mes_referencia || '').slice(0, 7)}</td>
@@ -2633,7 +2632,7 @@ function trEntradasBloco(entradas, contas, dono) {
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const mesAno = d => d ? String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '';
   const porque = e => e.situacao === 'SEM DESTINO' ? 'o texto não diz de que mês é a lista'
-    : e.situacao === 'ESPERA O FECHAMENTO' ? `é da lista de ${mesAno(e.mes_referencia)}, que ainda não tem fechamento validado — baixa sozinha quando tiver`
+    : e.situacao === 'ESPERA O FECHAMENTO' ? `é da lista de ${mesAno(e.mes_referencia)}, que ainda não foi fechada — baixa sozinha quando fechar`
     : 'estava vinculada a uma cobrança, mas o lançamento saiu do Saipos';
   const saldo = c => c.saldo != null ? Number(c.saldo) : Number(c.valor_total || 0);
   const abertasDe = u => contas.filter(c => c.unidade === u && c.tipo === 'MENSAL' && c.status === 'EM ABERTO' && c.credor !== 'MICHIRO');
@@ -2726,14 +2725,13 @@ async function trPagar(id) {
 // conforme a filial paga; dia 20 para o Boqueirao. Tudo pela regra da unidade.
 async function trTelaFechamento() {
   const alvo = document.getElementById('trTelaConteudo');
-  const [rv, ru, ra] = await Promise.all([
-    trFetch('vw_tr_fechamento_validar?order=unidade'),
+  // 12/11/2026 (dono, agenda #26): saiu a etapa de validar — a tabela "Esperando validação" e a leitura dela
+  // (vw_tr_fechamento_validar) saíram; o fechamento nasce EM ABERTO, já em Contas a pagar
+  const [ru, ra] = await Promise.all([
     trFetch('tr_regras_unidade?select=unidade,dia_pagamento,vigencia_inicio&order=unidade,vigencia_inicio.desc'),
     trFetch('vw_tr_avulsos_pendentes?select=id,id_lista,unidade,status_lista,item,un_medida,qtd,avulso'),
   ]);
-  if (!rv.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(rv)}</div>`; return; }
-  const esperando = await rv.json();
-  window._trFechEsperando = esperando;   // a faixa do topo (20/10/2026) valida daqui
+  if (!ru.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(ru)}</div>`; return; }
   const avulsos = ra.ok ? await ra.json() : [];
   const avulsosExtra = await trAvulsosExtra(avulsos);   // 18/10/2026: a Rita corrige aqui (trAvulsosBloco)
   // regras sao versionadas por vigencia (desde 01/09 ha duas por unidade):
@@ -2764,26 +2762,7 @@ async function trTelaFechamento() {
 
     <div id="trFechGeral"></div>
 
-    ${caixaAlto ? '' : blocoAvulsos}
-
-    <div class="section-label">Esperando validação</div>
-    ${!esperando.length ? '<div class="contexto">Nada esperando. Todo mês fechado já virou conta a pagar.</div>' : `
-    <div class="caption-label">Validado vira conta a pagar; diferença é acerto do dono.</div>
-    <div id="tabelaTrFech"><table>
-      <tr><th>Filial</th><th>Mês</th><th>Listas</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Vence</th><th>Diferenças</th><th>Ação</th></tr>
-      ${esperando.map(f => `<tr>
-        <td>${f.unidade}</td><td>${mesRef(f.mes_referencia)}</td>
-        <td>${f.qtd_listas} lista(s)<br><span style="color:var(--tx-4); font-size:11px;">${f.itens} itens</span></td>
-        <td>R$ ${fmt(-Number(f.valor_itens || 0))}</td>
-        <td>${Number(f.frete) ? 'R$ ' + fmt(-Number(f.frete)) : '—'}</td>
-        <td>${Number(f.royalty) ? 'R$ ' + fmt(-Number(f.royalty)) : '—'}</td>
-        <td><b>R$ ${fmt(-Number(f.valor_total || 0))}</b></td>
-        <td>${f.vencimento ? f.vencimento.slice(8,10)+'/'+f.vencimento.slice(5,7) : '—'}</td>
-        <td${Number(f.itens_divergentes) ? ' style="color:var(--farol-perto);"' : ''}>${Number(f.itens_divergentes)
-            ? f.itens_divergentes + ' item(ns) · R$ ' + fmt(Number(f.valor_divergencia || 0))
-            : 'bateu 100%'}</td>
-        <td><button class="preset-btn" onclick="trValidarFechamento(${f.id})">validar</button></td></tr>`).join('')}
-    </table></div>`}`;
+    ${caixaAlto ? '' : blocoAvulsos}`;
   trFechGeralMontar();
 }
 
@@ -3061,7 +3040,6 @@ function trFechSituacao(r) {
   if (r.situacao === 'PREVIA') return r.pode_fechar
     ? { txt: 'pronto para fechar', cls: 'pos', cor: 'var(--farol-ok)' }
     : { txt: 'não fecha ainda', cls: 'neg', cor: 'var(--farol-fora)' };
-  if (r.cobranca_status === 'EM VALIDACAO') return { txt: 'fechado — falta validar', cls: 'neutral', cor: 'var(--farol-perto)' };
   if (r.cobranca_status === 'PAGA') return { txt: 'fechado e pago', cls: 'neutral', cor: 'var(--farol-ok)' };
   if (r.cobranca_status === 'EM ABERTO') return { txt: Number(r.valor_pago) > 0 ? 'fechado — pago em parte' : 'fechado — a receber', cls: 'neutral', cor: 'var(--tx-2)' };
   return { txt: 'fechado', cls: 'neutral', cor: 'var(--tx-2)' };
@@ -3110,10 +3088,7 @@ async function trFechGeral() {
     const cab = `<div class="card-lbl">${trEscH(u)} · <b style="color:${s.cor};">${s.txt}</b></div>`;
     if (!x) return `<div class="card neutral" style="text-align:left;">${cab}</div>`;
     const comValor = x.valor_total != null;      // login sem valores recebe os R$ vazios
-    // 12/11/2026 (auditoria 07/11: "fechar num lugar, validar em outro"): o cartão "fechado — falta validar" ganha o
-    // mesmo "validar" da tabela Esperando validação (mesma função, mesmo documento)
-    const espera = x.cobranca_status === 'EM VALIDACAO'
-      ? (window._trFechEsperando || []).find(z => z.unidade === u && String(z.mes_referencia || '').slice(0, 7) === mes) : null;
+    // 12/11/2026 (dono, agenda #26): saiu o "validar" do cartão — fechar já é pronto
     const abertas = nu(x.listas_abertas), entregas = nu(x.frete_entregas), diretas = nu(x.frete_direto_entregas);
     const frete = x.frete_na_conta || nu(x.frete)
       ? `R$ ${fmt(nu(x.frete))}${entregas ? ' ' + cinza(`(${entregas} ${entregas === 1 ? 'entrega' : 'entregas'})`) : ''}`
@@ -3138,7 +3113,6 @@ async function trFechGeral() {
         <button class="preset-btn" onclick="trFechDocPdf(${ix})">PDF do mês</button>
         <button class="preset-btn" onclick="trConfListaPdf(${ix})" title="Uma lista por folha e, no fim, o resumo do mês com o mesmo total do documento">PDF lista a lista</button>
         ${x.pode_fechar ? `<button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharDaqui(${ix})">fechar o mês</button>` : ''}
-        ${espera ? `<button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trValidarFechamento(${espera.id})">validar</button>` : ''}
       </div>` : ''}
     </div>`;
   });
@@ -3199,7 +3173,6 @@ function trFechDocHtml(d, opc = {}) {
   const titulo = `Fechamento das listas — ${r.unidade} — ${mesNome}/${ano}`;
   const previa = r.situacao === 'PREVIA';
   const sit = previa ? ['PRÉVIA', 'mês ainda não fechado']
-    : r.cobranca_status === 'EM VALIDACAO' ? ['FECHADO', 'aguardando validação']
     : ['FECHADO', r.fechado_em ? 'em ' + trFechData(r.fechado_em) : ''];
   const dm = (x) => x ? String(x).slice(8, 10) + '/' + String(x).slice(5, 7) : '—';
   const entregasTxt = (n) => `${n} ${n === 1 ? 'entrega' : 'entregas'}`;
@@ -3588,91 +3561,8 @@ function trContasDocPdf() {
 }
 // "fechar o mes" direto do quadro: a pergunta repete o numero que esta na tela, e
 // depois de fechar a tela le de volta o que ficou gravado e diz se e o mesmo.
-// FAIXA "O QUE FALTA PARA FECHAR" (dono, 20/10/2026: "podemos facilitar esse processo de validação ... quanto
-// menos cliques melhor"). Uma linha por filial do mês escolhido, com a ação na própria linha. BATEU (pode fechar, sem
-// aviso e sem item de lista aberta) = "fechar e mandar à Hellen" num clique (dono, 20/10: "com fechar e mandar à Hellen
-// num clique só quando bateu 100%"): fecha (tr_fechar_mes) e só valida (tr_validar_fechamento) se o valor gravado for
-// igual ao da prévia e sem diferença; senão para no meio e diz que falta validar. Com aviso ou diferença, os dois passos
-// seguem separados, como antes.
-function trFechBateu(x) {
-  return !!x && x.situacao === 'PREVIA' && x.pode_fechar && !(x.avisos || []).length && !(Number(x.valor_itens_abertas) || 0);
-}
-function trFechFaixa(linhas, filiais, mes, av) {
-  const nu = (v) => Number(v) || 0;
-  const esp = window._trFechEsperando || [];
-  const linhasHtml = [];
-  const bateram = [];
-  filiais.forEach((u, ix) => {
-    const x = linhas.find(l => l.unidade === u);
-    if (!x) return;
-    const val = x.valor_total != null ? ` · R$ ${fmt(nu(x.valor_total))}` : '';
-    const nome = `<b>${trEscH(u)}</b>${val}`;
-    const btn = (rot, fn, forte) => `<button class="preset-btn" style="white-space:nowrap;${forte ? ' border-color:var(--farol-ok); color:var(--tx-1);' : ''}" onclick="${fn}">${rot}</button>`;
-    let detalhe = '', acao = '';
-    if (x.cobranca_status === 'EM VALIDACAO') {
-      const e = esp.find(z => z.unidade === u && String(z.mes_referencia || '').slice(0, 7) === mes);
-      detalhe = `fechado — falta validar${e && nu(e.itens_divergentes) ? ` · <span style="color:var(--farol-perto);">${e.itens_divergentes} item(ns) com diferença</span>` : ''}`;
-      // 04/11/2026 (dono: "esse mandar à Hellen não precisa, ele fecha e lança no Saipos"): o botão diz só a ação
-      acao = e ? btn('validar', `trValidarFechamento(${e.id})`, true) : '';
-    } else if (trFechBateu(x)) {
-      bateram.push(ix);
-      detalhe = '<span style="color:var(--farol-ok);">bateu: todas as listas conferidas, nada travando</span>';
-      acao = btn('fechar', `trFechFecharEValidar([${ix}])`, true);
-    } else if (x.situacao === 'PREVIA' && x.pode_fechar) {
-      detalhe = `<span style="color:var(--farol-perto);">pode fechar, com aviso: ${trEscH([...(x.avisos || []), nu(x.valor_itens_abertas) ? 'tem item de lista ainda não conferida' : ''].filter(Boolean).join('; '))}</span>`;
-      acao = btn('fechar', `trFechFecharDaqui(${ix})`, false);
-    } else if (x.situacao === 'PREVIA') {
-      const travas = x.trava || [];
-      detalhe = travas.map(t => `<div style="color:var(--farol-fora);">trava: ${trEscH(t)}</div>`).join('')
-        + ((x.avisos || []).length ? `<div style="color:var(--tx-3);">${trEscH(x.avisos.join('; '))}</div>` : '');
-      if (travas.some(t => /sem preço/i.test(t)) && document.getElementById('trAvulsoMsg'))
-        acao = btn('corrigir aqui', "document.getElementById('trAvulsoMsg').scrollIntoView({block:'center'})", false);
-    } else return;   // fechado, a receber ou pago: não é com quem aprova
-    linhasHtml.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line);">
-      <div style="flex:1 1 260px; min-width:0;">${nome}<div style="font-size:12.5px;">${detalhe}</div></div>${acao}</div>`);
-  });
-  const aviso = av ? `<div style="margin-top:6px; color:${av.ok ? 'var(--farol-ok)' : 'var(--farol-fora)'};">${trEscH(av.txt)}</div>` : '';
-  if (!linhasHtml.length) return `<div class="contexto" style="text-align:left;"><b>Nada para você aprovar em ${trFechMesTxt(mes)}.</b>${aviso}</div>`;
-  return `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);">
-    <b>O que falta para fechar ${trFechMesTxt(mes)}</b>${aviso}
-    <div style="margin-top:6px;">${linhasHtml.join('')}</div>
-    ${bateram.length > 1 ? `<div style="padding-top:8px; border-top:1px solid var(--line);"><button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharEValidar([${bateram.join(',')}])">fechar as ${bateram.length} que bateram</button></div>` : ''}
-  </div>`;
-}
-// fecha e valida as filiais escolhidas (as que bateram), uma pergunta só para todas
-async function trFechFecharEValidar(ixs) {
-  const g = window._trFechGeral;
-  if (!g) return;
-  const nu = (v) => Number(v) || 0;
-  const alvos = ixs.map(ix => ({ un: g.filiais[ix], r: g.linhas.find(x => x.unidade === g.filiais[ix]) })).filter(a => trFechBateu(a.r));
-  if (!alvos.length) return;
-  if (!confirm(`Fechar ${trFechMesTxt(g.mes)}? Vira conta a pagar.\n\n`
-      + alvos.map(a => `${a.un}: R$ ${fmt(nu(a.r.valor_total))} · vence em ${trFechData(a.r.vencimento)}`).join('\n')
-      + '\n\nSó manda se o valor gravado for igual a este e sem diferença; senão para e avisa.')) return;
-  const foi = [], parou = [];
-  avisoAcao('enviando', `Fechando e validando ${alvos.length} ${alvos.length === 1 ? 'filial' : 'filiais'} (leva alguns segundos)…`);
-  for (const a of alvos) {
-    const f = await trRpc('tr_fechar_mes', { p_unidade: a.un, p_mes: g.mes + '-01' });
-    if (!f.ok) { parou.push(`${a.un}: não fechou — ${await trErroDe(f)}`); continue; }
-    let v = null;
-    try {
-      const rv = await trFetch(`vw_tr_fechamento_validar?unidade=eq.${encodeURIComponent(a.un)}&mes_referencia=eq.${g.mes}-01`);
-      if (rv.ok) v = (await rv.json())[0];
-    } catch (e) { /* sem a leitura de volta nao valida */ }
-    const igual = v && Math.round(Math.abs(nu(v.valor_total)) * 100) === Math.round(Math.abs(nu(a.r.valor_total)) * 100);
-    if (!v || !igual || nu(v.itens_divergentes)) {
-      parou.push(`${a.un}: fechou, mas ${!v ? 'não consegui ler de volta' : nu(v.itens_divergentes) ? 'tem diferença' : 'o valor gravado não é o da prévia'} — valide aqui em cima`);
-      continue;
-    }
-    const val = await trRpc('tr_validar_fechamento', { p_id: v.id });
-    if (!val.ok) { parou.push(`${a.un}: fechou, mas não validou — ${await trErroDe(val)}`); continue; }
-    foi.push(`${a.un} R$ ${fmt(Math.abs(nu(v.valor_total)))}`);
-  }
-  window._trFechAviso = { ok: !parou.length,
-    txt: [foi.length ? `Fechado (já está em Contas a pagar): ${foi.join(' · ')}.` : '', ...parou].filter(Boolean).join(' ') };
-  LISTAS = null;
-  trTelaFechamento();
-}
+// 12/11/2026 (dono, agenda #26): saíram a faixa "o que falta para fechar" (sem chamada desde 12/11), o "fechar e
+// validar" (trFechFecharEValidar) e o "validar" (trValidarFechamento) — fechar já é pronto
 async function trFechFecharDaqui(ix) {
   const g = window._trFechGeral;
   if (!g) return;
@@ -3684,7 +3574,7 @@ async function trFechFecharDaqui(ix) {
   if (nu(r.royalty)) partes.push(`Royalty: R$ ${fmt(nu(r.royalty))}`);
   if (!confirm(`Fechar ${trFechMesTxt(g.mes)} de ${un}?\n\n${partes.join('\n')}\nTOTAL: R$ ${fmt(nu(r.valor_total))}\nVence em ${trFechData(r.vencimento)}\n`
       + ((r.avisos || []).length ? '\nAtenção: ' + r.avisos.join('; ') + '.\n' : '')
-      + '\nDepois de fechado, a Rita valida e vira conta a pagar.')) return;
+      + '\nFechado, já vira conta a pagar.')) return;
   avisoAcao('enviando', `Fechando ${un}…`);
   const resp = await trRpcSeguro('tr_fechar_mes', { p_unidade: un, p_mes: g.mes + '-01' });
   if (!resp.ok) { window._trFechAviso = { ok: false, txt: `Não fechou ${un}: ` + await trErroDe(resp) }; return trFechGeral(); }
@@ -3695,23 +3585,14 @@ async function trFechFecharDaqui(ix) {
   } catch (e) { /* sem a leitura de volta o aviso diz que nao conferiu */ }
   const bate = gravado && gravado.origem === 'COBRANCA' && Math.round(nu(gravado.valor_total) * 100) === Math.round(nu(r.valor_total) * 100);
   window._trFechAviso = bate
-    ? { ok: true, txt: `${un} fechado em R$ ${fmt(nu(gravado.valor_total))} — igual à prévia. Falta validar, no cartão, para virar conta a pagar.` }
-    : { ok: false, txt: `${un} fechou${gravado && gravado.origem === 'COBRANCA' ? ' em R$ ' + fmt(nu(gravado.valor_total)) : ''}, mas não consegui confirmar que é o mesmo valor da prévia (R$ ${fmt(nu(r.valor_total))}) — confira antes de validar.` };
+    ? { ok: true, txt: `${un} fechado em R$ ${fmt(nu(gravado.valor_total))} — igual à prévia. Já está em Contas a pagar.` }
+    : { ok: false, txt: `${un} fechou${gravado && gravado.origem === 'COBRANCA' ? ' em R$ ' + fmt(nu(gravado.valor_total)) : ''}, mas não consegui confirmar que é o mesmo valor da prévia (R$ ${fmt(nu(r.valor_total))}) — abra o documento e confira.` };
   trTelaFechamento();
 }
 
 // trFecharMes (o "fechar" do quadro de cima, com o select de filial) saiu em 12/11/2026: sem botão desde 04/11; o
 // cartão de cada filial fecha por trFechFecharDaqui
 
-async function trValidarFechamento(id) {
-  const msg = document.getElementById('trFechMsg');
-  if (msg) msg.textContent = '';
-  avisoAcao('enviando', 'Validando o fechamento…');
-  const r = await trRpcSeguro('tr_validar_fechamento', { p_id: id });
-  if (!r.ok) return avisoAcao('erro', `✗ NÃO validou: ${await trErroDe(r)}. Tente de novo.`);
-  avisoAcao('ok', `✓ Validado — já está em Contas a pagar. Às ${avisoHora()}.`);
-  setTimeout(trTelaFechamento, 1200);
-}
 
 // ---- tela: CMV semanal ----
 async function trTelaCmv() {

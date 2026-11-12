@@ -577,7 +577,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     <td style="${tdL}">${q.forma}</td>
     <td style="${tdL}">${p.real}</td>
     <td style="${tdL} text-align:right; white-space:nowrap;">${reaisCc(p.valor)}</td>
-    <td style="${tdL} color:var(--tx-creme);">${p.v.tipo ? '<b>' + caixaRotTipo(p.v.tipo) + '</b>' + (p.v.quebra > 0 ? ' · quebra R$ ' + fmt(+p.v.quebra) + (p.v.responsavel ? ' (' + p.v.responsavel + ')' : '') : '') + ' · ' : ''}${p.v.motivo}</td>
+    <td style="${tdL} color:var(--tx-creme);">${p.v.tipo ? '<b>' + caixaRotTipo(p.v.tipo) + '</b>' + (p.v.quebra > 0 ? ' · quebra R$ ' + fmt(+p.v.quebra) + (p.v.responsavel ? ' (' + p.v.responsavel + ')' : '') : '') + (caixaEstadoFalta(p.v) ? ' · ' + caixaEstadoFalta(p.v) : '') + ' · ' : ''}${p.v.motivo}${caixaFaltaAConfirmar(p.v) && caixaPodeConfirmar() ? ' ' + caixaBotaoConfirmar(p.v.chave) : ''}</td>
     <td style="${tdL} white-space:nowrap;">${String(p.v.quem || '').split('@')[0]} · ${String(p.v.validado_em || '').slice(0, 10).split('-').reverse().slice(0, 2).join('/')}</td>
     <td style="${tdL} border-right:0; white-space:nowrap;">${podeExplicar ? `<button onclick="caixaDesfazer(${p.i})" style="font:inherit; font-size:11px; padding:2px 8px; cursor:pointer;">desfazer</button>` : ''}</td></tr>`; };
   const cabE = `<tr><th style="${thL}">hora</th><th style="${thL}">venda</th><th style="${thL}">o Saipos diz</th><th style="${thL}">a maquininha / o banco diz</th><th style="${thL} text-align:right;">valor</th><th style="${thL}">motivo</th><th style="${thL}">quem</th><th style="${thL} border-right:0;"></th></tr>`;
@@ -719,7 +719,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
           </div><div style="font-size:11px; color:#8a897e; margin-top:2px;">enviado = o que você contou; troco = o que ficou na gaveta${cx === 'DELIVERY' ? ' (o delivery abre com R$ 0,01)' : ''}. O painel compara com o vendido em dinheiro deste caixa e trava o dia.</div></td></tr>`;
       };
       const statusPend = px => { const ex = valDe[px.chave];
-        if (ex) return { status: `<span style="color:#9aa4af;">explicada${ex.tipo ? ' · <b>' + caixaRotTipo(ex.tipo) + '</b>' : ''}${ex.quebra > 0 ? ' · quebra R$ ' + fmt(+ex.quebra) + (ex.responsavel ? ' (' + ex.responsavel + ')' : '') : ''}: ${ex.motivo}</span>${podeExplicar ? ` <button onclick="caixaDesfazer(${px.i})" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}`, cor: '#8a897e', bg: '' };
+        if (ex) return { status: `<span style="color:#9aa4af;">explicada${ex.tipo ? ' · <b>' + caixaRotTipo(ex.tipo) + '</b>' : ''}${ex.quebra > 0 ? ' · quebra R$ ' + fmt(+ex.quebra) + (ex.responsavel ? ' (' + ex.responsavel + ')' : '') : ''}${caixaEstadoFalta(ex) ? ' · ' + caixaEstadoFalta(ex) : ''}: ${ex.motivo}</span>${caixaFaltaAConfirmar(ex) && caixaPodeConfirmar() ? ' ' + caixaBotaoConfirmar(ex.chave) : ''}${podeExplicar ? ` <button onclick="caixaDesfazer(${px.i})" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}`, cor: '#8a897e', bg: '' };
         if (grupoDe(px) === 'auto') return { status: `<span style="color:#9aa4af;">⏳ ${px.acao} <span style="font-size:11px;">— ${px.leitura}</span></span>`, cor: '#8a897e', bg: '' };
         return { status: `<span style="color:var(--farol-fora); font-weight:700;">2º</span> ${px.acao}<div style="font-size:11px; color:#8a897e;">${px.leitura}</div>${btnExp(px)}`, cor: 'var(--tx-creme)', bg: 'background:rgba(255,107,107,.05);' }; };
       if (dinheiroLinha) {
@@ -840,16 +840,59 @@ async function caixaRecarregarValidadas() {
 // diferenca; qual a melhor forma de acertarmos e tratarmos essas quebras?" Regras dele:
 // delivery nao cobrado = desconto do motoboy (o atendente confere o comprovante na
 // maquininha); quebra do salao acumula e e descontada, todo mes, do rateio dos 10%.
+// 12/11/2026 (dono, 11/11 20:07 e 12/11 00:35): tabela simplificada — Erro de registro, Sobra (sempre, com o porquê),
+// Perda (o responsável vem sozinho: salão = quem fechou a frente no Saipos; delivery = o motoboy; nasce "a confirmar"),
+// Reposição e Cliente paga depois; "Outro" saiu. A Perda grava os ids de sempre (PERDA_SALAO / PERDA_MOTOBOY).
 const CAIXA_TIPOS_EXPL = [
-  { id: 'REGISTRO', rot: 'Erro de registro', desc: 'o dinheiro entrou certo; o Saipos é que está errado (bandeira, valor digitado) — corrigido lá, sem perda', quebra: false },
-  { id: 'PERDA_SALAO', rot: 'Quebra do salão', desc: 'não cobrado ou cobrado a menor no salão/balcão — acumula e é descontado do rateio dos 10% no mês', quebra: true },
-  { id: 'PERDA_MOTOBOY', rot: 'Não cobrado na entrega', desc: 'sem comprovante na maquininha — desconto do motoboy', quebra: true },
-  { id: 'REPOSICAO', rot: 'Reposição', desc: 'este dinheiro repõe uma quebra anterior (escolha qual) — explica a sobra de hoje', quebra: false },
-  { id: 'FIADO', rot: 'Cliente paga depois', desc: 'a venda existe, o pagamento vem depois — conferir quando entrar', quebra: false },
-  { id: 'SOBRA', rot: 'Sobra', desc: 'troco digitado errado, venda em dinheiro fora do Saipos, gorjeta', quebra: false },
-  { id: 'OUTRO', rot: 'Outro', desc: 'nenhum dos anteriores — descreva no motivo', quebra: false },
+  { id: 'REGISTRO', rot: 'Erro de registro', desc: 'o dinheiro entrou, só a forma foi registrada errada no Saipos — sem perda', quebra: false },
+  { id: 'SOBRA', rot: 'Sobra', desc: 'entrou mais do que o Saipos registrou — registre sempre e diga o porquê', quebra: false },
+  { id: 'PERDA', rot: 'Perda', desc: 'faltou dinheiro — responsável: no salão, quem fechou a frente no Saipos; no delivery, o motoboy. Fica "a confirmar" até o Neto ou a Hellen confirmarem', quebra: true },
+  { id: 'REPOSICAO', rot: 'Reposição', desc: 'este dinheiro fecha uma perda anterior (escolha qual)', quebra: false },
+  { id: 'FIADO', rot: 'Cliente paga depois', desc: 'fiado: a venda existe, o pagamento vem depois', quebra: false },
 ];
-const caixaRotTipo = t => (CAIXA_TIPOS_EXPL.find(x => x.id === t) || {}).rot || '';
+const CAIXA_SOBRA_PORQUE = ['venda sem registro', 'item sem baixa no estoque', 'outro'];
+// rótulo dos ids gravados (os antigos continuam aparecendo)
+const CAIXA_TIPOS_ROT = { REGISTRO: 'Erro de registro', SOBRA: 'Sobra', PERDA_SALAO: 'Perda do salão', PERDA_MOTOBOY: 'Perda na entrega',
+  REPOSICAO: 'Reposição', FIADO: 'Cliente paga depois', OUTRO: 'Outro' };
+const caixaRotTipo = t => CAIXA_TIPOS_ROT[t] || (CAIXA_TIPOS_EXPL.find(x => x.id === t) || {}).rot || '';
+// ---- confirmar a falta (dono, 12/11 00:35, agenda #96: "Eu e a Hellen"): a perda só desconta confirmada ----
+const caixaEhFalta = v => !!v && (v.tipo === 'PERDA_SALAO' || v.tipo === 'PERDA_MOTOBOY') && +v.quebra > 0 && !!v.chave;
+const caixaFaltaAConfirmar = v => caixaEhFalta(v) && !v.confirmada_em;
+function caixaEstadoFalta(v) {
+  if (!caixaEhFalta(v)) return '';
+  if (!v.confirmada_em) return '<span style="color:var(--farol-perto);">a confirmar</span>';
+  const quem = String(v.confirmada_por || '').split('@')[0], dd = String(v.confirmada_em).slice(0, 10).split('-').reverse().slice(0, 2).join('/');
+  return `<span style="color:var(--farol-ok);">confirmada${quem ? ' por ' + trEscH(quem) : ''} em ${dd}</span>`
+    + (caixaPodeConfirmar() ? ' ' + caixaBotaoConfirmar(v.chave, true) : '');
+}
+function caixaPodeConfirmar() {
+  const eu = String((rmbSessao() || {}).email || '').toLowerCase();
+  return (typeof souODono === 'function' && souODono()) || eu === 'hellen@cidadaodomundo.com.br';
+}
+// a chave vai por índice (pode ter aspas e dois-pontos); o banco decide de novo quem pode
+const CAIXA_CONF_CHAVES = [];
+function caixaBotaoConfirmar(chave, desfazer) {
+  let i = CAIXA_CONF_CHAVES.indexOf(chave); if (i < 0) { CAIXA_CONF_CHAVES.push(chave); i = CAIXA_CONF_CHAVES.length - 1; }
+  return desfazer
+    ? `<a href="javascript:void(0)" onclick="event.stopPropagation(); caixaConfirmarFalta(${i}, true)" style="font-size:11px; color:var(--tx-4);">desfazer</a>`
+    : `<button class="preset-btn" style="font-size:11px; padding:1px 8px; border-color:var(--farol-perto);" onclick="event.stopPropagation(); caixaConfirmarFalta(${i}, false)">confirmar a falta</button>`;
+}
+async function caixaConfirmarFalta(i, desfazer) {
+  const chave = CAIXA_CONF_CHAVES[i];
+  if (!chave) return;
+  const s = rmbSessao();
+  if (!s || !s.email) { avisoAcao('atencao', '! Sessão expirada — faça login de novo.'); return; }
+  avisoAcao('enviando', desfazer ? 'Desfazendo a confirmação…' : 'Confirmando a falta…');
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/caixa_confirmar_falta`, {
+      method: 'POST', headers: rmbHeaders(), body: JSON.stringify({ p_chave: chave, p_desfazer: !!desfazer }) });
+    const txt = await r.text();
+    if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch (e) { /* texto cru */ } throw new Error(String(m).slice(0, 200)); }
+    avisoAcao('ok', (desfazer ? '✓ Confirmação desfeita' : '✓ Falta confirmada — agora entra no desconto') + ` — às ${avisoHora()}.`);
+  } catch (e) { avisoAcao('erro', (desfazer ? '✗ A confirmação NÃO foi desfeita: ' : '✗ A falta NÃO foi confirmada: ') + e.message); return; }
+  await caixaRecarregarValidadas();
+  if (CAIXA_HELLEN !== null) { CAIXA_HELLEN = null; caixaHellenCarregar(); }
+}
 // quebras ainda sem reposicao, da loja (para o campo "repõe qual?")
 function caixaQuebrasAbertas(unidade) {
   const vals = (CAIXA_VALID || []).filter(v => v.unidade === unidade);
@@ -861,8 +904,10 @@ function caixaModalExplicar(x, d) {
   return new Promise(resolve => {
     const moto = (String(x.saipos || '').match(/motoboy ([^·]+)/) || [])[1];
     const contrib = String(x.chave).startsWith('dinheiro:') ? -x.efeito : x.efeito;
-    const tipo0 = moto ? 'PERDA_MOTOBOY' : String(x.chave).startsWith('rede:') ? 'REGISTRO' : contrib < 0 ? 'SOBRA' : 'PERDA_SALAO';
-    const resp0 = moto ? moto.trim() : (x.caixa === 'DELIVERY' ? 'Delivery' : 'Salão') + ' · turno';
+    const tipo0 = moto ? 'PERDA' : String(x.chave).startsWith('rede:') ? 'REGISTRO' : contrib < 0 ? 'SOBRA' : 'PERDA';
+    // responsável automático: delivery = o motoboy; salão = quem fechou a frente no Saipos (quando a pendência traz a frente)
+    const ehEntrega = !!moto || x.caixa === 'DELIVERY';
+    const resp0 = moto ? moto.trim() : x.frente ? String(x.frente) : (x.caixa === 'DELIVERY' ? 'Delivery' : 'Salão') + ' · turno';
     const abertas = caixaQuebrasAbertas(d.unidade);
     const ddmm = v => String(v || '').split('-').reverse().slice(0, 2).join('/');
     const ov = document.createElement('div');
@@ -877,6 +922,7 @@ function caixaModalExplicar(x, d) {
         <label style="flex:1; min-width:140px;">valor da diferença (R$)<br><input type="number" step="0.01" min="0" id="cxValor" value="${Math.abs(x.valor).toFixed(2)}" style="width:100%; padding:4px; font:inherit;"></label>
         <label style="flex:2; min-width:200px;">responsável (motoboy ou turno)<br><input type="text" id="cxResp" value="${resp0.replace(/"/g, '&quot;')}" style="width:100%; padding:4px; font:inherit;"></label>
       </div>
+      <div id="cxSobraBox" style="display:none; margin-bottom:8px;">por que sobrou?<div style="display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:3px;">${CAIXA_SOBRA_PORQUE.map((p, k) => `<label style="cursor:pointer;"><input type="radio" name="cxPorque" value="${p}" ${k === 0 ? 'checked' : ''}> ${p}</label>`).join('')}</div></div>
       <div id="cxRepBox" style="display:none; margin-bottom:8px;"><label>repõe qual quebra?<br><select id="cxRep" style="width:100%; padding:4px; font:inherit;">${abertas.length ? abertas.map(v => `<option value="${v.chave}">${ddmm(v.dia)} · R$ ${fmt(+v.quebra)} · ${v.responsavel || ''} · ${String(v.motivo || '').slice(0, 50)}</option>`).join('') : '<option value="">nenhuma quebra em aberto nesta loja</option>'}</select></label></div>
       <label>motivo (fica registrado)<br><textarea id="cxMotivo" rows="2" style="width:100%; padding:4px; font:inherit;"></textarea></label>
       <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
@@ -885,21 +931,27 @@ function caixaModalExplicar(x, d) {
       </div></div>`;
     document.body.appendChild(ov);
     const repBox = ov.querySelector('#cxRepBox');
-    const syncRep = () => { const t = ov.querySelector('input[name=cxTipo]:checked').value; repBox.style.display = t === 'REPOSICAO' ? 'block' : 'none'; };
+    const sobraBox = ov.querySelector('#cxSobraBox');
+    const syncRep = () => { const t = ov.querySelector('input[name=cxTipo]:checked').value; repBox.style.display = t === 'REPOSICAO' ? 'block' : 'none'; sobraBox.style.display = t === 'SOBRA' ? 'block' : 'none'; };
     ov.querySelectorAll('input[name=cxTipo]').forEach(r => r.addEventListener('change', syncRep)); syncRep();
     const fechar = v => { ov.remove(); resolve(v); };
     ov.querySelector('#cxCancelar').onclick = () => fechar(null);
     ov.addEventListener('click', e => { if (e.target === ov) fechar(null); });
     ov.querySelector('#cxSalvar').onclick = () => {
-      const tipo = ov.querySelector('input[name=cxTipo]:checked').value;
+      const escolha = ov.querySelector('input[name=cxTipo]:checked').value;
+      // a Perda grava o id de sempre: entrega = PERDA_MOTOBOY, salão = PERDA_SALAO
+      const tipo = escolha === 'PERDA' ? (ehEntrega ? 'PERDA_MOTOBOY' : 'PERDA_SALAO') : escolha;
       const valor = Number(ov.querySelector('#cxValor').value);
-      const motivo = ov.querySelector('#cxMotivo').value.trim();
+      const texto = ov.querySelector('#cxMotivo').value.trim();
+      const porque = escolha === 'SOBRA' ? ((ov.querySelector('input[name=cxPorque]:checked') || {}).value || '') : '';
+      // na Sobra o porquê vai no começo do motivo (o mesmo campo de sempre); "outro" pede o texto
+      const motivo = porque && porque !== 'outro' ? porque + (texto ? ' — ' + texto : '') : texto;
       const responsavel = ov.querySelector('#cxResp').value.trim();
       const rep = tipo === 'REPOSICAO' ? ov.querySelector('#cxRep').value : null;
       if (!motivo) { avisoAcao('atencao', '! Escreva o motivo — é o que fica registrado.'); return; }
       if (!(valor >= 0)) { avisoAcao('atencao', '! Valor inválido.'); return; }
-      if (tipo === 'REPOSICAO' && !rep) { avisoAcao('atencao', '! Escolha qual quebra este dinheiro repõe.'); return; }
-      const def = CAIXA_TIPOS_EXPL.find(t => t.id === tipo);
+      if (tipo === 'REPOSICAO' && !rep) { avisoAcao('atencao', '! Escolha qual perda este dinheiro repõe.'); return; }
+      const def = CAIXA_TIPOS_EXPL.find(t => t.id === escolha);
       fechar({ tipo, motivo, responsavel: responsavel || null, quebra: def.quebra ? Math.round(valor * 100) / 100 : null, reposicao_de: rep });
     };
     setTimeout(() => { const m = ov.querySelector('#cxMotivo'); if (m) m.focus(); }, 50);
@@ -1534,14 +1586,15 @@ function caixaHellenItens() {
       if (l.tratamento) { (CAIXA_SOBRAFALTA[u] = CAIXA_SOBRAFALTA[u] || []).push({ dia: l.data, valor: v, frente: l.frente || nome, tratamento: l.tratamento }); return; }
       const chave = 'difsai:' + l.id;
       if (valDS[l.data + '|' + chave]) return;
-      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro',
+      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro', frente: nome,
         saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
         leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
       add({ u, dia: l.data, ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro', frente: nome });
     });
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
-      oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir', bloco: 'quebra', quem: q.responsavel || 'sem responsável' }));
+      oque: `quebra (${q.responsavel || 'sem responsável'}): descontar ou repor`, acao: 'abrir', bloco: 'quebra', quem: q.responsavel || 'sem responsável',
+      chave: q.chave, tipo: q.tipo, quebra: q.quebra, confirmada_em: q.confirmada_em, confirmada_por: q.confirmada_por }));
   });
   // dinheiro do SB para a AV parado há mais de 2 dias, ou marcado como não chegou
   const doisDias = mais(H.hoje, -2);
@@ -1591,7 +1644,9 @@ function caixaTarefa(x) {   // { txt, btn } da pendência, em frase
     case 'troca': return { txt: `Trocar no Saipos a ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, <b>${R(x.valor)}</b>) de ${trEscH(x.de || '')} para <b>${trEscH(x.para || '')}</b>`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     case 'online': return { txt: `Trocar a forma da ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.forma || '')})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     case 'cofre': return x.acao === 'naochegou' || x.acao === 'cofre' ? { txt: trEscH(x.oque), btn: '' } : { txt: `Explicar o dinheiro contado ${trEscH(x.venda || '')} (${dd}, <b>${R(x.valor)}</b>)`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
-    case 'quebra': return { txt: `Descontar ou repor a quebra de <b>${R(x.valor)}</b> (${trEscH(x.quem || '')}, ${dd})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    // 12/11/2026 (dono, agenda #96): a perda mostra "a confirmar" ou "confirmada por X em dd/mm"; só o dono e a Hellen confirmam
+    case 'quebra': return { txt: `Descontar ou repor a quebra de <b>${R(x.valor)}</b> (${trEscH(x.quem || '')}, ${dd})${caixaEstadoFalta(x) ? ' · ' + caixaEstadoFalta(x) : ''}`,
+      btn: (caixaFaltaAConfirmar(x) && caixaPodeConfirmar() ? caixaBotaoConfirmar(x.chave) + ' ' : '') + B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     case 'aguardando': return { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(q)}, ${R(x.valor)}): esperando a Rede`, btn: '' };
     default: return { txt: trEscH(x.oque || ''), btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
   }

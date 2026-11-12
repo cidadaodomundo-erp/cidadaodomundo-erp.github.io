@@ -100,7 +100,7 @@ function renderModuloReembolsos(dados) {
         ${campo('Loja', `<select id="rmbLoja" style="${st}">${['AGUA VERDE', 'AHU', 'SÃO BRAZ'].map((u) => `<option ${u === lojaPad ? 'selected' : ''}>${u}</option>`).join('')}</select>`)}
         ${campo('O que foi *', `<select id="rmbTipo" style="${st}"><option value=""></option>${tipos.map((t) => `<option value="${cgEsc(t.codigo)}">${cgEsc(t.rotulo)}</option>`).join('')}</select>`)}
         ${campo('O que comprou *', `<input id="rmbDesc" maxlength="200" placeholder="ex.: gás da cozinha" style="${st}">`)}
-        ${campo('Comprovante (foto ou PDF) *', `<input id="rmbNota" type="file" accept="image/*,application/pdf" style="font-size:12px;">`)}
+        ${campo('Comprovante (foto ou PDF)', `<input id="rmbNota" type="file" accept="image/*,application/pdf" style="font-size:12px;">`)}
         <div id="rmbPixBox"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;">${cgBotaoPasso('Enviar pedido', 'rmbEnviarGasto()')}<button type="button" class="preset-btn" onclick="RMB_FORM.aberto=false;renderModuloReembolsos(REEMBOLSOS)">Cancelar</button></div></div>`;
@@ -140,16 +140,20 @@ async function rmbEnviarGasto() {
   const pessoa = g('rmbPessoa').value, data = g('rmbData').value, valor = Number(String(g('rmbValor').value).replace(',', '.'));
   const tipo = g('rmbTipo').value, desc = g('rmbDesc').value.trim(), unidade = g('rmbLoja').value, arquivo = g('rmbNota').files[0] || null;
   const pix = g('rmbPix') ? g('rmbPix').value.trim() : null;
-  const falta = [!(valor > 0) && 'valor', !data && 'data', !tipo && 'o que foi', !desc && 'o que comprou', !arquivo && 'comprovante', g('rmbPix') && !pix && 'chave PIX'].filter(Boolean);
+  const falta = [!(valor > 0) && 'valor', !data && 'data', !tipo && 'o que foi', !desc && 'o que comprou', g('rmbPix') && !pix && 'chave PIX'].filter(Boolean);
   if (falta.length) return avisoAcao('atencao', '! Falta preencher: ' + falta.join(', ') + '.');
-  if (arquivo.size > 15000000) return avisoAcao('atencao', '! Comprovante maior que 15 MB: use uma foto menor.');
+  // 12/11/2026 (dono, agenda #19: "Tira a obrigatoriedade do comprovante em anexo"): sem arquivo, rmb_pedir grava NULL
+  if (arquivo && arquivo.size > 15000000) return avisoAcao('atencao', '! Comprovante maior que 15 MB: use uma foto menor.');
   avisoAcao('enviando', '… enviando o pedido');
   try {
     await rmbGarantirTokenValido();
-    const caminho = `${pessoa || 'eu'}/${cgHojeIso()}-${Math.round(performance.now())}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
-    const sobe = () => fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` }, body: arquivo });
-    let up = await sobe(); if (await rmbRenovarSeExpirado(up)) up = await sobe();
-    if (!up.ok) throw new Error('o comprovante não subiu (' + up.status + ')');
+    let caminho = null;
+    if (arquivo) {
+      caminho = `${pessoa || 'eu'}/${cgHojeIso()}-${Math.round(performance.now())}-${arquivo.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
+      const sobe = () => fetch(`${SUPABASE_URL}/storage/v1/object/comprovantes/${caminho}`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${rmbSessao().access_token}` }, body: arquivo });
+      let up = await sobe(); if (await rmbRenovarSeExpirado(up)) up = await sobe();
+      if (!up.ok) throw new Error('o comprovante não subiu (' + up.status + ')');
+    }
     const r = await trRpcSeguro('rmb_pedir', { p_valor: valor, p_data: data, p_tipo: tipo, p_descricao: desc, p_unidade: unidade, p_comprovante: caminho, p_pix: pix || null, p_pessoa: pessoa || null });
     if (!r.ok) throw new Error(await trErroDe(r));
     RMB_FORM.aberto = false;

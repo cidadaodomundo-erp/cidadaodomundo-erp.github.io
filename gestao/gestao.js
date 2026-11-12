@@ -3311,6 +3311,12 @@ function renderHoje() {
       const ms = (HOJE_META_VENDA || []).filter(m => m.unidade === u && m.vale_desde <= mesIni);
       return ms.length ? Number(ms[ms.length - 1].receita_mes) : null;
     };
+    // 12/11/2026 (dono, agenda #45: "10%"): o % do rótulo vem de fin_meta_venda_loja.resultado_meta_pct, não do
+    // código; lojas com % diferentes → o rótulo diz só "a meta de resultado"
+    const metaPctLoja = (u) => {
+      const ms = (HOJE_META_VENDA || []).filter(m => m.unidade === u && m.vale_desde <= mesIni);
+      return ms.length && ms[ms.length - 1].resultado_meta_pct != null ? Number(ms[ms.length - 1].resultado_meta_pct) : null;
+    };
     const unid = FX_TODAS;
     const linha = (u) => plcComLoja(u, () => {
       const us = u === 'REDE' ? unid : [u];
@@ -3354,11 +3360,13 @@ function renderHoje() {
 
     // ---- tabela 1: o mes em andamento ----
     const mPess = plcMeta('PESSOAL', [ult]);
+    const pctsRes = [...new Set(cols.filter(c => c.u !== 'REDE').map(c => metaPctLoja(c.u)).filter(p => p !== null))];
+    const rotMetaRes = pctsRes.length === 1 ? 'a receita que dá ' + pctsRes[0].toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% de resultado' : 'a receita que dá a meta de resultado';
     const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ' + ddmm(ontemIso) + ' e previsão até o fim do mês</div>' +
       '<div id="tabelaHojeRumoMes" class="cel-cartao"><table><tr><th>Loja</th>' +
       '<th>Vendido até ' + ddmm(ontemIso) + sub('caixa das lojas · ' + um(corrido) + '% do mês já passou') + '</th>' +
       '<th>Previsto no mês' + sub('no ritmo das últimas 4 semanas') + '</th>' +
-      '<th>Meta do mês' + sub('a receita que dá 10% de resultado') + '</th>' +
+      '<th>Meta do mês' + sub(rotMetaRes) + '</th>' +
       '<th>CMO estimado' + sub('meta até ' + (mPess ? um(mPess.meta) : '—') + '% · escala e horas') + '</th>' +
       '<th>CMV do dia' + sub('orçamento de compra') + '</th></tr>' +
       cols.map(c => tr(c, [
