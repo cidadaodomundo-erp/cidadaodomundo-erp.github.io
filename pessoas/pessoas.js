@@ -867,6 +867,17 @@ function cgAbaPessoas() {
   return h;
 }
 // a pessoa aberta (dono, 31/10/2026): as movimentações, das folhas fechadas e do cadastro, e o que a casa paga além do salário
+// 13º JÁ ADIANTADO (dono 12/11/2026 11:19: "O desconto dos 2.200 do Edgar é no décimo terceiro; registrar isso nas telas que envolvem
+// os pagamentos e cálculos das folhas"; proposta 2026-11-12-rh-13-adiantado.md). Fonte vw_rh_13_adiantado, lida uma vez; chip âmbar
+// na linha da pessoa no ano da competência. Nenhuma tela manda pagar o 13º cheio de quem está aqui.
+let CG_13 = undefined;
+function cg13Chip(pid, nome, comp) {
+  if (CG_13 === undefined) { CG_13 = null; consultarTudo('vw_rh_13_adiantado?select=*').then((r) => { CG_13 = r || []; if (CG_13.length) renderModuloCargos(); }).catch(() => { CG_13 = []; }); return ''; }
+  if (!Array.isArray(CG_13) || !CG_13.length) return '';
+  const ano = Number(String(comp || cgHojeIso()).slice(0, 4)), nm = String(nome || '').trim().toUpperCase();
+  const x = CG_13.find((y) => Number(y.ano) === ano && (pid ? y.pessoa_id === pid : String(y.nome || '').trim().toUpperCase() === nm));
+  return x ? ` <span style="display:inline-block;font-size:11px;font-weight:700;color:var(--farol-perto);border:1px solid var(--farol-perto);border-radius:10px;padding:0 6px;white-space:normal;" title="${cgEsc(x.como_abate || '')}">13º: já adiantou ${cgEsc(x.detalhe || cgR(x.adiantado))} — ${cgEsc(x.como_abate || '')}</span>` : '';
+}
 function cgDetalhePessoa(p) {
   if (CARGOS_F.formando === p.id) return cgFormPessoa(p);
   const adm = cgAdmDaPessoa(p.id);
@@ -875,6 +886,7 @@ function cgDetalhePessoa(p) {
       <span><b>VT</b> ${p.vt_por_dia ? `${p.vt_por_dia} por dia` : 'não pega'}</span><span><b>VA</b> ${p.recebe_va ? 'sim' : 'não'}</span>
       <span><b>Adiantamento</b> ${p.pega_adiantamento && p.contrato === 'CLT' ? 'sim' : 'não'}</span>${p.desligamento ? `<span><b>Saiu</b> ${cgData(p.desligamento)}</span>` : ''}
       <button type="button" class="preset-btn" onclick="cgFormAbrir(${p.id})">Editar</button></div>
+    ${cg13Chip(p.id, p.nome) ? `<div style="margin:0 0 8px;">${cg13Chip(p.id, p.nome)}</div>` : ''}
     ${cgCombinadoFicha(p)}
     ${cgCustoPessoaHtml(p)}
     ${cgMovHtml(p)}`;
@@ -1444,7 +1456,7 @@ function cgAbaCusto() {
     <div id="tabelaCgCusto" style="overflow-x:auto;"><table>
       <thead><tr><th>Loja</th><th>Nome</th><th>Setor</th><th style="text-align:right;">Salário e adiant.</th><th style="text-align:right;">VT</th><th style="text-align:right;">VA</th><th style="text-align:right;">Rescisão, férias, 13º</th><th style="text-align:right;">Bonificação</th><th style="text-align:right;" title="INSS, FGTS, medicina… repartidos pela parte do salário de cada um no mês">Encargos (rateio)</th><th style="text-align:right;" title="gasto coletivo (uniforme etc.) repartido pela parte do salário; do contas a pagar, os 18 subtipos de folha da DRE, menos empréstimos e vales">Outros (rateio)</th><th style="text-align:right;">Total</th></tr></thead>
       <tbody>${linhas.map(c => `<tr>
-        <td>${cgEsc(c.unidade)}</td><td>${c.pessoa_id ? `<a href="javascript:void(0)" onclick="cgAbrirPessoa(${c.pessoa_id})" title="abrir o cadastro">${cgEsc(cgNome(c.nome))}</a>` : cgEsc(cgNome(c.nome))}${c.fora_do_cadastro ? ' <span style="font-size:10px;color:var(--tx-4);">ex-funcionário</span>' : ''}</td>
+        <td>${cgEsc(c.unidade)}</td><td>${c.pessoa_id ? `<a href="javascript:void(0)" onclick="cgAbrirPessoa(${c.pessoa_id})" title="abrir o cadastro">${cgEsc(cgNome(c.nome))}</a>` : cgEsc(cgNome(c.nome))}${cg13Chip(c.pessoa_id, c.nome, c.mes)}${c.fora_do_cadastro ? ' <span style="font-size:10px;color:var(--tx-4);">ex-funcionário</span>' : ''}</td>
         <td>${cgEsc(c.setor_rateio || '–')}</td>
         <td style="text-align:right;">${cgR(c.salario)}</td><td style="text-align:right;">${cgR(c.vt)}</td><td style="text-align:right;">${cgR(c.va)}</td>
         <td style="text-align:right;">${cgR(c.rescisao_ferias_13)}</td><td style="text-align:right;">${cgR(c.bonificacao)}</td>
@@ -1827,7 +1839,7 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k, al = alertas(x);
       const sit = String(x.situacao || '').toLowerCase();
       h += `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
-        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(x.nome || x.apelido))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
+        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(x.nome || x.apelido))}${cg13Chip(x.pessoa_id, x.nome, comp)} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
         <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;"${x.saipos_salario != null ? ` title="título de salário no Saipos: ${cgR(x.saipos_salario)}"` : ''}>${al.map(cgEsc).join('<br>')}</td>${hbCel(x)}
         ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
         ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
@@ -1905,7 +1917,7 @@ function cgFolhaQuadroForaCols(comp, R) {
       const extra = x.saiu ? '<div style="font-size:11px;font-weight:400;color:var(--tx-4);">saiu: a rescisão paga</div>'
         : ff ? `<div style="font-size:11px;font-weight:400;color:var(--tx-4);">${ffSituacaoTxt(ff, 'SALDO')}</div>${ff.saldo_pago_em ? `<button type="button" class="preset-btn" style="margin-top:4px;" onclick="ffReciboAbrir(${ff.pessoa_id},'${comp}','SALDO')">🧾 Recibo</button>` : ''}` : '';
       const fora = ff ? cgFfDescontos(ff).fora : [];
-      h += `<tr><td>${cgEsc(cgNome(x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>${cgFfCelulas(ff, V, extra)}
+      h += `<tr><td>${cgEsc(cgNome(x.nome))}${cg13Chip(x.pessoa_id, x.nome, comp)} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>${cgFfCelulas(ff, V, extra)}
         <td style="font-size:11.5px;white-space:normal;min-width:170px;" title="título de salário no Saipos: ${x.saipos_salario == null ? 'nenhum' : cgR(x.saipos_salario)}"><span style="color:var(--farol-perto);">${cgEsc(x.conferir_texto || '')}</span>
           ${fora.map((y) => `<div style="color:var(--tx-5);">${cgEsc(String(y.descricao || '').toLowerCase())} ${cgR(y.valor)}: desconto marcado para ${cgDiaMes(String(y.data_desconto))}, fora deste pagamento</div>`).join('')}</td></tr>`;
     });
@@ -1958,7 +1970,7 @@ function cgFolhaQuadroFora(comp) {
     const lin = R.filter((x) => x.empresa === e);
     h += `<tr class="sub"><td colspan="8"><b>${cgEsc(e)}</b></td></tr>`;
     lin.forEach((x) => {
-      h += `<tr><td>${cgEsc(cgNome(x.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
+      h += `<tr><td>${cgEsc(cgNome(x.nome))}${cg13Chip(x.pessoa_id, x.nome, comp)} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}</span></td>
         <td>${v0(x.liquido_folha)}</td>
         <td>${v0(x.acrescimo_combinado)}${x.combinado_tipo ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${x.combinado_tipo === 'TOTAL' ? 'total combinado ' + cgR(x.combinado_valor) : 'acréscimo fixo'}${x.combinado_motivo ? ' — ' + cgEsc(x.combinado_motivo) : ''}</div>` : ''}</td>
         <td>${v0(x.saldo_fora)}</td>
@@ -2224,7 +2236,7 @@ function cgAbaEnvio() {
     return `<div id="${id}" style="overflow-x:auto;"><table><thead><tr><th>Nome</th>${C.map(([, r]) => `<th>${r}</th>`).join('')}<th>Empresa · matr.</th></tr></thead><tbody>
     ${Q.map((p) => { const ab = F.envioAberta === id + p.k;
       return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(id + p.k))}?null:${cgEsc(JSON.stringify(id + p.k))};renderModuloCargos()'>
-        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
+        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(p.nome))}${cg13Chip(p.pessoa_id, p.nome, comp)} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         ${C.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"'
           : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k], p.vtPct)}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}
         <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td></tr>
@@ -2852,7 +2864,7 @@ const RESC_BLOCO_B = [
     ['salario_familia_cotas', 'Salário-família (cotas = filhos até 14 anos)', 'num']]],
   ['FGTS', [['saldo_fgts', 'Saldo do FGTS', 'num']]],
 ];
-const RESC_BLOCO_C = [['dsr_dias', 'DSR perdido (dias)', 'num'], ['atestado_dias', 'Dias de atestado no mês', 'num'], ['decimo_pago', '13º já adiantado', 'num'],
+const RESC_BLOCO_C = [['dsr_dias', 'DSR perdido (dias)', 'num'], ['atestado_dias', 'Dias de atestado no mês', 'num'], ['decimo_pago', '13º já adiantado no ano', 'num'],
   ['va_rescisao', 'VA na rescisão', 'num'], ['descontos', 'Outros descontos', 'num'], ['descontos_motivo', 'Motivo dos outros descontos', 'txt'],
   ['anos_aviso', 'Anos para o aviso (só para forçar)', 'num', 'calcula'], ['avos13', 'Avos do 13º (só para forçar)', 'num', 'calcula'], ['avos_ferias', 'Avos de férias (só para forçar)', 'num', 'calcula']];
 // campos que o painel estima e alguém precisa conferir: âmbar até editar ou tocar em "confere"
