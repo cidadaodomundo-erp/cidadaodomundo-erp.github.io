@@ -2433,18 +2433,19 @@ function cgAbaFerias() {
     return `<b style="color:${c};">${cgData(x.limite_gozo)}</b>${n === null ? '' : ` <span style="color:${c};font-size:12px;">${n === 0 ? 'é hoje' : `faltam ${n} ${n === 1 ? 'dia' : 'dias'}`}</span>`}`;
   };
   const goz = (pid) => (gozo || []).filter((g) => g.pessoa_id === pid);
-  h += `<div id="tabelaCgFerias" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Loja</th><th>Venceu a 1ª</th><th>Vence a 2ª</th><th>Começar até</th>
+  h += `<div id="tabelaCgFerias" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Loja</th><th>Última tirada</th><th>Venceu a 1ª</th><th>Vence a 2ª</th><th>Começar até</th>
       <th style="text-align:right;">Dias a gozar</th><th>Marcado na Flash</th><th style="text-align:right;">Valor estimado</th><th>Situação</th></tr></thead><tbody>
     ${vis.map((x) => { const k = `${x.pessoa_id}|${x.aquisitivo_inicio}`, ab = F.ferAberta === k, G = goz(x.pessoa_id);
       return `<tr style="cursor:pointer;" onclick="CARGOS_F.ferAberta=CARGOS_F.ferAberta==='${k}'?null:'${k}';renderModuloCargos()">
         <td>${cgEsc(cgNome(x.nome || x.apelido))}</td><td>${cgEsc(x.unidade || '')}</td>
+        <td>${(() => { const u = G.map((g) => String(g.inicio || '')).filter(Boolean).sort().pop(); return u ? cgData(u) : '–'; })()}</td>
         <td title="período aquisitivo: ${cgData(x.aquisitivo_inicio)} a ${cgData(x.aquisitivo_fim)}">${formacao(x) ? `<span style="color:var(--tx-4);">vence em ${cgData(x.aquisitivo_fim)}</span>` : cgData(x.aquisitivo_fim)}</td>
         <td>${venceSegunda(x) ? cgData(venceSegunda(x)) : '–'}</td><td style="white-space:normal;">${comecar(x)}</td>
         <td style="text-align:right;">${cgN(x.dias_a_gozar)}${cgN(x.dias_gozados) || cgN(x.faltas) ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgN(x.dias_direito)}</span>` : ''}</td>
         <td style="font-size:12px;">${cgN(x.dias_programados) ? cgEsc(cgFerMarcado(x)) : '<span style="color:var(--tx-5);">nada</span>'}</td>
         <td style="text-align:right;">${marcada(x) ? cgR(x.valor_programado) : cgN(x.valor_estimado) ? cgR(x.valor_estimado) : '–'}</td>
         <td style="color:${cor(sit(x))};font-weight:700;white-space:normal;">${cgEsc(sit(x))}</td></tr>
-        ${ab ? `<tr><td colspan="9"><b>Férias conhecidas de ${cgEsc(cgNome(x.nome || x.apelido))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
+        ${ab ? `<tr><td colspan="10"><b>Férias conhecidas de ${cgEsc(cgNome(x.nome || x.apelido))}:</b> ${G.length ? G.map((g) => `${cgData(g.inicio)} a ${cgData(g.fim)} (${cgN(g.dias_quitados)} dias · ${cgEsc(g.origem || '')})`).join(' · ') : 'nenhuma registrada.'}${cgN(x.dias_afastamento) ? ` · afastamento de ${cgN(x.dias_afastamento)} dias estica o limite` : ''}${cgN(x.faltas) ? ` · ${cgN(x.faltas)} faltas reduzem os dias` : ''}${cgFerSimHtml(x)}</td></tr>` : ''}`; }).join('')}
     </tbody></table></div>`;
   return h;
 }

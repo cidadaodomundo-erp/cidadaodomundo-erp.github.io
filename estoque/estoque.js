@@ -2345,7 +2345,7 @@ function plpSepsHtml(fech) {
   const campo = 'background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:4px 6px;';
   let h = `<div class="section-label">Listas em aberto</div>
     <div class="caption-label" style="text-align:left;">Uma lista por família de proteína (receita sem família, lista própria). Quem separa marca o que saiu de verdade;
-      outra pessoa confere; da lista conferida nasce a ordem de produção.</div>`;
+      quem separou ou outra pessoa confere; da lista conferida nasce a ordem de produção.</div>`;
   [...porSep.entries()].forEach(([id, ls]) => {
     const c = ls[0];
     const [st, cor] = SIT[c.situacao] || [String(c.situacao || '').toLowerCase(), 'var(--tx-4)'];
@@ -2362,7 +2362,7 @@ function plpSepsHtml(fech) {
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="preset-btn" onclick="plpSepImprimir(${id})">🖨️ Imprimir a folha</button>
           ${aberta ? `<button class="preset-btn active est-ciclo" onclick="plpSepSeparar(${id})">Marcar como separada</button>` : ''}
-          ${c.situacao === 'SEPARADA' ? `<button class="preset-btn active est-ciclo" onclick="plpSepConferir(${id})" title="outra pessoa, não quem separou">Conferir</button>` : ''}
+          ${c.situacao === 'SEPARADA' ? `<button class="preset-btn active est-ciclo" onclick="plpSepConferir(${id})">Conferir</button>` : ''}
           ${c.situacao === 'CONFERIDA' ? `<button class="preset-btn active est-ciclo" onclick="plpSepOrdem(${id})">Gerar a ordem de produção</button>` : ''}
           ${c.situacao === 'VINCULADA' ? `<a href="javascript:void(0)" style="color:var(--brand); align-self:center;" onclick="mostrarModulo('ordens')">${c.numero_ordem ? trEscH(c.numero_ordem) + ' — ' : ''}abrir em Ordens ›</a>` : ''}
         </div></div>
@@ -2416,12 +2416,7 @@ async function plpSepConferir(id) {
   // 27/10/2026 (dono): mostrar os dois nomes — o texto da regra parecia recusa
   const eu = ((rmbSessao() || {}).email || '').toLowerCase();
   const nome = (e) => estNome(e) || '?';
-  if (eu && String(c.separado_por || '').toLowerCase() === eu) {
-    avisoAcao('atencao', `! A ${c.numero} foi separada por você (${nome(eu)}).
-
-Quem confere tem de ser outra pessoa: entre com o login dela para conferir.`);
-    return;
-  }
+  // 11/11/2026 23:42 (dono, teste de 12/11): "O próprio Habrahan pode finalizar a separação" — quem separou também confere
   if (!confirm(`Conferir a ${c.numero}?
 
 Você está conferindo como ${nome(eu)}. Quem separou foi ${nome(c.separado_por)}.`)) return;
