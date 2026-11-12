@@ -1941,6 +1941,7 @@ function renderModuloCaixa() {
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
     <details class="cx-cofre" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
+    <details class="cx-descontos" style="margin-top:6px;color:var(--tx-4);"${DESC.aberto ? ' open' : ''} ontoggle="descAbrir(this.open)"><summary style="cursor:pointer;">descontos do salão e do balcão${DESC.resumo ? ' · ' + DESC.resumo : ''}</summary><div id="descCorpo">${DESC.aberto ? descHtml() : ''}</div></details>
     <details class="cx-historico" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">conferência do dia a dia (histórico)${pendTotal ? ` · ${pendTotal} dia(s) com pendência` : ''}</summary>
     <div class="contexto" style="text-align:left;">
       ${filtros}
@@ -1949,6 +1950,107 @@ function renderModuloCaixa() {
     </details>
     <div class="caption-label" style="text-align:left;margin-top:10px;">Resolva o dia da vez de cada loja; o próximo abre sozinho.</div>`;
   if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
+}
+// CONTROLE DE DESCONTOS do salão e do balcão (dono, qui 12/11/2026 03:23: "quem deu o desconto e o motivo, e se usou a senha
+// de autorização"; livro chat-frente-financeiro/respostas/controle-descontos-salao-balcao; proposta
+// contexto/propostas-telas/2026-11-12-controle-descontos.md). Lê as views vw_descontos_* (filtro de filial dentro delas)
+// só quando o bloco abre; loja = a do topo, janela = a dos filtros do caixa. Nada grava no Saipos.
+const DESC = { aberto: false, chave: null, linhas: null, vendas: null, conc: null, refe: null, erro: null, filtro: null, resumo: '' };
+function descAbrir(aberto) {
+  DESC.aberto = aberto;
+  if (aberto) descCarregar();
+}
+function descDesde() {
+  const d = new Date(new Date().toLocaleDateString('en-CA') + 'T12:00:00');
+  d.setDate(d.getDate() - (CAIXA_FILTRO.dias - 1));
+  return d.toLocaleDateString('en-CA');
+}
+async function descCarregar() {
+  const visao = caixaLojaVisao(), desde = descDesde();
+  const chave = (visao || 'REDE') + '|' + desde;
+  const corpo = () => document.getElementById('descCorpo');
+  if (DESC.chave === chave && DESC.linhas) { if (corpo()) corpo().innerHTML = descHtml(); return; }
+  DESC.chave = chave; DESC.filtro = null; DESC.erro = null; DESC.linhas = null;
+  if (corpo()) corpo().innerHTML = '<div class="contexto">Lendo os descontos…</div>';
+  const u = visao ? `&unidade=eq.${encodeURIComponent(visao)}` : '';
+  const mes = desde.slice(0, 8) + '01';
+  try {
+    const [linhas, vendas, conc, refe] = await Promise.all([
+      consultarTudo(`vw_descontos_controle_dia?select=unidade,dia,canal,quem,quem_fonte,motivo_classe,descontos,valor_desconto,venda_bruta_canal,pct_da_venda_do_canal,sem_motivo,valor_sem_motivo&dia=gte.${desde}${u}&order=dia.desc,unidade,canal`),
+      consultarTudo(`vw_descontos_venda?select=unidade,dia,canal,numero,mesa,hora,bruto,desconto,pct,motivo,para_quem,funcionario_nome,quem,quem_fonte,parece,alerta_sem_motivo,alerta_desconto_alto&refeicao_equipe=is.false&desconto=gt.0&dia=gte.${desde}${u}&order=hora.desc`),
+      consultarTudo(`vw_descontos_concentracao?select=unidade,mes,eixo,pessoa,descontos,valor,pct_da_loja&alerta_concentra=is.true&mes=gte.${mes}${u}&order=mes.desc,pct_da_loja.desc`),
+      consultarTudo(`vw_descontos_refeicao_equipe?select=unidade,dia,canal,refeicoes,quem_comeu&dia=gte.${desde}${u}&order=dia.desc,unidade`),
+    ]);
+    if (DESC.chave !== chave) return;   // trocou de loja ou de janela no meio
+    Object.assign(DESC, { linhas: linhas || [], vendas: vendas || [], conc: conc || [], refe: refe || [] });
+  } catch (e) { DESC.erro = e.message; }
+  const v = DESC.vendas || [], semM = v.filter((x) => x.alerta_sem_motivo).length;
+  DESC.resumo = DESC.erro ? '' : `${v.length} no período${semM ? `, ${semM} sem motivo` : ''}`;
+  const s = document.querySelector('details.cx-descontos > summary');
+  if (s) s.textContent = 'descontos do salão e do balcão' + (DESC.resumo ? ' · ' + DESC.resumo : '');
+  if (corpo()) corpo().innerHTML = descHtml();
+}
+function descFiltrar(f) { DESC.filtro = DESC.filtro === f ? null : f; const c = document.getElementById('descCorpo'); if (c) c.innerHTML = descHtml(); }
+function descHtml() {
+  if (DESC.erro) return `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os descontos: ${trEscH(DESC.erro)} <button type="button" class="preset-btn" onclick="DESC.chave=null;descCarregar()">Tentar de novo</button></div>`;
+  if (!DESC.linhas) return '<div class="contexto">Lendo os descontos…</div>';
+  const R = (v) => 'R$ ' + fmt(+v || 0), L = (u) => (typeof lojaNome === 'function' ? lojaNome(u) : u);
+  const pctF = (v) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+  const ddm = (d) => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+  const linhas = DESC.linhas, V = DESC.vendas;
+  const total = linhas.reduce((a, x) => a + (+x.valor_desconto || 0), 0);
+  const vendaCanal = new Map(); linhas.forEach((x) => vendaCanal.set(x.unidade + '|' + x.dia + '|' + x.canal, +x.venda_bruta_canal || 0));
+  const venda = [...vendaCanal.values()].reduce((a, b) => a + b, 0);
+  const semM = V.filter((x) => x.alerta_sem_motivo), alto = V.filter((x) => x.alerta_desconto_alto);
+  const F = DESC.filtro;
+  let h = `<div class="contexto" style="text-align:left;">
+    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px;">
+      ${[7, 15, 30, 60].map((n) => `<button class="navbtn ${CAIXA_FILTRO.dias === n ? 'active' : ''}" onclick="caixaFiltrar('dias',${n}); descCarregar();">${n} dias</button>`).join('')}
+      <span style="color:var(--tx-4); font-size:12px;">desde ${ddm(descDesde())}</span></div>
+    <div class="cards cards-3">
+      <div class="card ${total ? 'highlight' : 'pos'}"><div class="card-lbl">Desconto no salão e no balcão</div><div class="card-val">${R(total)}</div><div class="card-pct">${V.length} vendas com desconto</div></div>
+      <div class="card neutral"><div class="card-lbl">% da venda</div><div class="card-val">${venda ? pctF(total / venda * 100) : '–'}</div><div class="card-pct">da venda de ${R(venda)}</div></div>
+      <div class="card ${semM.length ? 'neg' : 'pos'}"><div class="card-lbl">Sem motivo</div><div class="card-val">${semM.length}</div><div class="card-pct">${R(semM.reduce((a, x) => a + (+x.desconto || 0), 0))}</div></div></div>`;
+  // alertas: só os que existem; clicar filtra as vendas
+  const al = [];
+  if (semM.length) al.push(`<a href="javascript:void(0)" onclick="descFiltrar('semMotivo')" style="color:var(--farol-perto); font-weight:700;">${F === 'semMotivo' ? '✓ ' : ''}${semM.length} descontos sem motivo (${R(semM.reduce((a, x) => a + (+x.desconto || 0), 0))})</a>`);
+  if (alto.length) al.push(`<a href="javascript:void(0)" onclick="descFiltrar('alto')" style="color:var(--farol-perto); font-weight:700;">${F === 'alto' ? '✓ ' : ''}${alto.length} descontos de 50% ou mais</a>`);
+  // "caixa nº" é o computador da frente de caixa, não uma pessoa: concentrar nele não diz nada
+  DESC.conc.filter((c) => !/^caixa n/i.test(c.pessoa || '')).forEach((c) => al.push(`<span style="color:var(--farol-perto);">${trEscH(c.pessoa)} concentra ${pctF(c.pct_da_loja)} dos descontos ${c.eixo === 'PARA QUEM' ? 'recebidos' : 'dados'} ${L(c.unidade) ? 'em ' + trEscH(L(c.unidade)) : ''} em ${ddm(c.mes).slice(3)} (${c.descontos}, ${R(c.valor)})</span>`));
+  if (al.length) h += `<div style="display:flex; flex-direction:column; gap:3px; margin:8px 0;">${al.join('')}</div>`;
+  h += `<div style="font-size:12px; color:var(--tx-4); margin:4px 0 10px;">O Saipos não informa se usou a senha de autorização nem quem autorizou.</div>`;
+  // lista por dia
+  const chaveL = (x) => 'dia:' + x.unidade + '|' + x.dia + '|' + x.canal;
+  h += `<div class="section-label" style="text-align:left;">Por dia</div>`;
+  h += linhas.length ? `<div id="tabelaDescDia" style="overflow-x:auto; max-height:320px;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Canal</th><th>Quem</th><th>Motivo</th><th style="text-align:right;">Descontos</th><th style="text-align:right;">Valor</th><th style="text-align:right;">% da venda</th></tr></thead><tbody>
+    ${linhas.map((x) => `<tr style="cursor:pointer;${F === chaveL(x) ? ' background:var(--surface-2);' : ''}" onclick="descFiltrar(${trEscH(JSON.stringify(chaveL(x)))})" title="clique para ver as vendas deste dia">
+      <td>${ddm(x.dia)}</td><td>${trEscH(L(x.unidade))}</td><td>${trEscH(x.canal === 'SALÃO' ? 'Salão' : 'Balcão')}</td><td>${trEscH(x.quem || '')}</td>
+      <td style="${x.sem_motivo > 0 ? 'color:var(--farol-perto);' : ''}">${trEscH(x.motivo_classe || (x.sem_motivo > 0 ? 'sem motivo' : ''))}</td>
+      <td style="text-align:right;">${x.descontos}</td><td style="text-align:right;">${R(x.valor_desconto)}</td><td style="text-align:right;">${pctF(x.pct_da_venda_do_canal)}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div style="color:var(--farol-ok);">✓ Nenhum desconto no salão e no balcão neste período.</div>';
+  // vendas
+  let vis = V;
+  if (F === 'semMotivo') vis = semM; else if (F === 'alto') vis = alto;
+  else if (F && F.startsWith('dia:')) { const [u, d, c] = F.slice(4).split('|'); vis = V.filter((x) => x.unidade === u && x.dia === d && x.canal === c); }
+  const cent = vis.filter((x) => +x.desconto < 1), cheias = vis.filter((x) => +x.desconto >= 1);
+  const linhaV = (x) => `<tr><td>${ddm(x.dia)} ${String(x.hora || '').slice(11, 16)}</td><td>${x.numero ? 'venda ' + x.numero : x.mesa ? 'mesa ' + trEscH(x.mesa) : '–'}<div style="font-size:11px;color:var(--tx-4);">${trEscH(L(x.unidade))} · ${x.canal === 'SALÃO' ? 'salão' : 'balcão'}</div></td>
+      <td style="text-align:right;">${R(x.bruto)}</td><td style="text-align:right;">${R(x.desconto)}<div style="font-size:11px;color:var(--tx-4);">${pctF(x.pct)}</div></td>
+      <td style="white-space:normal;${x.motivo ? '' : ' color:var(--farol-perto); font-weight:700;'}">${x.motivo ? trEscH(x.motivo) : 'sem motivo'}</td>
+      <td style="white-space:normal;">${trEscH(x.para_quem || '')}${x.funcionario_nome ? `<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.funcionario_nome)}</div>` : ''}</td>
+      <td>${trEscH(x.quem || '')}<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.quem_fonte || '')}</div></td>
+      <td style="white-space:normal; color:var(--tx-4); font-size:12px;">${trEscH(x.parece || '')}</td></tr>`;
+  const rotF = F === 'semMotivo' ? ' · só sem motivo' : F === 'alto' ? ' · só 50% ou mais' : F ? ' · ' + ddm(F.split('|')[1]) : '';
+  h += `<div class="section-label" style="text-align:left; margin-top:14px;">Vendas com desconto${rotF}${F ? ` <a href="javascript:void(0)" onclick="descFiltrar(null)" style="font-size:12px;">mostrar todas</a>` : ''}</div>`;
+  h += cheias.length ? `<div id="tabelaDescVendas" style="overflow-x:auto; max-height:420px;"><table><thead><tr><th>Hora</th><th>Venda</th><th style="text-align:right;">Conta cheia</th><th style="text-align:right;">Desconto</th><th>Motivo</th><th>Para quem</th><th>Quem</th><th>O que parece</th></tr></thead><tbody>${cheias.map(linhaV).join('')}</tbody></table></div>
+    <div style="font-size:12px; color:var(--tx-4); margin-top:4px;">"Quem" é o garçom da mesa ou o caixa que lançou — o Saipos não diz quem deu o desconto.</div>`
+    : '<div style="color:var(--tx-4);">Nenhuma venda neste filtro.</div>';
+  if (cent.length) h += `<details style="margin-top:6px;"><summary style="cursor:pointer; font-size:12px;">centavos (${cent.length}) — arredondamento abaixo de R$ 1</summary><div style="overflow-x:auto;"><table><tbody>${cent.map(linhaV).join('')}</tbody></table></div></details>`;
+  // refeição da equipe, à parte
+  const RE = DESC.refe;
+  if (RE.length) h += `<details style="margin-top:10px;"><summary style="cursor:pointer; font-size:12px;">refeição da equipe (${RE.reduce((a, x) => a + (+x.refeicoes || 0), 0)} de R$ 0) — não soma no desconto</summary>
+    <div style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Canal</th><th style="text-align:right;">Refeições</th><th>Quem comeu</th></tr></thead><tbody>
+    ${RE.map((x) => `<tr><td>${ddm(x.dia)}</td><td>${trEscH(L(x.unidade))}</td><td>${x.canal === 'SALÃO' ? 'Salão' : 'Balcão'}</td><td style="text-align:right;">${x.refeicoes}</td><td style="white-space:normal;">${trEscH(x.quem_comeu || '')}</td></tr>`).join('')}</tbody></table></div></details>`;
+  return h + '</div>';
 }
 // GUIA DE PRIMEIRO ACESSO (09/11/2026, dono: "pode sim, eu gostei do formato"; mecanismo no nucleo.js): abre uma vez por
 // login; o "?" no canto revê. Registra uma vez por carga da página, para o redesenho não reabrir o guia no meio.
