@@ -3092,8 +3092,12 @@ function renderModuloCardapio(periodoSel, lojaSel) {
   CARDAPIO_ESCOPOS = escopos; CARDAPIO_ESCOPO = escopo;
   const doEscopo = (r) => (r.nome_loja || 'REDE') === escopo;
   const itensEscopo = itensPeriodo.filter(doEscopo);
-  const itens = itensEscopo.slice(0, 12);
-  const compl = complPeriodo.filter(doEscopo).slice(0, 8);
+  // 12/11/2026 (auditoria de usabilidade): "ver todos" nas duas listas (antes cortavam em 12 e 8 sem aviso)
+  const complEscopo = complPeriodo.filter(doEscopo);
+  const itens = CARDAPIO_VER_TODOS.itens ? itensEscopo : itensEscopo.slice(0, 12);
+  const compl = CARDAPIO_VER_TODOS.compl ? complEscopo : complEscopo.slice(0, 8);
+  const verTodos = (k, total, mostra) => total > mostra || CARDAPIO_VER_TODOS[k]
+    ? `<div style="margin:6px 2px; font-size:13px;"><a href="javascript:void(0)" style="color:var(--tx-3);" onclick="CARDAPIO_VER_TODOS.${k}=!CARDAPIO_VER_TODOS.${k}; renderModuloCardapio('${pIni}|${pFim}', CARDAPIO_ESCOPO)">${CARDAPIO_VER_TODOS[k] ? 'mostrar só os primeiros' : `ver todos (${total})`}</a></div>` : '';
   // O <select> saiu (12/09/2026): quem escolhe agora e' a linha da loja na tabela do
   // funil, logo acima. Fica so' o chip que diz qual recorte esta valendo e o ✕ que
   // volta para o primeiro escopo — o mesmo chip do modulo Evolucao.
@@ -3136,17 +3140,17 @@ function renderModuloCardapio(periodoSel, lojaSel) {
   </div>
   <div id="tabelaMuitoVisto">
     <table>
-      <tr><th>Item</th><th>Categoria</th><th>Visitas</th><th>Pedidos</th><th title="De quem viu o item, quantos pediram.">Conversão</th><th>Valor total</th></tr>
+      <thead><tr><th>Item</th><th>Categoria</th><th>Visitas</th><th>Pedidos</th><th title="De quem viu o item, quantos pediram.">Conversão</th><th>Valor total</th></tr></thead><tbody>
       ${muitoVisto.map(r => `<tr><td>${r.item}</td><td>${r.categoria || '—'}</td>
         <td>${Number(r.visitas || 0).toLocaleString('pt-BR')}</td>
         <td>${(r.pedidos || 0).toLocaleString('pt-BR')}</td>
         <td${(convItem(r) || 0) < CORTE_CONV ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${pct(convItem(r) || 0)}%</td>
         <td>R$ ${fmt(Number(r.valor_total || 0))}</td></tr>`).join('')}
-    </table>
+    </tbody></table>
   </div>` : '';
 
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Cardápio — conversão e itens</div>
+  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Desempenho do cardápio no iFood</div>
   <div class="caption-label" style="text-align:center;">
     Retrato do relatório de cardápio do Portal de Redes (seletor de período abaixo — não segue o filtro de datas do topo).
   </div>
@@ -3164,7 +3168,7 @@ function renderModuloCardapio(periodoSel, lojaSel) {
   <div class="caption-label" style="text-align:center;">Visita → viu item → sacola → revisou → concluiu.${escopos.length > 1 ? ' <b>Clique na loja para ver os itens dela.</b>' : ''}</div>
   <div id="tabelaFunil">
     <table>
-      <tr><th>Loja</th><th>Visitas</th><th title="Quantas vezes alguém abriu a página de um item.">Viu item</th><th>Sacola</th><th title="Quantas vezes alguém chegou na tela de revisar o pedido — o passo antes de concluir.">Revisou</th><th>Concluídos</th><th>Conversão</th></tr>
+      <thead><tr><th>Loja</th><th>Visitas</th><th title="Quantas vezes alguém abriu a página de um item.">Viu item</th><th>Sacola</th><th title="Quantas vezes alguém chegou na tela de revisar o pedido — o passo antes de concluir.">Revisou</th><th>Concluídos</th><th>Conversão</th></tr></thead><tbody>
       ${funil.map(r => { const iE = escopos.indexOf(r.nome_loja); const sel = iE >= 0 && escopo === r.nome_loja;
         const solta = sel && escopo !== escopos[0];
         return `<tr${iE >= 0 ? ` onclick="cardapioEscopo('${chave}', ${iE})" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? (solta ? 'É o recorte que está na tela — clique para voltar ao primeiro escopo.' : 'É o recorte de itens e complementos que está na tela.') : 'Clique para ver os itens e complementos desta loja.'}"` : ' title="Sem export de itens desta loja neste período — o recorte de itens não muda."'}><td>${sel ? '<b>' : ''}${r.nome_loja}${sel ? '</b>' : ''}${solta ? ' ✕' : ''}</td><td>${(r.visitas || 0).toLocaleString('pt-BR')}</td>
@@ -3178,14 +3182,15 @@ function renderModuloCardapio(periodoSel, lojaSel) {
         <td>${funil.reduce((s, r) => s + (r.sacola || 0), 0).toLocaleString('pt-BR')}</td>
         <td>${funil.reduce((s, r) => s + (r.revisao || 0), 0).toLocaleString('pt-BR')}</td>
         <td>${totC.toLocaleString('pt-BR')}</td><td>${pct(totV ? totC / totV * 100 : 0)}%</td></tr>
-    </table>
+    </tbody></table>
   </div>
+  ${blocoMuitoVisto}
 
   <div class="section-label">Itens mais vendidos · ${escopo === 'REDE' ? 'rede inteira' : escopo}</div>
   ${chipEscopo}
   <div id="tabelaItens">
     <table>
-      <tr><th>Item</th><th>Categoria</th><th>Visitas</th><th>Pedidos</th><th title="De quem viu o item, quantos pediram.">Conversão</th><th>Qtd vendida</th><th>% com promoção</th><th>Valor total</th></tr>
+      <thead><tr><th>Item</th><th>Categoria</th><th>Visitas</th><th>Pedidos</th><th title="De quem viu o item, quantos pediram.">Conversão</th><th>Qtd vendida</th><th>% com promoção</th><th>Valor total</th></tr></thead><tbody>
       ${itens.map(r => `<tr><td>${r.item}</td><td>${r.categoria || '—'}</td>
         <td>${Number(r.visitas || 0) ? Number(r.visitas).toLocaleString('pt-BR') : '—'}</td>
         <td>${(r.pedidos || 0).toLocaleString('pt-BR')}</td>
@@ -3193,20 +3198,22 @@ function renderModuloCardapio(periodoSel, lojaSel) {
         <td>${(r.qtd_vendida || 0).toLocaleString('pt-BR')}</td>
         <td>${pct(r.qtd_vendida ? (r.qtd_com_promocao || 0) / r.qtd_vendida * 100 : 0)}%</td>
         <td>R$ ${fmt(Number(r.valor_total || 0))}</td></tr>`).join('')}
-    </table>
+    </tbody></table>
   </div>
-  ${blocoMuitoVisto}
+  ${verTodos('itens', itensEscopo.length, 12)}
 
   <div class="section-label">Complementos mais vendidos</div>
   <div id="tabelaCompl">
     <table>
-      <tr><th>Complemento</th><th>Tipo</th><th>Pedidos</th><th>Qtd</th><th>Valor total</th></tr>
+      <thead><tr><th>Complemento</th><th>Tipo</th><th>Pedidos</th><th>Qtd</th><th>Valor total</th></tr></thead><tbody>
       ${compl.map(r => `<tr><td>${r.complemento}</td><td>${r.classificacao || '—'}</td><td>${(r.pedidos || 0).toLocaleString('pt-BR')}</td>
         <td>${(r.qtd_vendida || 0).toLocaleString('pt-BR')}</td><td>R$ ${fmt(Number(r.valor_total || 0))}</td></tr>`).join('')}
-    </table>
-  </div>`;
+    </tbody></table>
+  </div>
+  ${verTodos('compl', complEscopo.length, 8)}`;
 }
 
+const CARDAPIO_VER_TODOS = { itens: false, compl: false };
 async function entrarClientes() {
   const alvo = document.getElementById('view-clientes');
   if (CLIENTES_REDE === null) {
