@@ -4405,7 +4405,9 @@ function renderModuloAtrasos() {
   // contradiz sozinha. A matriz NAO se recorta por turno nem por dia — e dela que
   // se troca de escolha.
   const POUCAS_ATR = 30;
-  const baseMat = rows.filter(r => passaF(r, 'turno') && passaF(r, 'dow'));
+  // 12/11/2026: so o recorte de entregador vale aqui (o AND de passaF ignorando turno e
+  // ignorando dia aplicava os dois e zerava os outros turnos ao fixar um).
+  const baseMat = rows.filter(r => !ATRASOS_F.entregador || chaveEnt(r) === ATRASOS_F.entregador);
   const turnosMat = turnos.filter(t => t !== null);
   const dowsMat = [1, 2, 3, 4, 5, 6, 7].filter(d => rows.some(r => r.dia_semana === d));
   const celTxt = (g) => {
