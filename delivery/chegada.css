@@ -1,0 +1,54 @@
+/* Motoboys rodando no dia (12/11/2026). Usa as variáveis do nucleo/nucleo.css, como o Delivery do dia. */
+.na-casca body::before { display:none !important; }
+.cg-topo { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin:8px 0 6px; }
+.cg-topo h1 { font-size:20px; margin:0; }
+.cg-voltar { font-size:13px; color:inherit; opacity:.8; text-decoration:none; }
+.cg-voltar:hover { opacity:1; text-decoration:underline; }
+.cg-filtros { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-left:auto; font-size:13px; }
+.cg-filtros label { display:flex; gap:6px; align-items:center; }
+.cg-filtros input, .cg-filtros select { font:inherit; padding:5px 8px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+.cg-btn { font:inherit; font-size:13px; padding:5px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+.cg-btn:hover { border-color:var(--brand); }
+.cg-estado { font-size:12px; opacity:.8; margin:0 0 12px; }
+.cg-loja { margin:0 0 18px; }
+.cg-loja-topo { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline; margin-bottom:6px; }
+.cg-loja-topo h2 { font-size:16px; margin:0; }
+.cg-meta { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; opacity:.85; }
+.cg-tab-wrap { overflow-x:auto; }
+.cg-tab { width:100%; border-collapse:collapse; font-size:14px; }
+.cg-tab th, .cg-tab td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+.cg-tab th { font-size:12px; font-weight:700; opacity:.85; white-space:nowrap; }
+.cg-hora { font-variant-numeric:tabular-nums; font-weight:600; }
+.cg-motivo, .cg-sub { display:block; font-size:11.5px; opacity:.8; line-height:1.35; margin-top:2px; }
+.cg-fraco { opacity:.7; }
+.cg-marca { color:var(--farol-atencao, #d29922); font-weight:700; }
+.cg-vivo { color:var(--farol-ok); font-weight:700; }
+.cg-alerta { color:var(--farol-atencao, #d29922); }
+.cg-f-anotado { font-style:italic; }
+.cg-dir { font-weight:800; }
+.cg-sim { color:var(--farol-ok); }
+.cg-nao { color:var(--farol-fora); }
+.cg-aguardando, .cg-conferir { color:inherit; opacity:.85; font-weight:700; }
+.cg-manual { font-size:11px; font-weight:600; opacity:.8; }
+.cg-ficha { margin-top:4px; font-size:12px; }
+.cg-ficha summary { cursor:pointer; opacity:.8; }
+.cg-ficha dl { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; margin:6px 0; }
+.cg-ficha dl div { display:contents; }
+.cg-ficha dt { opacity:.75; }
+.cg-ficha dd { margin:0; }
+.cg-aviso { padding:10px 12px; margin:6px 0 10px; border:1px solid var(--line-2); border-radius:10px; font-size:13px; line-height:1.45; }
+.cg-aviso-forte { border-color:var(--farol-atencao, #d29922); }
+.cg-vazio { padding:14px; opacity:.75; }
+.cg-nota { font-size:12px; opacity:.75; margin:8px 0 0; line-height:1.45; }
+/* Celular: cada turno vira um cartão; os 6 campos continuam visíveis, com o nome do campo ao lado */
+@media (max-width: 720px) {
+  .cg-filtros { margin-left:0; }
+  .cg-tab thead { display:none; }
+  .cg-tab, .cg-tab tbody, .cg-tab tr, .cg-tab td { display:block; width:100%; box-sizing:border-box; }
+  .cg-tab tr { border:1px solid var(--line-2); border-radius:10px; margin:0 0 10px; padding:6px 4px; }
+  .cg-tab td { border-bottom:none; padding:4px 8px; display:grid; grid-template-columns:42% 1fr; gap:6px; }
+  .cg-tab td::before { content:attr(data-rot); font-size:12px; opacity:.75; }
+  .cg-tab td.cg-c-nome { display:block; }
+  .cg-tab td.cg-c-nome::before { content:none; }
+  .cg-tab td > .cg-motivo { grid-column:2; }
+}

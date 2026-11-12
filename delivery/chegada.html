@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Motoboys rodando no dia · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- MOTOBOYS RODANDO NO DIA (12/11/2026, Fabio). Página nativa do portal novo: lê só a função fabio-delivery-chegada
+     (GET, JWT do ERP da sessão atual). Sem botão de editar, pagar ou mandar mensagem. Consulta atual, não é lacre
+     financeiro. Abre pela casca (chave chegada) ou pela aba Chegada do Delivery do dia, na mesma moldura. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="chegada.css?v=20261112a">
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="cg-topo">
+      <a class="cg-voltar" href="index.html">← Delivery do dia</a>
+      <h1 id="titulo">Motoboys rodando no dia</h1>
+      <div class="cg-filtros">
+        <label>Dia operacional <input type="date" id="dia" aria-label="Dia operacional"></label>
+        <button type="button" class="cg-btn" id="btnHoje">Hoje</button>
+        <button type="button" class="cg-btn" id="btnAtualizar">Atualizar</button>
+        <label id="lojaBox" hidden>Loja <select id="lojaSel" aria-label="Loja"></select></label>
+      </div>
+    </div>
+    <p class="cg-estado" id="estado"></p>
+    <div id="conteudo"></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="chegada-modelo.js?v=20261112b"></script>
+<script src="chegada.js?v=20261112b"></script>
+<script>
+// porta de login da página (o núcleo chama exigirLogin quando a sessão vence): na casca, a casca pede o login; fora, o sistema
+function exigirLogin(recado) {
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+ChegadaTela.iniciarNavegador().iniciar();
+</script>
+</body>
+</html>

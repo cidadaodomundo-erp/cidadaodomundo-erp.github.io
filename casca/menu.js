@@ -175,6 +175,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "chegada",
+    "rotulo": "Chegada dos motoboys",
+    "icone": "⏱️",
+    "origem": "fabio"
+   },
+   {
     "chave": "reservas",
     "rotulo": "Reservas (GetIn)",
     "icone": "📖",

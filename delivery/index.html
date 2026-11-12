@@ -56,7 +56,7 @@
       <button data-aba="tempo">Tempo de entrega</button>
       <button data-aba="cancel">Cancelamentos</button>
       <button data-aba="quali">Avaliações do dia</button>
-      <button data-aba="chegada">Chegada do dia <span class="op-selo">Em construção</span></button>
+      <button data-aba="chegada">Chegada do dia</button>
       <button data-aba="escala">Escala do Delivery <span class="op-selo">Em construção</span></button>
       <button data-aba="conferencia">Conferência do Delivery <span class="op-selo">Em construção</span></button>
     </div>
@@ -72,8 +72,9 @@
       <h2 id="dlMigT">O que já está aqui e o que está em migração</h2>
       <ul>
         <li><strong>Já consultam dados neste portal:</strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia (leitura do dia no banco do ERP, por loja autorizada).</li>
-        <li><strong>Leitura parcial, em construção:</strong> Chegada do dia (mostra só a atividade registrada nas entregas, que não é chegada nem saída do motoboy) e Escala do Delivery (só consulta da escala prevista).</li>
-        <li><strong>Em migração, ainda sem tela neste portal:</strong> Chegada completa dos motoboys (entrada combinada, chegada, saída registrada, tempo registrado, garantido e refeição), Fila de pedidos e a edição da Escala do Delivery. A fonte de dados correta ainda está sendo verificada. Garantido e refeição <strong>não</strong> são calculados nem mostrados nesta página.</li>
+        <li><strong>Com página própria neste portal:</strong> Chegada dos motoboys (a aba Chegada do dia abre a página da Chegada, nesta mesma tela: entrada combinada, chegada, saída registrada, intervalo registrado, garantido e refeição como o servidor informa).</li>
+        <li><strong>Leitura parcial, em construção:</strong> Escala do Delivery (só consulta da escala prevista).</li>
+        <li><strong>Em migração, ainda sem tela neste portal:</strong> Fila de pedidos e a edição da Escala do Delivery. Garantido e refeição <strong>não</strong> são calculados nem mostrados nesta página.</li>
       </ul>
     </section>
   </div>
@@ -89,6 +90,12 @@
 const TELA = 'delivery';
 const M = ModeloDelivery;
 let DADOS = null, ABA = DeliveryOperacao.abaDoHash(location.hash);
+// 12/11/2026 (Fabio): a aba Chegada e o endereço #chegada abrem a página nativa delivery/chegada.html NA MESMA moldura
+// (navegação normal do navegador; nada do portal antigo). As outras abas seguem iguais.
+function irParaChegada(substituir) {
+  try { if (substituir) location.replace('chegada.html'); else location.assign('chegada.html'); return true; } catch (e) { return false; }
+}
+if (ABA === 'chegada' && irParaChegada(true)) ABA = 'placar';
 let SESSAO_OK = false, SEQ = 0, DADOS_DIA = null; // SEQ: só a leitura mais recente pode mostrar resultado
 // Abas novas (Chegada e Escala): NOVO = última leitura mostrada; SEQ_NOVO = só a leitura mais recente vale; LOJAS_INFO = lojas autorizadas.
 let NOVO = null, SEQ_NOVO = 0, LOJAS_INFO = null;
@@ -304,10 +311,12 @@ function desenhar() {
 
 document.getElementById('abas').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-aba]'); if (!b) return;
+  if (b.dataset.aba === 'chegada' && irParaChegada(false)) return; // página própria da Chegada, mesma moldura
   location.hash = b.dataset.aba; // vira entrada no histórico; o hashchange abaixo troca a aba
 });
 window.addEventListener('hashchange', () => {
   const nova = DeliveryOperacao.abaDoHash(location.hash);
+  if (nova === 'chegada' && irParaChegada(true)) return;
   const mudou = nova !== ABA;
   ABA = nova;
   if (mudou) limparNovo();
