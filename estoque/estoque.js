@@ -4221,7 +4221,7 @@ function cnRender() {
   ${L.map((l, i) => { const d = l.diferenca_pct == null ? null : Number(l.diferenca_pct);
     return `<tr><td><b>${trEscH(l.insumo)}</b><div style="font-size:11.5px; color:var(--tx-4);">${l.usado_em_fichas ? 'em ' + l.usado_em_fichas + (l.usado_em_fichas === 1 ? ' ficha' : ' fichas') : 'em nenhuma ficha'}</div></td>
       <td>${cnMoeda(l.custo_atual, l.un_atual)}</td>
-      <td>${cnMoeda(l.custo_nota, l.un_nota)}<div style="font-size:11.5px; color:var(--tx-4);">${trEscH(l.loja_nota || '')}${l.data_nota ? ' · ' + cnDm(l.data_nota) : ''}${l.nota ? ' · nota ' + trEscH(l.nota) : ''}</div></td>
+      <td>${cnMoeda(l.custo_nota, l.un_nota)}<div style="font-size:11.5px; color:var(--tx-4);">${trEscH(l.loja_nota || '')}${l.data_nota ? ' · ' + cnDm(l.data_nota) : ''}${l.nota ? ' · ' + trEscH(/^nf/i.test(l.nota) ? l.nota : 'NF ' + l.nota) : ''}</div></td>
       <td style="color:${d != null && Math.abs(d) >= 20 ? 'var(--farol-fora)' : 'var(--tx-2)'};">${d == null ? '—' : (d > 0 ? '+' : '') + d.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'}</td>
       <td style="font-size:12.5px;">${trEscH(l.o_que_e || '')}</td>
       <td style="white-space:nowrap;"><button class="preset-btn" onclick="cnResponder(${i}, 'APLICAR')">Usar o da nota</button>
