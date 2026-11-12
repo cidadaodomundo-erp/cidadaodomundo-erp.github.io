@@ -3026,6 +3026,7 @@ async function entrarHoje() {
       : Promise.resolve()).catch(e => { erros.rumo = e.message; }),
     hojeLerFrescor().catch(() => {}),
     hojeLerFilas().catch(e => { erros.filas = e.message; }),
+    consultarTudo(`vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento&dia=gte.${fxSomaDias(trHoje(), -21)}`).then(r => { HOJE_TK = r; }).catch(() => { HOJE_TK = null; }),
   ]);
   HOJE_ERROS = erros;
   HOJE_CONFERIDO = new Date();
@@ -3089,6 +3090,34 @@ function hojeLigarRelogio() {
   }, 5 * 60000);
 }
 
+// TICKET POR CANAL na semana (dono, qui 12/11/2026 03:35; livro chat-frente-painel-modulos/respostas/ticket-medio-por-canal):
+// faturamento (venda cheia, com a promoção da loja no iFood) ÷ pedidos, por canal, de vw_ticket_canal_dia. Compara os mesmos
+// dias da semana anterior, só nos dias em que a loja abriu nas duas (§C3).
+let HOJE_TK = null;
+function hojeTicketCanalHtml(V) {
+  if (!HOJE_TK || !HOJE_TK.length) return '';
+  const so = finVazio(), menos7 = (s) => fxSomaDias(s, -7);
+  const lojas = so ? [so] : ['AGUA VERDE', 'AHU', 'SÃO BRAZ'];
+  const ac = {};
+  HOJE_TK.forEach((r) => {
+    if (!lojas.includes(r.unidade)) return;
+    const k = r.canal, o = ac[k] || (ac[k] = { f: 0, p: 0, cf: 0, cp: 0, bf: 0, bp: 0 });
+    if (r.dia >= V.iniIso && r.dia <= V.fimIso) {
+      o.f += +r.faturamento || 0; o.p += +r.pedidos || 0;
+      if (lojaAbriu(r.unidade, r.dia) && lojaAbriu(r.unidade, menos7(r.dia))) { o.cf += +r.faturamento || 0; o.cp += +r.pedidos || 0; }
+    } else if (r.dia >= menos7(V.iniIso) && r.dia <= menos7(V.fimIso) && lojaAbriu(r.unidade, r.dia) && lojaAbriu(r.unidade, fxSomaDias(r.dia, 7))) {
+      o.bf += +r.faturamento || 0; o.bp += +r.pedidos || 0;
+    }
+  });
+  const L = Object.entries(ac).filter(([, o]) => o.p > 0).sort((x, y) => y[1].p - x[1].p);
+  if (!L.length) return '';
+  const nome = (c) => ({ IFOOD: 'iFood', 'SALÃO': 'Salão', 'BALCÃO': 'Balcão', 'SITE PRÓPRIO': 'Site próprio', 'VNDX TECNOLOGIA': 'VNDX' }[c] || c);
+  return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + '</div>' +
+    '<div id="tabelaHojeTicket"><table><tr><th>Canal</th><th>Pedidos</th><th>Valor médio</th><th title="Os mesmos dias da semana anterior, nos dias em que a loja abriu nas duas">vs semana anterior</th></tr>' +
+    L.map(([c, o]) => '<tr><td>' + nome(c) + '</td><td>' + fxInt(o.p) + '</td><td>R$ ' + fmt(o.f / o.p) + '</td><td>' +
+      (o.cp && o.bp ? varTxt(o.cf / o.cp, o.bf / o.bp) : '—') + '</td></tr>').join('') + '</table></div>' +
+    '<div class="caption-label" style="text-align:left;">Valor médio = venda cheia (com a promoção paga pela loja no iFood) ÷ pedidos, sem as vendas de R$ 0.</div>';
+}
 function hojeVendaSemana() {
   if (!EVOL || !EVOL.length) return null;
   // 07/11/2026 (auditoria resultado-20): a semana vai ate o ultimo dia COMPLETO da carga do Saipos,
@@ -3202,17 +3231,17 @@ function renderHoje() {
     // a venda e' a real; a variacao compara so os dias em que a loja abriu nas duas semanas (ca × cb)
     const linha = (nome, a, ca, cb, nota, forte) =>
       '<tr' + (forte ? ' class="liq"' : '') + '><td>' + nome + (nota ? ' <span style="color:var(--tx-5); font-size:11px;">' + nota + '</span>' : '') + '</td>' +
-      '<td>R$ ' + fmt(a.t) + '<span class="so-cel">médio ' + (a.p ? 'R$ ' + fmt(a.t / a.p) : '—') + '</span></td><td>' + varTxt(ca.t, cb.t) + '</td>' +
-      '<td>' + fxInt(a.p) + '</td><td>' + (a.p ? 'R$ ' + fmt(a.t / a.p) : '—') + '</td></tr>';
+      '<td>R$ ' + fmt(a.t) + '</td><td>' + varTxt(ca.t, cb.t) + '</td>' +
+      '<td>' + fxInt(a.p) + '</td></tr>';
     // O QUE E' REDE E O QUE E' SO iFOOD VAI NO TITULO (dono, 15/10: a letra miuda ao lado "as
     // vezes passa batido por quem está lendo").
     // 07/11/2026 (dono): a Esta semana entrou aqui — este bloco e' a "semana em curso"; o detalhe do iFood fica no Resumo do canal
     b2 = '<div class="section-label" id="hojeSemana">' + (V.emCurso ? 'Semana em curso' : 'Semana passada') + ' · venda · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + ' · todos os canais · ' +
       diaRot(V.iniIso) + ' a ' + diaRot(V.fimIso) + '</div>' +
-      '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th><th>Valor médio</th></tr>' +
+      '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th></tr>' +
       V.linhas.filter(l => !finVazio() || l.u === finVazio()).map(l => linha(l.nome, l.a, l.ca, l.cb,
         [l.atrasada ? 'dados até ' + ddmm(l.ate) : '', l.fora.length ? 'variação sem ' + l.fora.map(diaRot).join(', ') + ' (fechada numa das semanas)' : ''].filter(Boolean).join(' · '))).join('') +
-      (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.ca, V.rede.cb, '', true)) + '</table></div>' +
+      (finVazio() ? '' : linha('Rede (as três)', V.rede.a, V.rede.ca, V.rede.cb, '', true)) + '</table></div>' + hojeTicketCanalHtml(V) +
       hojeFeriadoNota(V) +
       '<div style="text-align:center; margin-top:8px;">' + botao('evolucao', 'Evolução de vendas') + ' ' + botao('resumo', 'iFood por dentro') + '</div>';
   }
@@ -3774,6 +3803,20 @@ function fxAbrirBalde(id) { FX_BALDE = (FX_BALDE === id) ? null : id; renderFech
 // volta para a venda (canal IFOOD) e vira dedução nomeada (classe CANAL). O resultado não muda
 // um centavo. Cópia SQL: vw_fin_resultado_fato (script/sql/venda_cheia_2026_10_15.sql); cópia
 // Python: script/gerar_dre_pagina.py (venda_cheia). Mudou aqui, muda lá. Idempotente.
+// TICKET POR CANAL (dono, qui 12/11/2026 03:35: "Ticket médio tem que ser medido por canal nos filtros e análises"; livro
+// chat-frente-painel-modulos/respostas/ticket-medio-por-canal). Faturamento (venda cheia, a promoção da loja no iFood) ÷ pedidos
+// de cada canal — a mesma conta de vw_ticket_canal_dia. O ticket da loja nunca aparece sem a quebra ao lado.
+function fxTicketCanais(a) {
+  const P = (a && a.pedCanal) || {}, F = (a && a.canais) || {};
+  const L = Object.keys(P).filter((c) => P[c] > 0).sort((x, y) => P[y] - P[x]);
+  if (!L.length) return '';
+  return `<ul class="fx-lista">${L.map((c) => `<li><span>${c}</span><b>${fxR2((F[c] || 0) / P[c])} · ${fxInt(P[c])} ped.</b></li>`).join('')}</ul>`;
+}
+function fxTicketCanaisLinha(a) {   // a mesma quebra numa linha só (cartão do Placar)
+  const P = (a && a.pedCanal) || {}, F = (a && a.canais) || {};
+  const L = Object.keys(P).filter((c) => P[c] > 0).sort((x, y) => P[y] - P[x]);
+  return L.length ? `<br><span style="font-size:11.5px;">${L.map((c) => `${c} ${fxR2((F[c] || 0) / P[c])}`).join(' · ')}</span>` : '';
+}
 function fxVendaCheia(vendas, canal, campo) {
   const promo = {};
   (canal || []).forEach(r => {
@@ -3874,7 +3917,8 @@ function fxMesCalc(mes) {
   const semClass = s(r => r.natureza === 'SEM CLASSIFICACAO');
   const resultado = ebitda + recFin - despFin + semClass - irpj;
   const benef = FX_M.benef.filter(r => r.mes === mes && L.includes(r.unidade)).reduce((a, r) => a + fxN(r.beneficio_ifood), 0);
-  return { mes, canais, recBruta, pedidos, ticket: pedidos ? recBruta / pedidos : 0, outras, outrasDet, taxasCanais, comissoes, defasagem, temFato, deducoes, irpj, base, recLiq, grupos, outrasDesp, ebitda, despFin, recFin, semClass, resultado, benef };
+  const pedCanal = {}; v.forEach(r => { pedCanal[r.canal] = (pedCanal[r.canal] || 0) + fxN(r.pedidos); });
+  return { mes, canais, pedCanal, recBruta, pedidos, ticket: pedidos ? recBruta / pedidos : 0, outras, outrasDet, taxasCanais, comissoes, defasagem, temFato, deducoes, irpj, base, recLiq, grupos, outrasDesp, ebitda, despFin, recFin, semClass, resultado, benef };
 }
 
 // PONTE SO VALE INTEIRA (12/09/2026). A view pode nao ter uma das lojas da visao num mes;
@@ -4102,6 +4146,8 @@ function plcAgrega(meses) {
   ['CUSTO', 'PESSOAL', 'VENDA', 'ADMIN'].forEach(k => { grupos[k] = som(p => p.grupos[k]); });
   const canais = {};
   partes.forEach(p => Object.entries(p.canais).forEach(([c, v]) => { canais[c] = (canais[c] || 0) + v; }));
+  const pedCanal = {};
+  partes.forEach(p => Object.entries(p.pedCanal || {}).forEach(([c, v]) => { pedCanal[c] = (pedCanal[c] || 0) + v; }));
   const recBruta = som(p => p.recBruta), pedidos = som(p => p.pedidos);
   const base = som(p => p.base), taxas = som(p => p.taxasCanais), deducoes = som(p => p.deducoes);
   // 01/10/2026: a receita liquida e' a da DRE — sai tambem a comissao de vendedor
@@ -4113,7 +4159,7 @@ function plcAgrega(meses) {
     meses, recBruta, pedidos, ticket: pedidos ? recBruta / pedidos : 0,
     outras: som(p => p.outras), base, taxas, comissoes, deducoes, recLiq, grupos,
     mc: recLiq - grupos.CUSTO, ebitda: som(p => p.ebitda), resultado: som(p => p.resultado),
-    benef: som(p => p.benef), temFato: partes.every(p => p.temFato), canais,
+    benef: som(p => p.benef), temFato: partes.every(p => p.temFato), canais, pedCanal,
     caixa: pontes.length ? ps('v') : null,
     // 28/09/2026: desde que o ajuste de competencia passou a comparar o resultado com
     // (operacao + rendimentos), res + comp inclui o rendimento; tirando ele, sobra a operacao.
@@ -4268,7 +4314,7 @@ function renderPlacar() {
     const pctBase = (t.un === 'R$' && t.id !== 'caixa' && A.base) ? Math.abs(v) / A.base * 100 : null;
     let extra = '';
     if (t.id === 'fat') extra = `outras entradas ${fxMil(A.outras)} · tudo que entrou <b>${fxMil(A.base)}</b>`;
-    else if (t.id === 'ped') extra = `valor médio do pedido <b>${fxR2(A.ticket)}</b>${B && B.ticket ? ' · ' + fxVar(A.ticket, B.ticket, rotAnt).replace(/<\/?b>/g, '') : ''}`;
+    else if (t.id === 'ped') extra = `valor médio do pedido <b>${fxR2(A.ticket)}</b>${B && B.ticket ? ' · ' + fxVar(A.ticket, B.ticket, rotAnt).replace(/<\/?b>/g, '') : ''}${fxTicketCanaisLinha(A)}`;
     else if (t.id === 'caixa') extra = A.caixa === null ? 'a ponte até o caixa não tem este período'
       : `operação ${fxMil(A.caixaOper)} · fora da operação ${fxMil(A.caixaFora)} (XP, rendimento, investimento, retirada, aporte, empréstimo)`;
     else if (pctBase !== null) extra = `<b>${fxPct1(pctBase)}</b> de cada R$ 100 que entraram`;
@@ -4428,7 +4474,7 @@ function renderFechamento() {
     + fxTile('Vendas do mês', a.recBruta, j ? fxVar(a.recBruta, j.recBruta, rotAnt) : '', `${j ? `${fxMesRot(ant)}: ${fxMil(j.recBruta)} · ` : ''}maior mês: ${fxMesRot(maior.mes)}, ${fxMil(maior.recBruta)}`, fxSpark(serie.map(x => x.recBruta), rots, fxMil),
       `<ul class="fx-lista">${Object.entries(a.canais).sort((x, y) => y[1] - x[1]).filter(([, v]) => v >= 1).map(([c, v]) => `<li><span>${c}</span><b>${fxMil(v)} · ${fxPct1(v / a.recBruta * 100)}</b></li>`).join('')}</ul>`)
     + fxTile('Pedidos', fxInt(a.pedidos), j ? fxVar(a.pedidos, j.pedidos, rotAnt) : '', j ? `${fxMesRot(ant)}: ${fxInt(j.pedidos)} pedidos` : '', fxSpark(serie.map(x => x.pedidos), rots, fxInt))
-    + fxTile('Valor médio por pedido', fxR2(a.ticket), j ? fxVar(a.ticket, j.ticket, rotAnt) : '', j ? `${fxMesRot(ant)}: ${fxR2(j.ticket)}` : '', fxSpark(serie.map(x => x.ticket), rots, v => 'R$ ' + v.toFixed(0)))
+    + fxTile('Valor médio por pedido', fxR2(a.ticket), j ? fxVar(a.ticket, j.ticket, rotAnt) : '', j ? `${fxMesRot(ant)}: ${fxR2(j.ticket)}` : '', fxSpark(serie.map(x => x.ticket), rots, v => 'R$ ' + v.toFixed(0)), fxTicketCanais(a))
     + '</div>';
   const nomesOutras = { 'RECEITAS REVENDA': 'atacado', 'LISTAS SAO BRAZ': 'mercadoria vendida ao São Braz', 'LISTAS AHU': 'mercadoria vendida ao Ahú', 'RECEITAS BOQUEIRAO': 'royalties do Boqueirão', 'OUTRAS RECEITAS': 'eventos e outros' };
   h += `<div class="fx-nota">${a.outras > 0.5 ? `Além das vendas, entraram <b>${fxMil(a.outras)}</b> de outras receitas (${Object.entries(a.outrasDet).filter(([, v]) => Math.abs(v) > 0.5).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${nomesOutras[k] || k.toLowerCase()} ${fxMil(v)}`).join(', ')}). Somando tudo, o mês movimentou <b>${fxMil(a.base)}</b>; é sobre esse total que a seção 2 divide os R$ 100.` : `O total do mês é <b>${fxMil(a.base)}</b>; é sobre ele que a seção 2 divide os R$ 100.`}</div>`;
@@ -4693,13 +4739,14 @@ function fxSemCalc(w) {
   const promoLojaSem = fxSoma(ifd, 'promo_loja');
   if (promoLojaSem) canais.IFOOD = (canais.IFOOD || 0) + promoLojaSem;
   const fat = fxSoma(v, 'faturamento') + promoLojaSem, ped = fxSoma(v, 'pedidos'), it = fxSoma(f(FX_S.itens), 'itens');
+  const pedCanal = {}; v.forEach(r => { pedCanal[r.canal] = (pedCanal[r.canal] || 0) + fxN(r.pedidos); });
   const compMP = fxSoma(comp.filter(r => r.tipo === 'MATERIA PRIMA'), 'valor'), compUC = fxSoma(comp.filter(r => r.tipo === 'USO E CONSUMO'), 'valor');
   const listas = FX_S.listas.filter(r => r.semana === w);
   const enviadas = L.includes('AGUA VERDE') ? fxSoma(listas, 'valor') : 0;
   const recebidas = fxSoma(listas.filter(r => L.includes(r.unidade) && r.unidade !== 'AGUA VERDE'), 'valor');
   const custoIfood = fxSoma(ifd, 'promo_loja') + fxSoma(ifd, 'taxas') + an;
   const compras = compMP + compUC - enviadas + recebidas;
-  return { w, fat, ped, it, ticket: ped ? fat / ped : 0, canais, ifPed: fxSoma(ifd, 'pedidos'), ifItens: fxSoma(ifd, 'itens'), promoLoja: fxSoma(ifd, 'promo_loja'), promoIfood: fxSoma(ifd, 'promo_ifood'),
+  return { w, fat, ped, it, ticket: ped ? fat / ped : 0, canais, pedCanal, ifPed: fxSoma(ifd, 'pedidos'), ifItens: fxSoma(ifd, 'itens'), promoLoja: fxSoma(ifd, 'promo_loja'), promoIfood: fxSoma(ifd, 'promo_ifood'),
     taxas: fxSoma(ifd, 'taxas'), frete: fxSoma(ifd, 'frete'), anuncios: an, custoIfood, visitas: fxSoma(fu, 'visitas'), concluidos: fxSoma(fu, 'concluidos'),
     compras, compMP, compUC, enviadas, recebidas, margem: fat - compras - custoIfood };
 }
@@ -4755,7 +4802,7 @@ function renderSemana() {
     + fxTile('Vendas da semana', a.fat, j ? fxVar(a.fat, j.fat, ra) : '', j ? `semana anterior: ${fxMil(j.fat)}` : '', fxSpark(SEM.map(w => S[w].fat), rots, fxMil), `<ul class="fx-lista">${Object.entries(a.canais).sort((x, y) => y[1] - x[1]).filter(([, v]) => v >= 1).map(([c, v]) => `<li><span>${c}</span><b>${fxMil(v)} · ${fxPct1(v / a.fat * 100)}</b></li>`).join('')}</ul>`)
     + fxTile('Pedidos', fxInt(a.ped), j ? fxVar(a.ped, j.ped, ra) : '', j ? `semana anterior: ${fxInt(j.ped)}` : '', fxSpark(SEM.map(w => S[w].ped), rots, fxInt))
     + fxTile('Itens vendidos', fxInt(a.it), j ? fxVar(a.it, j.it, ra) : '', a.ped ? `${(a.it / a.ped).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} itens por pedido` : '', fxSpark(SEM.map(w => S[w].it), rots, fxInt))
-    + fxTile('Valor médio por pedido', fxR2(a.ticket), j ? fxVar(a.ticket, j.ticket, ra) : '', j ? `semana anterior: ${fxR2(j.ticket)}` : '', fxSpark(SEM.map(w => S[w].ticket), rots, v => 'R$ ' + v.toFixed(0)))
+    + fxTile('Valor médio por pedido', fxR2(a.ticket), j ? fxVar(a.ticket, j.ticket, ra) : '', j ? `semana anterior: ${fxR2(j.ticket)}` : '', fxSpark(SEM.map(w => S[w].ticket), rots, v => 'R$ ' + v.toFixed(0)), fxTicketCanais(a))
     + (conv !== null ? fxTile('Conversão do cardápio iFood', fxPct1(conv), convJ !== null ? `<b>${conv > convJ + 0.3 ? 'subiu' : conv < convJ - 0.3 ? 'caiu' : 'ficou igual'}</b> (anterior: ${fxPct1(convJ)})` : '', `${fxInt(a.visitas)} visitas viraram ${fxInt(a.concluidos)} pedidos`, fxSpark(SEM.map(w => S[w].visitas ? S[w].concluidos / S[w].visitas * 100 : 0), rots, fxPct1)) : '')
     + '</div>';
   // 2
