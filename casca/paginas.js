@@ -38,12 +38,10 @@ window.CASCA_PAGINAS = {
   // 26/10/2026 (bloco 4): Pessoas
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
-  pcartao: 'pessoas/index.html#pcartao',
-  pao: 'pessoas/index.html#pao',
-  peventos: 'pessoas/index.html#peventos',
   padm: 'pessoas/index.html#padm',
   atividades: 'atividades/index.html',
   agenda: 'agenda/index.html',
+  notasfaltam: 'notas/index.html',   // 12/11/2026: notas sem conta / sem entrada (tarefas 30 e 82 da Rita)
   cargos: 'pessoas/index.html#cargos',
   // 29/10/2026 (dono): cada passo da folha é uma tela
   pcalc: 'pessoas/index.html#pcalc',
@@ -75,24 +73,6 @@ window.CASCA_PAGINAS = {
   cardapio: 'canal/index.html#cardapio',
   clientes: 'canal/index.html#clientes',
   site: 'canal/index.html#site',
-  delivery: 'delivery/index.html?v=20261111b',
-  // 10/11/2026: Reservas (GetIn) e Produtos pausados, telas do Fábio incorporadas ao portal novo
-  reservas: 'reservas/index.html',
-  pausados: 'pausados/index.html',
-  // 11/11/2026: Reunião semanal (pauta temporária em memória, lote em construção). Está em CASCA_TELAS_POR_LOJA porque a
-  // tela separa de verdade o rascunho pela loja do seletor (nenhum dado de negócio é filtrado).
-  reuniao: 'reuniao/index.html?v=20261111a',
-  // 11/11/2026: Taxas e Freelas (só consulta dos cadastros e valores-hora que já existem no ERP; ponto/QR/pagamentos em construção).
-  freelas: 'freelas/index.html?v=20261111a',
-  // 11/11/2026: Manutenção e Quem conserta (duas rotas da mesma página; chamados só preparados, diretório de prestadores só consulta)
-  manutencao: 'manutencao/index.html?v=20261111a#chamados',
-  prestadores: 'manutencao/index.html?v=20261111a#prestadores',
-  // 11/11/2026: cinco telas em construção (campos desabilitados; nada é lido, enviado ou salvo)
-  cozinha: 'cozinha/index.html?v=20261111a',
-  tvs: 'tvs/index.html?v=20261111a',
-  salao: 'salao/index.html?v=20261111a',
-  mercadolivre: 'mercadolivre/index.html?v=20261111a',
-  encomendas: 'encomendas/index.html?v=20261111a',
   atrasos: 'canal/index.html#atrasos',
   frete: 'canal/index.html#frete',
   logfin: 'canal/index.html#logfin',
@@ -124,29 +104,14 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades',
-  // 11/11/2026: Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
-  'prestadores'];
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades'];
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
 window.CASCA_TELAS_POR_LOJA = ['caixa',
   'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao', 'reqpedir', 'reqseparar',
   'listas', 'listasfin',
-  'phoje', 'pcartao', 'pao', 'peventos', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
+  'phoje', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
-  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  // 10/11/2026: Reservas e Produtos pausados seguem de verdade o seletor único (lojaCarregar/lojaAtual/aoMudarLoja)
-  'reservas', 'pausados',
-  // 11/11/2026: Delivery do dia — as 7 abas (4 antigas e 3 novas) seguem a loja escolhida (lista de lojas autorizadas)
-  'delivery',
-  // 11/11/2026: Reunião semanal — o rascunho em memória é separado por loja (rede + lojas autorizadas)
-  'reuniao',
-  // 11/11/2026: Taxas e Freelas — a consulta segue a loja escolhida (lojas concretas da allowlist; REDE não é curinga)
-  'freelas',
-  // 11/11/2026: Manutenção — o campo Loja dos chamados (ainda desabilitado, nada é gravado) mostra a loja do seletor
-  'manutencao',
-  // 11/11/2026: o campo Loja das cinco telas em construção mostra a loja do seletor (desabilitado, nada é gravado)
-  'cozinha', 'tvs', 'salao', 'mercadolivre', 'encomendas'];
-
+  'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora'];

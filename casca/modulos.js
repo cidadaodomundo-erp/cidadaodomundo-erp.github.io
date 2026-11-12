@@ -18,7 +18,8 @@ window.CASCA_MODULOS_CFG = {
     plano: 'Em desenvolvimento',   // dono 07/11 03:59: o plano, com a evolução em cima (o Fabio acompanha)
   },
   // telas que não estão no menu.js e entram no menu novo
-  extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' } },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
+  extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
+    notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' } },   // 12/11: onde a Rita resolve as tarefas 30 e 82   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
@@ -27,24 +28,23 @@ window.CASCA_MODULOS = [
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
-    lancar: [], acompanhar: ['placar', 'semana', 'reuniao', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
+    lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: [], acompanhar: ['comprateto', 'manutencao', 'prestadores', 'mercadolivre', 'encomendas'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notasfaltam'], acompanhar: ['comprateto'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
   { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio'] },
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
-    lancar: ['phoje', 'pcartao', 'pao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos', 'freelas'], acompanhar: [] },   // ordem do dono (06/11)
+    lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
   { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
-    lancar: [], acompanhar: ['delivery', 'reservas', 'pausados', 'cozinha', 'tvs', 'salao', 'atrasos', 'atendimento', 'link:portal-qualidade'] },
+    lancar: [], acompanhar: ['atrasos', 'atendimento', 'link:portal-qualidade'] },
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: [], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];
-

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Notas sem conta / sem entrada · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- NOTAS SEM CONTA / SEM ENTRADA (Organizador, qui 12/11/2026 02:44): onde se resolvem as tarefas 30 e 82 da Rita
+     (wa_tarefa). Duas listas, das mesmas views que a prova das tarefas usa: vw_fin_nf_sem_titulo (entrou no estoque e não
+     tem conta a pagar) e vw_ft_nf_sem_entrada_tela (paga e sem entrada no estoque; filial vê só a própria). Para cada nota:
+     o que está lançado, o que falta e quem resolve (§C28: nada de "vá ao Saipos"). O robô confere a tarefa sozinho.
+     Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .nf-falta { color:var(--farol-perto); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-notasfaltam" class="modulo" style="display:none;"><div id="view-notasfaltam"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const NF = { semTit: null, semEnt: null, erro: null, todas: false };
+const nfE = (s) => trEscH(String(s == null ? '' : s));
+const nfR = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nfD = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '–';
+const nfLoja = (u) => ({ 'AGUA VERDE': 'Água Verde', AHU: 'Ahú', 'SÃO BRAZ': 'São Braz', BOQUEIRAO: 'Boqueirão' }[u] || u || '');
+const nfNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+async function entrarNotas() {
+  const alvo = document.getElementById('view-notasfaltam');
+  alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto">Carregando…</div>';
+  try {
+    const [a, b] = await Promise.all([
+      // só o que falta de verdade: troca da Ambev e "não pagar" (decisão do dono) não são pendência
+      consultarTudo('vw_fin_nf_sem_titulo?select=unidade,fornecedor,nf,data_nf,valor,vencimento_previsto,motivo,conta,lista_itens&motivo=in.(' + encodeURIComponent('"SEM TÍTULO NO SAIPOS","VENCIDA SEM LANÇAMENTO"') + ')&order=data_nf.desc,nf'),
+      consultarTudo('vw_ft_nf_sem_entrada_tela?select=unidade,competencia,nf,fornecedor,valor,titulo,dias&order=competencia.desc,nf'),
+    ]);
+    NF.semTit = a || []; NF.semEnt = b || []; NF.erro = null;
+  } catch (e) { NF.erro = e.message; }
+  nfDesenhar();
+}
+function nfDesenhar() {
+  const alvo = document.getElementById('view-notasfaltam');
+  if (NF.erro) { alvo.innerHTML = `<h2>Notas sem conta / sem entrada</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler as notas: ${nfE(NF.erro)} <button type="button" class="preset-btn" onclick="entrarNotas()">Tentar de novo</button></div>`; return; }
+  const T = NF.semTit, E = NF.semEnt;
+  const recentes = E.filter((x) => Number(x.dias) <= 60), visE = NF.todas ? E : recentes;
+  let h = '<h2>Notas sem conta / sem entrada</h2>';
+  h += `<div class="cards cards-3">
+    <div class="card ${T.length ? 'neg' : 'pos'}"><div class="card-lbl">Sem conta a pagar</div><div class="card-val">${T.length}</div><div class="card-pct">${nfR(T.reduce((s, x) => s + Number(x.valor || 0), 0))}</div></div>
+    <div class="card ${recentes.length ? 'highlight' : 'pos'}"><div class="card-lbl">Sem entrada no estoque · 60 dias</div><div class="card-val">${recentes.length}</div><div class="card-pct">${nfR(recentes.reduce((s, x) => s + Number(x.valor || 0), 0))}</div></div>
+    <div class="card neutral"><div class="card-lbl">Sem entrada · mais antigas</div><div class="card-val">${E.length - recentes.length}</div><div class="card-pct">de 61 dias para trás</div></div></div>`;
+  // 1) entrou no estoque e não tem conta a pagar
+  h += `<div class="section-label" style="text-align:left;">Entraram no estoque e não têm conta a pagar</div>`;
+  h += T.length ? `<div id="tabelaNfSemConta" style="overflow-x:auto;"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Loja</th><th>Valor</th><th>Lançado</th><th>Falta</th><th>Quem resolve</th></tr></thead><tbody>
+    ${T.map((x) => `<tr><td>NF ${nfE(x.nf)}<div style="font-size:11px;color:var(--tx-4);">${nfD(x.data_nf)}</div></td><td style="white-space:normal;">${nfE(nfNome(x.fornecedor))}${x.lista_itens ? `<div style="font-size:11px;color:var(--tx-4);">${nfE(String(x.lista_itens).slice(0, 80))}</div>` : ''}</td>
+      <td>${nfE(nfLoja(x.unidade))}</td><td>${nfR(x.valor)}</td><td>✓ entrada no estoque</td>
+      <td class="nf-falta" style="white-space:normal;">conta a pagar${x.vencimento_previsto ? ` · vence ${nfD(x.vencimento_previsto)}` : ''}${x.motivo === 'VENCIDA SEM LANÇAMENTO' ? ' · já vencida' : ''}${x.conta ? ` · ${nfE(x.conta)}` : ''}</td>
+      <td>Compras (Rita): conferir se é devida e lançar a conta</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Toda nota que entrou no estoque tem conta a pagar.</b></div>';
+  // 2) paga e sem entrada no estoque
+  h += `<div class="section-label" style="text-align:left;margin-top:18px;">Pagas e sem entrada no estoque${NF.todas ? '' : ' · últimos 60 dias'}</div>`;
+  h += visE.length ? `<div id="tabelaNfSemEntrada" style="overflow-x:auto;"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Loja</th><th>Valor</th><th>Lançado</th><th>Falta</th><th>Quem resolve</th></tr></thead><tbody>
+    ${visE.map((x) => `<tr><td>NF ${nfE(x.nf)}<div style="font-size:11px;color:var(--tx-4);">há ${Number(x.dias || 0)} dias</div></td><td style="white-space:normal;">${nfE(nfNome(x.fornecedor))}</td>
+      <td>${nfE(nfLoja(x.unidade))}</td><td>${nfR(x.valor)}</td><td>✓ conta paga em ${nfD(x.competencia)}</td>
+      <td class="nf-falta">entrada da nota no estoque</td><td>Compras (Rita): dar entrada da nota no estoque</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nenhuma nota paga sem entrada nos últimos 60 dias.</b></div>';
+  if (E.length > recentes.length) h += `<div style="margin-top:8px;"><button type="button" class="preset-btn" onclick="NF.todas=!NF.todas;nfDesenhar()">${NF.todas ? 'ver só os últimos 60 dias' : `ver também as ${E.length - recentes.length} mais antigas`}</button></div>`;
+  h += '<div class="caption-label" style="text-align:left;margin-top:10px;">O robô confere estas listas sozinho: quando a nota tem a conta ou a entrada, ela sai daqui e a atividade da agenda fecha.</div>';
+  alvo.innerHTML = h;
+  if (typeof barrasTopoTabelas === 'function') try { barrasTopoTabelas(); } catch (e) {}
+}
+
+const TELA = 'notasfaltam';
+let MODULO_ATUAL = 'notasfaltam';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-notasfaltam').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarNotas(); };
+entrarNotas();
+</script>
+</body>
+</html>
