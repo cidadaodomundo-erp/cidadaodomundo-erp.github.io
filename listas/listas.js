@@ -564,7 +564,7 @@ function trGuia() {
     { sel: 'button[onclick^="trAddAvulso"]', texto: '<b>+ item fora da grade</b>: para pedir algo que não está na lista. Entra sem preço até ser ligado à base.' },
     { sel: 'button[onclick^="trRevisarPedido"]', texto: '<b>Conferir e enviar</b> mostra o resumo do pedido antes de mandar para a Água Verde.' },
     { sel: '#tabelaTrOpFila button[onclick^="trListaAberta"]', texto: '<b>abrir</b> mostra os itens da lista para separar. A fila vem da mais antiga para a mais nova; <b>Parada há</b> se destaca a partir de 2 dias.' },
-    { sel: '#tabelaTrPesoFora', texto: '<b>Peso diferente do combinado</b>: itens que vêm saindo com peso diferente da embalagem combinada. Vale rever com o Neto.' },
+    { sel: '#trPesoFora', texto: '<b>Peso fora do combinado</b>: itens que vêm saindo com peso diferente da embalagem. Na hora de separar, pese cada um.' },
     { sel: '#tabelaTrConfAguardando button[onclick^="trListaAberta"]', texto: '<b>conferir</b> abre a lista que chegou: confira item a item o que recebeu.' },
   ]);
   guiaTalvez('listas');
@@ -868,17 +868,17 @@ function trPesoAlertaHtml(alerta) {
   if (!Array.isArray(alerta) || !alerta.length) return '';
   // 04/11/2026 18:20 (dono: "separar ele da grade dos pedidos, aparecer logo abaixo"): um quadro só, com
   // borda e título próprios — a tabela fica DENTRO do quadro, para não parecer continuação da fila
-  return `<div class="contexto" style="border-color:var(--farol-perto); margin-top:22px; text-align:left;">
-    <div><b>⚖️ Peso diferente do combinado</b> — nos últimos 60 dias estes itens saíram com um peso diferente do
-    que está combinado para a embalagem. Vale rever com o Neto o peso combinado (ou a porção na produção).</div>
-    <div id="tabelaTrPesoFora" style="margin-top:10px;"><table>
-      <tr><th>Item</th><th>Combinado</th><th>Vem dando</th><th>Em quantos envios</th></tr>
-      ${alerta.map(a => { const d = Number(a.desvio_pct); const emb = String(a.emb_nome || 'volume').split(' (')[0]; return `<tr>
-        <td>${a.item}</td>
-        <td>${emb} de ${trMedidaEmb(a.peso_combinado, a.un_medida)}</td>
-        <td><b>${trMedidaEmb(a.peso_medio, a.un_medida)}</b> <span class="tr-tag">${trNum(Math.abs(d), 1)}% ${d < 0 ? 'a menos' : 'a mais'}</span></td>
-        <td>${a.envios} ${Number(a.envios) === 1 ? 'envio' : 'envios'} <span class="tr-det">· ${trNum(a.embalagens)} ${trEmbPlural(emb, a.embalagens)}</span></td></tr>`; }).join('')}
-    </table></div></div>`;
+  // 12/11/2026 (dono: "essa tela tem que mostrar as quantidades pro Habrahan, tem que ser alerta pra ele"): linhas simples
+  // (no celular a grade virava cartão escuro sobre a ilha clara e o número sumia) e o texto fala com quem separa
+  return `<div id="trPesoFora" class="contexto" style="border-color:var(--farol-perto); margin-top:22px; text-align:left;">
+    <div><b style="color:var(--farol-perto);">⚖️ Atenção ao separar: peso fora do combinado</b> — nos últimos 60 dias estes itens saíram
+    com peso diferente da embalagem combinada. <b>Pese cada embalagem</b> antes de mandar.</div>
+    ${alerta.map(a => { const d = Number(a.desvio_pct); const emb = String(a.emb_nome || 'volume').split(' (')[0]; return `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--line); line-height:1.5;">
+      <b>${a.item}</b><br>
+      ${emb} combinado: <b>${trMedidaEmb(a.peso_combinado, a.un_medida)}</b> · vem saindo <b>${trMedidaEmb(a.peso_medio, a.un_medida)}</b>
+      <b style="color:var(--farol-perto);">(${trNum(Math.abs(d), 1)}% ${d < 0 ? 'a menos' : 'a mais'})</b><br>
+      <span class="tr-det">${a.envios} ${Number(a.envios) === 1 ? 'envio' : 'envios'} · ${trNum(a.embalagens)} ${trEmbPlural(emb, a.embalagens)}</span></div>`; }).join('')}
+    </div>`;
 }
 // Letreiro da linha (24/09/2026, dono): conversao da embalagem E o valor do
 // item conforme digita — "2 × 700 g ≈ 1,4 kg = R$ 26,51". Login sem valores
@@ -1950,6 +1950,11 @@ async function trAbrirSeparacao(id) {
   ]);
   const lista = (await rl.json())[0];
   const itens = await ri.json();
+  // 12/11/2026 (dono): o alerta de peso aparece na linha do item, para quem separa (se a view falhar, segue sem ele)
+  const pesoFora = {};
+  try { const rp = await trFetch('vw_tr_peso_fora_do_combinado?select=item,emb_nome,un_medida,peso_combinado,peso_medio,desvio_pct'); if (rp.ok) (await rp.json()).forEach(a => { pesoFora[a.item] = a; }); } catch (e) {}
+  const pesoAviso = (it) => { const a = pesoFora[it]; if (!a) return ''; const d = Number(a.desvio_pct), emb = String(a.emb_nome || 'volume').split(' (')[0];
+    return `<div style="margin-top:4px; color:var(--farol-perto); font-weight:700; white-space:normal;">⚖️ Pese cada ${emb}: o combinado é ${trMedidaEmb(a.peso_combinado, a.un_medida)} e vem saindo ${trMedidaEmb(a.peso_medio, a.un_medida)} (${trNum(Math.abs(d), 1)}% ${d < 0 ? 'a menos' : 'a mais'})</div>`; };
   const [mapa, cat] = await Promise.all([trEmbMapa(lista.unidade), trCatMapa(lista.unidade)]);
   // linha com pote automatico e contada em UNIDADES: o rotulo "caixa de 26"
   // do pote induzia a separar em caixas (a #24411 gravou 78 no lugar de 3)
@@ -1991,7 +1996,7 @@ async function trAbrirSeparacao(id) {
       ${lista.status === 'SOLICITADA' || (['SEPARADA', 'ENVIADA'].includes(lista.status) && ['DONO', 'SEPARACAO'].includes(TR_OP.papel)) ? `<button class="preset-btn" onclick="trListaAberta=null; trEditarPedido(${id})">✏️ corrigir pedido</button>` : ''}</div>
     <div id="tabelaTrOpSep"><table>
       <tr><th>Item</th><th>Solicitado</th><th>Separado</th></tr>
-      ${itens.map((i, idx) => `<tr><td>${i.item} <span class="dre-av">${i.un_medida || ''}</span>${i._semEmb ? '' : trEmbRotulo(mapa, i.item)}${i.avulso ? ' <span class="tr-tag">🆕 fora da grade</span>' : ''}${i.observacao ? ` <span class="tr-tag">${i.observacao}</span>` : ''}${i.editado ? ' <span class="tr-tag">✏️ editado</span>' : ''}</td>
+      ${itens.map((i, idx) => `<tr><td>${i.item} <span class="dre-av">${i.un_medida || ''}</span>${i._semEmb ? '' : trEmbRotulo(mapa, i.item)}${i.avulso ? ' <span class="tr-tag">🆕 fora da grade</span>' : ''}${i.observacao ? ` <span class="tr-tag">${i.observacao}</span>` : ''}${i.editado ? ' <span class="tr-tag">✏️ editado</span>' : ''}${pesoAviso(i.item)}</td>
         <td>${i._pedidoTxt}</td>
         ${i._cont ? `<td style="white-space:normal; line-height:2;">
           <span style="white-space:nowrap; margin-right:10px;"><input type="number" min="0" step="0.5" inputmode="decimal" id="trse_${idx}" class="trc-in" value="${i._n0}"
