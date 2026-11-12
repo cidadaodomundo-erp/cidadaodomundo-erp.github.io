@@ -875,7 +875,7 @@ async function carregarSinalAgenda() {
     const ler = async (q) => { const r = await fetch(SUPABASE_URL + '/rest/v1/' + q, { headers: cabecalho() }); if (!r.ok) throw new Error(r.status); return r.json(); };
     const opc = (q) => ler(q).catch(() => []);
     const [pend, venc, rmb, fer, fUlt, fVal] = await Promise.all([
-      ler('dono_pendencia?select=id,prazo&resolvido_em=is.null'),
+      ler('dono_pendencia?select=id,prazo&para=is.null&resolvido_em=is.null'),
       ler(`vw_fin_contas_pagar?select=vencimento,origem,id_titulo,conta_exibida&sentido=eq.PAGAR&situacao=eq.VENCIDA&dia_pagamento=lt.${hoje}`),
       opc('vw_rmb_pedidos?select=id&situacao=eq.PEDIDO&so_o_dono=is.true'),
       opc(`vw_rh_ferias_alertas?select=pagar_ate,pagamento&situacao=eq.programada&pagar_ate=lt.${hoje}`),

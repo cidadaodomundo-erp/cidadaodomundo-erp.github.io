@@ -91,7 +91,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   // 12/11/2026 (dono 01:09): o que o robô conferiu nas últimas 24 h aparece como "✓ conferido"
   const ontem = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf] = await Promise.all([
-    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+    ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota&para=is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
     ler('vw_rh_ferias_alertas?select=nome,situacao,limite_gozo,pagar_ate,valor_estimado,pagamento,extrato_ate&order=limite_gozo'),
     ler(`vw_rh_previsao_a_pagar?select=dia,tipo,unidade,valor&dia=gte.${hoje}&dia=lte.${fim}&order=dia,tipo`),
@@ -100,7 +100,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
     ler('vw_fin_conciliado_ate?select=conta,conciliado_ate&order=conta'),
     ler('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
     ler('rh_folha_validada?select=competencia'),
-    ler(`dono_pendencia?select=id,frente,o_que,resolvido_em&resolvido_por=like.conferido*&resolvido_em=gte.${ontem}&order=resolvido_em.desc`)]);
+    ler(`dono_pendencia?select=id,frente,o_que,resolvido_em&para=is.null&resolvido_por=like.conferido*&resolvido_em=gte.${ontem}&order=resolvido_em.desc`)]);
   AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf };
   agDesenhar();
 }
