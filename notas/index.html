@@ -46,16 +46,16 @@ const nfNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => 
 async function entrarNotas() {
   const alvo = document.getElementById('view-notasfaltam');
   alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto">Carregando…</div>';
-  // as duas listas são do financeiro (fin_restricao): login sem financeiro recebe vazio — dizer isso, nunca "✓ tudo certo"
-  try { const r = await trRpcSeguro('fin_restricao', {}); NF.semAcesso = r.ok ? (await r.json()) : null; } catch (e) { NF.semAcesso = null; }
-  if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não lê as notas do financeiro.</b> As listas desta tela vêm do financeiro. Peça ao Neto para liberar.</div>'; return; }
+  // 12/11 (dono 03:17, "Liberar a Rita na lista de notas"): as duas listas vêm por rpc com exceção nominal (rita@, compras@);
+  // quem lê o financeiro também lê; filial e outros logins recebem vazio (o resto do financeiro segue fechado para a Rita).
+  // Só o que falta de verdade: troca da Ambev e "não pagar" (decisão do dono) já saem na função.
+  // login fora da exceção recebe vazio: dizer isso, nunca "✓ tudo certo"
+  try { const r = await trRpcSeguro('notas_faltam_pode_ler', {}); NF.semAcesso = r.ok ? ((await r.json()) === false) : false; } catch (e) { NF.semAcesso = false; }
+  if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não lê estas notas.</b> A lista é de Compras (Rita). Peça ao Neto para liberar.</div>'; return; }
   try {
-    const [a, b] = await Promise.all([
-      // só o que falta de verdade: troca da Ambev e "não pagar" (decisão do dono) não são pendência
-      consultarTudo('vw_fin_nf_sem_titulo?select=unidade,fornecedor,nf,data_nf,valor,vencimento_previsto,motivo,conta,lista_itens&motivo=in.(' + encodeURIComponent('"SEM TÍTULO NO SAIPOS","VENCIDA SEM LANÇAMENTO"') + ')&order=data_nf.desc,nf'),
-      consultarTudo('vw_ft_nf_sem_entrada_tela?select=unidade,competencia,nf,fornecedor,valor,titulo,dias&order=competencia.desc,nf'),
-    ]);
-    NF.semTit = a || []; NF.semEnt = b || []; NF.erro = null;
+    const [ra, rb] = await Promise.all([trRpcSeguro('notas_sem_conta_tela', {}), trRpcSeguro('notas_sem_entrada_tela', {})]);
+    if (!ra.ok || !rb.ok) { const j = await (ra.ok ? rb : ra).json().catch(() => ({})); throw new Error(j.message || 'erro do banco'); }
+    NF.semTit = (await ra.json()) || []; NF.semEnt = (await rb.json()) || []; NF.erro = null;
   } catch (e) { NF.erro = e.message; }
   nfDesenhar();
 }
