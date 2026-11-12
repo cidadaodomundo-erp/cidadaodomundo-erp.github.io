@@ -160,7 +160,7 @@ async function rpc(nome, corpo) {
 // o banco ainda não tem a função com esses parâmetros (antes da etapa 1b): nada foi gravado, pode chamar do jeito antigo
 const semParametro = (e) => !!e && (e.code === 'PGRST202' || /Could not find the function/i.test(String(e.message || '')));
 const EMP = () => !!CHAVE || (LIGADO && !!TOKEN && !!(CAT && CAT.empresa));   // pedido de empresa: pelo link ?c= ou pelo login
-const usaArea = () => LIGADO && AREAS.length > 0;
+const usaArea = () => LIGADO && EMP() && AREAS.length > 0;   // 12/11 (Organizador): a área é do atacado; no link geral (pessoa física) o frete segue "combinado depois"
 function aviso(tipo, txt) { const a = $('aviso'); a.className = 'msg' + (tipo ? ' ' + tipo : ''); a.textContent = txt || ''; }
 // o motivo vem do banco; item indisponível traz o nome interno, que não aparece aqui
 function motivo(e) {

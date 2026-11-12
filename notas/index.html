@@ -46,6 +46,9 @@ const nfNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => 
 async function entrarNotas() {
   const alvo = document.getElementById('view-notasfaltam');
   alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto">Carregando…</div>';
+  // as duas listas são do financeiro (fin_restricao): login sem financeiro recebe vazio — dizer isso, nunca "✓ tudo certo"
+  try { const r = await trRpcSeguro('fin_restricao', {}); NF.semAcesso = r.ok ? (await r.json()) : null; } catch (e) { NF.semAcesso = null; }
+  if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não lê as notas do financeiro.</b> As listas desta tela vêm do financeiro. Peça ao Neto para liberar.</div>'; return; }
   try {
     const [a, b] = await Promise.all([
       // só o que falta de verdade: troca da Ambev e "não pagar" (decisão do dono) não são pendência
