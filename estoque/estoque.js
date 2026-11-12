@@ -4197,6 +4197,7 @@ function confRender() {
   const a = CONF_ABAS.find((x) => x.id === CONF_ABA) || CONF_ABAS[0];
   const cap = a.id === 'custonota' ? 'A nota trouxe um preço diferente do custo de hoje: aplique o da nota ou mantenha o de hoje.'
     : a.id === 'itemfora' ? 'Nome que apareceu na nota ou na venda e não está na base: diga o que ele é.'
+    : a.id === 'receitas' ? 'Conferida, a receita vira cadastro. Para mudar depois, abra aqui e clique em Conferir de novo.'
     : `Confira cada ficha uma vez. Conferida, ela vira <b>cadastro</b> e entra na base — dali em diante a mudança é feita
       só na ficha (Rita, Lana e Neto), e o Fabio é avisado pelo WhatsApp.`;
   alvo.innerHTML = `<h2>Conferências</h2>
