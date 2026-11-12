@@ -1085,7 +1085,7 @@ function cgFormAdmissao(a, id, parte) {   // parte: 'docs' (anexos, vão no topo
   const obrig = CG_ADM_BLOCOS.filter(([, cs]) => cs.some((c) => /\*/.test(c[1]))), resto = CG_ADM_BLOCOS.filter((b) => !obrig.includes(b));
   const abreResto = resto.some(([, cs]) => cs.some((c) => lido[c[0]] && lido[c[0]].doc || (a.id && a[c[0]] != null && a[c[0]] !== ''))) || (a.dependentes || []).length || !!a.obs;
   const ficha = `${obrig.map(bloco).join('')}
-    <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">▸ Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')}, dependentes)</span></summary>
+    <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')}, dependentes)</span></summary>
     ${resto.map(bloco).join('')}
     <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
     ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
