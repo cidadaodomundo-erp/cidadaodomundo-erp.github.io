@@ -2777,7 +2777,7 @@ function plpMpLinhaHtml(k) {
       style="background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); color:var(--p-ink, var(--tx-1)); border-radius:6px; padding:5px 8px; max-width:260px;">
       ${s.insumo ? '' : '<option value="">escolha a matéria-prima</option>'}
       ${ops.map((o) => `<option value="${trEscH(o.insumo)}"${o.insumo === s.insumo ? ' selected' : ''}>${trEscH(o.insumo)}${o.e_principal && o.principal_clara !== false ? ' (principal)' : ''}</option>`).join('')}</select>`;
-  return `<tr class="plp-mp"><td colspan="3" style="background:var(--surface-2); border-left:3px solid var(--info); padding:8px 10px;">
+  return `<tr class="plp-mp"><td colspan="3" style="border-left:3px solid var(--info); padding:8px 10px;">
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
         <b>Tenho</b>
         <input id="${plpIdK('mpq' + k)}" type="number" step="0.001" min="0" inputmode="decimal" value="${trEscH(s.qtd)}"
