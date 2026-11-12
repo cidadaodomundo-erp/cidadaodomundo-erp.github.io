@@ -3026,7 +3026,7 @@ async function entrarHoje() {
       : Promise.resolve()).catch(e => { erros.rumo = e.message; }),
     hojeLerFrescor().catch(() => {}),
     hojeLerFilas().catch(e => { erros.filas = e.message; }),
-    consultarTudo(`vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento&dia=gte.${fxSomaDias(trHoje(), -21)}`).then(r => { HOJE_TK = r; }).catch(() => { HOJE_TK = null; }),
+    consultarTudo(`vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento,promo_ok&dia=gte.${fxSomaDias(trHoje(), -21)}`).then(r => { HOJE_TK = r; }).catch(() => { HOJE_TK = null; }),
   ]);
   HOJE_ERROS = erros;
   HOJE_CONFERIDO = new Date();
@@ -3099,8 +3099,13 @@ function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variaç�
   const so = finVazio(), menos7 = (s) => fxSomaDias(s, -7);
   const lojas = so ? [so] : ['AGUA VERDE', 'AHU', 'SÃO BRAZ'];
   const ac = {};
+  // iFood: a promoção da loja chega com 1–2 dias de atraso; dia sem ela (promo_ok=false) fica fora dos dois lados
+  const semPromo = new Set(HOJE_TK.filter((r) => r.promo_ok === false).map((r) => r.unidade + '|' + r.dia));
+  let ifoodAte = '';
   HOJE_TK.forEach((r) => {
     if (!lojas.includes(r.unidade)) return;
+    if (r.canal === 'IFOOD' && (semPromo.has(r.unidade + '|' + r.dia) || semPromo.has(r.unidade + '|' + fxSomaDias(r.dia, 7)))) return;
+    if (r.canal === 'IFOOD' && r.dia <= V.fimIso && r.dia > ifoodAte) ifoodAte = r.dia;
     const k = r.canal, o = ac[k] || (ac[k] = { f: 0, p: 0, cf: 0, cp: 0, bf: 0, bp: 0 });
     if (r.dia >= V.iniIso && r.dia <= V.fimIso) {
       o.f += +r.faturamento || 0; o.p += +r.pedidos || 0;
@@ -3114,7 +3119,7 @@ function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variaç�
   const nome = (c) => ({ IFOOD: 'iFood', 'SALÃO': 'Salão', 'BALCÃO': 'Balcão', 'SITE PRÓPRIO': 'Site próprio', 'VNDX TECNOLOGIA': 'VNDX' }[c] || c);
   return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + '</div>' +
     '<div id="tabelaHojeTicket"><table><tr><th>Canal</th><th>Pedidos</th><th>Valor médio</th><th title="Os mesmos dias da semana anterior, nos dias em que a loja abriu nas duas">vs semana anterior</th></tr>' +
-    L.map(([c, o]) => '<tr><td>' + nome(c) + '</td><td>' + fxInt(o.p) + '</td><td>R$ ' + fmt(o.f / o.p) + '</td><td>' +
+    L.map(([c, o]) => '<tr><td>' + nome(c) + (c === 'IFOOD' && ifoodAte && ifoodAte < V.fimIso ? ' <span style="color:var(--tx-5); font-size:11px;">até ' + ifoodAte.slice(8, 10) + '/' + ifoodAte.slice(5, 7) + ' (a promoção dos dias seguintes ainda não chegou)</span>' : '') + '</td><td>' + fxInt(o.p) + '</td><td>R$ ' + fmt(o.f / o.p) + '</td><td>' +
       (o.cp && o.bp ? varTxt(o.cf / o.cp, o.bf / o.bp) : '—') + '</td></tr>').join('') + '</table></div>' +
     '<div class="caption-label" style="text-align:left;">Valor médio = venda cheia (com a promoção paga pela loja no iFood) ÷ pedidos, sem as vendas de R$ 0.</div>';
 }
