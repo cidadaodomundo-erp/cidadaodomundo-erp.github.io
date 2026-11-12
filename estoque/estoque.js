@@ -3318,7 +3318,7 @@ async function prdCarregar() {
     // 21/10/2026: o lote com perda, entrou no estoque, planejado, rendimento e a marca de corrigida (vw_est_producao_lote)
     consultarTudo(`vw_est_producao_lote?select=*&unidade=eq.${u}&data=eq.${PRD.data}&order=criado_em.desc`),
     // 22/10/2026 (dono): só RECEITA da base em uso; água, refri e brownie de revenda tinham "ficha" de si mesmos
-    consultarTudo('ft_receita_base?select=nome_base,grupo_receita,nao_usa&order=nome_base'),
+    consultarTudo('ft_receita_base?select=nome_base,grupo_receita,nao_usa,nome_saipos&order=nome_base'),
     // 24/10/2026 (Estoque): por receita, se apontar move o saldo e por quê; e se é receita de fato (a regra é do banco)
     consultarTudo(`vw_est_receita_move?select=nome_base,move,motivo,e_receita&unidade=eq.${u}&order=nome_base`).catch(() => null),
     // 24/10/2026: perda fora da produção (estragou, venceu, caiu, voltou do salão) registrada no dia
@@ -3330,6 +3330,9 @@ async function prdCarregar() {
   const moveDe = move && move.length ? new Map(move.map((m) => [m.nome_base, m])) : null;
   PRD.receitas = receitas.filter((r) => grupoDe.has(r.nome_base) && !(moveDe && moveDe.get(r.nome_base) && moveDe.get(r.nome_base).e_receita === false))
     .map((r) => { const m = moveDe && moveDe.get(r.nome_base); return { ...r, grupo: grupoDe.get(r.nome_base), move: m ? m.move : null, move_motivo: m ? m.motivo : null }; });
+  // 12/11/2026 (Estoque, proposta 2026-11-12-apontar-feito-na-hora): no Saipos estas receitas são FICHA, não item de estoque —
+  // a venda já baixa a matéria-prima. Apontar vale para o plano e o rendimento, sem mexer no saldo: etiqueta, sem alerta.
+  PRD.naHora = new Set(base.filter((b) => /^FICHA:/i.test(String(b.nome_saipos || '').trim())).map((b) => b.nome_base));
   PRD.perdas = perdas;
   PRD.itensEst = itensEst;
   PRD.lancamentos = lancamentos;
@@ -3464,10 +3467,10 @@ function prdRender() {
       ? Math.round((new Date(hoje + 'T12:00:00') - new Date(r.ultima_producao + 'T12:00:00')) / 86400000) : null;
     h += `<tr><td style="min-width:180px;"><a href="#" onclick="prdVer(${prdTxt(r.receita)}); return false;" style="color:var(--p-ink, var(--tx-1)); text-decoration:none; font-weight:600; font-size:13px;"
           title="ver o que sai do estoque">${r.nome_base || r.receita}</a>
-        ${Number(r.ingredientes_fora_do_estoque || 0) > 0
+        ${prdNaHora(r.nome_base) ? prdNaHoraTag() : Number(r.ingredientes_fora_do_estoque || 0) > 0
           ? `<div style="color:var(--farol-perto); font-size:11px;" title="Ao apontar, esses ingredientes não saem do estoque: não têm linha de estoque (falta o de/para). Toque na receita para ver quais.">${
               r.ingredientes_fora_do_estoque} ${Number(r.ingredientes_fora_do_estoque) === 1 ? 'ingrediente' : 'ingredientes'} sem estoque</div>` : ''}
-        ${r.move === false ? `<div style="color:var(--farol-perto); font-size:11px;" title="Apontar esta receita fica registrado, mas não mexe no saldo: nem entra a receita nem saem os ingredientes.">não mexe no saldo · ${trEscH(r.move_motivo || '')}</div>` : ''}</td>
+        ${r.move === false && !prdNaHora(r.nome_base) ? `<div style="color:var(--farol-perto); font-size:11px;" title="Apontar esta receita fica registrado, mas não mexe no saldo: nem entra a receita nem saem os ingredientes.">não mexe no saldo · ${trEscH(r.move_motivo || '')}</div>` : ''}</td>
       <td style="white-space:nowrap;">${r.rendimento ? qtd(r.rendimento) : '—'} <span style="color:var(--tx-4); font-size:11px;">${r.un || ''}</span></td>
       <td style="color:var(--tx-5); font-size:12px; line-height:1.2;${dias === null ? ' opacity:.6;' : ' white-space:nowrap;'}">${dias === null ? 'nunca apontada' : dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`}</td>
       <td><input type="number" step="0.001" min="0" inputmode="decimal" id="${id}_pl" value="${r.rendimento ? Math.round(Number(r.rendimento) * 100) / 100 : ''}"
@@ -3620,7 +3623,7 @@ function prdOrdensHtml() {
           ${o.situacao === 'ABERTA' ? `<button class="preset-btn" onclick="prdOrdemCancelar(${o.id})" title="tira a ordem da separação; o motivo fica registrado">Cancelar</button>` : ''}
         </div></div>
       <div id="tabelaPrdOrd${o.id}" style="overflow-x:auto; margin-top:8px;"><table><thead><tr><th>Receita</th><th>A ordem manda</th><th>Já apontado</th><th>Falta apontar</th><th>Perda</th><th>Situação</th>${viva ? '<th title="quanto saiu pronto agora">Saiu agora</th><th title="só se houve perda: quanto e o motivo">Perdeu</th>' : ''}</tr></thead><tbody>
-        ${its.map((i, k) => `<tr><td>${trEscH(i.nome_base)}${i.familia && i.familia !== 'NENHUMA' ? ` <span style="color:var(--tx-5); font-size:11px;">família ${trEscH(i.familia)}</span>` : ''}</td>
+        ${its.map((i, k) => `<tr><td>${trEscH(i.nome_base)}${prdNaHora(i.nome_base) ? prdNaHoraTag() : ''}${i.familia && i.familia !== 'NENHUMA' ? ` <span style="color:var(--tx-5); font-size:11px;">família ${trEscH(i.familia)}</span>` : ''}</td>
           <td>${fmt(Number(i.qtd))} ${trEscH(i.un || '')}</td><td>${fmt(Number(i.ja_apontado || 0))}</td>
           <td style="font-weight:700;">${fmt(Number(i.falta_apontar || 0))}</td><td>${Number(i.perda_apontada) ? fmt(Number(i.perda_apontada)) : '—'}</td>
           <td style="font-size:12px; color:${i.leitura === 'APONTADO' ? 'var(--farol-ok)' : i.leitura === 'APONTADO EM PARTE' ? 'var(--farol-perto)' : 'var(--tx-4)'};">${String(i.leitura || '').toLowerCase().replace('nao', 'não')}</td>
@@ -3829,6 +3832,10 @@ async function prdVer(receita) {
   }
 }
 
+function prdNaHora(nome) { return !!(PRD && PRD.naHora && nome && PRD.naHora.has(nome)); }
+function prdNaHoraTag() {
+  return `<div style="color:var(--tx-4); font-size:11px;" title="No Saipos esta receita é ficha: a venda já baixa a matéria-prima. Apontar serve para o plano do dia e o rendimento, sem mexer no saldo.">feita na hora — o estoque baixa pela venda</div>`;
+}
 async function prdApontar(receita, un) {
   const campo = document.getElementById(prdId(receita));
   const qtd = Number((campo.value || '').replace(',', '.'));
