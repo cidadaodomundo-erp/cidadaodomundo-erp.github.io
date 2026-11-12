@@ -1,8 +1,10 @@
-// PONTO AO VIVO (rota pao, módulo Pessoas). Só LEITURA (GET) de rh_pessoa, rh_flash_batida, rh_flash_ausencia e rh_ocorrencia.
+// PONTO AO VIVO (rota pao, módulo Pessoas). Só LEITURA. Fonte principal: leitura direta do Flash + refeições do Saipos, via a Edge
+// Function fabio-ponto-leitura (GET com o JWT da sessão). Ausências e ocorrências (rh_flash_ausencia, rh_ocorrencia) são lidas direto.
+// O modo antigo em lote (rh_pessoa + rh_flash_batida) só roda quando a leitura direta não é injetada (testes/legado).
 // A lista tem só quem tem batida válida e vínculo ativo; cada coluna de horário diz se é exata, "sem detalhe" ou ambígua; a fonte
-// (rh_flash_batida, gravada em lote) e o frescor ficam sempre visíveis; refeição só aparece se uma fonte real for injetada (hoje: nenhuma).
+// e o frescor ficam sempre visíveis; refeição vem da resposta direta (indisponível = a tela diz, sem afirmar nada).
 // Não escreve, não guarda dado de pessoa no navegador, usa só textContent (nunca innerHTML). Regras ficam em ponto-ao-vivo-modelo.js.
-// Atualiza sozinho a cada 60 s SOMENTE enquanto a tela está ativa, visível e o dia consultado é hoje.
+// Atualiza sozinho a cada 60 s SOMENTE enquanto a tela está ativa, visível e o dia consultado é o dia operacional atual.
 (function (root, factory) {
   'use strict';
   const modelo = factory(typeof require === 'function' && typeof module !== 'undefined' ? require('./ponto-ao-vivo-modelo.js') : (root && root.PontoAoVivoModelo));
@@ -135,7 +137,7 @@
         quadro.forEach(([t, v]) => { const c = el('div', 'pao-card'); c.appendChild(el('b', null, String(v))); c.appendChild(el('span', null, t)); ui.resumo.appendChild(c); });
       }
       const av = res.avaliacao;
-      const textos = [av.atrasoJornadaIntervalo, av.folga];
+      const textos = f.direta ? [] : [av.atrasoJornadaIntervalo, av.folga];   // avisos estáticos técnicos só no modo lote; na leitura direta não aparecem
       if (!av.cargoConfianca) textos.push('Cargo de confiança: o cadastro lido não traz esse campo; o filtro por cargo NÃO foi aplicado (só "não usa ponto" e vínculo).');
       textos.concat(res.avisos).forEach((t) => ui.avisos.appendChild(el('p', 'pao-aviso', t)));
       const linhas = res.listadas.filter((l) => passaFiltro(st.filtro, l));

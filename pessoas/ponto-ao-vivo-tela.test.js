@@ -221,6 +221,12 @@ test('direto: horários exatos, refeição por pessoa, "sem vínculo" não vira 
   assert.match(tudo(t.raiz), /1 item\(ns\) de refeição sem dono/);
   assert.ok(t.log.length > 0 && soAuxiliares(t.log), t.log.join('\n'));
 });
+test('avisos estáticos técnicos: somem no direto e continuam no lote', async () => {
+  const dir = mk({ direta: async () => RESP() }); await dir.c.entrar(); await settle();
+  assert.ok(!/NÃO AVALIADOS|Folga fixa do cadastro NÃO usada|rh_/.test(tudo(dir.raiz)));
+  const lote = mk({ batidas: [B()] }); await lote.c.entrar(); await settle();
+  assert.match(tudo(lote.raiz), /NÃO AVALIADOS/); assert.match(tudo(lote.raiz), /Folga fixa do cadastro NÃO usada/);
+});
 test('direto, ninguém bateu: leitura bem-sucedida com lista vazia é "ninguém", não "sem leitura"', async () => {
   const t = mk({ direta: async () => RESP({ batidas: [] }) });
   await t.c.entrar(); await settle();
