@@ -68,6 +68,7 @@ function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome });
 async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (sem "Carregando…", sem piscar)
   const alvo = document.getElementById('view-agenda');
   AG_LIDO = Date.now();
+  AGPL.pend = null;   // relê a agenda do Fabio junto
   await rmbGarantirTokenValido().catch(() => {});
   await carregarEmailDono();
   if (EMAIL_DONO === null) {   // não deu para confirmar quem está logado: nunca concluir "não é o dono" por falha de leitura
@@ -82,6 +83,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
     if (AGENDA_TODOS) await agPessoaEntrar(silencioso ? AGP.verComo || null : null);
     else alvo.innerHTML = '<h2>Minha agenda</h2>' + (AGP.veEquipe ? '' : '<div class="contexto">A sua agenda chega em breve.</div>');
     if (AGP.veEquipe) agEquipeMontar().then(agGuia);
+    agPlanoMontar();
     return;
   }
   if (!silencioso) alvo.innerHTML = '<h2>Minha agenda</h2><div class="contexto">Carregando…</div>';
@@ -223,6 +225,7 @@ function agDesenhar() {
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
   agEquipeMontar().then(agGuia);
+  agPlanoMontar();
 }
 function agFiltrar(k) { try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
 // GUIA DE PRIMEIRO ACESSO (07/11/2026, exemplo do padrão novo; mecanismo no nucleo.js): abre uma vez por login; "?" revê
@@ -287,7 +290,7 @@ async function agAdiar(id) {
   await entrarAgenda(true);
   avisoAcao('ok', `✓ Adiado para ${agSem(dia)} ${agDm(dia)} (${avisoHora()}). O item continua aberto.`);
 }
-function agPend(id) { return ((AG.dados && Array.isArray(AG.dados.pend)) ? AG.dados.pend : []).find((p) => p.id === id) || {}; }
+function agPend(id) { return ((AG.dados && Array.isArray(AG.dados.pend)) ? AG.dados.pend : []).concat(Array.isArray(AGPL.pend) ? AGPL.pend : []).find((p) => p.id === id) || {}; }
 function agRespForm(id) {
   const box = document.getElementById('agForm_' + id); if (!box) return;
   if (box.innerHTML) { box.innerHTML = ''; return; }
@@ -334,6 +337,58 @@ async function agFeito(id, desfazer) {
   avisoAcao('ok', desfazer ? `✓ "Feito" desfeito às ${avisoHora()}: o item voltou para você.`
     : p.confere ? `✓ Marcado como feito às ${avisoHora()}. O robô confere e fecha ${agConfereTxt(p.confere)}.`
     : `✓ Marcado como feito às ${avisoHora()}. Sem conferência automática: a frente ${p.frente || ''} confere e fecha.`);
+}
+
+// =====================================================================================================================
+// AGENDA DO FABIO (dono 12/11/2026 09:52–09:58; desenho contexto/para-fabio/agenda-do-fabio-desenho-2026-11-12.md; banco do chat
+// Junção: contexto/propostas-telas/2026-11-12-agenda-do-fabio-banco-pronto.md). RESTRITO a Neto e Fabio — quem decide é o banco:
+// dono_pendencia.para (RLS: o dono vê tudo, o fabio@ só o dele, o resto nada) e vw_juncao_desenvolvimento (pode_ver_plano()).
+// Bloco A "Pendente com você" (para o Fabio) / "Com o Fabio" (para o dono, só leitura) · Bloco B "Desenvolvimentos".
+// Sem linha nas duas fontes (equipe), nada aparece.
+// =====================================================================================================================
+const AGPL = { pend: null, dev: null };
+const AGPL_ESTADO = { ESPERANDO_DECISAO: ['Esperando decisão', 'var(--farol-perto)'], EM_CONSTRUCAO: ['Em construção', 'var(--info)'], A_FAZER: ['A fazer', 'var(--tx-3)'], PRONTO: ['Pronto', 'var(--farol-ok)'] };
+const AGPL_LADO = { NETO: 'Neto', FABIO: 'Fabio', JUNTOS: 'os dois' };
+async function agPlanoMontar(reler) {
+  const alvo = document.getElementById('view-agenda');
+  if (!alvo) return;
+  if (reler || AGPL.pend === null) {
+    const ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
+    [AGPL.pend, AGPL.dev] = await Promise.all([
+      ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,fio,feito_em,confere,conferencia_nota,para&para=not.is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
+      ler('vw_juncao_desenvolvimento?select=*&order=prazo.nullslast,titulo')]);
+  }
+  const P = Array.isArray(AGPL.pend) ? AGPL.pend : [], D = Array.isArray(AGPL.dev) ? AGPL.dev : [];
+  let box = document.getElementById('agPlano');
+  if (!P.length && !D.length) { if (box) box.remove(); return; }
+  if (!box) { box = document.createElement('div'); box.id = 'agPlano'; const h2 = alvo.querySelector('h2'); if (h2 && h2.nextSibling) alvo.insertBefore(box, h2.nextSibling); else alvo.appendChild(box); }
+  const dono = souODono(), hoje = agHoje();
+  const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
+  const linhaA = (p) => {
+    const fio = Array.isArray(p.fio) ? p.fio : [];
+    const atraso = p.prazo && p.prazo < hoje && !p.resposta && !p.feito_em;
+    const estado = p.feito_em ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ feito ${quando(p.feito_em)} — conferindo</div>`
+      : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${quando(p.respondido_em)}: ${agE(p.resposta)}</div>`
+      : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
+    const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
+    return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''} <span class="f">#${p.id}</span></span>${bts}
+      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+  };
+  let h = '';
+  if (AGPL.pend && AGPL.pend.erro) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li as pendências: ${agE(AGPL.pend.erro)}</div>`;
+  if (P.length) h += `<div class="ag-bloco">${dono ? 'Com o Fabio' : 'Pendente com você'} (${P.length})${dono ? ' <span class="f">· o que depende dele; só ele marca</span>' : ''}</div>` + P.map(linhaA).join('');
+  if (D.length) {
+    // o que mudou nos últimos 7 dias em destaque; o resto recolhido, por estado
+    const semana = new Date(Date.now() - 7 * 86400000).toISOString();
+    const novo = D.filter((d) => d.atualizado_em && d.atualizado_em >= semana), resto = D.filter((d) => !novo.includes(d));
+    const linhaB = (d) => { const E = AGPL_ESTADO[d.estado] || [d.estado, 'var(--tx-3)'];
+      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t"><b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span></span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${d.detalhe ? `<div class="ag-ctx">${agE(d.detalhe)}</div>` : ''}</div>`; };
+    const cont = Object.keys(AGPL_ESTADO).map((k) => [k, D.filter((d) => d.estado === k).length]).filter(([, n]) => n).map(([k, n]) => `${AGPL_ESTADO[k][0].toLowerCase()} ${n}`).join(' · ');
+    h += `<div class="ag-bloco">Desenvolvimentos <span class="f">· ${cont}</span></div>`
+      + (novo.length ? novo.map(linhaB).join('') : '<div class="ag-lin"><span class="t" style="color:var(--tx-3);">nada mudou nos últimos 7 dias</span></div>')
+      + (resto.length ? `<details style="margin:4px 2px;"><summary style="cursor:pointer;color:var(--tx-3);font-size:13px;">o resto (${resto.length})</summary>${Object.keys(AGPL_ESTADO).map((k) => resto.filter((d) => d.estado === k).map(linhaB).join('')).join('')}</details>` : '');
+  }
+  box.innerHTML = h;
 }
 
 // =====================================================================================================================
@@ -434,6 +489,7 @@ function agPessoaRedesenhar() {
     : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada na sua agenda nos próximos 7 dias</span></div>');
   agRolarAteItem();
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AGP.linhas.filter((x) => ['Atrasada', 'Travada', 'Falta', 'Voltou'].includes(x.estado) || (x.estado === 'A fazer' && x.dia <= agHoje())).length });
+  agPlanoMontar();
 }
 function agPessoaForm(id, tipo) { AGP.form = AGP.form && AGP.form.id === id && AGP.form.tipo === tipo ? null : { id, tipo }; agPessoaRedesenhar(); }
 function agPessoaFormHtml(id, tipo) {
