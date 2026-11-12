@@ -3495,7 +3495,15 @@ async function entrarRh() {
       consultarTudo('vw_rh_a_receber_deposito?select=*&order=data_deposito,chave').catch(() => []),
     ]);
     const lida = await consultarTudo('rh_descontos?select=atualizado_em&order=atualizado_em.desc.nullslast&limit=1').catch(() => []);
-    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null };
+    // 12/11/2026 (dono 10:25, agenda #14): o detalhe do Quem deve mostra o emprestado, as parcelas já pagas e a saída do dinheiro;
+    // (dono 10:27, proposta 2026-11-12-rh-quem-deve-vales-novos.md): vale novo do Saipos que a Hellen parcela aqui
+    const [emp, pagos, novos, pesAtivas] = await Promise.all([
+      consultarTudo('vw_rh_emprestimos?select=chave,valor_total,descontado,data_concessao,credor').catch(() => []),
+      consultarTudo('rh_descontos?select=emprestimo,parcela,parcelas_no_plano,valor,data_desconto&status=eq.PAGO&order=data_desconto').catch(() => []),
+      consultarTudo('vw_rh_emprestimo_novo?select=*&situacao=eq.A_PARCELAR&order=data').catch((e) => ({ erro: e.message })),
+      consultarTudo('rh_pessoa?select=id,nome&ativo=is.true&order=nome').catch(() => [])]);
+    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null,
+      emp: new Map(emp.map((e) => [e.chave, e])), pagos, novos, pesAtivas };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${cgEsc(e.message)}</div>`;
     return;
@@ -3503,6 +3511,75 @@ async function entrarRh() {
   renderModuloRh();
 }
 let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null;
+// SAÍDA DO DINHEIRO (dono 12/11/2026 10:25): procura no extrato um débito do mesmo valor até 5 dias da concessão. É busca, não prova:
+// a tela diz o que achou e diz quando não achou. Dinheiro de terceiro (credor ≠ EMPRESA) não passa pelas contas da empresa.
+const RH_SAIDA = {};
+function rhSaidaHtml(k, e, r0) {
+  const credor = e.credor || r0.credor;
+  if (credor && credor !== 'EMPRESA') return `<span style="color:var(--tx-4);">Saída: o dinheiro foi de ${cgEsc(cgNome(credor))}, não das contas da empresa.</span> `;
+  if (!e.data_concessao || !(Number(e.valor_total) > 0)) return '';
+  const S = RH_SAIDA[k];
+  if (!S) return `<a href="javascript:void(0)" onclick="rhSaidaBuscar('${cgEsc(k)}')">procurar a saída do dinheiro no extrato</a> `;
+  if (S === 'lendo') return '<span style="color:var(--info);">procurando no extrato…</span> ';
+  if (S.erro) return `<span style="color:var(--farol-fora);">✗ não consegui ler o extrato: ${cgEsc(S.erro)}</span> <a href="javascript:void(0)" onclick="rhSaidaBuscar('${cgEsc(k)}')">tentar de novo</a> `;
+  if (!S.L.length) return `<span style="color:var(--farol-perto);">Saída: nenhum débito de R$ ${fmt(Number(e.valor_total))} no extrato entre ${cgData(S.de)} e ${cgData(S.ate)}${S.de < '2026-01-02' ? ' (o extrato começa em 02/01/2026)' : ''}.</span> `;
+  return `Saída no extrato: ${S.L.map((x) => `<b>${cgData(x.data)}</b> · ${cgEsc(x.conta)} · R$ ${fmt(Math.abs(Number(x.valor)))} · <span style="color:var(--tx-4);">${cgEsc(String(x.memo || '').slice(0, 90))}</span>`).join('<br>')}${S.L.length > 1 ? '<div style="color:var(--farol-perto);">mais de um débito com este valor: conferir qual é</div>' : ''} `;
+}
+async function rhSaidaBuscar(k) {
+  const e = (RH.emp && RH.emp.get(k)) || {};
+  const d0 = String(e.data_concessao).slice(0, 10), de = fxSomaDias(d0, -5), ate = fxSomaDias(d0, 5);
+  RH_SAIDA[k] = 'lendo'; renderModuloRh();
+  try { RH_SAIDA[k] = { de, ate, L: await consultarTudo(`fin_extrato_banco?select=data,conta,valor,memo&valor=eq.${-Number(e.valor_total)}&data=gte.${de}&data=lte.${ate}&order=data`) }; }
+  catch (x) { RH_SAIDA[k] = { erro: x.message }; }
+  renderModuloRh();
+}
+// VALES NOVOS (dono 12/11/2026 10:27): o robô pega o vale do Saipos e a Hellen decide aqui como parcelar
+const RH_NOVO = { id: null, parcelas: 1, inicio: '', pessoa: '', enviando: false };
+function rhProxMes() { const d = new Date(cgHojeIso() + 'T12:00:00'); d.setDate(1); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); }
+function rhValesNovosHtml() {
+  const V = RH.novos;
+  if (V && V.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler os vales novos: ${cgEsc(V.erro)}</div>`;
+  if (!Array.isArray(V) || !V.length) return '';
+  const R0 = (v) => 'R$ ' + fmt(Number(v) || 0);
+  const inp = 'padding:4px 6px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;';
+  const linha = (x) => {
+    const ab = RH_NOVO.id === x.id_titulo, np = Math.max(1, Number(RH_NOVO.parcelas) || 1);
+    const form = !ab ? '' : `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      ${x.pessoa_id ? '' : `<select style="${inp}" onchange="RH_NOVO.pessoa=this.value"><option value="">quem é?</option>${(RH.pesAtivas || []).map((p) => `<option value="${p.id}"${String(RH_NOVO.pessoa) === String(p.id) ? ' selected' : ''}>${cgEsc(cgNome(p.nome))}</option>`).join('')}</select>`}
+      <label>em <input type="number" min="1" max="24" value="${np}" style="${inp}width:56px;" onchange="RH_NOVO.parcelas=this.value;renderModuloRh()"> ${np === 1 ? 'parcela' : 'parcelas'}</label>
+      <label>a partir de <input type="month" value="${RH_NOVO.inicio || rhProxMes()}" style="${inp}" onchange="RH_NOVO.inicio=this.value;renderModuloRh()"></label>
+      <b>${np} × ${R0(Number(x.valor) / np)}</b>
+      <button type="button" class="preset-btn active" ${RH_NOVO.enviando ? 'disabled' : ''} onclick="rhNovoParcelar(${x.id_titulo})">${RH_NOVO.enviando ? 'enviando…' : 'Confirmar'}</button>
+      <button type="button" class="preset-btn" onclick="RH_NOVO.id=null;renderModuloRh()">Cancelar</button></div>`;
+    return `<tr><td>${cgData(x.data)}</td><td>${x.pessoa_nome ? cgEsc(cgNome(x.pessoa_nome)) : `<span style="color:var(--farol-perto);font-weight:700;">a identificar</span>${x.nome_lido ? ` <span style="font-size:11px;color:var(--tx-4);">(${cgEsc(x.nome_lido)})</span>` : ''}`}</td>
+      <td style="white-space:normal;">${cgEsc(x.descricao || '')}${x.credor && x.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(x.credor))}</span>` : ''}${x.duplicado_na_planilha ? ' <span style="color:var(--farol-perto);font-weight:700;font-size:11px;">duplicado na planilha — apagar de um dos dois</span>' : ''}${form}</td>
+      <td>${cgEsc(x.conta || '')}</td><td>${R0(x.valor)}</td>
+      <td style="white-space:nowrap;">${ab ? '' : `<button type="button" class="preset-btn active" onclick="RH_NOVO.id=${x.id_titulo};RH_NOVO.parcelas=1;RH_NOVO.inicio='';RH_NOVO.pessoa='';renderModuloRh()">Parcelar</button> <button type="button" class="preset-btn" onclick="rhNovoDescartar(${x.id_titulo})">Não é empréstimo</button>`}</td></tr>`;
+  };
+  return `<div class="section-label">Vales novos (${V.length})</div><div id="tabelaRhNovos" style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Nome completo</th><th>O quê</th><th>Conta</th><th>Valor</th><th></th></tr></thead><tbody>${V.map(linha).join('')}</tbody></table></div>`;
+}
+async function rhNovosReler() { RH.novos = await consultarTudo('vw_rh_emprestimo_novo?select=*&situacao=eq.A_PARCELAR&order=data').catch((e) => ({ erro: e.message })); }
+async function rhNovoParcelar(id) {
+  const x = (RH.novos || []).find((v) => v.id_titulo === id);
+  if (x && !x.pessoa_id && !RH_NOVO.pessoa) return avisoAcao('atencao', '! Escolha de quem é o vale.');
+  RH_NOVO.enviando = true; renderModuloRh(); avisoAcao('enviando', '… parcelando');
+  const r = await trRpcSeguro('rh_emprestimo_parcelar', { p_id_titulo: id, p_parcelas: Math.max(1, Number(RH_NOVO.parcelas) || 1), p_inicio: (RH_NOVO.inicio || rhProxMes()) + '-01', p_pessoa_id: RH_NOVO.pessoa ? Number(RH_NOVO.pessoa) : null });
+  RH_NOVO.enviando = false;
+  if (!r.ok) { const e = await trErroDe(r); renderModuloRh(); return avisoAcao('erro', `✗ Não parcelou: ${e}`, () => rhNovoParcelar(id)); }
+  const txt = await r.json().catch(() => '');
+  RH_NOVO.id = null; await rhNovosReler(); renderModuloRh();
+  avisoAcao('ok', `✓ ${typeof txt === 'string' && txt ? txt : 'Parcelado'} — às ${avisoHora()}.`);
+}
+async function rhNovoDescartar(id) {
+  const m = prompt('Por que não é empréstimo?');
+  if (m === null) return;
+  if (!m.trim()) return avisoAcao('atencao', '! Escreva o motivo.');
+  avisoAcao('enviando', '… gravando');
+  const r = await trRpcSeguro('rh_emprestimo_descartar', { p_id_titulo: id, p_motivo: m.trim() });
+  if (!r.ok) return avisoAcao('erro', `✗ Não gravou: ${await trErroDe(r)}`, () => rhNovoDescartar(id));
+  await rhNovosReler(); renderModuloRh();
+  avisoAcao('ok', `✓ Marcado como "não é empréstimo" às ${avisoHora()}.`);
+}
 function rhIr(campo, v) {
   if (campo === 'aba') { RH_ABA = v; RH_PESSOA = null; }
   else if (campo === 'dia') RH_DIA = RH_DIA === v ? null : v;
@@ -3584,6 +3661,7 @@ function renderModuloRh() {
     ${devolver > 0 && !P ? `<div class="card neutral"><div class="card-lbl">A repassar à ${credor.map((c) => cgNome(c.credor)).join(' e ao ')}</div><div class="card-val">${R(devolver)}</div><div class="card-pct">conforme desconta</div></div>` : ''}
   </div>`;
 
+  if (!P) h += rhValesNovosHtml();
   // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
   const confDe = (r) => confDia.find((x) => x.pessoa_id === r.pessoa_id);
   const visto = new Set();
@@ -3620,9 +3698,13 @@ function renderModuloRh() {
       let t = `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})' title="${ab ? 'clique para soltar' : 'clique para a tela falar só desta pessoa'}">
         <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${R(c.a_descontar)}</td><td>${n(c.parcelas_abertas)}</td><td>${cgData(c.proximo_desconto)}</td><td>${mesTxt(c.quitacao_prevista)}</td></tr>`;
       if (ab) { const E = [...new Set(RH.aberto.filter((r) => r.colaborador === c.colaborador).map((r) => r.chave))].map((k) => RH.aberto.filter((r) => r.chave === k && r.colaborador === c.colaborador));
-        t += `<tr><td colspan="5"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
-          ${E.map((L) => `<tr><td>${cgEsc(L[0].descricao || '')}${L[0].credor && L[0].credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(L[0].credor))}</span>` : ''}</td>
-            <td>${L.length}${L[0].parcelas_total ? ` (de ${L[0].parcelas_total})` : ''}</td><td>${R(L.reduce((a, r) => a + n(r.valor), 0))}</td><td>${cgData(L[0].data_desconto)}</td><td>${cgData(L[L.length - 1].data_desconto)}</td></tr>`).join('')}</tbody></table></td></tr>`; }
+        t += `<tr><td colspan="5"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Emprestado</th><th>Já descontado</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
+          ${E.map((L) => { const k = L[0].chave, e = (RH.emp && RH.emp.get(k)) || {}, pg = (RH.pagos || []).filter((x) => x.emprestimo === k);
+            return `<tr><td>${cgEsc(L[0].descricao || '')}${L[0].credor && L[0].credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(L[0].credor))}</span>` : ''}</td>
+            <td>${e.valor_total != null ? R(e.valor_total) : '—'}${e.data_concessao ? `<div style="font-size:11px;color:var(--tx-4);">em ${cgData(e.data_concessao)}</div>` : ''}</td>
+            <td>${R(pg.reduce((a, x) => a + n(x.valor), 0))}<div style="font-size:11px;color:var(--tx-4);">${pg.length} ${pg.length === 1 ? 'parcela' : 'parcelas'}</div></td>
+            <td>${L.length}${L[0].parcelas_total ? ` (de ${L[0].parcelas_total})` : ''}</td><td>${R(L.reduce((a, r) => a + n(r.valor), 0))}</td><td>${cgData(L[0].data_desconto)}</td><td>${cgData(L[L.length - 1].data_desconto)}</td></tr>
+            <tr><td colspan="7" style="white-space:normal;font-size:12px;padding-top:0;">${rhSaidaHtml(k, e, L[0])}${pg.length ? `<details style="margin-top:2px;"><summary style="cursor:pointer;color:var(--tx-3);">parcelas já pagas (${pg.length})</summary>${pg.map((x) => `${x.parcela ? x.parcela + (x.parcelas_no_plano ? '/' + x.parcelas_no_plano : '') + ' · ' : ''}${cgData(x.data_desconto)} · ${R(x.valor)}`).join('<br>')}</details>` : ''}</td></tr>`; }).join('')}</tbody></table></td></tr>`; }
       return t; }).join('')}
     </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td></tr></tfoot></table></div>`;
 

@@ -1979,7 +1979,7 @@ async function descCarregar() {
   try {
     const [linhas, vendas, conc, refe] = await Promise.all([
       consultarTudo(`vw_descontos_controle_dia?select=unidade,dia,canal,quem,quem_fonte,motivo_classe,descontos,valor_desconto,venda_bruta_canal,pct_da_venda_do_canal,sem_motivo,valor_sem_motivo&dia=gte.${desde}${u}&order=dia.desc,unidade,canal`),
-      consultarTudo(`vw_descontos_venda?select=unidade,dia,canal,numero,mesa,hora,bruto,desconto,pct,motivo,para_quem,funcionario_nome,quem,quem_fonte,parece,alerta_sem_motivo,alerta_desconto_alto&refeicao_equipe=is.false&desconto=gt.0&dia=gte.${desde}${u}&order=hora.desc`),
+      consultarTudo(`vw_descontos_venda?select=unidade,dia,canal,numero,mesa,hora,bruto,desconto,pct,motivo,para_quem,funcionario_nome,quem,quem_fonte,parece,alerta_sem_motivo,alerta_desconto_alto,turno,quem_padrao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.${desde}${u}&order=hora.desc`),
       consultarTudo(`vw_descontos_concentracao?select=unidade,mes,eixo,pessoa,descontos,valor,pct_da_loja&alerta_concentra=is.true&mes=gte.${mes}${u}&order=mes.desc,pct_da_loja.desc`),
       consultarTudo(`vw_descontos_refeicao_equipe?select=unidade,dia,canal,refeicoes,quem_comeu&dia=gte.${desde}${u}&order=dia.desc,unidade`),
     ]);
@@ -2041,7 +2041,7 @@ function descHtml() {
       <td style="text-align:right;">${R(x.bruto)}</td><td style="text-align:right;">${R(x.desconto)}<div style="font-size:11px;color:var(--tx-4);">${pctF(x.pct)}</div></td>
       <td style="white-space:normal;${x.motivo ? '' : ' color:var(--farol-perto); font-weight:700;'}">${x.motivo ? trEscH(x.motivo) : 'sem motivo'}</td>
       <td style="white-space:normal;">${trEscH(x.para_quem || '')}${x.funcionario_nome ? `<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.funcionario_nome)}</div>` : ''}</td>
-      <td>${trEscH(descNome(x.quem))}<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.quem_fonte || '')}</div></td>
+      <td${x.quem_padrao ? ' style="color:var(--tx-4);" title="número padrão do Saipos, não é uma pessoa"' : ''}>${trEscH(descNome(x.quem))}${x.turno ? ` <span style="font-size:11px;color:var(--tx-4);">${x.turno === 'DIA' ? 'dia' : 'noite'}</span>` : ''}<div style="font-size:11px;color:var(--tx-4);">${trEscH(x.quem_fonte || '')}</div></td>
       <td style="white-space:normal; color:var(--tx-4); font-size:12px;">${trEscH(x.parece || '')}</td></tr>`;
   const rotF = F === 'semMotivo' ? ' · só sem motivo' : F === 'alto' ? ' · só 50% ou mais' : F ? ' · ' + ddm(F.split('|')[1]) : '';
   h += `<div class="section-label" style="text-align:left; margin-top:14px;">Vendas com desconto${rotF}${F ? ` <a href="javascript:void(0)" onclick="descFiltrar(null)" style="font-size:12px;">mostrar todas</a>` : ''}</div>`;
