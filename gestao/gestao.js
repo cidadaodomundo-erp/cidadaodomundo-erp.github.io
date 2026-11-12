@@ -1902,9 +1902,13 @@ async function entrarEvolucao() {
     alvo.innerHTML = '<div class="contexto">Carregando a evolução das vendas...</div>';
     EVOL = await consultarTudo('vw_venda_evolucao?select=data,unidade,canal,faixa,pedidos,total,canceladas,total_cancelado&order=data');
     EVOL_LIDO_EM = Date.now();
+    EVOL_TK = null;
   }
+  // 12/11/2026 (dono 03:35, ticket por canal): o valor médio vem de vw_ticket_canal_dia (venda cheia, com a promoção da loja)
+  if (EVOL_TK === null) EVOL_TK = await consultarTudo('vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento,promo_ok&order=dia').catch(() => []);
   renderModuloEvolucao();
 }
+let EVOL_TK = null;
 
 function evolJanela(i) { EVOL_JANELA = i; renderModuloEvolucao(); }
 
@@ -2017,6 +2021,38 @@ function renderModuloEvolucao() {
   const atualX = atual.filter(r => passaF(r, 'faixa')), antX = anterior.filter(r => passaF(r, 'faixa'));
   const parF = atualPar.filter(r => passaF(r)), parC = atualPar.filter(r => passaF(r, 'canal')), parX = atualPar.filter(r => passaF(r, 'faixa'));
 
+  // ---------- VALOR MEDIO POR CANAL (dono, 12/11/2026 03:35; livro chat-frente-painel-modulos/respostas/ticket-medio-por-canal) ----------
+  // Fonte: vw_ticket_canal_dia (faturamento = venda cheia, com a promocao paga pela loja no iFood; pedidos sem os de R$ 0).
+  // Soma faturamento e pedidos e divide no fim. Nunca um valor medio misturando canais: sempre aberto por canal.
+  // iFood: a promocao chega 1-2 dias depois; dia sem ela (promo_ok=false) fica fora dos dois lados. A faixa de horario
+  // nao tem a promocao: com uma faixa escolhida o valor medio volta a ser o do caixa (PDV), e a tela diz.
+  const TKR = ITEM || EVOL_F.faixa ? [] : (EVOL_TK || []);
+  const tkSemPromo = new Set(TKR.filter(r => r.promo_ok === false).map(r => r.unidade + '|' + r.dia));
+  const tkFora = (r, desloc) => r.canal === 'IFOOD' && (tkSemPromo.has(r.unidade + '|' + r.dia) || (desloc && tkSemPromo.has(r.unidade + '|' + fxSomaDias(r.dia, desloc))));
+  let tkIfoodAte = '';
+  const tkJan = (a, b, desloc, comPar, chave) => {
+    const m = {};
+    if (!a || !b) return m;
+    TKR.forEach(r => {
+      if (r.dia < a || r.dia > b || (activeUnidades.size && !activeUnidades.has(r.unidade))) return;
+      if (EVOL_F.canal && r.canal !== EVOL_F.canal && chave !== 'canal') return;
+      if (tkFora(r, temBase ? desloc : 0)) return;
+      if (comPar && !parOk(r, desloc)) return;
+      if (!desloc || desloc < 0) { if (r.canal === 'IFOOD' && r.dia > tkIfoodAte) tkIfoodAte = r.dia; }
+      const k = chave === 'unidade' ? r.unidade : chave === 'canal' ? r.canal : chave ? chave(r) : r.canal;
+      const o = m[k] || (m[k] = { f: 0, p: 0 }); o.f += +r.faturamento || 0; o.p += +r.pedidos || 0;
+    });
+    return m;
+  };
+  const tkDe = (o) => o && o.p ? o.f / o.p : null;
+  const tkAt = tkJan(janIni, janFim, -tamanho, false, 'canal'), tkPr = tkJan(janIni, janFim, -tamanho, true, 'canal');
+  const tkAn = temBase ? tkJan(janAntIni, janAntFim, tamanho, true, 'canal') : {};
+  const tkLoja = EVOL_F.canal ? tkJan(janIni, janFim, -tamanho, false, 'unidade') : {};
+  const tkLojaP = EVOL_F.canal ? tkJan(janIni, janFim, -tamanho, true, 'unidade') : {};
+  const tkLojaA = EVOL_F.canal && temBase ? tkJan(janAntIni, janAntFim, tamanho, true, 'unidade') : {};
+  const tkCanais = Object.keys(tkAt).filter(c => tkAt[c].p > 0 && (!EVOL_F.canal || c === EVOL_F.canal)).sort((x, y) => tkAt[y].p - tkAt[x].p);
+  const tkIfoodNota = tkIfoodAte && tkIfoodAte < janFim ? ` (iFood até ${tkIfoodAte.slice(8, 10)}/${tkIfoodAte.slice(5, 7)}: a promoção dos dias seguintes ainda não chegou)` : '';
+
   const soma = (rows, campo) => rows.reduce((s, r) => s + Number(r[campo] || 0), 0);
   const tot = soma(atualF, 'total'), ped = soma(atualF, 'pedidos');
   // CANCELADOS (12/09/2026): era a unica coisa que a Visao consolidada tinha e esta tela
@@ -2058,7 +2094,11 @@ function renderModuloEvolucao() {
   if (ITEM) for (let d = janIni; d <= janFim; d = maisSete(d)) if (!serie[d]) serie[d] = { total: 0, pedidos: 0 };
   const chaves = Object.keys(serie).sort();
   const medidaDe = (o) => EVOL_MEDIDA === 'total' ? o.total : EVOL_MEDIDA === 'pedidos' ? o.pedidos : (o.pedidos ? o.total / o.pedidos : 0);
-  const valores = chaves.map(k => medidaDe(serie[k]));
+  // 12/11/2026: no "Valor médio" o grafico mostra UM canal (o escolhido ou, sem filtro, o de mais pedidos), da vw_ticket_canal_dia
+  const tkCanalGraf = EVOL_MEDIDA === 'ticket' && TKR.length ? (EVOL_F.canal || tkCanais[0] || null) : null;
+  const tkSerie = (a, b, desloc) => tkJan(a, b, desloc, false, (r) => r.canal === tkCanalGraf ? evolChave(r.dia, grao) : '_');
+  const tkSerAt = tkCanalGraf ? tkSerie(janIni, janFim, -tamanho) : null;
+  const valores = chaves.map(k => tkSerAt ? (tkDe(tkSerAt[k]) ?? 0) : medidaDe(serie[k]));
 
   // O PERIODO ANTERIOR ENTRA NO GRAFICO como linha tracejada por tras das barras —
   // mesma escala, alinhado POSICAO A POSICAO (1a semana com 1a semana, sabado com
@@ -2077,7 +2117,7 @@ function renderModuloEvolucao() {
   if (ITEM && Object.keys(serieAnt).length) for (let d = janAntIni; d <= janAntFim; d = maisSete(d)) if (!serieAnt[d]) serieAnt[d] = { total: 0, pedidos: 0 };
   const chavesAnt = Object.keys(serieAnt).sort().slice(-chaves.length);
   const valoresAnt = temBase && chavesAnt.length === chaves.length
-    ? chavesAnt.map(k => medidaDe(serieAnt[k])) : null;
+    ? (() => { const sA = tkCanalGraf ? tkSerie(janAntIni, janAntFim, tamanho) : null; return chavesAnt.map(k => sA ? (tkDe(sA[k]) ?? 0) : medidaDe(serieAnt[k])); })() : null;
   const rotAnt = valoresAnt ? chavesAnt.map(k => evolRotulo(k, grao)) : [];
   // O ULTIMO periodo do grao quase sempre esta pela metade (a semana ou o mes em
   // curso). Mostrar sem avisar faz parecer queda — entao ele fica marcado.
@@ -2100,36 +2140,40 @@ function renderModuloEvolucao() {
   };
   const linhaQuebra = (x, totalGeral, tipo) => {
     const share = totalGeral ? x.total / totalGeral * 100 : 0;
-    const tkx = x.pedidos ? x.total / x.pedidos : 0;
+    const tkx = x.tk !== undefined ? x.tk : (x.pedidos ? x.total / x.pedidos : 0);
     const sel = tipo && EVOL_F[tipo] === x.k;
     const clic = tipo ? ` onclick="evolFiltrar('${tipo}','${String(x.k).replace(/'/g, "\'")}')" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o filtro' : 'clique para filtrar a tela por ' + (x.rot || x.k)}"` : '';
     return `<tr${clic}><td>${sel ? '<b>' : ''}${x.rot || x.k}${sel ? '</b> ✕' : ''}</td>
       <td>R$ ${fmt(x.total)}<span class="dre-av">${pct(share)}%</span></td>
       <td>${x.pedidos.toLocaleString('pt-BR')}</td>
-      <td>R$ ${fmt(tkx)}</td>
+      ${x.semTk ? '' : `<td>${tkx === null ? '—' : 'R$ ' + fmt(tkx)}</td>`}
       <td>${varTxt(x.par, x.ant && x.ant.total)}</td></tr>`;
   };
   // Cada quebra vira GRAFICO DE BARRA (o controle) + tabela (os numeros). Barra por
   // entidade usa UMA cor so: a identidade vem do rotulo do eixo, regra da skill
   // painel-visual. A barra selecionada fica na cor da marca.
-  const tabela = (titulo, sub, id, itens, tipo, totalDim) => {
+  // 12/11/2026: o valor medio so aparece aberto por canal — mais de um canal na linha = coluna fora (semTk)
+  const tabela = (titulo, sub, id, itens, tipo, totalDim, tkOpc) => {
     const totD = totalDim === undefined ? tot : totalDim;
     const somaPed = itens.reduce((t, x) => t + x.pedidos, 0);
+    const semTk = !!(tkOpc && tkOpc.semTk);
+    itens = semTk ? itens.map(x => ({ ...x, semTk: true })) : itens;
+    const tkTot = tkOpc && 'total' in tkOpc ? tkOpc.total : (somaPed ? totD / somaPed : 0);
     return `
     <div class="section-label">${titulo}</div>
     <div class="caption-label" style="text-align:center;">${sub}${tipo ? ' <b>Clique na barra ou na linha para filtrar a tela inteira.</b>' : ''}</div>
     ${tipo ? `<div class="chart-box" style="height:${Math.max(130, 34 * itens.length + 40)}px;"><canvas id="chart${id}"></canvas></div>` : ''}
     <div id="${id}"><table>
-      <tr><th>${titulo.split('—')[0].trim()}</th><th>Venda · % do total</th><th>Pedidos</th><th>Valor médio</th><th>vs período anterior</th></tr>
+      <tr><th>${titulo.split('—')[0].trim()}</th><th>Venda · % do total</th><th>Pedidos</th>${semTk ? '' : `<th${tkOpc && tkOpc.th ? ` title="${tkOpc.th}"` : ''}>Valor médio${tkOpc && tkOpc.rot ? ' ' + tkOpc.rot : ''}</th>`}<th>vs período anterior</th></tr>
       ${itens.map(x => linhaQuebra(x, totD, tipo)).join('')}
-      <tr class="liq"><td>TOTAL</td><td>R$ ${fmt(totD)}</td><td>${somaPed.toLocaleString('pt-BR')}</td><td>R$ ${fmt(somaPed ? totD / somaPed : 0)}</td><td>${varTxt(itens.reduce((t, x) => t + x.par, 0), itens.reduce((t, x) => t + (x.ant ? x.ant.total : 0), 0))}</td></tr>
+      <tr class="liq"><td>TOTAL</td><td>R$ ${fmt(totD)}</td><td>${somaPed.toLocaleString('pt-BR')}</td>${semTk ? '' : `<td>${tkTot === null ? '— <span style="font-size:11px;color:var(--tx-5);">ver por canal</span>' : 'R$ ' + fmt(tkTot)}</td>`}<td>${varTxt(itens.reduce((t, x) => t + x.par, 0), itens.reduce((t, x) => t + (x.ant ? x.ant.total : 0), 0))}</td></tr>
     </table></div>`;
   };
 
   const FAIXA_ROT = { '1 MADRUGADA': 'Madrugada (0h–4h)', '2 MANHÃ': 'Manhã (5h–10h)', '3 ALMOÇO': 'Almoço (11h–14h)', '4 TARDE': 'Tarde (15h–17h)', '5 NOITE': 'Noite (18h–23h)' };
-  const porCanal = quebra('canal', atualC, antC, parC).map(x => ({ ...x, rot: nomeCanal(x.k) }));
+  const porCanal = quebra('canal', atualC, antC, parC).map(x => ({ ...x, rot: nomeCanal(x.k), ...(TKR.length ? { tk: tkDe(tkAt[x.k]) } : {}) }));
   const porFaixa = quebra('faixa', atualX, antX, parX).sort((a, b) => a.k < b.k ? -1 : 1).map(x => ({ ...x, rot: FAIXA_ROT[x.k] || x.k }));
-  const porLoja = quebra('unidade', atualF, anteriorF, parF).map(x => ({ ...x, rot: UN_ROT[x.k] || x.k }));
+  const porLoja = quebra('unidade', atualF, anteriorF, parF).map(x => ({ ...x, rot: UN_ROT[x.k] || x.k, ...(TKR.length && EVOL_F.canal ? { tk: tkDe(tkLoja[x.k]) } : {}) }));
   const totCanal = porCanal.reduce((t, x) => t + x.total, 0);
   const totFaixa = porFaixa.reduce((t, x) => t + x.total, 0);
 
@@ -2325,8 +2369,12 @@ function renderModuloEvolucao() {
         <div class="card-val">R$ ${fmt(tot)}</div><div class="card-pct">${varTxt(totP, totA)}</div></div>
       <div class="card neutral"><div class="card-lbl">${ITEM ? 'Pedidos com o item' : 'Pedidos'}</div>
         <div class="card-val">${ped.toLocaleString('pt-BR')}</div><div class="card-pct">${varTxt(pedP, pedA)}</div></div>
-      <div class="card neutral"><div class="card-lbl">${ITEM ? 'Do item por pedido' : 'Valor médio por pedido'}</div>
-        <div class="card-val">R$ ${fmt(tk)}</div><div class="card-pct">${varTxt(tkP, tkA)}</div></div>
+      ${ITEM || !TKR.length && !EVOL_F.canal && !EVOL_F.faixa ? `<div class="card neutral"><div class="card-lbl">${ITEM ? 'Do item por pedido' : 'Valor médio por pedido'}</div>
+        <div class="card-val">R$ ${fmt(tk)}</div><div class="card-pct">${varTxt(tkP, tkA)}</div></div>` : EVOL_F.faixa ? `<div class="card neutral"><div class="card-lbl">Valor médio por pedido${EVOL_F.canal ? ' · ' + nomeCanal(EVOL_F.canal) : ''}</div>
+        ${EVOL_F.canal ? `<div class="card-val">R$ ${fmt(tk)}</div><div class="card-pct">${varTxt(tkP, tkA)} · do caixa, sem a promoção</div>` : `<div class="card-pct" style="text-align:left;">${porCanal.map(x => `${x.rot} <b>R$ ${fmt(x.pedidos ? x.total / x.pedidos : 0)}</b>`).join('<br>')}<br><span style="color:var(--tx-5);">do caixa, sem a promoção</span></div>`}</div>`
+        : `<div class="card neutral"><div class="card-lbl">Valor médio por pedido${EVOL_F.canal ? ' · ' + nomeCanal(EVOL_F.canal) : ' por canal'}</div>
+        ${tkCanais.length === 1 ? `<div class="card-val">R$ ${fmt(tkDe(tkAt[tkCanais[0]]))}</div><div class="card-pct">${varTxt(tkDe(tkPr[tkCanais[0]]) || 0, tkDe(tkAn[tkCanais[0]]) || 0)}</div>`
+          : `<div class="card-pct" style="text-align:left;line-height:1.55;">${tkCanais.map(c => `${nomeCanal(c)} <b>R$ ${fmt(tkDe(tkAt[c]))}</b> <span style="font-size:11px;">${varTxt(tkDe(tkPr[c]) || 0, tkDe(tkAn[c]) || 0)}</span>`).join('<br>') || 'sem pedidos'}</div>`}</div>`}
       <div class="card neutral"><div class="card-lbl">${ITEM ? 'Receita por semana' : 'Venda por dia'}</div>
         <div class="card-val">R$ ${fmt(tot / nDias)}</div><div class="card-pct">média de ${nDias} ${ITEM ? 'semana(s)' : 'dia(s)'} com venda</div></div>
       ${ITEM ? '' : `<div class="card ${tot && canc / tot * 100 > 1.2 ? 'neg' : 'neutral'}"><div class="card-lbl">Cancelados</div>
@@ -2338,12 +2386,16 @@ function renderModuloEvolucao() {
     <div class="caption-label" style="text-align:center;">Por ${grao === 'mes' ? 'mês' : grao === 'dia' ? 'dia' : 'semana (segunda a domingo)'}.${valoresAnt ? ' A linha tracejada é o período anterior, ponto a ponto na mesma escala — passe o mouse para ver as duas datas e os dois valores.' : ''}
       ${ultimoParcial ? `O último ponto é ${grao === 'mes' ? 'o mês' : grao === 'dia' ? 'o dia' : 'a semana'} em curso: fica vazado e com o traço pontilhado, porque ainda não fechou.` : ''}</div>
     ${seletor([['total', 'Venda'], ['pedidos', 'Pedidos'], ['ticket', 'Valor médio']], EVOL_MEDIDA, 'evolMedida', true)}
+    ${EVOL_MEDIDA === 'ticket' && !ITEM ? `<div class="caption-label" style="text-align:center;">${tkCanalGraf ? `Valor médio do <b>${nomeCanal(tkCanalGraf)}</b>${EVOL_F.canal ? '' : ' (o canal com mais pedidos) — clique em outro canal na tabela abaixo para trocar'}.${tkCanalGraf === 'IFOOD' && tkIfoodNota ? ' Os dias sem a promoção carregada ficam fora.' : ''}` : 'Valor médio do caixa, sem a promoção da loja (a faixa de horário não tem a promoção)' + (EVOL_F.canal ? '' : ': escolha um canal na tabela para não misturar canais') + '.'}</div>` : ''}
     <div class="chart-box" style="height:260px;"><canvas id="chartEvolucao"></canvas></div>
 
-    ${tabela('Por canal', ITEM ? 'Por onde este item sai.' : 'Onde a venda entra.', 'tabelaEvolCanal', porCanal, 'canal', totCanal)}
-    ${tabela('Por faixa de horário', 'A faixa sai da hora da venda registrada no Saipos, não do turno do cadastro.', 'tabelaEvolFaixa', porFaixa, 'faixa', totFaixa)}
+    ${tabela('Por canal', ITEM ? 'Por onde este item sai.' : `Onde a venda entra. ${TKR.length ? 'Valor médio = venda cheia (com a promoção paga pela loja no iFood) ÷ pedidos, sem as vendas de R$ 0' + tkIfoodNota + '.' : EVOL_F.faixa ? 'Com uma faixa escolhida, o valor médio é o do caixa, sem a promoção da loja no iFood.' : ''}`, 'tabelaEvolCanal', porCanal, 'canal', totCanal,
+      ITEM ? undefined : { total: porCanal.length === 1 ? porCanal[0].tk ?? (porCanal[0].pedidos ? porCanal[0].total / porCanal[0].pedidos : 0) : null })}
+    ${tabela('Por faixa de horário', 'A faixa sai da hora da venda registrada no Saipos, não do turno do cadastro.' + (!ITEM && !EVOL_F.canal ? ' O valor médio por faixa aparece ao escolher um canal.' : ''), 'tabelaEvolFaixa', porFaixa, 'faixa', totFaixa,
+      ITEM ? undefined : EVOL_F.canal ? { rot: EVOL_F.canal === 'IFOOD' ? '(do caixa)' : '', th: 'A faixa de horário não tem a promoção paga pela loja: aqui o valor médio é o do caixa (Saipos).' } : { semTk: true })}
     ${matriz}
-    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, escolha a loja no topo.', 'tabelaEvolLoja', porLoja) : ''}
+    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, escolha a loja no topo.' + (!ITEM && !EVOL_F.canal ? ' O valor médio por loja aparece ao escolher um canal.' : ''), 'tabelaEvolLoja', porLoja, undefined,
+      ITEM ? undefined : EVOL_F.canal ? (TKR.length ? { total: tkDe(Object.values(tkLoja).reduce((a, o) => ({ f: a.f + o.f, p: a.p + o.p }), { f: 0, p: 0 })) } : undefined) : { semTk: true }) : ''}
     ${blocoItens}
 
     <div class="caption-label" title="A faixa vem da hora da venda: no salão é a abertura da comanda, no delivery é a criação do pedido. O valor é o do PDV e não se compara direto com o bruto do portal do iFood. Ressalva aberta desde 20/08: o salão da Água Verde registra comandas antes das 11h com ticket alto — pendente de conferir na loja.">
