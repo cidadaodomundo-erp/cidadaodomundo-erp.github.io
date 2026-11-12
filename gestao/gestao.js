@@ -6943,9 +6943,14 @@ function cpHojeLimpo() {
   // com a data mais antiga entre elas. Sem a view, a linha some. O número da previsão não muda.
   const part = (CP.partida || []).filter(p => p.fonte_partida === 'EXTRATO' && (!CP.loja || p.unidade === CP.loja));
   const banco = part.length ? part.reduce((s, p) => s + Number(p.saldo_partida || 0), 0) : null;
-  const dataBanco = part.map(p => p.data_partida).filter(Boolean).sort()[0];
+  // 12/11/2026 02:39 (Organizador): a data é a MAIS RECENTE (a da maioria das contas); a conta que ficou para trás vem à
+  // parte, em alerta ("Santander sem extrato desde 03/11") — a mais antiga dava a impressão de a Rede toda estar parada
+  const dataBanco = part.map(p => p.data_partida).filter(Boolean).sort().pop();
+  const nomeCt = (c) => (typeof nomeConta === 'function' ? nomeConta(c) : c);
+  const atras = dataBanco ? part.filter(p => p.data_partida && p.data_partida < dataBanco) : [];
+  const linhaAtras = atras.map(p => `<span style="color:var(--farol-perto);font-weight:700;">${trEscH(nomeCt(p.conta))} sem extrato desde ${ffDdmm(p.data_partida)}</span>`).join(' · ');
   const linhaBanco = banco != null && dataBanco
-    ? ` · <span style="color:var(--tx-3);">banco conciliado em ${ffDdmm(dataBanco)}: ${banco < 0 ? '' : '+'}${mil(banco)}</span>` : '';
+    ? ` · <span style="color:var(--tx-3);">banco conciliado em ${ffDdmm(dataBanco)}: ${banco < 0 ? '' : '+'}${mil(banco)}</span>${linhaAtras ? ' · ' + linhaAtras : ''}` : '';
   return `<div class="contexto" style="border-color:${v < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)'}; cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado">
     Previsão para o fim de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b>${linhaBanco} · <b>ver no Fluxo projetado →</b></div>`;
 }
