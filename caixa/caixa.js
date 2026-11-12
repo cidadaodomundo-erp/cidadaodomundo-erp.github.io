@@ -1412,7 +1412,8 @@ function cofreLinhaDia(unidade, dia) {
   return cab + `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
       <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre.trim()}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
       <button class="preset-btn${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a contagem</button>
-      <span class="caption-label">O saldo do Saipos aparece depois de gravar.</span></div></div>`;
+      <button class="preset-btn${livre}" onclick="cedAbrir('${unidade}', '${dia}', '${k}')">contar por cédula</button>
+      <span class="caption-label">O saldo do Saipos aparece depois de gravar.</span></div><div id="cfCed_${k}"></div></div>`;
 }
 // abre o campo de novo, já preenchido, no lugar do "contado × Saipos" (grava por cima: o upsert é o mesmo)
 function cofreCorrigir(unidade, dia, k, atual) {
@@ -1422,12 +1423,13 @@ function cofreCorrigir(unidade, dia, k, atual) {
   box.innerHTML = `<b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">corrigir a contagem de ${dia.split('-').reverse().join('/')}${unidade === 'AGUA VERDE' ? ' — gaveta e cofre da AV, <b>sem</b> a gaveta do SB' : ''}</span>
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
       <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" value="${Number(atual) || ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
-      <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a correção</button></div>`;
+      <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a correção</button>
+      <button class="preset-btn ${livre}" onclick="cedAbrir('${unidade}', '${dia}', '${k}')">contar por cédula</button></div><div id="cfCed_${k}"></div>`;
   const el = document.getElementById('cfT_' + k); if (el) el.focus();
 }
 let COFRE_ZERO = null;   // o 0 só passa no segundo clique (11/11: em 04/11 um 0 gravado por engano travou a fila)
-async function cofreGravarTotal(unidade, dia, k) {
-  const el = document.getElementById('cfT_' + k), v = el ? el.value : '';
+async function cofreGravarTotal(unidade, dia, k, ced) {
+  const el = document.getElementById('cfT_' + k), v = ced ? String(ced.caixa + ced.deposito) : (el ? el.value : '');
   if (v === '') { avisoAcao('atencao', '! Digite o dinheiro contado (gaveta + cofre). Se não tinha nada, digite 0.'); return; }
   if (Number(v) === 0 && COFRE_ZERO !== k) { COFRE_ZERO = k; avisoAcao('atencao', '! Você contou R$ 0,00 na gaveta e no cofre juntos? O sistema espera dinheiro aqui. Se é isso mesmo, clique em gravar de novo.'); return; }
   COFRE_ZERO = null;
@@ -1437,7 +1439,9 @@ async function cofreGravarTotal(unidade, dia, k) {
     // chave da loja no dia; a contagem por caixa está desligada desde 22/10 (CAIXA_DINHEIRO_ATE), então não há mistura
     const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem?on_conflict=unidade,data,caixa`, { method: 'POST',
       headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify({ unidade, data: dia, caixa: 'SALÃO', contado: 0, troco: null, cofre: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
+      // 12/11/2026 (contar por cédula, banco do Financeiro): CAIXA = gaveta (contado), DEPOSITO = envelope/cofre (cofre)
+      body: JSON.stringify(Object.assign({ unidade, data: dia, caixa: 'SALÃO', contado: 0, troco: null, cofre: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() },
+        ced ? { contado: ced.caixa, cofre: ced.deposito, cedulas: ced.cedulas } : {})) });
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     await cofreCarregar();
     const x = (COFRE_DIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia);
@@ -1447,7 +1451,59 @@ async function cofreGravarTotal(unidade, dia, k) {
     CAIXA_HELLEN_CALC = null;
     if (CAIXA_DRILL_DADOS && CAIXA_DRILL_DADOS.unidade === unidade && CAIXA_DRILL_DADOS.dia === dia) { const d = CAIXA_DRILL_DADOS; renderDiaConcartao(d.unidade, d.dia, d.trs, d.pix, d.cobr, d.forma, d.descs, d.onl); }
     renderModuloCaixa();
-  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarTotal(unidade, dia, k)); }
+  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarTotal(unidade, dia, k, ced)); }
+}
+// CONTAR POR CÉDULA (dono 12/11/2026 19:58: "ela conta a quantidade de cédulas por valor e ele dá o total"; substitui a planilha
+// Conferencia Caixa da Hellen; proposta contexto/propostas-telas/2026-11-12-contagem-por-cedulas.md). Duas colunas, como na
+// planilha: Caixa (gaveta) e Depósito (envelope/cofre). "Usar este total" grava contado = Caixa, cofre = Depósito e as
+// quantidades em caixa_contagem.cedulas. Continua às cegas: o saldo do Saipos só aparece depois de gravar.
+const CED_VALORES = ['100', '50', '20', '10', '5', '2', '1', '0.50', '0.25', '0.10', '0.05'];
+const CED = {};
+function cedAbrir(unidade, dia, k) {
+  const box = document.getElementById('cfCed_' + k);
+  if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  if (!CED[k]) {
+    const c = (CAIXA_CONTAGENS || []).find((x) => x.unidade === unidade && String(x.data).slice(0, 10) === dia && x.caixa === 'SALÃO');
+    const g = c && c.cedulas && typeof c.cedulas === 'object' ? c.cedulas : {};
+    CED[k] = { CAIXA: Object.assign({}, g.CAIXA || {}), DEPOSITO: Object.assign({}, g.DEPOSITO || {}) };
+  }
+  const q = CED[k], rot = (v) => 'R$ ' + (Number(v) < 1 ? fmt(Number(v)) : String(v));
+  const inp = (gr, v) => `<input type="number" min="0" step="1" inputmode="numeric" value="${q[gr][v] || ''}" oninput="cedDigitou('${k}', '${gr}', '${v}', this.value)" style="width:70px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;">`;
+  box.innerHTML = `<div id="tabelaCed_${k}" style="margin-top:8px; overflow-x:auto;"><table>
+    <thead><tr><th>Valor</th><th>Caixa (qtd)</th><th>Caixa R$</th><th>Depósito (qtd)</th><th>Depósito R$</th></tr></thead>
+    <tbody>${CED_VALORES.map((v) => `<tr><td>${rot(v)}</td><td>${inp('CAIXA', v)}</td><td id="ced_${k}_CAIXA_${v.replace('.', '_')}"></td><td>${inp('DEPOSITO', v)}</td><td id="ced_${k}_DEPOSITO_${v.replace('.', '_')}"></td></tr>`).join('')}</tbody>
+    <tfoot><tr class="liq"><td>Total</td><td></td><td id="ced_${k}_CAIXA"></td><td></td><td id="ced_${k}_DEPOSITO"></td></tr></tfoot></table></div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;">
+      <b id="ced_${k}_TOTAL"></b>
+      <button class="preset-btn active" onclick="cedUsar('${unidade}', '${dia}', '${k}')">Usar este total e gravar</button></div>`;
+  cedSomar(k);
+}
+function cedDigitou(k, gr, v, val) {
+  const n = Math.max(0, Math.floor(Number(val) || 0));
+  if (n) CED[k][gr][v] = n; else delete CED[k][gr][v];
+  cedSomar(k);
+}
+function cedSomar(k) {
+  const q = CED[k], tot = {};
+  ['CAIXA', 'DEPOSITO'].forEach((gr) => {
+    tot[gr] = 0;
+    CED_VALORES.forEach((v) => {
+      const val = Math.round((q[gr][v] || 0) * Number(v) * 100) / 100; tot[gr] += val;
+      const el = document.getElementById(`ced_${k}_${gr}_${v.replace('.', '_')}`); if (el) el.textContent = val ? 'R$ ' + fmt(val) : '';
+    });
+    tot[gr] = Math.round(tot[gr] * 100) / 100;
+    const el = document.getElementById(`ced_${k}_${gr}`); if (el) el.textContent = 'R$ ' + fmt(tot[gr]);
+  });
+  const t = document.getElementById(`ced_${k}_TOTAL`);
+  if (t) t.textContent = `gaveta + cofre: R$ ${fmt(Math.round((tot.CAIXA + tot.DEPOSITO) * 100) / 100)}`;
+  return tot;
+}
+function cedUsar(unidade, dia, k) {
+  const tot = cedSomar(k), q = CED[k], cedulas = {};
+  ['CAIXA', 'DEPOSITO'].forEach((gr) => { const o = {}; Object.keys(q[gr]).forEach((v) => { if (q[gr][v] > 0) o[v] = q[gr][v]; }); if (Object.keys(o).length) cedulas[gr] = o; });
+  const el = document.getElementById('cfT_' + k); if (el) el.value = Math.round((tot.CAIXA + tot.DEPOSITO) * 100) / 100;
+  cofreGravarTotal(unidade, dia, k, { caixa: tot.CAIXA, deposito: tot.DEPOSITO, cedulas });
 }
 async function cofreGravarContagem(unidade, dia, k) {
   const g = document.getElementById('cfG_' + k).value, c = document.getElementById('cfC_' + k).value;
