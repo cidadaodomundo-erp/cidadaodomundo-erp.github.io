@@ -464,7 +464,7 @@ async function entrarConcbanco() {
     // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
     // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
     const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, parcial] = await Promise.all([
+           diaSaldo, duvidas, sresiduo, parcial, robo] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
@@ -481,9 +481,11 @@ async function entrarConcbanco() {
       consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao&order=data'),
       // 07/11/2026 (auditoria lote 1, dinheiro-18): o dia cujo extrato veio parcial (OFX baixado no meio do dia)
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
+      // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): o que o robô está baixando
+      consultarTudo('vw_fin_robo_baixando?select=conta,fitid,estado,feito_em').catch(() => []),
     ]);
     CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, parcial };
+              diaSaldo, duvidas, parcial, robo };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -1549,7 +1551,34 @@ function renderConcbanco() {
       + '</div>';
   };
 
-  const blocosConferir = Object.entries(porConta).sort((a, b) => concbOrdem(a[0], b[0])).map(([conta, lista]) => {
+  // 12/11/2026 (proposta 09/11; dono 09/11 11:33: a baixa do que o banco pagou no centavo é do robô, não da Hellen):
+  // a linha cujo fitid está em vw_fin_robo_baixando (mesma conta) sai do "só conciliar" e vai para um bloco cinza,
+  // sem caixa de marcar e sem botão. Sem a view (falhou), nada muda.
+  const roboDe = {};
+  (cru.robo || []).forEach(r => { roboDe[r.conta + '|' + r.fitid] = r; });
+  const blocoRobo = (lista) => {
+    if (!lista.length) return '';
+    const total = lista.reduce((s, x) => s + Math.abs(n(x.valor)), 0);
+    const hhmm = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    return '<div style="margin:14px 0 6px;padding:6px 10px;border-left:4px solid var(--tx-3);background:var(--surface-2)">'
+      + '<b style="color:var(--tx-3);font-size:13px">🤖 O robô está dando a baixa (' + lista.length + ') · R$ ' + rs(total)
+      + '</b><span style="font-size:12px;color:var(--tx-3)"> — não precisa fazer nada</span></div>'
+      + '<div style="overflow-x:auto"><table style="width:100%"><tbody>'
+      + lista.map(p => {
+          const r = roboDe[p.conta + '|' + p.fitid];
+          const feito = r.estado === 'BAIXADO_AGUARDA_CARGA';
+          return '<tr style="color:var(--tx-3)"><td style="font-size:12px;text-align:left;white-space:nowrap">' + ddmm(p.data) + '</td>'
+            + '<td style="text-align:left;white-space:normal">' + esc(p.nome || memoLimpo(p.memo)) + '</td>'
+            + '<td style="text-align:left;white-space:nowrap">' + rs(p.valor) + '</td>'
+            + '<td style="text-align:left;font-size:12px;white-space:normal">'
+            + (feito ? '✓ baixado pelo robô' + (r.feito_em ? ' às ' + hhmm(r.feito_em) : '') + ' — some na próxima carga do Saipos'
+                     : 'na fila do robô') + '</td></tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  };
+  const blocosConferir = Object.entries(porConta).sort((a, b) => concbOrdem(a[0], b[0])).map(([conta, todas]) => {
+    const doRobo = todas.filter(p => roboDe[p.conta + '|' + p.fitid]);
+    const lista = todas.filter(p => !roboDe[p.conta + '|' + p.fitid]);
     const ent = lista.filter(p => n(p.valor) > 0);
     const sai = lista.filter(p => n(p.valor) < 0);
     // O nome da conta e o titulo do bloco inteiro: tudo abaixo dele e daquela
@@ -1560,7 +1589,7 @@ function renderConcbanco() {
       + 'letter-spacing:.3px;border-bottom:2px solid currentColor;padding-bottom:3px">'
       + esc(nomeConta(conta)) + '</div>' +
       tabela(conta, 'ent', ent, true) + tabela(conta, 'ent', ent, false) +
-      tabela(conta, 'sai', sai, true) + tabela(conta, 'sai', sai, false);
+      tabela(conta, 'sai', sai, true) + tabela(conta, 'sai', sai, false) + blocoRobo(doRobo);
   }).join('');
 
   // DUVIDA REGISTRADA E DUVIDA QUE APARECE. Quem concilia clicou "nao sei" e
@@ -6499,14 +6528,20 @@ const cpFiltroVazio = () => ({ situacao: '', origem: '', unidade: '', faixa: nul
 async function cpCarregar() {
   await carregarApelidos();
   try { await trRpc('rh_ff_baixa_automatica', {}); } catch (e) {}   // sem acesso a pessoal: ignora
-  const [linhas, venc, imp, motor] = await Promise.all([
+  const [linhas, venc, imp, motor, robo, partida] = await Promise.all([
     consultarTudo('vw_fin_contas_pagar?select=vencimento,dia_pagamento,conta_exibida,unidade,situacao,dias_vencida,subtipo,tipo,descricao,credito,debito,origem,id_titulo,titulo,fornecedor&order=dia_pagamento,vencimento'),
     consultarTudo('vw_fin_vencidas_status?select=vencimento,descricao,debito,data_debito_banco,achou_no_banco,aguarda_extrato').catch(() => []),
     consultarTudo('vw_fin_ultima_importacao?select=fonte,importado_em').catch(() => []),
     // 07/11/2026: a projeção do fluxo (~20 consultas) NÃO segura mais a lista. Com o servidor cheio ela passava de 30 s e a
     // tela ficava em "Carregando contas a pagar..."; agora a lista sai já, e os quadros que dependem dela entram quando ela chega
     false,
+    // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): título na fila do robô não é vencida
+    consultarTudo('vw_fin_robo_baixando?select=id_titulo,data_banco,estado').catch(() => []),
+    // 12/11/2026 (dono, Organizador 02:28): o último saldo conciliado do banco ao lado da previsão do fim de hoje
+    consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,data_partida,saldo_partida&fonte_partida=eq.EXTRATO').catch(() => []),
   ]);
+  const roboTit = {};
+  (robo || []).forEach(r => { if (r.id_titulo != null) roboTit[String(r.id_titulo)] = r; });
   const saiu = {};
   (venc || []).filter(v => v.achou_no_banco).forEach(v => { saiu[`${v.vencimento}|${Number(v.debito)}|${v.descricao || ''}`] = v.data_debito_banco; });
   // 16/10/2026 (dono): "conta que ainda aguarda o extrato aparece como 'aguardando o extrato', não
@@ -6515,7 +6550,16 @@ async function cpCarregar() {
   const aguarda = {};
   (venc || []).filter(v => v.aguarda_extrato).forEach(v => { aguarda[`${v.vencimento}|${Number(v.debito)}|${v.descricao || ''}`] = true; });
   const impSaipos = (imp || []).find(i => i.fonte === 'SAIPOS_PREV');
-  CP = { itens: cpTitulos(linhas || [], saiu, aguarda),
+  const itens = cpTitulos(linhas || [], saiu, aguarda);
+  // título com id_titulo em vw_fin_robo_baixando: sai das vencidas e fica cinza, na faixa do "aguardando conciliação"
+  itens.forEach(t => {
+    const r = t.origem === 'SAIPOS' && t.idTitulo != null ? roboTit[String(t.idTitulo)] : null;
+    if (!r || t.sentido !== 'PAGAR') return;
+    t.robo = r;
+    if (t.situacao === 'VENCIDA') t.situacao = 'AGUARDANDO EXTRATO';
+  });
+  CP = { itens,
+         partida: partida || [],
          filtros: CP ? CP.filtros : { PAGAR: cpFiltroVazio(), RECEBER: cpFiltroVazio() },
          tudo: CP ? CP.tudo : false,
          ordem: CP ? CP.ordem : { col: 'conta', dir: 1 },   // dono, 16/10/2026: por banco e, no banco, do menor valor para o maior
@@ -6565,7 +6609,7 @@ function cpTitulos(linhas, saiu, aguarda) {
       t = { vencimento: r.vencimento, situacao: r.situacao === 'AGUARDANDO CONCILIACAO' ? 'AGUARDANDO EXTRATO' : r.situacao, dias_vencida: r.dias_vencida, origem: r.origem,
             unidade: r.unidade, conta_exibida: r.conta_exibida || '', descricao: String(r.titulo || r.descricao || '').replace(/\s*\(parc\.[^)]*\)\s*$/i, ''),
             fornecedor: r.fornecedor || '', liquido: 0, partes: [], saiuTodas: true, saiuBanco: undefined, aguardaTodas: true,
-            vencTitulo: r.vencimento, diaPag: r.dia_pagamento || r.vencimento };
+            vencTitulo: r.vencimento, diaPag: r.dia_pagamento || r.vencimento, idTitulo: r.id_titulo };
       mapa.set(k, t);
     }
     if (!t.fornecedor && r.fornecedor) t.fornecedor = r.fornecedor;
@@ -6820,9 +6864,11 @@ function cpTabela(sentido) {
     const og = CP_ORIGEM[r.origem] || { rot: r.origem || '—', baixa: '—' };
     const cor = r.situacao === 'VENCIDA' ? 'var(--farol-fora)' : r.situacao === 'VENCE HOJE' ? 'var(--amber-2)' : 'inherit';
     const venc = `${r.vencTitulo && r.vencTitulo !== r.vencimento ? `vence ${ffDdmm(r.vencTitulo)} · paga em ` : ''}${ffDdmm(r.vencimento)}${r.situacao === 'VENCIDA' ? ` · ${r.dias_vencida}d` : ''}`;
-    const nota = r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="a conciliação do banco deste dia ainda não terminou (regra de 09/11)">aguardando a conciliação</span>' : '';
+    const nota = r.robo ? `<span style="color:var(--tx-3);" title="o banco já pagou no centavo; a baixa no Saipos é do robô (regra do dono, 09/11)">${r.robo.estado === 'BAIXADO_AGUARDA_CARGA' ? '✓ baixado pelo robô, some na próxima carga' : `🤖 robô baixando${r.robo.data_banco ? ` (pago no banco em ${ffDdmm(r.robo.data_banco)})` : ''}`}</span>`
+      : r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="a conciliação do banco deste dia ainda não terminou (regra de 09/11)">aguardando a conciliação</span>' : '';
     // "no Saipos" e' o caso comum: so aparece a baixa quando ela foge disso
-    const baixa = r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
+    const baixa = r.robo ? '<span style="color:var(--tx-3);">🤖 robô</span>'
+      : r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
       ? `<span style="color:var(--amber-2);" title="o débito já apareceu no extrato do banco">saiu do banco em ${ffDdmm(r.saiuBanco)} · robô dá a baixa</span>`
       : og.tela ? `<a href="javascript:void(0)" style="color:var(--tx-3);" onclick="${og.aba ? `sessionStorage.setItem('pesAbaPedida','${og.aba}');` : ''}mostrarModulo('${og.tela}')">${og.baixa} ›</a>`
       : `<span style="color:var(--tx-3);">${og.baixa}</span>`;
@@ -6892,8 +6938,16 @@ function cpHojeLimpo() {
   if (!x) return '';
   const v = x.saldo_final;
   const mil = (n) => (n < 0 ? '−' : '') + 'R$ ' + (Math.abs(n) / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' mil';
+  // 12/11/2026 (dono, Organizador 02:28: leu "saldo final" como saldo do banco): o rótulo diz que é previsão, e ao lado
+  // vem o último saldo conciliado do banco (vw_fin_saldo_partida, só partida por EXTRATO), as contas da loja somadas,
+  // com a data mais antiga entre elas. Sem a view, a linha some. O número da previsão não muda.
+  const part = (CP.partida || []).filter(p => p.fonte_partida === 'EXTRATO' && (!CP.loja || p.unidade === CP.loja));
+  const banco = part.length ? part.reduce((s, p) => s + Number(p.saldo_partida || 0), 0) : null;
+  const dataBanco = part.map(p => p.data_partida).filter(Boolean).sort()[0];
+  const linhaBanco = banco != null && dataBanco
+    ? ` · <span style="color:var(--tx-3);">banco conciliado em ${ffDdmm(dataBanco)}: ${banco < 0 ? '' : '+'}${mil(banco)}</span>` : '';
   return `<div class="contexto" style="border-color:${v < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)'}; cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado">
-    Saldo final de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b> · <b>ver no Fluxo projetado →</b></div>`;
+    Previsão para o fim de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b>${linhaBanco} · <b>ver no Fluxo projetado →</b></div>`;
 }
 
 function cpHojeAbrir(k) { CP.fxlAberto = CP.fxlAberto === k ? null : k; const a = document.getElementById('cpHojeWrap'); if (a) a.innerHTML = cpHojeLimpo(); }
@@ -8423,6 +8477,10 @@ function fxlAbrir(k) { FXL.aberto = FXL.aberto === k ? null : k; const a = docum
 
 function fxlLoja(u) { FXL.aberto = null; finPedirLoja(u); }
 
+// 12/11/2026 (livro chat-frente-financeiro/respostas/projetado-por-fornecedor-e-recebiveis, dono 22/10): como o projetado
+// é feito, uma linha no título do bloco — NF: média por fornecedor, some quando a nota entra · iFood: pelas vendas
+const FXL_COMO = { PROVISAO_NF: 'média por fornecedor, sai quando a nota entra', PROVISAO_RECEITA: 'iFood: pelas vendas' };
+
 function fxlComposicao(itens, titulo) {
   const reais = (v) => 'R$ ' + fmt(v);
   const dm = (s) => s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) : '';
@@ -8431,7 +8489,7 @@ function fxlComposicao(itens, titulo) {
   l.forEach((x) => { const g = FXL_ORIGEM[x.origem] || String(x.origem || '').toLowerCase(); (grupos[g] = grupos[g] || []).push(x); });
   const ordem = Object.keys(grupos).sort((a, b) => grupos[b].reduce((s, x) => s + x.valor, 0) - grupos[a].reduce((s, x) => s + x.valor, 0));
   return `<div class="contexto" data-fxl="1" style="text-align:left; margin:6px 0 10px;"><b>${titulo}</b> · ${l.length} ${l.length === 1 ? 'item' : 'itens'} · ${reais(l.reduce((s, x) => s + x.valor, 0))}
-    ${ordem.map((g) => `<div style="margin-top:8px; font-weight:700;">${trEscH(g)} <span style="font-weight:400; color:var(--tx-4);">· ${reais(grupos[g].reduce((s, x) => s + x.valor, 0))}</span></div>
+    ${ordem.map((g) => `<div style="margin-top:8px; font-weight:700;">${trEscH(g)} <span style="font-weight:400; color:var(--tx-4);">· ${reais(grupos[g].reduce((s, x) => s + x.valor, 0))}${FXL_COMO[grupos[g][0].origem] ? ` · ${FXL_COMO[grupos[g][0].origem]}` : ''}</span></div>
       ${grupos[g].map((x) => {
         const incerto = /EMPRESTIMO/i.test(x.subtipo || '') || /EMPRESTIMO/i.test(x.descricao || '');
         return `<div style="display:flex; justify-content:space-between; gap:12px; font-size:12.5px; padding:2px 0 2px 10px; border-bottom:1px solid var(--line);">
