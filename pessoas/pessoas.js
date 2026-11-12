@@ -1592,27 +1592,48 @@ function cgAbaFolha() {
   const E = emp.filter((x) => String(x.competencia).slice(0, 10) === comp);
   const P = pes.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
   const ok = (a, b) => Math.abs(cgN(a) - cgN(b)) < 0.01;
+  // 12/11/2026 (usabilidade 07/11, pconf): ordem nova — mês → importar (uma linha) → total a pagar e empresas → correções →
+  // tabela → só por fora → validar no fim. O cartão da empresa fica com líquido, pessoas e ✓/✗ das guias; o detalhe vai no title.
+  const guias = (x) => {
+    const r = [x.fgts_guia != null ? ok(x.fgts_folha, x.fgts_guia) : null, x.consignado_guia != null ? ok(x.consignado_folha, x.consignado_guia) : null].filter((v) => v !== null);
+    return !r.length ? '<span style="color:var(--tx-4);">guias: sem guia</span>' : r.every(Boolean) ? '<span style="color:var(--farol-ok);">guias ✓</span>' : '<span style="color:var(--farol-fora);font-weight:700;">guias ✗ não batem</span>';
+  };
+  const guiasTit = (x) => `proventos ${cgR0(x.proventos)} · FGTS folha ${cgR(x.fgts_folha)} × guia ${x.fgts_guia == null ? '—' : cgR(x.fgts_guia)} · consignado ${cgR(x.consignado_folha)} × ${x.consignado_guia == null ? '—' : cgR(x.consignado_guia)} · INSS da guia ${x.inss_guia == null ? '—' : cgR(x.inss_guia)}`;
+  const tp = cgFolhaTotalPagar(comp);
   let h = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">${cgSelPeriodo('Mês', [...comps].sort().map((c) => [c, cgMesRot(c) + ((CARGOS.folha.previa || new Set()).has(c) ? ' (prévia)' : '')]), comp,
       "(v) => { CARGOS_F.folhaComp = v; CARGOS_F.folhaCol = null; CARGOS_F.folhaAberta = null; renderModuloCargos(); }")}
       ${cgBotaoPasso('🖨 Imprimir / PDF do pagamento', `cgImprimirFolha('${comp}')`, true)}</div>
     ${cgFolhaImportarHtml()}
     ${(CARGOS.folha.previa || new Set()).has(comp)
-      ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a PRÉVIA da contabilidade.</b> Os números podem mudar quando a folha final chegar; o que está em "conferir" já vale para pedir à contabilidade.</div>`
-      : `<div class="caption-label" style="text-align:left;">A folha fechada que a contabilidade devolveu, conferida contra as guias do mês e o cadastro. Só consulta.</div>`}
-    <div class="cards">${E.map((x) => `<div class="card ${cgLista(x.conferencia).length ? 'highlight' : 'neutral'}" style="text-align:left;">
+      ? `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${cgMesRot(comp)} é a prévia da contabilidade</b> — pode mudar quando a folha final chegar.</div>` : ''}
+    <div class="cards">${tp === null ? '' : `<div class="card highlight" style="text-align:left;">
+      <div class="card-lbl">Total a pagar no mês</div>
+      <div class="card-val" style="font-size:20px;">${tp === undefined ? 'calculando…' : cgR(tp)}</div>
+      <div class="card-pct">folha + só por fora</div></div>`}
+    ${E.map((x) => `<div class="card ${cgLista(x.conferencia).length ? 'highlight' : 'neutral'}" style="text-align:left;" title="${cgEsc(guiasTit(x))}">
       <div class="card-lbl">${cgEsc(String(x.empresa).replace(/^\d+\s*-\s*/, ''))}</div>
       <div class="card-val" style="font-size:18px;">${cgR0(x.liquido)} <span style="font-size:12px;color:var(--tx-4);font-weight:600;">líquido · ${cgN(x.pessoas)} pessoas</span></div>
-      <div class="card-pct" style="line-height:1.6;">proventos ${cgR0(x.proventos)}<br>
-        FGTS folha ${cgR(x.fgts_folha)} × guia ${x.fgts_guia == null ? '—' : cgR(x.fgts_guia)} ${x.fgts_guia != null && ok(x.fgts_folha, x.fgts_guia) ? '<span style="color:var(--farol-ok);">✓</span>' : ''}<br>
-        consignado ${cgR(x.consignado_folha)} × ${x.consignado_guia == null ? '—' : cgR(x.consignado_guia)} ${x.consignado_guia != null && ok(x.consignado_folha, x.consignado_guia) ? '<span style="color:var(--farol-ok);">✓</span>' : ''}<br>
-        INSS da guia ${x.inss_guia == null ? '—' : cgR(x.inss_guia)}${x.guia_vencimento ? ` · vence ${cgData(x.guia_vencimento)}` : ''}</div>
+      <div class="card-pct">${guias(x)}${x.guia_vencimento ? ` · vence ${cgData(x.guia_vencimento)}` : ''}</div>
       ${cgLista(x.conferencia).length ? `<div style="font-size:11.5px;color:var(--farol-perto);margin-top:4px;">${cgLista(x.conferencia).map(cgEsc).join('<br>')}</div>` : ''}</div>`).join('')}</div>
-    ${cgFolhaValidacaoHtml(comp)}
     ${cgFolhaCorrecoesHtml(comp)}
     ${cgFiltroUnidade(CARGOS.pessoas)}`;
   // 05/11/2026 (dono, chat RH): "o que entra por dentro da folha até o líquido [...] e um quadro novo abaixo com o por fora"
-  h += cgFolhaQuadroDentro(comp, P) + cgFolhaQuadroFora(comp);
+  h += cgFolhaQuadroDentro(comp, P) + cgFolhaQuadroFora(comp) + cgFolhaValidacaoHtml(comp);
   return h;
+}
+// 12/11/2026: o "Total a pagar no mês" subiu para o topo — a MESMA conta que ficava embaixo do quadro "Só por fora"
+// (cgFolhaQuadroForaCols: valor_a_pagar de quem tem folha + o A pagar de cada por fora). null = não se aplica; undefined = lendo.
+function cgFolhaTotalPagar(comp) {
+  const F = CARGOS_F, Rall = CARGOS.folha.pag;
+  if (!Rall) return null;
+  const soFora = (CARGOS.folha.quadro || []).some((x) => 'valor_a_pagar' in x);
+  if (!soFora) return null;
+  const R = Rall.filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade) && x.liquido_folha == null);
+  if (!R.length) return null;
+  if (CARGOS.adtFora === undefined) cgAdtForaCarregar();
+  if (!CARGOS.adtFora) return undefined;
+  const Q = (CARGOS.folha.quadro || []).filter((x) => String(x.competencia).slice(0, 10) === comp && (!F.unidade || x.unidade === F.unidade));
+  return Q.reduce((a, x) => a + cgN(x.valor_a_pagar), 0) + R.reduce((a, x) => a + cgFfValores(cgFfDoMes(x, comp), x.bonificacao, x.valor_a_pagar).apagar, 0);
 }
 // ---- Conferência da folha em dois quadros + validação (RH 05/11/2026: 2026-11-05-rh-conferencia-dois-quadros.md e
 // 2026-11-05-rh-validar-conferencia.md). Só depois de validar o robô atualiza o Saipos e a lista de pagamento (dono, 12:47).
@@ -1643,20 +1664,20 @@ function cgFolhaCorrecoesHtml(comp) {
   const sitTxt = (x) => x.situacao === 'ENVIADO' && x.enviado_em ? `ENVIADO em ${cgData(x.enviado_em)}` : /N[ÃA]O CORRIGIDO/.test(x.situacao) && x.folha_lida_em ? `NÃO CORRIGIDO (folha relida em ${cgData(x.folha_lida_em)})` : x.situacao;
   const quem = (x) => `${x.nome ? cgEsc(cgNome(x.nome)) : 'todos'}<div style="font-size:11px;color:var(--tx-4);">${cgEsc(String(x.empresa || '').replace(/^\d+\s*-\s*/, ''))}</div>`;
   let h = '';
-  if (H.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Para a Hellen conferir antes de mandar</b> — ${H.length} ${H.length === 1 ? 'item' : 'itens'}. Não vai à contabilidade: o erro pode ser nosso.
+  if (H.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Conferir antes de mandar à contabilidade (${H.length})</b>
     <div id="tabelaCgCorrHellen" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Quem</th><th>O que aconteceu</th><th>O que fazer</th></tr></thead><tbody>
     ${H.map((x) => `<tr><td>${quem(x)}</td><td style="white-space:normal;min-width:200px;">${cgEsc(x.texto || x.item || '')}</td>
       <td style="white-space:normal;min-width:220px;font-weight:600;">${cgEsc(x.para_hellen || '')}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   if (!C.length) return h;
-  h += `<div class="contexto" style="text-align:left;border-color:${aEnviar ? 'var(--farol-perto)' : 'var(--line)'};"><b>Erros da contabilidade</b> — ${C.length} ${C.length === 1 ? 'item' : 'itens'}${aEnviar ? `, ${aEnviar} a enviar` : ''}. Quando a folha corrigida volta, a situação muda sozinha.
+  h += `<div class="contexto" style="text-align:left;border-color:${aEnviar ? 'var(--farol-perto)' : 'var(--line)'};"><b>Erros da contabilidade (${C.length}${aEnviar ? ` · ${aEnviar} a enviar` : ''})</b>
     <div id="tabelaCgCorr" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Quem</th><th>O quê</th><th>Esperado</th><th>Na folha</th><th>Situação</th></tr></thead><tbody>
     ${C.map((x) => `<tr><td>${quem(x)}</td>
       <td style="white-space:normal;min-width:220px;">${cgEsc(x.texto || x.item || '')}</td><td>${cgEsc(x.esperado == null ? '–' : x.esperado)}</td><td>${cgEsc(x.na_folha == null ? '–' : x.na_folha)}</td>
       <td><span style="font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;border:1px solid ${CG_CORR_SIT[x.situacao] || 'var(--line)'};color:${CG_CORR_SIT[x.situacao] || 'var(--tx-3)'};white-space:nowrap;">${cgEsc(sitTxt(x))}</span></td></tr>`).join('')}
     </tbody></table></div>`;
   const M = T[0];
-  if (M && M.texto) h += `<div style="margin-top:10px;"><b style="font-size:12.5px;">Mensagem para a contabilidade</b> (uma só, por empresa; só o que falta corrigir)</div>
+  if (M && M.texto) h += `<div style="margin-top:10px;"><b style="font-size:12.5px;">Mensagem para a contabilidade</b> (só o que falta corrigir)</div>
     <div style="margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
       <pre id="cgCorrTxt0" style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;margin:0 0 8px;">${cgEsc(M.texto)}</pre>
       ${cgBotaoPasso('Copiar mensagem', 'cgFolhaCorrCopiar(0)', true)} ${cgBotaoPasso('Marquei como enviado', `cgFolhaCorrEnviada('${comp}',null)`, true)}</div>`;
@@ -1680,18 +1701,18 @@ async function cgFolhaCorrEnviada(comp, emp) {
 function cgFolhaImportarHtml() {
   if (CARGOS.folhaImp === undefined) { CARGOS.folhaImp = null; cgFolhaImpCarregar(); }
   const L = (CARGOS.folhaImp || []).slice(0, 4);
-  const linha = (x) => {
-    const q = String(x.quem || '').split('@')[0], em = x.enviado_em ? new Date(x.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') : '';
-    const st = x.situacao === 'LENDO' ? `<span style="color:var(--farol-perto);font-weight:700;">⏳ ${x.resultado ? cgEsc(x.resultado) : 'lendo (até 5 min)'}</span>`
-      : x.situacao === 'LIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ ${cgEsc(x.resultado || 'lida e gravada')}</span>`
-      : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgEsc(x.resultado || 'não lida')}</span> — confira se é o Extrato Mensal da Folha e envie de novo`;
-    return `<div style="font-size:12.5px;margin-top:4px;">${cgEsc(x.nome || '')} <span style="color:var(--tx-4);">· ${cgEsc(q)} ${em}</span> — ${st}</div>`;
-  };
-  return `<div class="contexto" style="text-align:left;margin-bottom:10px;">
-    <label class="preset-btn" style="cursor:pointer;display:inline-block;">📄 Importar folha da contabilidade (PDF)
+  const em = (x) => x.enviado_em ? new Date(x.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') : '';
+  const st = (x) => x.situacao === 'LENDO' ? `<span style="color:var(--farol-perto);font-weight:700;">⏳ ${x.resultado ? cgEsc(x.resultado) : 'lendo (até 5 min)'}</span>`
+    : x.situacao === 'LIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ ${cgEsc(x.resultado || 'lida e gravada')}</span>`
+    : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgEsc(x.resultado || 'não lida')}</span> — confira se é o Extrato Mensal da Folha e envie de novo`;
+  const linha = (x) => `<div style="font-size:12.5px;margin-top:4px;">${cgEsc(x.nome || '')} <span style="color:var(--tx-4);">· ${cgEsc(String(x.quem || '').split('@')[0])} ${em(x)}</span> — ${st(x)}</div>`;
+  // 12/11/2026 (usabilidade pconf): uma linha só — o botão e a última importação; as 4 últimas ficam no histórico recolhido
+  const u = L[0];
+  return `<div class="contexto" style="text-align:left;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+    <label class="preset-btn" style="cursor:pointer;display:inline-block;" title="o robô lê em até 5 min e a conferência atualiza sozinha">📄 Importar folha da contabilidade (PDF)
       <input type="file" accept=".pdf,application/pdf" multiple style="display:none;" onchange="cgFolhaImportar(this)"></label>
-    <span class="caption-label" style="margin-left:8px;">o robô lê em até 5 min e a conferência atualiza sozinha</span>
-    ${L.map(linha).join('')}</div>`;
+    ${u ? `<span style="font-size:12.5px;">última: ${st(u)} <span style="color:var(--tx-4);">${em(u)}</span></span>` : ''}
+    ${L.length ? `<details style="flex-basis:100%;"><summary style="cursor:pointer;font-size:12px;color:var(--tx-3);">histórico das importações (${L.length})</summary>${L.map(linha).join('')}</details>` : ''}</div>`;
 }
 async function cgFolhaImpCarregar() {
   try { const r = await trFetch('vw_rh_folha_importacao?select=id,nome,quem,enviado_em,atendido_em,ok,resultado,situacao&order=enviado_em.desc,id.desc&limit=4');
@@ -1727,14 +1748,13 @@ async function cgFolhaImportar(inp) {
 }
 function cgFolhaValidacaoHtml(comp) {
   const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
-  if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
+  if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);margin-top:14px;"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
     ${v.obs ? `<span style="color:var(--tx-3);">${cgEsc(v.obs)}</span>` : ''} O robô já pode atualizar o Saipos e a lista de pagamento.
     <a href="javascript:void(0)" onclick="if(confirm('Desfazer a validação de ${cgEsc(cgMesRot(comp))}? O robô para de atualizar o Saipos e a lista de pagamento até validar de novo.'))cgFolhaValidar('${comp}',false)" style="color:var(--tx-4);margin-left:6px;">desfazer</a></div>`;
-  return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b>Conferência de ${cgEsc(cgMesRot(comp))} ainda não validada.</b>
-    Depois de validar, o robô atualiza o Saipos (salários e bonificação) e a lista de pagamento.
+  return `<div class="contexto" style="text-align:left;border-color:var(--farol-perto);margin-top:14px;"><b>Conferência de ${cgEsc(cgMesRot(comp))} ainda não validada.</b>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
       <input id="cgFolhaObs" type="text" placeholder="observação (opcional)" style="flex:1 1 220px;padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;">
-      ${cgBotaoPasso('Validar conferência', `cgFolhaValidar('${comp}',true)`)}</div></div>`;
+      ${cgBotaoPasso('Validar e liberar o robô (Saipos e lista de pagamento)', `cgFolhaValidar('${comp}',true)`)}</div></div>`;
 }
 async function cgFolhaValidar(comp, sim) {
   const el = document.getElementById('cgFolhaObs'), obs = sim && el ? el.value.trim() || null : null;
@@ -1776,8 +1796,9 @@ function cgFolhaQuadroDentro(comp, Pconf) {
   const comFora = Q.some((x) => 'valor_a_pagar' in x);
   const ncol = PV.length + DS.length + 5 + (comFora ? 4 : 0) + (temHB ? 1 : 0);
   const foraTot = (arr) => comFora ? `<td>${cgR(soma(arr, 'acrescimo_combinado'))}</td><td>− ${cgR(soma(arr, 'desconto_emprestimo'))}</td><td>${cgR(soma(arr, 'bonificacao'))}</td><td>${cgR(soma(arr, 'valor_a_pagar'))}</td>` : '';
-  const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td>${temHB ? '<td></td>' : ''}${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
-    ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td>${foraTot(arr)}<td></td></tr>`;
+  // 12/11/2026 (usabilidade pconf): a coluna Conferir veio para logo depois do Nome, para o aviso ficar à vista sem rolar
+  const linhaTot = (rot, arr, cls) => `<tr class="${cls}"><td>${rot}</td><td></td>${temHB ? '<td></td>' : ''}${PV.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'proventos'))}</td>
+    ${DS.map(([k]) => `<td>${cgR(soma(arr, k))}</td>`).join('')}<td>${cgR(soma(arr, 'descontos'))}</td><td>${cgR(soma(arr, 'liquido'))}</td>${foraTot(arr)}</tr>`;
   const socio = (x) => x.vinculo && /diretor/i.test(x.vinculo), saiu = (x) => /demiti|rescis|deslig/i.test(String(x.situacao || ''));
   const foraCel = (x) => {
     if (!comFora) return '';
@@ -1792,7 +1813,7 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       ? `<button type="button" class="preset-btn ${F.folhaCol === 'conf' ? 'active' : ''}" style="border-color:var(--farol-perto);" onclick="CARGOS_F.folhaCol=CARGOS_F.folhaCol==='conf'?null:'conf';renderModuloCargos()" title="filtra a tabela: só as pessoas com algum aviso na coluna Conferir">${F.folhaCol === 'conf' ? `mostrando só as ${nConf} com aviso ✕` : `mostrar só as ${nConf} pessoas com aviso em "Conferir"`}</button>`
       : '<span style="font-size:12px;color:var(--farol-ok);">✓ todas as rubricas entraram e cada pessoa fecha com o extrato</span>'}</div>
     <div id="tabelaCgFolha" style="overflow-x:auto;"><table><thead>
-      <tr><th rowspan="2">Nome</th>${temHB ? '<th rowspan="2" title="horas normais + férias/afastamento na folha, contra a carga do contrato">Horas base</th>' : ''}<th colspan="${PV.length + 1}" style="text-align:center;cursor:pointer;" title="${G.prov ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('prov')">${G.prov ? '⊟' : '⊞'} Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;cursor:pointer;" title="${G.desc ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('desc')">${G.desc ? '⊟' : '⊞'} Descontos</th><th rowspan="2">Líquido CLT</th>${comFora ? '<th colspan="4" style="text-align:center;">Depois do líquido</th>' : ''}<th rowspan="2">Conferir</th></tr>
+      <tr><th rowspan="2">Nome</th><th rowspan="2">Conferir</th>${temHB ? '<th rowspan="2" title="horas normais + férias/afastamento na folha, contra a carga do contrato">Horas base</th>' : ''}<th colspan="${PV.length + 1}" style="text-align:center;cursor:pointer;" title="${G.prov ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('prov')">${G.prov ? '⊟' : '⊞'} Proventos</th><th colspan="${DS.length + 1}" style="text-align:center;cursor:pointer;" title="${G.desc ? 'fechar' : 'abrir'} o bloco" onclick="cgFolhaGrupoTroca('desc')">${G.desc ? '⊟' : '⊞'} Descontos</th><th rowspan="2">Líquido CLT</th>${comFora ? '<th colspan="4" style="text-align:center;">Depois do líquido</th>' : ''}</tr>
       <tr>${PV.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.prov ? 'Total' : 'Proventos'}</th>${DS.map(([, r]) => `<th>${r}</th>`).join('')}<th>${G.desc ? 'Total' : 'Descontos'}</th>${comFora ? '<th>Combinado</th><th>Empréstimo / vale</th><th>Bonificação</th><th>A pagar</th>' : ''}</tr></thead><tbody>`;
   const emps = [...new Set(vis.map((x) => x.empresa))];
   emps.forEach((e) => {
@@ -1802,11 +1823,11 @@ function cgFolhaQuadroDentro(comp, Pconf) {
       const k = `${x.empresa}|${x.matricula}`, ab = F.folhaAberta === k, al = alertas(x);
       const sit = String(x.situacao || '').toLowerCase();
       h += `<tr style="cursor:pointer;" onclick='cgFolhaAbrir(${cgEsc(JSON.stringify(k))})'>
-        <td>${cgEsc(cgNome(x.nome || x.apelido))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>${hbCel(x)}
+        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(x.nome || x.apelido))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(x.unidade || '')}${sit && sit !== 'trabalhando' ? ' · ' + cgEsc(sit) : ''}${x.vinculo && /diretor/i.test(x.vinculo) ? ' · sócio' : ''}</span></td>
+        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;"${x.saipos_salario != null ? ` title="título de salário no Saipos: ${cgR(x.saipos_salario)}"` : ''}>${al.map(cgEsc).join('<br>')}</td>${hbCel(x)}
         ${PV.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.proventos)}</td>
         ${DS.map(([kk]) => `<td>${v0(x[kk])}</td>`).join('')}<td style="font-weight:600;">${cgR(x.descontos)}</td>
-        <td style="font-weight:700;">${cgR(x.liquido)}</td>${foraCel(x)}
-        <td style="font-size:11.5px;color:var(--farol-perto);white-space:normal;min-width:160px;"${x.saipos_salario != null ? ` title="título de salário no Saipos: ${cgR(x.saipos_salario)}"` : ''}>${al.map(cgEsc).join('<br>')}</td></tr>
+        <td style="font-weight:700;">${cgR(x.liquido)}</td>${foraCel(x)}</tr>
         ${ab ? `<tr><td colspan="${ncol}">${cgFolhaRubHtml(x)}</td></tr>` : ''}`;
     });
     h += linhaTot(`Subtotal ${cgEsc(String(e).replace(/^\d+\s*-\s*/, ''))}`, lin, 'sub');
@@ -1886,8 +1907,8 @@ function cgFolhaQuadroForaCols(comp, R) {
     });
     h += `<tr class="sub"><td>Subtotal ${cgEsc(e)}</td>${cgFfTotais(G.map((l) => l.V))}<td></td></tr>`;
   });
-  return h + `</tbody><tfoot><tr class="liq"><td>Total · ${L.length} ${L.length === 1 ? 'pessoa' : 'pessoas'}</td>${cgFfTotais(L.map((l) => l.V))}<td></td></tr></tfoot></table></div>
-    <div class="contexto" style="text-align:left;margin-top:10px;"><b>Total a pagar no mês: ${cgR(totPagina)}</b> <span style="color:var(--tx-3);">(a tabela de cima + só por fora)</span></div>`;
+  // 12/11/2026: o "Total a pagar no mês" (totPagina) subiu para o cartão do topo da tela (cgFolhaTotalPagar)
+  return h + `</tbody><tfoot><tr class="liq"><td>Total · ${L.length} ${L.length === 1 ? 'pessoa' : 'pessoas'}</td>${cgFfTotais(L.map((l) => l.V))}<td></td></tr></tfoot></table></div>`;
 }
 // Cálculos da folha › Cálculos por fora (05/11/2026, dono 19:52): o histórico mês a mês de quem é por fora, só leitura
 function cgAbaFfCalc() {
@@ -1995,9 +2016,9 @@ function cgFolhaRubHtml(x) {
   const kk = String(x.competencia).slice(0, 10) + '|' + x.empresa + '|' + x.matricula, R = CARGOS.folha.rub[kk];
   if (!R) return '<span style="color:var(--tx-4);">Lendo as rubricas…</span>';
   if (R.erro) return `Não consegui ler: ${cgEsc(R.erro)}`;
-  return `<div id="tabelaCgFolhaRub" style="overflow-x:auto;max-width:680px;"><table><thead><tr><th>Rubrica</th><th style="text-align:right;">Referência</th><th style="text-align:right;">Provento</th><th style="text-align:right;">Desconto</th></tr></thead><tbody>
-    ${R.map((r) => `<tr><td>${cgEsc(r.codigo)} · ${cgEsc(r.rubrica)}</td><td style="text-align:right;color:var(--tx-4);">${cgEsc(r.referencia || '')}</td>
-      <td style="text-align:right;color:var(--farol-ok);">${r.tipo === 'P' ? cgR(r.valor) : ''}</td><td style="text-align:right;color:var(--tx-3);">${r.tipo === 'D' ? cgR(r.valor) : ''}</td></tr>`).join('')}
+  return `<div id="tabelaCgFolhaRub" style="overflow-x:auto;max-width:680px;"><table><thead><tr><th>Rubrica</th><th>Referência</th><th>Provento</th><th>Desconto</th></tr></thead><tbody>
+    ${R.map((r) => `<tr><td>${cgEsc(r.codigo)} · ${cgEsc(r.rubrica)}</td><td style="color:var(--tx-4);">${cgEsc(r.referencia || '')}</td>
+      <td style="color:var(--farol-ok);">${r.tipo === 'P' ? cgR(r.valor) : ''}</td><td style="color:var(--tx-3);">${r.tipo === 'D' ? cgR(r.valor) : ''}</td></tr>`).join('')}
     </tbody><tfoot><tr class="sub"><td colspan="4">Proventos ${cgR(x.proventos)} · descontos ${cgR(x.descontos)} · <b>líquido ${cgR(x.liquido)}</b></td></tr></tfoot></table></div>`;
 }
 
@@ -2148,13 +2169,18 @@ function cgAbaEnvio() {
   const conf = (CARGOS.envio.conf || []).find((x) => String(x.competencia).slice(0, 10) === comp);
   // Dias das faltas ✓ quando toda pessoa com falta (0040) no arquivo da Flash tem a linha DSR (RH 05/11)
   const PT = cgEnvioPessoas(M), fComF = PT.filter((p) => p.falta).length, fPend = PT.filter((p) => p.falta && !p.dsr).length;
-  let h = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;">${comps.slice(0, 6).reverse().map((c) =>
-      `<button type="button" class="preset-btn ${c === comp ? 'active' : ''}" onclick="CARGOS_F.envioComp='${c}';CARGOS_F.envioEmp=null;CARGOS_F.envioAberta=null;renderModuloCargos()">${cgMesRot(c)}</button>`).join('')}</div>
+  // 12/11/2026 (usabilidade penvio): o mês na lista suspensa, como nas outras telas de Pessoas; "Marcar como conferido" desceu
+  // para o fim, depois das duas tabelas que se conferem
+  const empNome = new Map();
+  (CARGOS.envio.prev || []).concat(CARGOS.pessoas || []).forEach((x) => { const m = /^(\d+)\s*-\s*(.+)$/.exec(String(x.empresa || '')); if (m && !empNome.has(m[1])) empNome.set(m[1], m[2]); });
+  const empRot = (e) => empNome.has(String(e)) ? `${cgEsc(empNome.get(String(e)))} (${cgEsc(e)})` : `Empresa ${cgEsc(e)}`;
+  let h = `${cgSelPeriodo('Mês', [...comps].sort().map((c) => [c, cgMesRot(c)]), comp,
+      "(v) => { CARGOS_F.envioComp = v; CARGOS_F.envioEmp = null; CARGOS_F.envioAberta = null; renderModuloCargos(); }")}
     <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
     ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
                 ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')],
-                [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, !fPend && (fComF > 0 || empsFlash.size > 0)], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-4px 0 12px;">${conf
+                [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, !fPend && (fComF > 0 || empsFlash.size > 0)], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}`;
+  const botaoConferido = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 12px;">${conf
       ? `<span style="font-size:12.5px;color:var(--farol-ok);">✓ Conferido — pode enviar à contabilidade.</span> ${cgBotaoPasso('Desfazer a conferência', `cgEnvioConferir('${comp}',false)`, true)}`
       : cgBotaoPasso('Marcar como conferido', `cgEnvioConferir('${comp}',true)`)}</div>`;
   // um cartão por empresa: clicar filtra a tabela
@@ -2163,7 +2189,7 @@ function cgAbaEnvio() {
       const us = [...new Set(L.map((x) => x.unidade).filter(Boolean))].join(' · ');
       const soma = (k) => P.reduce((a, p) => a + (p[k] || 0), 0);
       return `<div class="card ${ativo ? 'highlight' : 'neutral'}" style="text-align:left;cursor:pointer;" onclick="CARGOS_F.envioEmp=CARGOS_F.envioEmp==='${cgEsc(e)}'?null:'${cgEsc(e)}';CARGOS_F.envioAberta=null;renderModuloCargos()">
-        <div class="card-lbl">Empresa ${cgEsc(e)}${us ? ' · ' + cgEsc(us) : ''}${ativo ? ' ✕' : ''}</div>
+        <div class="card-lbl">${empRot(e)}${us ? ' · ' + cgEsc(us) : ''}${ativo ? ' ✕' : ''}</div>
         <div class="card-val" style="font-size:18px;">${P.length} <span style="font-size:12px;color:var(--tx-4);font-weight:600;">${P.length === 1 ? 'pessoa' : 'pessoas'} · ${L.length} lançamentos</span></div>
         <div class="card-pct" style="line-height:1.6;">horas extras ${cgEnvHM(soma('he100') + soma('he70')) || '–'} · faltas ${cgEnvHM(soma('falta') + soma('atraso')) || '–'}<br>
           gratificações ${cgR0(soma('grat'))} · VT ${P.some((p) => p.vtPct) ? P.filter((p) => p.vt).length + ' com desconto' : cgR0(soma('vt'))} · adiantamento ${cgR0(soma('adt'))}</div></div>`; }).join('')}</div>`;
@@ -2190,28 +2216,31 @@ function cgAbaEnvio() {
   const tabela = (id, ks) => {
     const C = CG_ENV_COLS.filter(([k]) => ks.includes(k)), Q = P.filter((p) => ks.some((k) => p[k]));
     if (!Q.length) return '<div class="contexto">Nada neste mês.</div>';
-    return `<div id="${id}" style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Empresa · matr.</th>${C.map(([, r]) => `<th>${r}</th>`).join('')}</tr></thead><tbody>
+    // 12/11/2026 (usabilidade penvio): "Empresa · matr." foi para a última coluna (é de conferência, não de leitura); ▸ no nome
+    return `<div id="${id}" style="overflow-x:auto;"><table><thead><tr><th>Nome</th>${C.map(([, r]) => `<th>${r}</th>`).join('')}<th>Empresa · matr.</th></tr></thead><tbody>
     ${Q.map((p) => { const ab = F.envioAberta === id + p.k;
       return `<tr style="cursor:pointer;" onclick='CARGOS_F.envioAberta=CARGOS_F.envioAberta===${cgEsc(JSON.stringify(id + p.k))}?null:${cgEsc(JSON.stringify(id + p.k))};renderModuloCargos()'>
-        <td>${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
-        <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td>
+        <td>${ab ? '▾' : '▸'} ${cgEsc(cgNome(p.nome))} <span style="font-size:11px;color:var(--tx-5);">${cgEsc(p.unidade || '')}</span>${p.fora ? ' <span style="font-size:11px;color:var(--farol-perto);">fora do cadastro</span>' : ''}</td>
         ${C.map(([k]) => `<td${k === 'adt' && adtDifK.has(p.k) ? ' style="color:var(--farol-perto);font-weight:700;" title="não bate com a folha da contabilidade"'
-          : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k], p.vtPct)}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}</tr>
+          : k === 'dsr' && p.dsrOrigem ? ` title="${cgEsc(p.dsrOrigem)}"` : k === 'falta' && p.falta && !p.dsr ? ' style="color:var(--farol-perto);" title="falta sem a linha de dias para o DSR"' : ''}>${cgEnvVal(k, p[k], p.vtPct)}${k === 'dsr' && p.dsrOrigem ? `<div style="font-size:11px;color:var(--tx-4);white-space:normal;">${cgEsc(String(p.dsrOrigem).replace(/^.*?:\s*/, ''))}</div>` : ''}</td>`).join('')}
+        <td style="color:var(--tx-4);">${cgEsc(p.empresa)} · ${cgEsc(p.matricula)}</td></tr>
         ${ab ? `<tr><td colspan="${C.length + 2}">${cgEnvioLinhasHtml({ ...p, lin: p.lin.filter((x) => { const c = CG_ENV_COLS.find(([, , f]) => f(x)); return c && ks.includes(c[0]); }) })}</td></tr>` : ''}`; }).join('')}
-    </tbody><tfoot><tr class="sub"><td colspan="2">${Q.length} ${Q.length === 1 ? 'pessoa' : 'pessoas'}</td>
+    </tbody><tfoot><tr class="sub"><td>${Q.length} ${Q.length === 1 ? 'pessoa' : 'pessoas'}</td>
       ${C.map(([k]) => { const pct = k === 'vt' && Q.some((p) => p.vtPct), n = Q.filter((p) => p[k]).length;
-        return `<td>${pct ? `${n} ${n === 1 ? 'pessoa' : 'pessoas'}` : cgEnvVal(k, Q.reduce((a, p) => a + (p[k] || 0), 0))}</td>`; }).join('')}</tr></tfoot></table></div>`;
+        return `<td>${pct ? `${n} ${n === 1 ? 'pessoa' : 'pessoas'}` : cgEnvVal(k, Q.reduce((a, p) => a + (p[k] || 0), 0))}</td>`; }).join('')}<td></td></tr></tfoot></table></div>`;
   };
   h += avisos + `<div class="section-label" style="margin-top:14px;">1 · Arquivo da Flash — baixar na Flash</div>
-    <div class="caption-label" style="text-align:left;line-height:1.7;">Flash › Controle de jornada › Integrações › Domínio › <b>Exportar arquivo</b> › código da empresa (945 / 944 / 413) › Período fechado (mês/ano) ›
+    <details class="caption-label" style="text-align:left;line-height:1.7;"><summary style="cursor:pointer;">Baixe na Flash: Controle de jornada › Integrações › Domínio › Exportar arquivo <span style="color:var(--tx-4);">(passo a passo)</span></summary>
+      Flash › Controle de jornada › Integrações › Domínio › <b>Exportar arquivo</b> › código da empresa (945 / 944 / 413) › Período fechado (mês/ano) ›
       conjunto "Exportação para contabilidade" › Selecionar pessoas: <b>só os registrados da empresa que batem ponto</b>${comp >= '2026-11-01' ? ' › "Exportar apenas funcionários com espelho de ponto FECHADO" = <b>Sim</b>' : ''}.
-      Cidadão AV (350) não tem arquivo. O txt baixado é o que vale: a Conferência da folha compara com ele.</div>
+      Cidadão AV (350) não tem arquivo. O txt baixado é o que vale: a Conferência da folha compara com ele.</details>
     ${tabela('tabelaCgEnvioFlash', CG_ENV_FLASH)}
     <div class="section-label" style="margin-top:18px;">2 · Arquivo do painel — enviar à contabilidade</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
       ${cgBotaoPasso('Gerar arquivo para a contabilidade (.xlsx)', 'cgEnvioXlsx()')}
-      <span class="caption-label" style="margin:0;">uma aba por empresa: matrícula, nome, rubrica, descrição e valor, com o total por rubrica</span></div>
-    ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}`;
+      <span class="caption-label" style="margin:0;">uma aba por empresa, com o total por rubrica</span></div>
+    ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}
+    ${botaoConferido}`;
   return h;
 }
 function cgEnvioLinhasHtml(p) {
@@ -3346,15 +3375,15 @@ function cgAbaSaipos() {
       <div class="card neutral"><div class="card-lbl">Esperando fechar</div><div class="card-val">${n('PARE', 'NAO_FECHADO')}</div><div class="card-pct">VT e VA do mês seguinte</div></div>
     </div>
     <div id="tabelaCgSaipos" style="overflow-x:auto;"><table>
-      <thead><tr><th>Vence</th><th>O quê</th><th>Loja</th><th>Quem</th><th style="text-align:right;">No painel</th><th style="text-align:right;">No Saipos</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Vence</th><th>O quê</th><th>Loja</th><th>Quem</th><th>No painel</th><th>No Saipos</th><th>Situação</th></tr></thead>
       <tbody>${ord.map(s => `<tr>
         <td>${cgData(s.vencimento)}</td><td>${cgEsc(rot[s.tipo] || s.tipo)}</td><td>${cgEsc(s.unidade_pagadora)}</td><td>${cgEsc(cgNome(s.quem))}</td>
-        <td style="text-align:right;">${cgR(s.valor_painel)}</td><td style="text-align:right;color:var(--tx-4);">${s.valor_saipos != null ? cgR(s.valor_saipos) : '–'}</td>
-        <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? (junto.has(s)
+        <td>${cgR(s.valor_painel)}</td><td style="color:var(--tx-4);">${s.valor_saipos != null ? cgR(s.valor_saipos) : '–'}</td>
+        <td style="font-size:12px;white-space:normal;">${s.acao === 'PARE' ? `<span style="color:var(--farol-perto);">${cgEsc(CG_SAIPOS_MOTIVO[s.motivo_codigo] || s.motivo || 'parado')}</span>` : s.acao === 'ABRIR' ? 'o robô abre' : s.acao === 'ALTERAR' ? 'o robô troca o valor' : cgEsc(CG_SAIPOS_ACAO[s.acao] || s.acao)}${cgSaiposExcluir(s) ? (junto.has(s)
           ? `<div style="margin-top:3px;color:var(--tx-3);">sai junto com a de ${cgData(junto.get(s).vencimento)} (mesma recorrência)</div>`
           : `<div style="margin-top:3px;color:var(--tx-2);" title="título ${cgEsc(s.id_titulo || '')}">No Saipos: <b>${cgEsc(cgSaiposAchar(s))}</b>${temMais.has(s) ? ` — excluir "este e os próximos"` : ''}</div>`) : ''}</td></tr>`).join('')}</tbody>
     </table></div>
-    <div class="contexto" style="margin-top:8px;">É a fila que o robô do contas a pagar lê: ele troca valores e abre provisão; excluir é só da Hellen, e o robô avisa no aviso do dia.${nCerto ? ` ${nCerto} lançamentos já estão certos.` : ''} O Saipos mostra a troca na hora, a carga do painel só umas 2 horas depois.</div>`;
+    <div class="caption-label" style="text-align:left;margin-top:8px;">${nCerto ? `${nCerto} lançamentos já certos · ` : ''}o painel mostra a troca do Saipos umas 2 h depois.</div>`;
 }
 
 // ---------- CORREÇÕES NA FLASH (também a tela 'flash', da Arissa) ----------

@@ -198,9 +198,8 @@ function renderModuloRateio() {
   const precoBloco = temPreco ? `
     <div class="section-label">Preço alvo · ${nome[RATEIO_CANAL] || RATEIO_CANAL} — comissão cheia, pró-labore pago e o lucro que você escolher</div>
     <div class="contexto">Lucro final desejado: ${[0.05, 0.10, 0.15, 0.20].map(pill).join(' ')} &nbsp;·&nbsp; com ${pctM}%, o preço alvo neste canal é o <b>custo da ficha × ~${mult || '—'}</b>.
-      ${plPct > 0.0005 ? `O <b>pró-labore da própria loja (${pc(plPct)} da venda) já está dentro da conta</b> — o lucro mostrado é depois de pagar os sócios.` : '<b>Esta loja não tem pró-labore local</b> — a linha é zero e o lucro mostrado já é o final.'}
-      <b>Clique num produto para abrir a conta dele</b>, linha a linha, no preço de hoje.
-      Lucro abaixo de ${pctM}% fica âmbar; negativo, vermelho. Passe o mouse em <b>preço atual</b> e em <b>ganho 30d no alvo</b>, no cabeçalho da tabela, para ver como cada um é calculado.</div>
+      ${plPct > 0.0005 ? `Pró-labore da loja (${pc(plPct)}) já descontado.` : 'Sem pró-labore local.'}
+      <b>Clique num produto para abrir a conta dele.</b> Lucro abaixo de ${pctM}% âmbar; negativo, vermelho.</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0 6px;">
       <span style="font-size:12px; color:var(--tx-3);">ordenar:</span>
       <select onchange="rateioOrdem(this.value)" style="font:inherit; font-size:12.5px; background:#111110; color:#fff; border:1px solid #34332f; border-radius:6px; padding:3px 6px;">
@@ -216,7 +215,7 @@ function renderModuloRateio() {
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Preço alvo por produto · ${mesNome(de)} a ${mesNome(ate)}</div>
     ${rateioBarraUnidades()}
-    <div class="contexto">Aqui é <b>preço</b>: o custo de operar cada canal vira um <b>markup</b> sobre o custo da ficha, e o markup × CMV dá o preço alvo de cada produto. Os cartões mostram quanto de cada R$ 100 vendidos vai para operar o canal — <b>sem a matéria-prima</b> (ela entra pela ficha) — na leitura <b>cheia</b> (comissão de 9,5% do iFood que o benefício zera até dez/26–jan/27; é por ela que se precifica). Clique no canal para ver o preço alvo dele. Para ler <b>venda</b> por canal, faixa de horário e dia, use a <b>Evolução de vendas</b> aqui do menu.${canais.some(c => porCanal[c].provisorio) ? ' <span style="color:var(--tx-3);">Parte da folha ainda cai na proporção geral (nomes sem setor).</span>' : ''}</div>
+    <div class="contexto" title="O custo de operar cada canal vira um markup sobre o custo da ficha; a matéria-prima entra pela ficha. Leitura cheia: comissão de 9,5% do iFood, que o benefício zera até dez/26–jan/27 — é por ela que se precifica. Venda por canal, horário e dia: Evolução de vendas.">Cartões: de cada R$ 100 vendidos, quanto vai para operar o canal (comissão cheia). Clique no canal.${canais.some(c => porCanal[c].provisorio) ? ' <span style="color:var(--tx-3);">Parte da folha ainda cai na proporção geral (nomes sem setor).</span>' : ''}</div>
     ${(RATEIO.semCriterio || []).length ? `<div class="contexto" style="border-color:#c8102e;"><b>Conta nova sem critério de rateio</b> — está caindo em "por vendas" sem ninguém ter decidido: ${RATEIO.semCriterio.map(r => `${String(r.subtipo).toLowerCase()} (${reais(r.valor_3m)} em 3 meses)`).join(' · ')}. Decidir em rateio_criterios.</div>` : ''}
     <div class="cards">${cards}</div>
     ${precoBloco}`;
@@ -546,13 +545,7 @@ function renderModuloEngcard() {
 
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Engenharia de cardápio — Água Verde</div>
-    <div class="caption-label" style="text-align:center;">
-      O que vende muito × o que sobra muito, produto a produto da base, nos últimos ${ENGCARD_DIAS} dias.
-      Corte pela média da casa: <b>${Math.round(unMedio).toLocaleString('pt-BR')} unidades</b> por item e
-      <b>R$ ${fmt(mgUnMedio)}</b> de margem por unidade.
-      <br><b style="color:#f6c63e;">Margem aqui é preço menos o custo dos ingredientes.</b>
-      Não é lucro: falta comissão do iFood, taxa de cartão, embalagem, gente e ponto.
-      Serve para comparar itens entre si, não para dizer quanto sobra no caixa.</div>
+    <div class="caption-label" style="text-align:center;">Corte pela média: <b>${Math.round(unMedio).toLocaleString('pt-BR')} un.</b> por item e <b>R$ ${fmt(mgUnMedio)}</b> de sobra sobre ingrediente por unidade.</div>
     <div style="text-align:center; margin:10px 0;">
       ${[30, 60, 90].map(d => `<button class="preset-btn ${ENGCARD_DIAS === d ? 'active' : ''}"
         onclick="engcardPeriodo(${d})">${d} dias</button>`).join(' ')}
@@ -561,12 +554,12 @@ function renderModuloEngcard() {
     <div class="caption-label" style="text-align:center;">
       ${ENGCARD_GRUPO ? 'Mostrando só <b>' + GRUPOS[ENGCARD_GRUPO].nome + '</b>, '
                       + (piorPrimeiro ? 'do que menos sobra por unidade para o que mais sobra'
-                                      : 'da maior margem total para a menor')
+                                      : 'da maior sobra total para a menor')
                       + '. <button class="preset-btn" onclick="engcardGrupo(null)">ver todos</button>'
                       : 'Clique num grupo para filtrar a tabela.'}</div>
     <div id="tabelaEngcard"><table>
       <thead><tr><th>Item</th><th>Grupo</th><th>Unidades</th><th>Preço médio</th>
-        <th>Receita</th><th>Margem por unidade</th><th>Margem total</th><th>% da receita</th></tr></thead>
+        <th>Receita</th><th title="preço menos o custo dos ingredientes; não é lucro">Sobra sobre ingrediente (un.)</th><th>Sobra sobre ingrediente (total)</th><th>% da receita</th></tr></thead>
       <tbody>${linhas}</tbody></table></div>
     ${lista.length > 200 ? '<div class="caption-label">Mostrando os 200 maiores de ' + lista.length + '.</div>' : ''}
     ${foraBase.length ? `<div class="section-label">Fora da base · ${foraBase.length} nomes do caixa · R$ ${fmt(foraBase.reduce((s,a) => s + a.rec, 0))}</div>
@@ -578,10 +571,7 @@ function renderModuloEngcard() {
     ${blocoAdicionais()}
     ${blocoEstrutura()}
     ${cortesia.length ? `<div class="contexto" style="text-align:left; margin-top:14px;">
-      <b>Fora da conta:</b> ${cortesia.length} itens saíram com preço zero
-      (${unCortesia.toLocaleString('pt-BR')} unidades, <b>R$ ${fmt(custoCortesia)}</b> de ingrediente) — cortesia,
-      consumo de funcionário e motoboy. Não entram na engenharia porque não têm preço,
-      mas o custo existe.</div>` : ''}`;
+      <b>Fora da conta (preço zero):</b> ${cortesia.length} itens, ${unCortesia.toLocaleString('pt-BR')} unidades, <b>R$ ${fmt(custoCortesia)}</b> de ingrediente — cortesia, funcionário e motoboy.</div>` : ''}`;
 }
 
 // ============ FICHAS TÉCNICAS ============
@@ -984,7 +974,7 @@ function renderModuloFichas() {
       <div class="section-label">${esc(nome)}</div>
       ${avisoFora}
       <div class="caption-label" style="text-align:center;">
-        Composição igual à Base FT da planilha. Clique num ingrediente para ver de onde vem o custo dele.
+        Clique num ingrediente para ver de onde vem o custo dele.
         ${nu(vendas) ? nu(vendas) + ' nome' + (nu(vendas) > 1 ? 's' : '') + ' de venda apontam para esta ficha.'
                      : '<b>Nenhum nome de venda aponta para esta ficha</b> — ela não entra no CMV hoje.'}</div>
       <div id="tabelaFichaGrade"><table>
@@ -999,16 +989,14 @@ function renderModuloFichas() {
         <div style="margin-top:10px;">
           <button class="preset-btn" onclick="fichaEditar('${esc(nome)}')">Editar esta ficha</button>
           <button class="preset-btn" onclick="fichaExcluir('${esc(nome)}')" style="margin-left:8px;">Apagar</button>
-        </div>` : `
-        <div class="caption-label" style="text-align:center; margin-top:8px;">
-          Ficha da planilha — para mudar, corrija na planilha e reimporte.</div>`}`;
+        </div>` : ''}`;
   }
 
   function origemDoCusto(item) {
     const o = porItem[item];
     if (!o) return `<div class="contexto" style="border-color:var(--farol-fora);">
       <b>${esc(item)}</b> não está cadastrado nem como insumo nem como ficha — por isso a
-      linha fica sem preço. Corrigir na planilha (Base Insumos e Produtos).</div>`;
+      linha fica sem preço.</div>`;
     if (o.tipo === 'FICHA') {
       return `<div class="contexto" style="text-align:left;">
         <b>${esc(item)}</b> é uma <b>preparação</b>: o custo dela vem da própria ficha
@@ -1042,8 +1030,7 @@ function renderModuloFichas() {
       ${daNota || o.custo_fonte === 'AJUSTE' ? '' : `<b>Uso na ficha:</b> R$ ${fmt(usado)} por ${esc(o.un_uso)}
         (custo da planilha — sem nota fiscal nos últimos 90 dias).`}
       ${bate ? '' : `<br><b style="color:var(--farol-fora);">A conversão não fecha:</b> pelo preço de compra
-        deveria ser R$ ${fmt(esperado)} por ${esc(o.un_uso)}, e a planilha usa R$ ${fmt(usado)}.
-        Corrigir na planilha — o importador reclama a cada carga até lá.`}</div>`;
+        deveria ser R$ ${fmt(esperado)} por ${esc(o.un_uso)}, e a ficha usa R$ ${fmt(usado)}.`}</div>`;
   }
 
   alvo.innerHTML = `

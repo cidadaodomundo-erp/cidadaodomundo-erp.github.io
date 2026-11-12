@@ -74,9 +74,7 @@ function tabelaLiquidoPorLoja(ant) {
   if (!lista.length) return '';
 
   return `<div class="section-label">Líquido por loja</div>
-  <div class="caption-label" style="text-align:center;">
-    Onde o resultado está sendo feito — e onde está vazando. Clique numa linha para olhar só aquela loja.
-  </div>
+  <div class="caption-label" style="text-align:center;">Clique numa loja para ver só ela.</div>
   <div id="tabelaLojasResumo">
     <table>
       <tr><th>Loja</th><th>Pedidos</th><th>Bruto</th><th title="Ordenado do maior para o menor líquido do período.">Líquido</th><th>vs período anterior</th></tr>
@@ -167,16 +165,14 @@ function extratoFinanceiro(m, a) {
       + ' do resultado — a maior perda entre as linhas do extrato.">tirou mais do resultado</span>'
     : '';
 
-  return `<div class="section-label">Para onde foi o dinheiro</div>
-  <div class="caption-label" style="text-align:center;">
-    A conta inteira, do que o cliente pagou ao que sobrou. O % ao lado do valor é sempre sobre o faturamento bruto.
-  </div>
+  // 12/11/2026 (auditoria lote 3, canal-37/39): a ressalva dos custos próprios fica uma vez só, no título do extrato
+  return `<div class="section-label">Para onde foi o dinheiro (antes dos custos próprios)</div>
   <div id="extratoFin">
     <table>
       <tr><th>Item</th><th>Valor · % do bruto</th><th>vs período anterior</th></tr>
       ${linha('Venda dos produtos' + marcaPior('itens'), m.itens, m.itensPct, variacaoSpan(m.itens, a && a.itens))}
       ${linha('Taxa de entrega paga pelo cliente' + marcaPior('frete'), m.frete, m.fretePct, variacaoSpan(m.frete, a && a.frete))}
-      ${linha('<b>= Faturamento bruto</b>', m.bruto, 100, variacaoSpan(m.bruto, a && a.bruto), 'sub')}
+      ${linha('<b>= Faturamento bruto</b> <span style="font-size:11px;color:var(--tx-4);">venda cheia, com frete</span>', m.bruto, 100, variacaoSpan(m.bruto, a && a.bruto), 'sub')}
       ${linha('− Taxa de pagamento online' + marcaPior('taxaOnline'), m.taxaOnline, m.taxaOnlinePct, variacaoSpan(m.taxaOnline, a && a.taxaOnline, 'menorMelhor'), '', -1)}
       ${linha('− Comissão sobre vendas' + marcaPior('comissaoVendas'), m.comissaoVendas, m.comissaoVendasPct, variacaoSpan(m.comissaoVendas, a && a.comissaoVendas, 'menorMelhor'), '', -1)}
       ${linha('− Outros ajustes (inclui mensalidade)' + marcaPior('outrosAjustes'), m.outrosAjustes, m.outrosAjustesPct, variacaoSpan(m.outrosAjustes, a && a.outrosAjustes, 'menorMelhor'), '', -1)}
@@ -189,24 +185,15 @@ function extratoFinanceiro(m, a) {
       ${linha('<b>= Total investido em marketing</b>' + faroLinha('mkt_por_pedido', m.custoMktPorPedido), m.totalMkt, m.totalMktPct, variacaoSpan(m.totalMkt, a && a.totalMkt, 'neutro'), 'sub', -1)}
       ${linha('<b>= LÍQUIDO — o que sobra para a loja</b>' + faroLinha('margem_pct', m.liquidoPct), m.liquido, m.liquidoPct, variacaoSpan(m.liquido, a && a.liquido), 'liq')}
     </table>
-  </div>
-  <div class="caption-label" style="text-align:center;">
-    De cada R$ 100 vendidos, o iFood levou <b>R$ ${fmt(m.custoIfoodPct)}</b> entre taxas, comissões e marketing.
-    O líquido ainda não desconta os custos próprios (insumos, equipe, aluguel) — não é a margem final do negócio.
-    Investimento em marketing fica em cinza: gastar mais não é bom nem ruim por si só, depende do retorno.
   </div>`;
 }
 
 // Sinais e detalhes secundarios: resumo de cancelamentos com atalho pro modulo, e os
 // recortes informativos (como o cliente pagou / quem banca a promocao) recolhidos.
 function blocoSinais(m, a) {
-  return `<div class="section-label">Cancelamentos — resumo</div>
-  <div class="cards">
-    <div class="card neg"><div class="card-lbl">Total cancelado</div><div class="card-val">R$ ${fmt(m.valorCancelado)}</div><div class="card-pct">${pct(m.valorCanceladoPct)}% do bruto</div>${selo(m.valorCancelado, a && a.valorCancelado, 'menorMelhor')}</div>
-    <div class="card neg highlight"><div class="card-lbl">Valor perdido de verdade</div><div class="card-val">R$ ${fmt(m.valorPerdidoReal)}</div><div class="card-pct">já descontando o que o iFood devolveu</div>${selo(m.valorPerdidoReal, a && a.valorPerdidoReal, 'menorMelhor')}</div>
-  </div>
-  <div style="text-align:center; margin-top:6px;">
-    <button class="preset-btn" onclick="mostrarModulo('cancelamentos')">Ver análise completa de cancelamentos →</button>
+  // 12/11/2026 (auditoria lote 3, canal-33): os cartões de cancelamento moram só na tela Cancelamentos; aqui fica o link
+  return `<div style="text-align:center; margin-top:14px;">
+    <button class="preset-btn" onclick="mostrarModulo('cancelamentos')">Cancelamentos do período →</button>
   </div>
 
   <details class="detalhes-extra">
@@ -217,7 +204,6 @@ function blocoSinais(m, a) {
       <div class="card neg"><div class="card-lbl">Promoção bancada pela loja</div><div class="card-val">R$ ${fmt(m.investLoja)}</div><div class="card-pct" style="color:var(--farol-fora);">${pct(m.investLojaPct)}% do total</div></div>
       <div class="card pos"><div class="card-lbl">Promoção bancada pelo iFood</div><div class="card-val">R$ ${fmt(m.investPlataforma)}</div><div class="card-pct" style="color:var(--farol-ok);">${pct(m.investPlataformaPct)}% do total</div></div>
     </div>
-    <div class="caption-label" style="text-align:center;">Quanto mais o iFood banca das promoções, menos sai do seu caixa para gerar a mesma venda.</div>
   </details>`;
 }
 
@@ -259,14 +245,6 @@ function linhaContexto(ant) {
   return `<div class="contexto contexto-filtro">
     Mostrando ${partes.join(' &middot; ')}.<br>${comparacao}
     ${canais}
-    <details style="margin-top:8px; padding-top:8px; border-top:1px solid #34332f; font-size:11.5px; color:#8a897e;">
-      <summary style="cursor:pointer;">O que a cor quer dizer</summary>
-      A palavra diz o que aconteceu (<b>subiu</b> / <b>caiu</b>) e a cor diz se é bom ou ruim:
-      <span style="color:var(--farol-ok); font-weight:bold;">verde</span> melhora o resultado,
-      <span style="color:var(--farol-fora); font-weight:bold;">vermelho</span> piora.
-      Em custos, cair é verde. Investimento em marketing fica em
-      <span style="color:#8a897e; font-weight:bold;">cinza</span> — gastar mais não é bom nem ruim por si só, depende do retorno.
-    </details>
   </div>`;
 }
 
@@ -278,26 +256,18 @@ function blocoAbertura(m, a, ant) {
     ? 'Sem período anterior para comparar'
     : `${seta} ${pct(Math.abs(variacao))}% vs os ${ant.dias} dias anteriores (R$ ${fmt(a.liquido)})`;
 
-  const frase = `Neste período a operação vendeu <b>R$ ${fmt(m.bruto)}</b> em
-    <b>${m.totalPedidos.toLocaleString('pt-BR')} pedidos</b>. O iFood ficou com
-    <b>R$ ${fmt(m.custoIfood)}</b> entre taxas, comissões e marketing —
-    <b>${pct(m.custoIfoodPct)}%</b> de tudo que foi vendido. O que sobrou ainda
-    não desconta os custos próprios (insumos, equipe, aluguel), então não é a margem final do negócio.`;
-
+  // 12/11/2026 (auditoria lote 3, canal-32/39): o hero fica só com o número e a variação — bruto, pedidos e custo do
+  // iFood já estão nos cartões e no extrato logo abaixo
   return `<div class="hero" style="border-color:${cor};">
     <div class="hero-lbl">O que sobrou para a loja no período</div>
     <div class="hero-val">R$ ${fmt(m.liquido)}</div>
     <div class="hero-delta" style="color:${cor};">${deltaTexto}</div>
-    <div class="hero-frase">${frase}</div>
   </div>
   ${a ? `<div class="chart-box" style="height:320px; margin-bottom:16px;">
     <div class="chart-title">Por que o resultado mudou em relação ao período anterior</div>
     <div class="chart-canvas-wrap"><canvas id="chartWaterfall"></canvas></div>
   </div>
-  <div class="caption-label" style="text-align:center; margin-top:0;">
-    A barra azul da esquerda é o resultado do período anterior; a da direita, o atual. As barras do meio
-    mostram o quanto cada fator empurrou o resultado para cima (verde) ou para baixo (vermelho).
-  </div>` : ''}`;
+  <div class="caption-label" style="text-align:center; margin-top:0;">Azul: antes e agora · verde subiu o resultado · vermelho desceu.</div>` : ''}`;
 }
 
 // Os 4 cards de totais — aparecem tanto na Visao Geral (fechando o resumo) quanto no topo do
@@ -305,25 +275,17 @@ function blocoAbertura(m, a, ant) {
 function cardsCancel(m, a) {
   return `<div class="section-label">O que perdemos com cancelamentos</div>
   <div class="cards">
-    <div class="card neg"><div class="card-lbl">Total cancelado</div><div class="card-val">R$ ${fmt(m.valorCancelado)}</div><div class="card-pct">${pct(m.valorCanceladoPct)}% do bruto</div>${selo(m.valorCancelado, a && a.valorCancelado, 'menorMelhor')}</div>
+    <div class="card neg"><div class="card-lbl">Total cancelado (parciais + totais)</div><div class="card-val">R$ ${fmt(m.valorCancelado)}</div><div class="card-pct">${pct(m.valorCanceladoPct)}% do bruto</div>${selo(m.valorCancelado, a && a.valorCancelado, 'menorMelhor')}</div>
     <div class="card neutral"><div class="card-lbl">Cancelamentos parciais</div><div class="card-val">R$ ${fmt(m.vParcial)}</div><div class="card-pct">${m.nParcial} pedidos (${pct(m.nParcialPct)}%)</div>${selo(m.vParcial, a && a.vParcial, 'menorMelhor')}</div>
     <div class="card neutral"${cardFarol('taxa_cancelamento', m.nFullPct)}><div class="card-lbl">Cancelamentos totais</div><div class="card-val">R$ ${fmt(m.vFull)}</div><div class="card-pct">${m.nFull} pedidos (${pct(m.nFullPct)}%)</div>${selo(m.vFull, a && a.vFull, 'menorMelhor')}</div>
     <div class="card pos"><div class="card-lbl">Devolvido pelo iFood</div><div class="card-val">R$ ${fmt(m.ressarcimentoCancelamento)}</div><div class="card-pct">${pct(m.ressarcimentoCancelamentoPct)}% do bruto</div>${selo(m.ressarcimentoCancelamento, a && a.ressarcimentoCancelamento)}</div>
   </div>
-  <div class="caption-label" style="text-align:center;">
-    "Total cancelado" e a soma dos outros dois: <b>parciais</b> (o cliente cancelou parte do pedido — só o item cancelado entra) +
-    <b>totais</b> (o pedido inteiro foi cancelado).
-  </div>
   <div style="display:flex; justify-content:center; margin-top:6px;">
     <div class="card neg highlight" style="flex:0 1 420px;">
-      <div class="card-lbl">Valor perdido de verdade</div>
+      <div class="card-lbl">Valor perdido de verdade (cancelado − devolvido)</div>
       <div class="card-val" style="font-size:26px;">R$ ${fmt(m.valorPerdidoReal)}</div>
       <div class="card-pct">${pct(m.valorPerdidoRealPct)}% do bruto</div>
       ${selo(m.valorPerdidoReal, a && a.valorPerdidoReal, 'menorMelhor')}
-      <div style="color:#8a897e; font-size:11px; line-height:1.5; margin-top:12px; border-top:1px solid #34332f; padding-top:10px;">
-        Total cancelado <b>menos</b> o que o iFood devolveu.<br>
-        É o que de fato saiu do bolso da operação.
-      </div>
     </div>
   </div>`;
 }
@@ -450,7 +412,7 @@ function moduloCancelamentos(m, a) {
           CANCEL_LISTA_MOTIVOS = ord.map(x => x.responsavel);   // o clique vai por indice
           return ord.map((x, i) => { const sel = CANCEL_MOTIVO === x.responsavel;
           return `<tr onclick="cancelFiltrarMotivoIdx(${i})" style="cursor:pointer;${sel ? 'background:var(--brand-wine);' : ''}" title="${sel ? 'clique para soltar o recorte' : 'clique para recortar a tela por esta categoria'}">
-          <td>${sel ? '<b>' : ''}${x.responsavel}${sel ? '</b> ✕' : ''}</td><td>${x.n}</td><td>${pct(x.pct)}%</td>
+          <td>${sel ? '<b>' : ''}${x.responsavel === 'NAO_MAPEADO' ? 'sem categoria' : x.responsavel}${sel ? '</b> ✕' : ''}</td><td>${x.n}</td><td>${pct(x.pct)}%</td>
           <td>R$ ${fmt(x.valor)}</td><td>R$ ${fmt(x.n ? x.valor/x.n : 0)}</td></tr>`; }).join(''); })()}
         ${(() => { const t = motivos.reduce((a, x) => ({ n: a.n + x.n, v: a.v + x.valor }), { n: 0, v: 0 });
           return `<tr class="liq"><td>TOTAL</td><td>${t.n}</td><td>100%</td>
@@ -461,8 +423,8 @@ function moduloCancelamentos(m, a) {
   return cardsCancel(m, a) + `
   ${CANCEL_MOTIVO ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
-    <button class="preset-btn active" onclick="cancelFiltrarMotivo(null)">categoria ${CANCEL_MOTIVO} ✕</button>
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">A tabela de lojas e os dois gráficos de "Estamos melhorando ou piorando?" estão neste recorte. <b>Os cartões acima, não.</b> A lista de categorias continua inteira, para você poder trocar.</div>
+    <button class="preset-btn active" onclick="cancelFiltrarMotivo(null)">categoria ${CANCEL_MOTIVO === 'NAO_MAPEADO' ? 'sem categoria' : CANCEL_MOTIVO} ✕</button>
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cartões acima seguem o período inteiro, sem este recorte.</div>
   </div>` : ''}
   <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:stretch; margin-top:14px;">
     <div class="chart-box" style="flex:1 1 340px; height:300px;">
@@ -474,14 +436,7 @@ function moduloCancelamentos(m, a) {
       <div class="chart-canvas-wrap"><canvas id="chartMotivosQtd"></canvas></div>
     </div>
   </div>
-  <div class="caption-label" style="text-align:center;">
-    Cada gráfico está ordenado do maior para o menor pela sua própria medida — por isso a
-    ordem das categorias muda de um para o outro. Quando uma categoria lidera em quantidade mas
-    não em valor, ela acontece muito e custa pouco por vez (e vice-versa); a coluna
-    <b>R$ por cancelamento</b> da tabela mostra esse custo unitário.
-  </div>
 
-  <div class="caption-label">Fonte da classificação: motivos.xlsx — categoria "NAO_MAPEADO" ainda não foi classificada</div>
   ${tabelaMotivos}
 
   <div class="section-label">Quanto dessa perda ainda dá para recuperar</div>
@@ -512,10 +467,7 @@ function moduloCancelamentos(m, a) {
       <div class="chart-canvas-wrap"><canvas id="chartCancelValor"></canvas></div>
     </div>
   </div>
-  <div class="caption-label" style="text-align:center;">
-    O agrupamento (dia, semana ou mês) é escolhido automaticamente conforme o tamanho do período filtrado.
-    A taxa é o que mostra se a operação está melhorando: o valor sobe naturalmente quando se vende mais.
-  </div>`;
+  <div class="caption-label" style="text-align:center;">Agrupado por ${granularidadeAutomatica() === 'dia' ? 'dia' : granularidadeAutomatica() === 'semana' ? 'semana' : 'mês'}, pelo tamanho do período.</div>`;
 }
 
 // ------------------------------------------------------------------
@@ -737,19 +689,14 @@ function blocoFreteGratis() {
   const avulso = por.get('Frete grátis avulso');
   const alerta = (emp && avulso && avulso.ped)
     ? `<div class="contexto" style="border-color:var(--farol-fora); margin-top:10px;">
-        <b>Empilhamento:</b> ${emp.ped.toLocaleString('pt-BR')} pedidos receberam frete grátis
-        <b>em cima de outro desconto nosso</b> (Campanha Inteligente, Cupom ou Clube). Só a parte do frete
-        nesses pedidos custou cerca de <b>R$ ${fmt(avulso.invL / avulso.ped * emp.ped)}</b> — e é a faixa com
-        o pior retorno do iFood. É o alvo mais óbvio de corte, sem tirar o frete grátis de quem compra sem desconto.
+        <b>Empilhamento:</b> ${emp.ped.toLocaleString('pt-BR')} pedidos com frete grátis em cima de outro desconto nosso
+        (Campanha Inteligente, Cupom ou Clube); só o frete custou cerca de <b>R$ ${fmt(avulso.invL / avulso.ped * emp.ped)}</b>.
       </div>` : '';
 
+  // 12/11/2026 (auditoria lote 3, canal-41): legenda de uma linha
   return `
   <div class="section-label">Como o frete grátis chegou ao cliente</div>
-  <div class="caption-label" style="text-align:center;">
-    O mesmo benefício (entrega grátis) custa e retorna de formas muito diferentes conforme o caminho.
-    Dentro do <b>Hits</b> o iFood divide a conta; <b>avulso</b> é quase todo nosso; <b>empilhado</b> em outro
-    desconto é o mais caro de todos.
-  </div>
+  <div class="caption-label" style="text-align:center;">Hits: o iFood divide · avulso: quase todo nosso · empilhado em outro desconto.</div>
   <div id="tabelaFreteGratis">
     <table>
       <tr><th>Como foi entregue</th><th>Pedidos</th><th>Nós (R$)</th><th>% da verba</th><th>iFood (R$)</th><th>Alavancagem</th><th>Nosso R$/pedido</th><th>Ticket médio</th></tr>
@@ -829,22 +776,14 @@ function blocoMecanicas() {
 
   return `
   <div class="section-label">Cada promoção isolada — quanto custa e quanto o iFood devolve</div>
-  <div class="caption-label" style="text-align:center;">
-    O relatório do iFood mistura as promoções que caem no mesmo pedido ("Campanha Inteligente + Frete Grátis").
-    Aqui elas foram <b>separadas</b>: o custo de cada mecânica-base sai dos pedidos em que ela veio sozinha (a Campanha
-    Inteligente custa até R$ 5,00 por pedido para a loja) e o que sobra é o custo real do Frete Grátis.
-  </div>
+  <div class="caption-label" style="text-align:center;">Cada mecânica pelos pedidos em que veio sozinha; o que sobra é o Frete Grátis.</div>
   <div id="tabelaMecanicas">
     <table>
       <tr><th>Promoção</th><th>Pedidos</th><th>Nós (R$)</th><th>% da verba</th><th>iFood (R$)</th><th>Alavancagem</th><th>Nosso R$/pedido</th></tr>
       ${linhas}
       <tr class="sub"><td><b>TOTAL</b></td><td></td><td><b>R$ ${fmt(d.totL)}</b></td><td>100%</td><td><b>R$ ${fmt(d.totI)}</b></td><td>${alavTxt(d.alavGeral)}</td><td></td></tr>
-      <tr class="liq"><td><b>Total SEM o Frete Grátis</b></td><td></td><td><b>R$ ${fmt(d.semFreteL)}</b></td><td></td><td><b>R$ ${fmt(d.semFreteI)}</b></td><td>${alavTxt(d.alavSemFrete)}</td><td></td></tr>
+      <tr class="liq"><td><b>Total SEM o Frete Grátis avulso</b></td><td></td><td><b>R$ ${fmt(d.semFreteL)}</b></td><td></td><td><b>R$ ${fmt(d.semFreteI)}</b></td><td>${alavTxt(d.alavSemFrete)}</td><td></td></tr>
     </table>
-  </div>
-  <div class="caption-label" style="text-align:center;">
-    A última linha é a mais importante: mostra qual seria a alavancagem da rede <b>sem</b> o frete grátis avulso —
-    a única mecânica que o iFood praticamente não co-financia.
   </div>`;
 }
 
@@ -925,8 +864,7 @@ function blocoTestePromos() {
   return `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Teste de promoções — quem está pagando a conta</div>
   <div class="caption-label" style="text-align:center;" title="Teste desde 10/08/2026: Hits + Campanha Inteligente + Frete grátis (até R$ 6,99 desde 13/08) e anúncios pagos à parte. Nosso = incentivo da loja + incentivo da rede (os dois saem do nosso bolso); iFood = incentivo do iFood. Fonte: pedidos do dia, no período filtrado no topo.">
-    Quanto cada loja gastou de promoção e quanto o iFood pôs em cima — <b>alavancagem</b> é o R$ do iFood para cada R$ 1 nosso, e a meta é acima de <b>1,00x</b>.
-  </div>
+Alavancagem = R$ do iFood para cada R$ 1 nosso; meta acima de 1,00x.</div>
   <div class="cards">
     <div class="card neutral"><div class="card-lbl">Investimos (loja + rede)</div><div class="card-val">R$ ${fmt(t.nosso)}</div>${selo(t.nosso, antR && antR.tot.nosso, 'neutro')}</div>
     <div class="card pos"><div class="card-lbl">iFood investiu</div><div class="card-val">R$ ${fmt(t.ifood)}</div>${selo(t.ifood, antR && antR.tot.ifood)}</div>
@@ -937,6 +875,8 @@ function blocoTestePromos() {
     <table>
       <tr><th>Loja</th><th>Pedidos</th><th>Nós (R$)</th><th>iFood (R$)</th><th>Alavanc.</th><th>Nosso R$/pedido</th><th>Nosso invest. vs anterior</th></tr>
       ${linhas}
+      <tr class="liq"><td><b>REDE</b></td><td>${t.ped.toLocaleString('pt-BR')}</td><td>R$ ${fmt(t.nosso)}</td><td>R$ ${fmt(t.ifood)}</td>
+        <td>${alavTxt(alavGeral)}</td><td>${t.ped ? 'R$ ' + fmt(t.nosso / t.ped) : '—'}</td><td>${variacaoSpan(t.nosso, antR ? antR.tot.nosso : null, 'neutro')}</td></tr>
     </table>
   </div>`;
 }
@@ -951,7 +891,8 @@ function moduloPromocoes() {
   // deste corte, senão o painel some justo no período mais recente.
   if (!r.lista.length) {
     const disp = periodosPromoDisponiveis();
-    return teste + blocoAlavancagemPorLoja() + `
+    // 12/11/2026 (auditoria lote 3, canal-34): a "Alavancagem por loja" repetia a tabela do teste (agora com a linha REDE)
+    return teste + `
     <div class="contexto" style="border-color:var(--farol-perto); margin-top:16px;">
       <b>Detalhe por tipo de promoção indisponível neste período.</b><br>
       A quebra por mecânica (Hits, Campanha Inteligente, Clube, Frete grátis) vem do
@@ -979,7 +920,6 @@ function moduloPromocoes() {
       <td>R$ ${fmt(x.invPorPedido)}</td>
       <td>R$ ${fmt(x.ticket)}</td>
       <td>${pct(x.pctIfood)}%</td>
-      <td style="color:#8a897e;">${x.retornoAtribuido.toFixed(1)}x</td>
     </tr>`).join('');
 
   const linhasLojas = porLoja.map(x => `<tr>
@@ -990,15 +930,12 @@ function moduloPromocoes() {
       <td>R$ ${fmt(x.ticket)}</td>
     </tr>`).join('');
 
-  return teste + blocoAlavancagemPorLoja() + blocoMecanicas() + blocoFreteGratis() + `
+  // 12/11/2026 (auditoria lote 3, canal-34): "Investido pela loja" e "Bancado pelo iFood" saíram daqui (o par de cartões
+  // fica no teste, no topo; o total do relatório está na linha TOTAL das mecânicas)
+  return teste + blocoMecanicas() + blocoFreteGratis() + `
   <div class="section-label">Quanto e onde investimos em promoção (relatório de promoções)</div>
-  <div class="caption-label" style="text-align:center;">
-    Recortes usados: <b>${mesesTexto}</b>. O relatório de promoções vem por período fechado (semana de segunda a domingo; até julho, mês) — este bloco
-    ignora o recorte por dia ou turno e usa só os recortes que cabem inteiros no período escolhido.
-  </div>
+  <div class="caption-label" style="text-align:center;" title="O relatório vem por semana fechada (seg–dom; até julho, mês) e não recorta por dia nem turno.">Recortes inteiros dentro do período: <b>${mesesTexto}</b> · iFood bancou ${pct(pctIfoodGeral)}% do total.</div>
   <div class="cards">
-    <div class="card neutral"><div class="card-lbl">Investido pela loja</div><div class="card-val">R$ ${fmt(r.totalInv)}</div></div>
-    <div class="card pos"><div class="card-lbl">Bancado pelo iFood</div><div class="card-val">R$ ${fmt(r.totalInvIfood)}</div><div class="card-pct">${pct(pctIfoodGeral)}% do total</div></div>
     <div class="card neutral"><div class="card-lbl">Pedidos com promoção</div><div class="card-val">${r.totalPedidos.toLocaleString('pt-BR')}</div></div>
     <div class="card neutral"><div class="card-lbl">Investido por pedido</div><div class="card-val">R$ ${fmt(invPorPedidoGeral)}</div></div>
   </div>
@@ -1014,28 +951,19 @@ function moduloPromocoes() {
       <div class="chart-canvas-wrap"><canvas id="chartPromoCustoTicket"></canvas></div>
     </div>
   </div>
-  <div class="caption-label" style="text-align:center;">
-    No gráfico da direita, cada ponto é uma estratégia: quanto mais <b>à esquerda</b> (custa menos por pedido)
-    e mais <b>para cima</b> (traz pedido maior), melhor. O tamanho da bolha é o quanto da verba vai ali.
-  </div>
+  <div class="caption-label" style="text-align:center;">Direita: à esquerda custa menos por pedido, acima traz pedido maior; bolha = verba.</div>
 
   <div class="section-label">Detalhe por estratégia</div>
   <div id="tabelaPromo">
     <table>
       <tr><th>Estratégia (verbas combinadas)</th><th>Pedidos</th><th>Investido</th><th>% da verba</th>
-          <th>R$ por pedido</th><th>Ticket médio</th><th>iFood banca</th><th title="Conta do portal do iFood: venda do pedido menos o investimento, dividido pelo investimento. Ela credita a venda inteira à promoção, como se o cliente não fosse comprar sem ela — por isso, quanto menor o desconto, maior o número.">Retorno atribuído</th></tr>
+          <th>R$ por pedido</th><th>Ticket médio</th><th>iFood banca</th></tr>
       ${linhasTabela}
     </table>
   </div>
-  <div class="contexto" style="border-color:var(--farol-fora); margin-top:14px;">
-    <b style="color:var(--farol-fora);">"Retorno atribuído" é o número do portal e serve para conferir com o iFood, não para decidir onde investir.</b>
-  </div>
 
   <div class="section-label">Mesma estratégia, lojas diferentes</div>
-  <div class="caption-label" style="text-align:center;">
-    Comparando <b>${principal.estrategia}</b> (a maior verba do período) entre as lojas. Aqui a comparação é confiável:
-    como a estratégia é a mesma dos dois lados, a diferença vem da operação de cada loja, não da métrica.
-  </div>
+  <div class="caption-label" style="text-align:center;"><b>${principal.estrategia}</b> (a maior verba do período), loja a loja.</div>
   <div id="tabelaPromoLojas">
     <table>
       <tr><th>Loja</th><th>Pedidos</th><th>Investido</th><th>R$ por pedido</th><th>Ticket médio</th></tr>
@@ -2563,7 +2491,7 @@ async function gerarRelatorioAdHoc() {
   const alertas = [];
   const alerta = (txt, modulo, tela) => `<li style="cursor:pointer;" onclick="mostrarModulo('${modulo}')"
     title="Abre ${tela}. A tela usa a janela de datas padrão dela, não o período deste relatório.">${txt}
-    <span style="font-size:11px; color:var(--tx-5);">abrir ${tela} (na janela padrão da tela) →</span></li>`;
+    <span style="font-size:11px; color:var(--tx-5);">abrir ${tela} →</span></li>`;
   if (negSem > 0) alertas.push(alerta(`<b style="color:var(--farol-fora);">${negSem} negociações sem resposta</b> (${pct(negResp ? negSem / negResp * 100 : 0)}% das ${negResp} que dependem da loja) — resposta evita cancelamento automático.`, 'negociacoes', 'Negociações'));
   if (negs.length && negAtraso / negs.length > 0.4) alertas.push(alerta(`<b style="color:var(--farol-fora);">${pct(negAtraso / negs.length * 100)}% das negociações por atraso</b> — olhar preparo/despacho no pico.`, 'negociacoes', 'Negociações'));
   if (notaMedia !== null && notaMedia < 4.6) alertas.push(alerta(`<b style="color:var(--farol-fora);">Nota média ${notaMedia.toFixed(2).replace('.', ',')}</b> abaixo do padrão da rede (4,6+).`, 'avaliacoes', 'Avaliações'));
@@ -2580,7 +2508,7 @@ async function gerarRelatorioAdHoc() {
     <table>
       <tr><th>Indicador</th><th>Período</th><th>Anterior</th><th>Variação</th></tr>
       ${linha('Pedidos', m.totalPedidos, a && a.totalPedidos, 'int')}
-      ${linha('Faturamento bruto', m.bruto, a && a.bruto, 'moeda')}
+      ${linha('Faturamento bruto (venda cheia, com frete)', m.bruto, a && a.bruto, 'moeda')}
       ${linha('Ticket médio', m.ticketMedio, a && a.ticketMedio, 'moeda')}
       ${linha('Custo total do iFood', m.custoIfood, a && a.custoIfood, 'moeda', 'menorMelhor')}
       ${linha('Marketing total', m.totalMkt, a && a.totalMkt, 'moeda', 'neutro')}
@@ -2595,7 +2523,7 @@ async function gerarRelatorioAdHoc() {
       ${motivos.length ? `<li>Top motivos de cancelamento: ${motivos.map(x => `${x.responsavel} (${x.n})`).join(' · ')}</li>` : ''}
     </ul>
     <h3>Pontos de atenção (regras automáticas)</h3>
-    <p style="color:var(--tx-5); font-size:11.5px; margin:0 0 4px;">Clique num ponto para abrir a tela que resolve — ela abre na janela de datas padrão dela, não neste período.</p>
+    <p style="color:var(--tx-5); font-size:11.5px; margin:0 0 4px;">A tela abre no período padrão dela, não neste.</p>
     <ul>${alertas.join('')}</ul>
     <p style="color:#8a897e; font-size:11.5px;">Líquido antes dos custos próprios (insumos, equipe, aluguel).
     Negociações e avaliações existem na base a partir de jun-jul/2026.</p>
@@ -2717,10 +2645,8 @@ function renderModuloContestacoes() {
   };
 
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contestações de cancelamento</div>
-  <div class="caption-label" style="text-align:center;" title="Esta tela é a fila de trabalho da contestação: segue a loja escolhida no topo (Rede = Água Verde, Ahú e São Braz), mas não o período. A coluna Loja diz de quem é cada pedido. Os dados vêm da mesma fila que a rotina usa (pedidos da API do iFood). O status do iFood leva até 48h, então contestação de ontem costuma aparecer em aguardando.">
-    <b>${contestEscopoTxt()}, últimos 45 dias</b> — esta tela não segue o período do topo.
-  </div>
+  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contestações de cancelamento · ${contestEscopoTxt()}, últimos 45 dias</div>
+  <div class="caption-label" style="text-align:center;" title="Segue a loja do topo; o status do iFood leva até 48h.">Não segue o período do topo.</div>
   <div class="cards">
     <div class="card ${aContestarVoce.length ? 'neg' : 'neutral'}"><div class="card-lbl">Você precisa contestar</div><div class="card-val">${aContestarVoce.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarVoce))}</div></div>
     <div class="card neutral"><div class="card-lbl">A rotina contesta</div><div class="card-val">${aContestarRotina.length}</div><div class="card-pct">R$ ${fmt(soma(aContestarRotina))}</div></div>
@@ -2731,8 +2657,7 @@ function renderModuloContestacoes() {
 
   <div class="section-label">Você precisa contestar</div>
   ${aContestarVoce.length ? `<div id="tabelaContestVoce">${grade(aContestarVoce, colPrazoMotivo)}</div>
-  <div class="caption-label" style="text-align:center;" title="A ordem é por faixa de prazo (até 2 dias, 3 a 5 dias, 6 dias ou mais, e por último os sem prazo) e, dentro da faixa, do maior valor para o menor. São os pedidos que a rotina abriu no portal e devolveu porque não achou um fato verdadeiro para escrever.">
-  Na ordem de fazer: quem vence antes primeiro e, no mesmo prazo, o de maior valor.</div>`
+  <div class="caption-label" style="text-align:center;" title="A rotina devolveu por não achar um fato verdadeiro para escrever.">Na ordem de fazer: quem vence antes primeiro e, no mesmo prazo, o de maior valor.</div>`
   : '<div class="contexto" style="border-color:var(--farol-ok);">Nada esperando por você agora. ✔</div>'}
 
   <div class="section-label">A rotina contesta sozinha</div>
@@ -2758,7 +2683,7 @@ function renderModuloContestacoes() {
   <div id="tabelaContestPerd">${grade(perdidas, colQuem)}</div>
   <div class="caption-label" style="text-align:center;">Não dá mais para contestar: escaparam R$ ${fmt(soma(perdidas))}, contra R$ ${fmt(soma(aprovadas))} recuperados nas aprovadas.</div>` : ''}
 
-  <div class="caption-label" style="text-align:center; margin-top:14px;">Janela: últimos 45 dias.${naoContest.length ? ` Outros ${naoContest.length} cancelamento(s) (R$ ${fmt(soma(naoContest))}) têm motivo que o iFood nunca deixou contestar.` : ''}
+  <div class="caption-label" style="text-align:center; margin-top:14px;">${naoContest.length ? `Outros ${naoContest.length} cancelamento(s) (R$ ${fmt(soma(naoContest))}) têm motivo que o iFood nunca deixou contestar.` : ''}
   ${semDado.length ? `<br>${semDado.length} cancelamento(s) sem a hora do cancelamento ficam fora dos blocos — não são prazo perdido.` : ''}</div>`;
 }
 
@@ -3024,11 +2949,12 @@ function trocarModoUnidades(modo) {
     if (b) b.classList.toggle('active', m === modo);
   });
   const leg = document.getElementById('legendaUnidades');
-  if (leg) leg.textContent = MODO_UNIDADES === 'pedidos'
-    ? 'Cancelamento total não conta como pedido, a mesma regra do resto do painel. Cada unidade tem cor fixa: tirar uma do filtro não troca a cor das outras.'
-    : 'Cada unidade começa em 100 na primeira semana em que teve pedido, então o que se compara é o movimento, não o tamanho. Acima de 100 cresceu desde então; abaixo, caiu.';
+  if (leg) leg.textContent = MODO_UNIDADES === 'pedidos' ? CANAL_LEG_UNI_PED : CANAL_LEG_UNI_CRESC;
   renderChartUnidades();
 }
+// 12/11/2026 (auditoria lote 3, canal-39): uma linha por modo do gráfico de unidades
+const CANAL_LEG_UNI_PED = 'Cancelamento total não conta como pedido. Cada unidade tem cor fixa.';
+const CANAL_LEG_UNI_CRESC = 'Cada unidade começa em 100: acima cresceu, abaixo caiu.';
 
 function renderChartUnidades() {
   const el = document.getElementById('chartUnidades');
@@ -3167,14 +3093,9 @@ function renderModuloCardapio(periodoSel, lojaSel) {
   // O <select> saiu (12/09/2026): quem escolhe agora e' a linha da loja na tabela do
   // funil, logo acima. Fica so' o chip que diz qual recorte esta valendo e o ✕ que
   // volta para o primeiro escopo — o mesmo chip do modulo Evolucao.
-  const chipEscopo = escopos.length > 1 ? `
-    <div class="contexto" style="border-color:var(--brand);">
-      <b>Itens e complementos de:</b> ${escopo === 'REDE' ? 'rede inteira (agregado)' : escopo}
-      ${escopo !== escopos[0] ? `<button class="preset-btn active" onclick="cardapioEscopoLimpar('${chave}')">${escopo} ✕</button>` : ''}
-      <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="O funil vem de um relatório e os itens vêm de outro: só a loja com export próprio de itens neste período pode ser escolhida. As demais continuam na tabela, sem clique.">
-        Clique na linha da loja na tabela do funil, acima, para trocar.
-      </div>
-    </div>` : '';
+  // 12/11/2026 (auditoria lote 3, canal-46): a loja escolhida vai no título da tabela de itens; saíram as instruções
+  const chipEscopo = (escopos.length > 1 && escopo !== escopos[0]) ? `
+    <div style="margin:4px 0 8px;"><button class="preset-btn active" onclick="cardapioEscopoLimpar('${chave}')">${escopo} ✕</button></div>` : '';
 
   const totV = funil.reduce((s, r) => s + (r.visitas || 0), 0);
   const totC = funil.reduce((s, r) => s + (r.concluidos || 0), 0);
@@ -3236,7 +3157,7 @@ function renderModuloCardapio(periodoSel, lojaSel) {
   </div>
 
   <div class="section-label">Funil por loja — piores primeiro</div>
-  <div class="caption-label" style="text-align:center;" title="Só a loja com export próprio de itens neste período pode ser escolhida; as outras continuam na tabela, sem clique. Clicar de novo na mesma loja volta para o primeiro escopo.">Visita → viu item → colocou na sacola → revisou → concluiu. Conversão baixa com muitas visitas = cardápio que atrai mas não convence (foto, preço, descrição). ${escopos.length > 1 ? '<b>Clique na loja para ver os itens dela.</b>' : ''}</div>
+  <div class="caption-label" style="text-align:center;">Visita → viu item → sacola → revisou → concluiu.${escopos.length > 1 ? ' <b>Clique na loja para ver os itens dela.</b>' : ''}</div>
   <div id="tabelaFunil">
     <table>
       <tr><th>Loja</th><th>Visitas</th><th title="Quantas vezes alguém abriu a página de um item.">Viu item</th><th>Sacola</th><th title="Quantas vezes alguém chegou na tela de revisar o pedido — o passo antes de concluir.">Revisou</th><th>Concluídos</th><th>Conversão</th></tr>
@@ -3256,11 +3177,8 @@ function renderModuloCardapio(periodoSel, lojaSel) {
     </table>
   </div>
 
-  <div class="section-label">Itens mais vendidos</div>
+  <div class="section-label">Itens mais vendidos · ${escopo === 'REDE' ? 'rede inteira' : escopo}</div>
   ${chipEscopo}
-  <div class="caption-label" style="text-align:center;">${escopo === 'REDE'
-    ? 'Recorte agregado da rede inteira (o relatório soma tudo como uma marca só). Clique numa loja da tabela do funil quando houver exports por loja no período.'
-    : `Itens vendidos na loja <b>${escopo}</b> no período selecionado.`}</div>
   <div id="tabelaItens">
     <table>
       <tr><th>Item</th><th>Categoria</th><th>Visitas</th><th>Pedidos</th><th title="De quem viu o item, quantos pediram.">Conversão</th><th>Qtd vendida</th><th>% com promoção</th><th>Valor total</th></tr>
@@ -3400,7 +3318,7 @@ function renderModuloClientes(mesSel) {
           <td>${variacaoSpan(t.tot, totAnt)}</td></tr>`; })()}
     </table>
   </div>
-  <div class="caption-label">Ordenado por <b>Frequentes por novo</b>: as primeiras linhas são as que têm menos clientes frequentes para cada cliente novo do mês.</div>`;
+  `;
 }
 
 // Farol de meta para cards FORA do modulo Indicadores (12/08/2026).
@@ -3512,9 +3430,9 @@ function renderModuloFrete(linhas) {
       <div class="card-val">${entregasPeriodo.toLocaleString('pt-BR')}</div>
       <div class="card-pct">em ${canais.length} canal(is) e ${faixasResumo.length} faixa(s) de distância</div></div>
     <div class="card ${resultadoGeral < 0 ? 'neg' : 'pos'}">
-      <div class="card-lbl">${resultadoGeral < 0 ? 'A loja bancou' : 'O frete sobrou'}</div>
+      <div class="card-lbl">${resultadoGeral < 0 ? 'A loja bancou' : 'O frete sobrou'} (frete cobrado − corridas, sem promoção)</div>
       <div class="card-val">${reais(Math.abs(resultadoGeral))}</div>
-      <div class="card-pct">frete cobrado menos custo do entregador, somando todos os canais</div></div>
+      <div class="card-pct">todos os canais e faixas</div></div>
     <div class="card ${piorFaixa ? 'neg' : 'neutral'}"><div class="card-lbl">Faixa que mais custa</div>
       <div class="card-val">${piorFaixa ? piorFaixa.faixa : '—'}</div>
       <div class="card-pct">${piorFaixa ? `${reais(Math.abs(piorFaixa.res))} bancados em ${piorFaixa.entregas.toLocaleString('pt-BR')} entregas · ${porEntrega(piorFaixa)}` : 'nenhuma faixa ficou no vermelho no período'}</div></div>
@@ -3607,7 +3525,6 @@ function renderModuloFrete(linhas) {
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Frete por distância — ${rotJanela}</div>
     <div class="caption-label" style="text-align:center;">
-      Quanto cada entrega custa de verdade, quanto foi cobrado do cliente e qual o ticket daquela faixa.
       <b>Vermelho = a loja está bancando; verde = o frete se paga.</b>
       ${unsComDado.length ? `<span style="font-size:11.5px; color:var(--tx-3); border:1px solid #34332f; border-radius:12px; padding:3px 10px; margin-left:6px;">${unsComDado.map(u => UN_ROT[u] || u).join(', ')}</span>` : ''}
     </div>
@@ -3616,9 +3533,7 @@ function renderModuloFrete(linhas) {
     ${agregado.length ? matrizFrete : ''}
     ${agregado.length ? canais.map((c, i) => tabela(c, i)).join('')
       : '<div class="contexto" style="border-color:var(--farol-perto);">Sem entrega nesta janela e nestas unidades.</div>'}
-    <div class="caption-label" title="Faixa com menos de 30 entregas fica em cinza: o número existe, mas oscila demais para decidir em cima dele. As entregas vêm do TrackEat (Água Verde, Ahú e São Braz) — a etiqueta no topo da tela lista as unidades com dado.">
-      A coluna do ticket é a que decide: quem está acima de 3 km costuma levar o carrinho maior e já paga o frete, enquanto o subsídio vai para quem está perto e gasta menos.
-    </div>`;
+    <div class="caption-label" title="As entregas vêm do TrackEat (Água Verde, Ahú e São Braz).">Faixa com menos de 30 entregas fica em cinza.</div>`;
 }
 
 // 26/10/2026: tela de Custo e cardápio movida para docs/cardapio/cardapio.js (bloco 5 do painel em módulos).
@@ -3958,11 +3873,8 @@ function renderModuloSite() {
     vendas: vendasF, cli: cliF, corteVenda, corteCliente, corteCupom, semAsc };
 
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;" title="O canal que é nosso: sem comissão de marketplace e com o cliente no nome. Venda e cliente (novo, quem voltou, recência) vêm do Saipos, todo dia pela API, nas três lojas próprias — o cliente é o telefone que o Saipos registra no pedido. Boqueirão e 2025 vêm do portal da Accon. Cupom e campanha (UTM) só a Accon tem. O período é o desta tela; o filtro de unidades do topo vale aqui.">Site próprio</div>
-  <div class="caption-label" style="text-align:center;">
-    Venda e cliente até <b>${ddmm(corteCliente && corteCliente < corteVenda ? corteCliente : corteVenda)}</b> (Saipos${fontes.includes('accon') ? '; Boqueirão e 2025 pela Accon' : ''}) ·
-    cupom e campanha (UTM) até <b>${ddmm(corteCupom)}</b> — esses dois só existem no portal da Accon.
-  </div>
+  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;" title="Venda e cliente vêm do Saipos, todo dia pela API; o cliente é o telefone do pedido.">Site próprio · venda e cliente até ${ddmm(corteCliente && corteCliente < corteVenda ? corteCliente : corteVenda)}</div>
+  <div class="caption-label" style="text-align:center;">Cupom e campanha (UTM) até <b>${ddmm(corteCupom)}</b>.</div>
   ${avisoVenda}${notaSemPedido}${avisoCliente}
   ${siteBarraPeriodo()}
   ${(SITE_F.loja || SITE_F.canal) ? `<div class="contexto" style="border-color:var(--brand);">
@@ -3970,7 +3882,7 @@ function renderModuloSite() {
     ${SITE_F.loja ? `<button class="preset-btn active" onclick="siteFiltrar('loja','${SITE_F.loja}')">loja ${SITE_F.loja} ✕</button>` : ''}
     ${SITE_F.canal ? `<button class="preset-btn active" onclick="siteFiltrar('canal','${SITE_F.canal}')">${SITE_F.canal} ✕</button>` : ''}
     <button class="preset-btn" onclick="siteLimparFiltros()">limpar</button>
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cartões, o gráfico, a tabela de semanas e o CSV estão neste recorte. Coorte, recência, base de clientes e campanhas não — essas quatro são da rede inteira (uma pessoa é um telefone, em qualquer loja); os cupons também ficam de fora, porque vêm por mês fechado. As tabelas de loja e de tipo de entrega continuam mostrando todas as opções, para você poder trocar.</div>
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Coorte, recência, base de clientes, campanhas e cupons não seguem este recorte.</div>
   </div>` : ''}
 
   <div class="cards">
@@ -3989,7 +3901,7 @@ function renderModuloSite() {
       <div class="card-val">${num(C.pedidos - C.pedNovos)}</div>
       <div class="card-pct">de ${num(C.pedidos)} pedidos com cliente identificado</div></div>
     <div class="card neutral"><div class="card-lbl">Cupom de primeira compra</div><div class="card-val">${num(C.cupomPrim)}</div>
-      <div class="card-pct">pedidos com PRIMEIRACOMPRA · só a Accon tem cupom: conta ${num(C.comAccon)} de ${num(C.pedidos)} pedidos, até ${ddmm(corteCupom)}</div></div>
+      <div class="card-pct" title="conta ${num(C.comAccon)} de ${num(C.pedidos)} pedidos (os que têm o código do cupom)">pedidos com cupom de 1ª compra, até ${ddmm(corteCupom)}</div></div>
     <div class="card neutral"><div class="card-lbl">Pedidos que pagam frete</div>
       <div class="card-val">${pct(C.pedidos ? C.comFrete / C.pedidos * 100 : 0)}%</div>
       <div class="card-pct">${reais(C.frete)} cobrados de frete</div></div>
@@ -4027,10 +3939,7 @@ function renderModuloSite() {
     <button class="preset-btn" onclick="siteBaixarCSV()">Baixar CSV (semana × loja)</button>
     <button class="preset-btn" id="btnSiteResumo" onclick="siteCopiarResumo()">Copiar resumo do período</button>
   </div>
-  <div class="caption-label">
-    O CSV sai separado por ponto e vírgula, com vírgula decimal — abre direto no Excel em português.
-    Sai só número agregado: nenhum nome, telefone ou e-mail de cliente deixa o painel.
-  </div>
+  <div class="caption-label">Só número agregado, nenhum dado de cliente; abre direto no Excel.</div>
 
   <div class="section-label">Por loja</div>
   <div class="caption-label" style="text-align:center;"><b>Clique numa loja para recortar a tela por ela.</b></div>
@@ -4060,7 +3969,7 @@ function renderModuloSite() {
       <td>${reais(c.fat)}</td><td>${reais(c.pedidos ? c.fat / c.pedidos : 0)}</td>
       <td>${reais(c.pedidos ? c.desc / c.pedidos : 0)}</td></tr>`).join('')}
   </table></div>
-  <div class="caption-label">Cupom só existe no portal da Accon (o Saipos não recebe o código) e vem por mês inteiro, então esta tabela pega os meses que a janela toca — ela não recorta no dia. <b>Nas três lojas próprias ela para no último export manual: ${ativas.filter(a => a.o_que === 'cupom').map(a => `${a.loja} ${ddmm(a.ate)}`).join(' · ')}.</b></div>
+  <div class="caption-label">Por mês inteiro, sem recorte no dia; vai até: <b>${ativas.filter(a => a.o_que === 'cupom').map(a => `${a.loja} ${ddmm(a.ate)}`).join(' · ')}</b>.</div>
 
   <div class="section-label">Quem estreou em cada mês voltou?</div>
   <div id="tabelaSiteCoorte"><table>
@@ -4075,7 +3984,7 @@ function renderModuloSite() {
     }).join('')}
   </table></div>
   <div class="caption-label" title="É a pergunta que decide se o tráfego pago se paga: trazer cliente que compra uma vez só custa caro. Mês recente teve menos tempo de voltar, então a queda no fim da lista é esperada.">
-    É da rede inteira (uma pessoa = um telefone, em qualquer loja) — não segue o filtro de unidades. Nas três lojas próprias vem do Saipos; Boqueirão e 2025, da Accon.
+    Da rede inteira (uma pessoa = um telefone); não segue o filtro de unidades.
   </div>
 
   <div class="section-label">Base de clientes hoje</div>
@@ -4947,7 +4856,8 @@ function renderModuloLogfin() {
         <td>R$ ${fmt(t.c)}</td><td>R$ ${fmt(t.g + t.c)}</td><td>R$ ${fmt(t.n ? (t.g + t.c) / t.n : 0)}</td></tr>`; })()}
   </table></div>
 
-  <div class="section-label">Simulação — diária por turno + taxa por corrida, tudo editável</div>
+  <details class="detalhes-extra" style="margin-top:16px;" ontoggle="window.LOGFIN_SIM_ABERTA=this.open"${window.LOGFIN_SIM_ABERTA ? ' open' : ''}>
+  <summary>Simulação — diária por turno + taxa por corrida (editável)</summary>
   <div class="contexto" title="Cada motoboy ganha uma diária por turno de escala (dia = almoço+café, noite = jantar+madrugada; a janela do iFood não vale como turno, senão a diária contaria duas vezes) mais a taxa por corrida. As taxas começam no reajuste proporcional que, com diária de R$ 50, empata com o custo de hoje.">Edite a coluna <b>Taxa nova</b> e a diária na última linha e veja na hora quanto muda — foram <b>${turnosReais} turnos</b> no período.
   <button class="preset-btn" onclick="logfinSimReset()" style="margin-left:8px;">voltar ao padrão (diária 50 + proporcional)</button></div>
   <div id="tabelaLogfinSim"><table>
@@ -4964,7 +4874,8 @@ function renderModuloLogfin() {
     <tr class="liq"><td><b>Total simulado</b></td><td>${entregas.toLocaleString('pt-BR')}</td><td>diárias + corridas</td><td id="lgsimTotN">R$ ${fmt(simCustoNovo)}</td><td>${abate > 0 ? '− R$ ' + fmt(abate) : '—'}</td><td id="lgsimTotLiq"><b>R$ ${fmt(simCustoNovo - abate)}</b></td></tr>
   </table></div>
   <div class="cards" id="lgsimCards">${logfinSimCardsHTML()}</div>
-  <div class="caption-label" style="text-align:center;">A diária substitui o garantido por hora — manter os dois seria pagar a garantia duas vezes. O "turno médio" reparte todo o custo simulado pelos ${turnosReais} turnos do período; turno forte paga mais, fraco paga menos.</div>
+  <div class="caption-label" style="text-align:center;">A diária substitui o garantido por hora; o turno médio reparte o custo pelos ${turnosReais} turnos.</div>
+  </details>
 
   <div class="section-label">Qualidade do apontamento — o quanto dá pra confiar nessa conta</div>
   <div class="contexto" title="As corridas das entregas sem entregador apontado entram no total, mas ficam fora da conta por pessoa. Turno sem horário confiável fica fora das horas e do complemento: hoje são ${turnosSemHora} sem horário e ${turnosSemSentido} com hora sem sentido (mais de ${fmt(logfinTeto())}h no turno). Turno com uma entrega só tem hora do tamanho daquela corrida, então o garantido quase não aparece nele: é o limite da régua primeira-última entrega, que ponto batido resolveria.">Entregas sem entregador apontado: <b>${pctTxt(semEntregador, entregas)}</b> (${semEntregador}).
@@ -5465,7 +5376,7 @@ function renderAllCanal(m, a, ant, contexto, ativo) {
   // modulo Tendencias — bruto x liquido, com agrupamento automatico pelo tamanho do periodo).
   html += `<div class="section-label">Evolução do resultado</div>
     <div class="chart-box" style="height:300px;">
-      <div class="chart-title">Faturamento bruto x líquido no tempo</div>
+      <div class="chart-title">Faturamento bruto x líquido, por ${granularidadeAutomatica() === 'dia' ? 'dia' : granularidadeAutomatica() === 'semana' ? 'semana' : 'mês'}</div>
       <div class="chart-canvas-wrap"><canvas id="chartTendencia"></canvas></div>
     </div>
     <div class="chart-box" style="height:340px; margin-top:14px;">
@@ -5476,8 +5387,7 @@ function renderAllCanal(m, a, ant, contexto, ativo) {
       </div>
       <div class="chart-canvas-wrap"><canvas id="chartUnidades"></canvas></div>
     </div>
-    <div class="caption-label" id="legendaUnidades" style="text-align:center;">${MODO_UNIDADES === 'pedidos' ? 'Cancelamento total não conta como pedido, a mesma regra do resto do painel. Cada unidade tem cor fixa: tirar uma do filtro não troca a cor das outras.' : 'Cada unidade começa em 100 na primeira semana em que teve pedido, então o que se compara é o movimento, não o tamanho. Acima de 100 cresceu desde então; abaixo, caiu.'}</div>
-    <div class="caption-label" style="text-align:center;">Agrupado por ${granularidadeAutomatica() === 'dia' ? 'dia' : granularidadeAutomatica() === 'semana' ? 'semana' : 'mês'}, conforme o tamanho do período filtrado.</div>`;
+    <div class="caption-label" id="legendaUnidades" style="text-align:center;">${MODO_UNIDADES === 'pedidos' ? CANAL_LEG_UNI_PED : CANAL_LEG_UNI_CRESC}</div>`;
   document.getElementById('view-content').innerHTML = html;
   document.getElementById('view-cancelamentos').innerHTML = contexto + moduloCancelamentos(m, a);
   document.getElementById('view-promocoes').innerHTML = contexto + moduloPromocoes();

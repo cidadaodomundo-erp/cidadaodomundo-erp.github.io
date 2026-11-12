@@ -399,27 +399,23 @@ function renderModuloRede(d) {
     <div class="section-label">Taxas da maquininha</div>
     <div class="contexto" style="text-align:left;">
       O que a <b>Rede</b> cobrou de fato (direto da API), comparado com o <b>combinado</b>. ${resumo}
-      <details style="margin-top:6px; font-size:12px; color:#9aa4af;"><summary style="cursor:pointer;">como ler</summary>
-        Taxa efetiva = taxa cobrada dividida pelo que passou, por tipo e bandeira. O combinado é o que foi negociado com a Rede;
-        quem grava é o dono (botão "definir"). Vale (VR, Ticket, Alelo, Pluxee) a Rede só captura: a taxa é da bandeira e não aparece aqui.
-        Aluguel é cobrado por máquina, uma vez por mês. Boqueirão fica fora (máquinas fora do credenciamento). Atualiza na rotina das APIs, 08:00.</details>
       ${filtros}
     </div>
     <div class="cards" style="display:flex; flex-wrap:wrap; gap:12px; margin:14px 0;">${cards}${card('Cobrado a mais que o combinado', reais(cobradoAMais), (F.mes ? mesLabel(F.mes) : 'todo o período') + (semCombinado ? ' · ' + semCombinado + ' sem combinado fica de fora' : ''), cobradoAMais > 0.005 ? 'var(--farol-fora)' : '')}</div>
     <div class="section-label">Taxa cobrada × combinada</div>
     <div class="card" style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; width:100%; min-width:760px;">
-      <tr><th style="${th} text-align:left;">tipo e bandeira</th><th style="${th} text-align:right;">vendas</th><th style="${th} text-align:right;">passou</th>
-        <th style="${th} text-align:right;">taxa cobrada</th><th style="${th} text-align:right;">efetiva</th><th style="${th} text-align:right;">combinada</th><th style="${th} text-align:left;">situação</th></tr>
+      <tr><th style="${th} text-align:left;" title="Vale (VR, Ticket, Alelo, Pluxee) a Rede só captura: a taxa é da bandeira e não aparece aqui. Boqueirão fica fora (máquinas fora do credenciamento).">tipo e bandeira</th><th style="${th} text-align:right;">vendas</th><th style="${th} text-align:right;">passou</th>
+        <th style="${th} text-align:right;">taxa cobrada</th><th style="${th} text-align:right;" title="taxa cobrada ÷ o que passou, por tipo e bandeira">efetiva</th><th style="${th} text-align:right;" title="o negociado com a Rede; quem grava é o dono, pelo botão salvar">combinada</th><th style="${th} text-align:left;">situação</th></tr>
       ${linhasTaxa || '<tr><td colspan="7" style="padding:8px; color:#9aa4af;">sem venda no filtro</td></tr>'}</table></div>
     <div class="section-label" style="margin-top:18px;">Aluguel cobrado × combinado</div>
     <div class="card" style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; width:100%; min-width:640px;">
       <tr><th style="${th} text-align:left;">loja</th><th style="${th} text-align:left;">mês</th><th style="${th} text-align:right;">máquinas cobradas</th>
-        <th style="${th} text-align:right;">cobrado</th><th style="${th} text-align:right;">combinado</th><th style="${th} text-align:left;">situação</th></tr>
+        <th style="${th} text-align:right;" title="cobrado por máquina, uma vez por mês">cobrado</th><th style="${th} text-align:right;">combinado</th><th style="${th} text-align:left;">situação</th></tr>
       ${linhasAlug || '<tr><td colspan="6" style="padding:8px; color:#9aa4af;">sem cobrança de aluguel no filtro</td></tr>'}</table></div>
     ${outras.length ? `<div class="section-label" style="margin-top:18px;">Outras cobranças da Rede</div>
     <div class="card" style="overflow-x:auto;"><table style="border-collapse:collapse; font-size:12px; width:100%;">
-      <tr><th style="${th} text-align:left;">loja</th><th style="${th} text-align:left;">mês</th><th style="${th} text-align:left;">o que</th><th style="${th} text-align:right;">n</th><th style="${th} text-align:right;">valor</th></tr>${linhasOutras}</table></div>` : ''}
-    <div class="contexto" style="margin-top:14px; color:#8a897e; font-size:11.5px;">Fonte: API da Rede em produção. A agenda de recebíveis não entra aqui — está fora do ar do lado da Rede.</div>`;
+      <tr><th style="${th} text-align:left;">loja</th><th style="${th} text-align:left;">mês</th><th style="${th} text-align:left;">o que</th><th style="${th} text-align:right;">n</th><th style="${th} text-align:right;">valor</th></tr>${linhasOutras}</table></div>` : ''}`;
+  // 12/11/2026 (lote 3 dinheiro-31): sairam o "como ler" (o essencial foi para o title das colunas) e o rodapé da fonte
 }
 
 // 26/10/2026: tela de Pessoas movida para docs/pessoas/pessoas.js (bloco 4 do painel em módulos).
@@ -453,6 +449,8 @@ const CONCB_TOLERANCIA_DIAS = 1;
 // Dia escolhido a mao pelas setas. Null = o sistema decide (o mais antigo em
 // aberto). Fica fora do CONCB para sobreviver ao recarregar dos dados.
 let CONCB_DIA_ESCOLHIDO = null;
+// 12/11/2026: filas que a pessoa abriu inteiras ("ver todas as N"); sobrevive ao recarregar dos dados
+const CONCB_VER_TODAS = new Set();
 
 const CONCB_TOL_CENTAVOS = 0.005;   // zero de verdade; so o arredondamento passa
 
@@ -463,14 +461,12 @@ async function entrarConcbanco() {
   if (CONCB) { renderConcbanco(); return; }
   alvo.innerHTML = '<div class="contexto">Carregando a conciliação...</div>';
   try {
-    const [placar, pend, saldoDia, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, matur, avisos, conferencia, parcial] = await Promise.all([
+    // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
+    // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
+    const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
+           diaSaldo, duvidas, sresiduo, parcial] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
-      // 18/10/2026: a materializada nao tem RLS; o login le pela JANELA (vw_..._tela, fechada para
-      // filial — script/sql/financeiro_fechado_para_filial_2026_10_18.sql). Sem a janela, a materializada.
-      consultarTudo('vw_fin_conciliacao_saldo_dia_tela?select=*&order=data.desc')
-        .catch(() => consultarTudo('mv_fin_conciliacao_saldo_dia?select=*&order=data.desc')),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
       consultarTudo('fin_conciliacao_marcacao?select=*&order=criado_em.desc'),
       consultarTudo('vw_fin_conciliacao_nao_confirmou?select=*'),
@@ -483,24 +479,11 @@ async function entrarConcbanco() {
       // no chat (marcacao 'saipos|...' com nao_vigiar) — caso Flavio/Viviane de
       // 28/08/2026, que reaparecia como alarme depois de validado.
       consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao&order=data'),
-      // MATURIDADE: so as familias com volume, ordenadas por movimento. Sem o
-      // corte, 490 das 600 familias sao contraparte que apareceu 3 vezes em 90
-      // dias — barulho que esconde as 30 que decidem alguma coisa.
-      consultarTudo('vw_fin_conciliacao_maturidade?select=*&linhas=gte.10&order=linhas.desc'),
-      // Aviso da rotina unificada (28/08/2026): a rotina de conciliacao+lancamento
-      // grava aqui quando termina cada passada; o banner diz a Hellen a hora de
-      // agir. So leitura — quem escreve e a rotina, via conexao do servidor.
-      consultarTudo('fin_conciliacao_aviso?select=*&order=criado_em.desc&limit=5'),
-      // O QUE NAO BATE, LINHA A LINHA (dono, 25/09/2026: "vc que tem que nos
-      // informar as diferencas entre banco e Saipos"). A conferencia ja nomeia a
-      // linha que falta ou sobra no Saipos em cada dia em que o saldo nao fecha;
-      // o painel nao lia isso e so mostrava o total.
-      consultarTudo('vw_fin_conciliacao_conferencia?select=*&verificacao=eq.SALDO%20NAO%20FECHA'),
       // 07/11/2026 (auditoria lote 1, dinheiro-18): o dia cujo extrato veio parcial (OFX baixado no meio do dia)
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
     ]);
-    CONCB = { placar, pend, saldoDia, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, matur, avisos, conferencia, parcial };
+    CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
+              diaSaldo, duvidas, parcial };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -517,6 +500,11 @@ async function entrarConcbanco() {
 // com a senha unica, e pedir um segundo login so para marcar era atrito sem
 // ganho. O rastro continua pela identificacao escolhida na tela, lembrada no
 // navegador — quem quiser marcar sem se identificar fica como PAINEL.
+// 12/11/2026: hora do retorno da barra (avisoAcao) — "✓ … às HH:MM"
+function concbHora() {
+  return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+}
+
 function concbQuem() {
   const s = rmbSessao();
   if (!s) return localStorage.getItem('concbQuem') || 'PAINEL';
@@ -593,10 +581,12 @@ async function concbEnviarOfx(inp, bt) {
     }
   } catch (e) {
     bt.textContent = texto; bt.disabled = false;
-    alert('Não consegui enviar: ' + e.message);
+    // 12/11/2026 (usabilidade, T9): retorno na barra fixa do núcleo, não em alert
+    avisoAcao('erro', '✗ Extrato não enviado: ' + e.message, () => inp.click());
     return;
   }
   bt.textContent = texto; bt.disabled = false;
+  avisoAcao('atencao', '✓ Extrato enviado às ' + concbHora() + ' · atualizando a conciliação…');
   // enviar sem importar não serve para nada: dispara o ciclo na sequência
   await concbRodarComparador(document.getElementById('concbAtualizar'));
 }
@@ -631,14 +621,18 @@ async function concbRodarComparador(bt) {
       const linha = (await q.json())[0];
       if (linha) estado = linha.status;
       bt.textContent = estado === 'RODANDO' ? 'rodando...' : 'na fila...';
-      if (estado === 'ERRO') { alert('Não consegui atualizar: ' + (linha.resumo || '')); break; }
+      if (estado === 'ERRO') { avisoAcao('erro', '✗ Não atualizou: ' + (linha.resumo || 'erro na rotina'), () => concbRodarComparador(document.getElementById('concbAtualizar') || bt)); break; }
     }
     if (estado === 'PENDENTE') {
-      alert('O pedido entrou na fila mas ninguém atendeu. A máquina das rotinas '
-          + 'pode estar desligada — a conciliação da manhã pega isso de qualquer jeito.');
+      avisoAcao('atencao', '✗ O pedido entrou na fila e ninguém atendeu: a máquina das rotinas pode estar desligada. '
+          + 'A próxima passada da conciliação pega isso.', () => concbRodarComparador(document.getElementById('concbAtualizar') || bt));
+    } else if (estado === 'OK') {
+      avisoAcao('ok', '✓ Conciliação atualizada às ' + concbHora());
+    } else if (estado === 'RODANDO') {
+      avisoAcao('atencao', 'A atualização ainda está rodando · a tela mostra o que já chegou às ' + concbHora());
     }
   } catch (e) {
-    alert('Não consegui pedir a atualização: ' + e.message);
+    avisoAcao('erro', '✗ Não consegui pedir a atualização: ' + e.message, () => concbRodarComparador(document.getElementById('concbAtualizar') || bt));
   }
   bt.textContent = texto;
   bt.disabled = false;
@@ -675,9 +669,8 @@ async function concbRodarComparador(bt) {
 async function concbAvisaLista(nome, r) {
   const detalhe = await r.text().catch(() => '');
   console.error('lista ' + nome + ' falhou', r.status, detalhe);
-  alert('Não consegui carregar a lista de ' + nome + ' (erro ' + r.status + ').\n\n'
-      + 'Quase sempre é a sessão que expirou: recarregue a página (F5) e entre de novo.\n'
-      + 'Se continuar, me chame — a lista vazia aqui esconderia o erro.');
+  avisoAcao('erro', '✗ Não carregou a lista de ' + nome + ' (erro ' + r.status + '). '
+      + 'Quase sempre é a sessão que expirou: recarregue a página (F5) e entre de novo.');
 }
 
 let CONCB_CATEGORIAS = null;
@@ -735,7 +728,7 @@ async function concbFormEnsinar(d) {
     '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;'
     + 'opacity:.8;margin-bottom:3px">' + rotulo + '</label>'
     + '<input id="' + id + '" placeholder="' + dica + '" style="width:100%;padding:6px 8px;'
-    + 'font-size:13px;border:1px solid #8a897e;border-radius:4px;background:transparent;'
+    + 'font-size:13px;border:1px solid var(--line-2);border-radius:4px;background:transparent;'
     + 'color:inherit;box-sizing:border-box"></div>';
   // Lista fechada de proposito: digitar a categoria na mao foi o que trouxe esta
   // proposta — a Hellen digitou uma em 21/08, e categoria errada joga o
@@ -751,7 +744,7 @@ async function concbFormEnsinar(d) {
     '<div style="margin-bottom:10px"><label style="display:block;font-size:11px;'
     + 'opacity:.8;margin-bottom:3px">' + rotulo + '</label>'
     + '<select id="' + id + '" style="width:100%;padding:6px 8px;font-size:13px;'
-    + 'border:1px solid #8a897e;border-radius:4px;background:#1a1a19;color:inherit;'
+    + 'border:1px solid var(--line-2);border-radius:4px;background:var(--surface);color:inherit;'
     + 'box-sizing:border-box"><option value="">\u2014 escolha \u2014</option>'
     + itens.map(v => v && typeof v === 'object'
       ? '<option value="' + seguro(v.v) + '">' + seguro(v.t) + '</option>'
@@ -773,8 +766,8 @@ async function concbFormEnsinar(d) {
   cx.id = 'concbFormEnsinar';
   cx.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;'
     + 'display:flex;align-items:center;justify-content:center';
-  cx.innerHTML = '<div style="background:#1a1a19;color:#e8e6dc;padding:18px 20px;'
-    + 'border-radius:8px;max-width:460px;width:92%;border:1px solid #8a897e">'
+  cx.innerHTML = '<div style="background:var(--surface);color:var(--tx-1);padding:18px 20px;'
+    + 'border-radius:8px;max-width:460px;width:92%;max-height:92vh;overflow-y:auto;border:1px solid var(--line-2)">'
     + '<div style="font-weight:700;margin-bottom:4px">Ensinar esta linha</div>'
     + '<div style="font-size:12px;opacity:.8;margin-bottom:14px">No banco: <b>'
     + seguro(d.nome || d.memo || '') + '</b>'
@@ -819,12 +812,9 @@ async function concbFormEnsinar(d) {
     +   campo('ensPalavra', 'Palavra que agrupa', 'ex.: REDECARD')
     + '</div>'
     + '<div style="text-align:right;margin-top:14px">'
-    + '<button id="ensCancela" style="font-size:12px;padding:5px 12px;margin-right:6px;'
-    + 'cursor:pointer;border:1px solid #8a897e;background:transparent;color:inherit;'
-    + 'border-radius:4px">cancelar</button>'
-    + '<button id="ensSalva" style="font-size:12px;padding:5px 14px;cursor:pointer;'
-    + 'border:1px solid #c8102e;background:transparent;color:#c8102e;border-radius:4px">'
-    + 'guardar</button></div></div>';
+    + '<button id="ensCancela" class="preset-btn" style="margin-right:6px">cancelar</button>'
+    + '<button id="ensSalva" class="preset-btn" style="border-color:var(--tx-2);color:var(--tx-1)">'
+    + 'guardar a regra</button></div></div>';
   document.body.appendChild(cx);
   // A TELA PERGUNTA SO O QUE CABE. Transferencia nao tem categoria e
   // despesa/receita nao tem conta de origem e destino — palavras do dono,
@@ -899,22 +889,23 @@ async function concbFormEnsinar(d) {
     }
     // MARCOU QUE AGRUPA E NAO DISSE A PALAVRA: sem ela o agrupamento nao existe,
     // e gravar assim faria a pessoa achar que ensinou algo que nao vai valer.
+    // 12/11/2026: o que falta preencher aparece na barra fixa (avisoAcao), não em alert — a janela fica aberta
     if (agrupa && !palavra) {
-      alert('Você marcou que o banco manda várias linhas. Escreva a palavra que aparece em todas elas.');
+      avisoAcao('atencao', 'Falta a palavra que agrupa: você marcou que o banco manda várias linhas.');
       return;
     }
     // A descricao e o unico campo obrigatorio: e ela que vira o par de de-para e
     // faz a linha casar sozinha da proxima vez. Os outros dois enriquecem.
-    if (!desc) { alert('A descrição do Saipos é o que faz a linha casar. Preencha ela.'); return; }
+    if (!desc) { avisoAcao('atencao', 'Falta a descrição no Saipos: é ela que faz a linha casar.'); return; }
     // Sem resposta nao se chuta: SIM lancaria em dobro uma conta que so devia casar.
-    if (!robo) { alert('Escolha se o robô lança (SIM), se a regra serve só para casar (NÃO) ou se já tem provisão e o robô só dá a baixa.'); return; }
+    if (!robo) { avisoAcao('atencao', 'Falta escolher "Robô lança?": sim, não ou já tem provisão.'); return; }
     const nomeBanco = document.getElementById('ensNome').value.trim().toUpperCase();
     // O documento vai para a regra ESCRITO COMO O BANCO ESCREVE (pontos, barra e
     // traco): o aplicar_licoes usa o texto como padrao, e so digitos nao casariam
     // com "385.789.238-20" no memo. Quem digita so numeros nao precisa saber disso.
     const dig = document.getElementById('ensDoc').value.replace(/\D/g, '');
     if (dig && dig.length !== 11 && dig.length !== 14) {
-      alert('O CPF tem 11 números e o CNPJ tem 14. Confira ou deixe o campo vazio.');
+      avisoAcao('atencao', 'CPF tem 11 números e CNPJ tem 14: confira ou deixe o campo vazio.');
       return;
     }
     const docFinal = dig.length === 11
@@ -983,18 +974,21 @@ async function concbGravarLicao(corpo) {
   let r;
   // try/catch em volta: sem ele, qualquer erro daqui morre como promessa
   // rejeitada e a pessoa fica achando que gravou. Aviso na cara e obrigatorio.
+  // 12/11/2026 (usabilidade, T9): enviando → ✓ às HH:MM / ✗ motivo + tentar de novo, na barra fixa
+  const deNovo = () => concbGravarLicao(corpo);
+  avisoAcao('atencao', 'Gravando…');
   try {
     r = await fetch(`${SUPABASE_URL}/rest/v1/fin_licao`, {
       method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }),
       body: JSON.stringify(corpo) });
   } catch (e) {
-    alert('Não consegui gravar: ' + e.message);
+    avisoAcao('erro', '✗ Não gravou: ' + e.message, deNovo);
     return;
   }
-  if (!r.ok) { alert('Não gravou: ' + (await r.text()).slice(0, 140)); return; }
-  alert(corpo.tipo === 'NOME'
-    ? 'Guardado. Na próxima atualização essa linha já casa sozinha.'
-    : 'Guardado. Vai ser lido e aplicado — não é automático.');
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + (await r.text()).slice(0, 140), deNovo); return; }
+  avisoAcao('ok', corpo.tipo === 'NOME'
+    ? '✓ Guardado às ' + concbHora() + ' · na próxima atualização essa linha já casa sozinha'
+    : '✓ Guardado às ' + concbHora() + ' · vai ser lido e aplicado (não é automático)');
 }
 
 // CONCILIAR EM LOTE: uma chamada com todas as linhas marcadas, e um recarregar
@@ -1004,7 +998,7 @@ async function concbConciliarMarcadas(bt) {
   const tab = document.getElementById(bt.dataset.alvo);
   if (!tab) return;
   const marcadas = [...tab.querySelectorAll('.concb-check')].filter(x => x.checked);
-  if (!marcadas.length) { alert('Marque as linhas que você já conciliou no Saipos.'); return; }
+  if (!marcadas.length) { avisoAcao('atencao', 'Nenhuma linha marcada: marque as que você já conciliou no Saipos.'); return; }
   const quem = await concbGarantirQuem();
   if (!quem) return;
   const s = rmbSessao();
@@ -1021,7 +1015,8 @@ async function concbConciliarMarcadas(bt) {
       body: JSON.stringify(corpo) });
   }
   bt.disabled = false; bt.textContent = texto;
-  if (!r.ok) { alert('Não gravou: ' + (await r.text()).slice(0, 140)); return; }
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + (await r.text()).slice(0, 140), () => concbConciliarMarcadas(bt)); return; }
+  avisoAcao('ok', '✓ ' + marcadas.length + (marcadas.length === 1 ? ' linha conciliada' : ' linhas conciliadas') + ' às ' + concbHora());
   CONCB = null;
   await entrarConcbanco();
 }
@@ -1031,7 +1026,8 @@ async function concbDesmarcar(conta, fitid) {
     + `?conta=eq.${encodeURIComponent(conta)}&fitid=eq.${encodeURIComponent(fitid)}`;
   let r = await fetch(url, { method: 'DELETE', headers: rmbHeaders() });
   if (await rmbRenovarSeExpirado(r)) r = await fetch(url, { method: 'DELETE', headers: rmbHeaders() });
-  if (!r.ok) { alert('Não desfez: ' + (await r.text()).slice(0, 140)); return; }
+  if (!r.ok) { avisoAcao('erro', '✗ Não desfez: ' + (await r.text()).slice(0, 140), () => concbDesmarcar(conta, fitid)); return; }
+  avisoAcao('ok', '✓ Marcação desfeita às ' + concbHora() + ' · a linha voltou para a fila');
   CONCB = null;
   await entrarConcbanco();
 }
@@ -1089,7 +1085,7 @@ function renderConcbanco() {
   // o dia a dia". Quem concilia precisa saber o que fazer, nao como eu penso.
   const cru = CONCB;
   const daLoja = (arr) => (arr || []).filter(r => lojaFin() === 'REDE' || r.unidade === lojaFin());
-  const placar = daLoja(cru.placar), pend = daLoja(cru.pend), saldoDia = daLoja(cru.saldoDia);
+  const placar = daLoja(cru.placar), pend = daLoja(cru.pend);
   const naoConf = daLoja(cru.naoConf);
   const saldoConf = daLoja(cru.saldoConf);
   const aFazer = daLoja(cru.aFazer);
@@ -1107,7 +1103,7 @@ function renderConcbanco() {
   if (!placar.length) {
     alvo.innerHTML = seletorLojaFin() +
       '<div class="contexto">Sem conciliação para <b>' + nomeLojaFin() + '</b> ainda. ' +
-      'A rotina roda todo dia às 08:40 e alimenta esta tela.</div>';
+      'A conciliação roda de 10 em 10 minutos nos dias úteis e alimenta esta tela.</div>';
     return;
   }
 
@@ -1238,7 +1234,8 @@ function renderConcbanco() {
     // coluna do saldo souber a resposta, esta marca e promovida a ✓ ou ✗. Sem isso a
     // linha se contradizia: travessao cinza no status e "Saipos igual" em verde no
     // saldo, na mesma linha (dono, 09/09/2026, olhando PARTICIPACOES e SANTANDER).
-    let cor = !c.temOntem ? '#a5a49a' : fechou ? '#2e7d32' : semExtrato ? '#b8860b' : '#c8102e';
+    // 12/11/2026: cor só por token de farol (o vermelho da marca não é status)
+    let cor = !c.temOntem ? 'var(--tx-3)' : fechou ? 'var(--farol-ok)' : semExtrato ? 'var(--farol-perto)' : 'var(--farol-fora)';
     let marca = !c.temOntem ? '—' : fechou ? '✓' : semExtrato ? '?' : '✗';
     // total do banco em cima; embaixo, quando os totais do dia nao batem, a
     // diferenca contra o Saipos daquele lado — e o numero que diz ONDE procurar
@@ -1247,7 +1244,7 @@ function renderConcbanco() {
       if (!c.temOntem || Math.abs(v) < CONCB_TOL_CENTAVOS)
         return '<span style="opacity:.4">—</span>';
       const difTxt = Math.abs(dif || 0) >= CONCB_TOL_CENTAVOS
-        ? '<div style="font-size:11px;color:#c8102e">Saipos difere ' + rs(Math.abs(dif)) + '</div>'
+        ? '<div style="font-size:11px;color:var(--farol-fora)">Saipos difere ' + rs(Math.abs(dif)) + '</div>'
         : '';
       return '<span style="color:' + cor + '">' + rs(Math.abs(v)) + '</span>' + difTxt;
     };
@@ -1313,7 +1310,7 @@ function renderConcbanco() {
       if (semExtratoDe) {
         // Extrato parado não é diferença: é falta de dado, e não se resolve
         // conciliando. Mostrar o saldo velho como se fosse o de ontem mente.
-        saldoTxt = '<span style="color:#b8860b">extrato parado'
+        saldoTxt = '<span style="color:var(--farol-perto)">extrato parado'
           + (semExtratoDe === 'nunca' ? '' : ' em ' + semExtratoDe) + '</span>';
       } else if (parcialDia && parcialDia === diaAlvo) {
         saldoTxt = '<span style="color:var(--farol-perto)">extrato parcial de ' + ddmm(parcialDia) + '</span>';
@@ -1330,7 +1327,7 @@ function renderConcbanco() {
         // ela ainda responde. Verde quando banco e Saipos dão o mesmo número.
         if (!c.temOntem) {
           marca = bateu ? '✓' : '✗';
-          cor = bateu ? '#2e7d32' : '#c8102e';
+          cor = bateu ? 'var(--farol-ok)' : 'var(--farol-fora)';
         }
         // A decomposição (fila, outra data, varredura) só existe para ONTEM: ela
         // depende do resíduo acumulado que o comparador grava. Em dia anterior eu
@@ -1345,17 +1342,17 @@ function renderConcbanco() {
         // de resto, e a tela pintava de vermelho uma conta fechada).
         saldoTxt = (ultimoMov ? '<span style="opacity:.7">último movimento ' + ultimoMov + '</span> · ' : '')
           + '<b>' + rs(sd.saldo_banco) + '</b> · '
-          + (bateu ? '<span style="color:#2e7d32">Saipos igual</span>'
+          + (bateu ? '<span style="color:var(--farol-ok)">Saipos igual</span>'
              : Math.abs(sobra) >= TOL_SALDO
-               ? '<span style="color:#c8102e">Saipos ' + rs(sd.saldo_saipos)
+               ? '<span style="color:var(--farol-fora)">Saipos ' + rs(sd.saldo_saipos)
                  + ', R$ ' + rs(Math.abs(sobra))
                  + (temDecomposicao ? ' sem explicação' : ' de diferença') + '</span>'
-               : '<span style="color:#2e7d32">conferido</span>');
+               : '<span style="color:var(--farol-ok)">conferido</span>');
         // ✓ SO COM O SALDO BATENDO (25/09/2026): a marca vinha so da fila do banco,
         // e a ITAU AV aparecia verde com o Saipos R$ 12.400 acima — a linha que
         // faltava estava marcada como conciliada e a que sobrava era do Saipos.
         if (!bateu && Math.abs(sobra) >= TOL_SALDO) {
-          marca = '✗'; cor = '#c8102e'; saldoNaoBate.add(conta);
+          marca = '✗'; cor = 'var(--farol-fora)'; saldoNaoBate.add(conta);
         }
       }
     }
@@ -1369,8 +1366,8 @@ function renderConcbanco() {
         + '" title="ver as linhas desta conta" style="cursor:pointer"' : '';
     return '<tr' + irPara + '><td style="text-align:left;font-size:18px;color:' + cor + '">' + marca + '</td>'
       + '<td style="text-align:left"><b>' + esc(nomeConta(conta)) + '</b></td>'
-      + '<td ' + td + '>' + lado(c.entrou, '#2e7d32', c.difEnt) + '</td>'
-      + '<td ' + td + '>' + lado(c.saiu, '#c8102e', c.difSai) + '</td>'
+      + '<td ' + td + '>' + lado(c.entrou, 'var(--farol-ok)', c.difEnt) + '</td>'
+      + '<td ' + td + '>' + lado(c.saiu, 'var(--farol-fora)', c.difSai) + '</td>'
       + '<td ' + td + ' title="' + esc(saldoTitulo) + '">' + saldoTxt + '</td></tr>';
   };
 
@@ -1393,7 +1390,7 @@ function renderConcbanco() {
     const linhaSr = srSai.map(r =>
       '<tr><td style="text-align:left">' + esc(r.descricao || '') + '</td>' +
       '<td style="text-align:left">' + esc(r.subtipo || '') + '</td>' +
-      '<td style="text-align:right">' + rs(Math.abs(n(r.valor))) + '</td></tr>').join('');
+      '<td style="text-align:left">' + rs(Math.abs(n(r.valor))) + '</td></tr>').join('');
     // Dono, 03/09/2026: o titulo "A conta da diferenca" e a frase de somas
     // sairam — "podemos manter somente as grades com as diferencas". Fica so a
     // tabela do lado que a fila nao mostra (Saipos sem banco), com o nome da
@@ -1401,13 +1398,12 @@ function renderConcbanco() {
     return (srSai.length
         ? '<div id="tabelaConcbSres' + esc(conta).replace(/\W/g, '') + '" style="overflow-x:auto"><table style="width:100%">' +
           '<thead><tr><th style="text-align:left">' + esc(nomeConta(conta)) + ' — lançado no Saipos, sem débito no banco no dia</th>' +
-          '<th style="text-align:left">Categoria</th><th style="text-align:right">Valor</th></tr></thead>' +
+          '<th style="text-align:left">Categoria</th><th style="text-align:left">Valor</th></tr></thead>' +
           '<tbody>' + linhaSr +
-          '<tr><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:right"><b>' +
+          '<tr class="liq"><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:left"><b>' +
           rs(srTot) + '</b></td></tr></tbody></table></div>' +
-          '<div class="caption-label" style="text-align:left">Lançado adiantado, valor divergente, ' +
-          'ou movimento que nunca saiu do banco. Não é para lançar de novo — é para conferir se o ' +
-          'lançamento está certo.</div>'
+          // 12/11/2026 (T4): legenda de uma linha
+          '<div class="caption-label" style="text-align:left">Não lance de novo: confira se o lançamento do Saipos está certo.</div>'
         : '');
   }).join('');
 
@@ -1416,12 +1412,12 @@ function renderConcbanco() {
   const linhasGrade = nomes.map(cartao).join('');
   const ruins = [...new Set(naoFecharam.concat([...saldoNaoBate]))].filter(c => !contaParcial.has(c));
   const resumo = ruins.length
-    ? '<b style="color:#c8102e">' + ruins.length
+    ? '<b style="color:var(--farol-fora)">' + ruins.length
       + (ruins.length === 1 ? ' conta não fechou ' : ' contas não fecharam ')
       + quando + '.</b> Confira as linhas abaixo.'
     : contaParcial.size
       ? '<b style="color:var(--farol-perto)">Extrato parcial ' + quando + '.</b> O saldo fecha quando chegar o extrato do dia inteiro.'
-    : '<b style="color:#2e7d32">Tudo certo ' + quando + '.</b> Nada a fazer nesta loja.';
+    : '<b style="color:var(--farol-ok)">Tudo certo ' + quando + '.</b> Nada a fazer nesta loja.';
 
   // O quadro "O QUE CORRIGIR NO SAIPOS" (25/09) saiu em 29/09 a pedido do dono:
   // era redundante com as tabelas de ensinar/conciliar abaixo, e confundia.
@@ -1434,10 +1430,13 @@ function renderConcbanco() {
   // Caixa de marcar, nao botao (dono, 19/08/2026): ela marca varias linhas e
   // manda conciliar de uma vez. Um botao por linha obriga a esperar o recarregar
   // da tela a cada clique — com 30 linhas isso e meia hora de espera somada.
-  const botoes = (p) => '<input type="checkbox" class="concb-check"'
+  // 12/11/2026 (usabilidade 07/11): a caixa de marcar fica na coluna ✓ e "ensinar" / "não sei" viram botões de
+  // tamanho normal na coluna Ação — antes os três dividiam a mesma célula, em 10px e meio apagados.
+  const marcar = (p) => '<input type="checkbox" class="concb-check"'
     + ' data-conta="' + String(p.conta).replace(/"/g, '&quot;')
     + '" data-fitid="' + String(p.fitid).replace(/"/g, '&quot;')
-    + '" style="width:16px;height:16px;cursor:pointer">'
+    + '" style="width:18px;height:18px;cursor:pointer" aria-label="marcar como conciliada">';
+  const botoes = (p) => ''
     // ENSINAR EM TODA LINHA — pedido do dono, 24/08/2026: "ele deve aparecer
     // dentro do painel ao lado de cada linha onde ainda tem duvida". Ate aqui o
     // botao so aparecia quando a linha vinha SEM descricao, que e o caso mais
@@ -1445,23 +1444,21 @@ function renderConcbanco() {
     // forma de pagamento faltando ou pertencendo a um agrupamento que ninguem
     // cadastrou. Toda linha que chega nesta fila ainda tem duvida — e por isso
     // que ela esta aqui.
-    + ('<br><button class="concb-ensina" data-conta="' + String(p.conta).replace(/"/g, '&quot;')
+    + ('<button class="preset-btn concb-ensina" data-conta="' + String(p.conta).replace(/"/g, '&quot;')
        + '" data-fitid="' + String(p.fitid).replace(/"/g, '&quot;')
        + '" data-nome="' + String(p.nome || '').replace(/"/g, '&quot;')
        + '" data-memo="' + String(p.memo || '').replace(/"/g, '&quot;')
-       + '" style="font-size:10px;padding:2px 6px;margin-top:3px;cursor:pointer;border:none;'
-       + 'background:transparent;color:inherit;opacity:.6;text-decoration:underline">'
+       + '" style="margin:2px 4px 2px 0">'
        + 'ensinar</button>'
        // NAO SEI: a alternativa era deixar a linha na fila em silencio. Funciona
        // — ela volta amanha —, mas nao avisa ninguem, e quem concilia fica sem
        // saida quando nao acha o lancamento nem sabe cria-lo. Registrar a duvida
        // custa um clique e vira lista para o dono (pedido dele, 21/08/2026).
-       + '<button class="concb-duvida" data-conta="' + String(p.conta).replace(/"/g, '&quot;')
+       + '<button class="preset-btn concb-duvida" data-conta="' + String(p.conta).replace(/"/g, '&quot;')
        + '" data-fitid="' + String(p.fitid).replace(/"/g, '&quot;')
        + '" data-nome="' + String(p.nome || '').replace(/"/g, '&quot;')
        + '" data-memo="' + String(p.memo || '').replace(/"/g, '&quot;')
-       + '" style="font-size:10px;padding:2px 6px;margin-top:3px;cursor:pointer;border:none;'
-       + 'background:transparent;color:inherit;opacity:.6;text-decoration:underline">'
+       + '" style="margin:2px 0">'
        + 'não sei</button>');
 
   // ENTRADA primeiro, SAIDA depois — ordem de trabalho definida pelo dono. Sao
@@ -1489,9 +1486,12 @@ function renderConcbanco() {
     // precisa saber de relance em qual esta — o titulo sozinho perde a briga
     // quando a lista e longa e a pessoa rolou a tela.
     const ent = lado === 'ent';
-    const cor = ent ? '#2e7d32' : '#c8102e';
+    const cor = ent ? 'var(--farol-ok)' : 'var(--farol-fora)';
     const idTabela = 'tabelaConcbFila' + conta.replace(/[^A-Za-z]/g, '') + lado
       + (temProv ? 'P' : 'S');
+    // 12/11/2026: "ver todas as N" no lugar do corte mudo em 30
+    const verTodas = CONCB_VER_TODAS.has(idTabela);
+    const mostra = verTodas ? lista : lista.slice(0, 30);
     return '<div style="margin:14px 0 6px;padding:6px 10px;border-left:4px solid ' + cor + ';'
       + 'background:' + (ent ? 'rgba(46,125,50,.07)' : 'rgba(200,16,46,.07)') + '">'
       + '<b style="color:' + cor + ';font-size:13px">'
@@ -1504,44 +1504,49 @@ function renderConcbanco() {
       // table-layout fixo com larguras declaradas: sem isso a coluna "Descrição"
       // estica com o texto mais longo e joga o botao para fora do quadro. Se
       // ainda nao couber, a barra horizontal aparece so nesta div.
+      // 12/11/2026 (usabilidade 07/11): colunas Data | Descrição | Valor | Categoria | O que é | Ação | ✓, tudo à
+      // esquerda, texto sem reticências (quebra a linha em vez de cortar) e sem a largura mínima que rolava de lado.
       '<div style="overflow-x:auto" id="' + idTabela
-      + '"><table style="table-layout:fixed;width:100%;min-width:560px">'
-      + '<colgroup><col style="width:48px"><col style="width:86px"><col>'
-      + '<col style="width:150px"><col style="width:118px"><col style="width:96px"></colgroup>'
-      // O CSS do painel alinha celula de tabela a direita por padrao (serve para
-      // as tabelas de numero). Aqui a maioria e texto, e texto colado na direita
-      // com vao no meio fica ilegivel — so Data e Valor continuam alinhados.
+      + '"><table style="width:100%">'
       + '<thead><tr>' +
-      '<th style="text-align:left">Data</th><th style="text-align:right">Valor</th>'
+      '<th style="text-align:left">Data</th>'
       + '<th style="text-align:left">Descrição</th>'
-      + '<th style="text-align:left">O que é</th>'
+      + '<th style="text-align:left">Valor</th>'
       + '<th style="text-align:left">Categoria</th>'
-      + '<th style="text-align:center"><input type="checkbox" class="concb-todos"'
-      + ' data-alvo="' + idTabela + '" title="marcar todas"'
-      + ' style="width:16px;height:16px;cursor:pointer"></th>' +
+      + '<th style="text-align:left">O que é</th>'
+      + '<th style="text-align:left">Ação</th>'
+      + '<th style="text-align:center">✓</th>' +
       '</tr></thead><tbody>' +
       // DESCRICAO e o historico a digitar, quando eu sei qual e; sem isso, mostro
       // quem esta do outro lado no banco — nunca um palpite escrito como se fosse
       // certeza. O QUE E diz de onde a linha veio; CATEGORIA e a do Saipos.
-      lista.slice(0, 30).map(p =>
-        '<tr><td style="font-size:12px;text-align:left">' + ddmm(p.data) + '</td>' +
-        '<td style="text-align:right;color:' + cor + ';font-weight:600;white-space:nowrap">'
-          + rs(p.valor) + '</td>' +
-        '<td style="text-align:left;overflow:hidden;text-overflow:ellipsis">' + (p.descricao_lancar
+      mostra.map(p =>
+        '<tr><td style="font-size:12px;text-align:left;white-space:nowrap">' + ddmm(p.data) + '</td>' +
+        '<td style="text-align:left;white-space:normal">' + (p.descricao_lancar
             ? '<b>' + esc(p.descricao_lancar) + '</b>'
             : esc(p.nome || memoLimpo(p.memo))) + '</td>' +
-        '<td style="text-align:left;opacity:.75;font-size:11px;overflow:hidden;text-overflow:ellipsis">'
-          + (p.pista ? esc(p.pista) : '—') + '</td>' +
-        '<td style="text-align:left;font-size:11px;overflow:hidden;text-overflow:ellipsis">'
+        '<td style="text-align:left;color:' + cor + ';font-weight:600;white-space:nowrap">'
+          + rs(p.valor) + '</td>' +
+        '<td style="text-align:left;font-size:12px;white-space:normal">'
           + (p.categoria ? esc(p.categoria) : '—') + '</td>' +
-        '<td style="text-align:center">' + botoes(p) + '</td></tr>').join('') +
+        '<td style="text-align:left;color:var(--tx-3);font-size:12px;white-space:normal">'
+          + (p.pista ? esc(p.pista) : '—') + '</td>' +
+        '<td style="text-align:left;white-space:nowrap">' + botoes(p) + '</td>' +
+        '<td style="text-align:center">' + marcar(p) + '</td></tr>').join('') +
       '</tbody></table></div>' +
-      '<div style="margin:4px 0 2px;text-align:right">'
-      + '<button class="concb-conciliar" data-alvo="' + idTabela + '"'
-      + ' style="font-size:11px;padding:4px 12px;cursor:pointer;border:1px solid ' + cor + ';'
-      + 'background:transparent;color:' + cor + ';border-radius:4px">'
-      + 'conciliar marcadas</button></div>' +
-      (lista.length > 30 ? '<div class="contexto">Mostrando 30 de ' + lista.length + '.</div>' : '');
+      // "marcar todas" ao lado do botão: o <thead> some no celular e levava a caixa junto
+      '<div style="margin:6px 0 2px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+      + '<label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px">'
+      + '<input type="checkbox" class="concb-todos" data-alvo="' + idTabela + '"'
+      + ' style="width:18px;height:18px;cursor:pointer">marcar todas</label>'
+      + '<button class="preset-btn concb-conciliar" data-alvo="' + idTabela + '"'
+      + ' style="border-color:' + cor + ';color:' + cor + '">'
+      + 'conciliar as marcadas</button>'
+      + (lista.length > 30
+          ? '<button class="preset-btn concb-ver-todas" data-alvo="' + idTabela + '">'
+            + (verTodas ? 'mostrar só 30' : 'ver todas as ' + lista.length) + '</button>'
+          : '')
+      + '</div>';
   };
 
   const blocosConferir = Object.entries(porConta).sort((a, b) => concbOrdem(a[0], b[0])).map(([conta, lista]) => {
@@ -1564,9 +1569,9 @@ function renderConcbanco() {
   const duvidas = (cru.duvidas || []).filter(d => !d.conta
     || lojaFin() === 'REDE' || (placar.find(r => r.conta === d.conta) !== undefined));
   const blocoDuvidas = !duvidas.length ? '' :
-    '<div style="margin:16px 0;padding:10px 14px;border-left:3px solid #b8860b;'
-    + 'background:rgba(184,134,11,.09)">'
-    + '<b style="color:#b8860b">' + duvidas.length
+    '<div style="margin:16px 0;padding:10px 14px;border-left:3px solid var(--farol-perto);'
+    + 'background:var(--surface-2)">'
+    + '<b style="color:var(--farol-perto)">' + duvidas.length
     + (duvidas.length === 1 ? ' linha esperando você' : ' linhas esperando você')
     + '</b><div style="font-size:12px;opacity:.85;margin-top:5px">'
     + duvidas.slice(0, 6).map(d => esc(d.quem || '?') + ' não soube o que fazer com '
@@ -1578,22 +1583,23 @@ function renderConcbanco() {
     + '</div></div>';
 
   const trava = naoConf.length
-    ? '<div class="section-label" style="color:#c8102e">Marcado como lançado, mas ainda não apareceu</div>' +
-      '<div class="contexto">Provavelmente foi lançado com valor ou data diferente do extrato. ' +
-      'Se a marcação foi engano, <b>desfazer</b> devolve a linha para a fila de conciliação.</div>' +
+    // 12/11/2026 (usabilidade 07/11): legenda de uma linha, valor à esquerda, memo inteiro e escapado, total e
+    // "desfazer" como botão de verdade numa coluna com título
+    ? '<div class="section-label" style="color:var(--farol-fora)">Marcado como lançado, mas ainda não apareceu</div>' +
+      '<div class="contexto">Valor ou data diferente do extrato? Confira no Saipos; marcou por engano, <b>desfazer</b>.</div>' +
       '<div id="tabelaConcbTrava"><table><thead><tr><th>Dia</th><th>Conta</th><th>Valor</th>' +
-      '<th>O que o banco diz</th><th>Quem marcou</th><th></th></tr></thead><tbody>' +
+      '<th>O que o banco diz</th><th>Quem marcou</th><th>Ação</th></tr></thead><tbody>' +
       naoConf.map(x => '<tr><td>' + ddmm(x.data) + '</td><td>' + esc(nomeConta(x.conta)) + '</td>' +
-        '<td style="text-align:right">' + rs(x.valor) + '</td><td>' + (x.memo || '').slice(0, 44) + '</td>' +
-        '<td>' + (x.quem || '') + '</td>' +
+        '<td style="text-align:left">' + rs(x.valor) + '</td><td style="white-space:normal">' + esc(memoLimpo(x.memo)) + '</td>' +
+        '<td>' + esc(x.quem || '') + '</td>' +
         // ESTE e o unico lugar da tela onde uma marcacao errada reaparece: sem
         // desfazer aqui, a linha sai da fila para sempre e ninguem mais a ve.
         // O listener .concb-desmarca e a policy de DELETE ja existiam.
-        '<td><button class="concb-desmarca" data-conta="' + esc(x.conta) +
-        '" data-fitid="' + esc(x.fitid) +
-        '" style="font-size:10px;padding:2px 6px;cursor:pointer;border:none;' +
-        'background:transparent;color:inherit;opacity:.6;text-decoration:underline">' +
-        'desfazer</button></td></tr>').join('') + '</tbody></table></div>'
+        '<td><button class="preset-btn concb-desmarca" data-conta="' + esc(x.conta) +
+        '" data-fitid="' + esc(x.fitid) + '">' +
+        'desfazer</button></td></tr>').join('') +
+      '</tbody><tfoot><tr class="liq"><td colspan="2"><b>Total</b></td><td style="text-align:left"><b>' +
+        rs(naoConf.reduce((s, x) => s + n(x.valor), 0)) + '</b></td><td colspan="3"></td></tr></tfoot></table></div>'
     : '';
 
   // ---- o resto, recolhido: quem quiser auditar abre ----
@@ -1604,9 +1610,8 @@ function renderConcbanco() {
   const detalhe =
     (ruido.length
       ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">' +
-        ruido.length + ' linhas que o sistema já explicou sozinho</summary>' +
-        '<div class="contexto">Repasse de maquininha e pagamento em lote: o banco lista várias linhas ' +
-        'e o Saipos lança uma só. Não é trabalho.</div></details>'
+        ruido.length + ' linhas que o sistema já explicou sozinho (lote e repasse de maquininha)</summary>' +
+        '<div class="contexto">O banco lista várias linhas e o Saipos lança uma só: nada a fazer.</div></details>'
       : '');
 
   // Em 12/09/2026 sairam daqui dois blocos que ja estavam desligados por decisao
@@ -1618,48 +1623,37 @@ function renderConcbanco() {
   // e `cru.avisos` seguem carregados e sem uso — podem cair da consulta depois.
 
   alvo.innerHTML = seletorLojaFin() + plcCabecalhoQuebra('concbanco') +
-    '<div class="section-label" style="border-top:none;margin-top:0;padding-top:0;' +
-      'display:flex;align-items:center;gap:12px">' +
-      '<span>Conciliação de ' + ddmm(diaAlvo)
-        + (diaAlvo === ontem ? ' (ontem)' : '') + ' — ' + nomeLojaFin() + '</span>' +
+    // 12/11/2026 (usabilidade 07/11): o título numa linha; embaixo os dias em chips e os três botões no padrão
+    // (preset-btn; o dia ativo é contorno, não vermelho da marca). Antes tudo dividia uma linha só.
+    '<div class="section-label" style="border-top:none;margin-top:0;padding-top:0">' +
+      'Conciliação de ' + ddmm(diaAlvo)
+        + (diaAlvo === ontem ? ' (ontem)' : '') + ' — ' + nomeLojaFin() + '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px">' +
       // Setas para andar entre os dias. A ordem importa — fecha o 19 antes de ir
       // ao 20 —, mas quem concilia às vezes precisa olhar o dia seguinte para
       // entender o de hoje, então navegar é livre e a ordem é orientação.
       (diasNavega.length > 1
-        ? '<span style="font-size:12px;font-weight:normal;opacity:.85">'
-          + diasNavega.map(d =>
-              '<button class="concb-dia" data-dia="' + d + '" style="font-size:11px;'
-              + 'padding:2px 8px;margin-right:3px;cursor:pointer;border-radius:4px;'
-              + 'border:1px solid ' + (d === diaAlvo ? '#c8102e' : '#8a897e') + ';'
-              + 'background:transparent;color:' + (d === diaAlvo ? '#c8102e' : 'inherit')
-              + '">' + ddmm(d) + '</button>').join('')
-          + (diasNavega.length > 1
-              ? '<span style="opacity:.7">· ' + diasNavega.length + ' dias para conciliar</span>'
-              : '') + '</span>'
+        ? diasNavega.map(d =>
+              '<button class="preset-btn concb-dia' + (d === diaAlvo ? ' active' : '') + '" data-dia="' + d + '">'
+              + ddmm(d) + '</button>').join('')
+          + '<span style="font-size:12px;color:var(--tx-3);margin-right:8px">' + diasNavega.length + ' dias para conciliar</span>'
         : '') +
-      // Atualizar RELE o banco. Nao roda o comparador nem importa o Saipos —
-      // isso e a rotina das 08:44. Serve para tirar da tela o que ja foi
-      // conciliado e ver o que sobrou, sem recarregar a pagina inteira.
-      '<button id="concbAtualizar" style="font-size:11px;padding:3px 10px;cursor:pointer;' +
-      'border:1px solid #8a897e;background:transparent;color:inherit;border-radius:4px;' +
-      'font-weight:normal">atualizar</button>' +
-      '<button id="concbRecado" style="font-size:11px;padding:3px 10px;cursor:pointer;' +
-      'border:1px solid #8a897e;background:transparent;color:inherit;border-radius:4px;' +
-      'font-weight:normal">mandar uma regra</button>' +
+      // Atualizar pede à máquina das rotinas: importa o OFX, relê o Saipos e roda o comparador
+      // (concbRodarComparador). O retorno sai na barra fixa: ✓ às HH:MM ou ✗ + tentar de novo.
+      '<button id="concbAtualizar" class="preset-btn">atualizar</button>' +
       // Enviar o OFX pela tela. O painel nao grava em disco: ele manda o TEXTO do
       // arquivo para o banco e a rotina daqui o escreve na pasta do Drive, no
       // mesmo lugar em que ela salvaria a mao. Um so caminho de importacao.
       '<input type="file" id="concbArquivo" accept=".ofx" multiple style="display:none">' +
-      '<button id="concbEnviarOfx" style="font-size:11px;padding:3px 10px;cursor:pointer;' +
-      'border:1px solid #8a897e;background:transparent;color:inherit;border-radius:4px;' +
-      'font-weight:normal">enviar extrato (OFX)</button></div>' +
+      '<button id="concbEnviarOfx" class="preset-btn">enviar extrato (OFX)</button>' +
+      '<button id="concbRecado" class="preset-btn">mandar uma regra</button></div>' +
 
     '<div class="contexto">' + resumo + '</div>' + blocoDuvidas +
     '<div id="tabelaConcbOntem"><table style="width:100%">' +
       '<colgroup><col style="width:34px"><col style="width:130px"><col style="width:110px">' +
       '<col style="width:110px"><col></colgroup>' +
       '<thead><tr>' +
-      '<th style="text-align:left"></th><th style="text-align:left">Conta</th>' +
+      '<th style="text-align:left">Fechou</th><th style="text-align:left">Conta</th>' +
       '<th style="text-align:left">Entradas</th><th style="text-align:left">Saídas</th>' +
       '<th style="text-align:left">Saldo no banco · no Saipos</th></tr></thead><tbody>' +
       linhasGrade +
@@ -1668,10 +1662,9 @@ function renderConcbanco() {
     trava +
     (blocosConferir
       ? '<div class="section-label">O que conferir no Saipos</div>' +
-        '<div class="contexto">' + (quem ? 'Você está como <b>' + quem + '</b>. ' : '') +
-        'Marque o que você já lançou ou achou no Saipos e clique <b>conciliar marcadas</b> — ' +
-        '<b>comece pelas entradas, depois as saídas</b>. Toda linha tem um <b>ensinar</b>: ' +
-        'escreva como ela se chama no Saipos e da próxima vez ela vem pronta.</div>' +
+        // 12/11/2026 (lote 3 dinheiro-21 e T4): uma linha; a ordem entradas → saídas já é a dos blocos
+        '<div class="contexto">Entradas primeiro · marque o que achou no Saipos e clique <b>conciliar as marcadas</b>' +
+        (quem ? ' · você está como <b>' + esc(quem) + '</b>' : '') + '</div>' +
         blocosConferir
       : '') +
     detalhe;
@@ -1700,6 +1693,11 @@ function renderConcbanco() {
   }));
   alvo.querySelectorAll('.concb-conciliar').forEach(b => b.addEventListener('click', () =>
     concbConciliarMarcadas(b)));
+  alvo.querySelectorAll('.concb-ver-todas').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.alvo;
+    if (CONCB_VER_TODAS.has(k)) CONCB_VER_TODAS.delete(k); else CONCB_VER_TODAS.add(k);
+    renderConcbanco();
+  }));
   alvo.querySelectorAll('.concb-desmarca').forEach(b => b.addEventListener('click', () =>
     concbDesmarcar(b.dataset.conta, b.dataset.fitid)));
   alvo.querySelectorAll('.concb-ir').forEach(tr => tr.addEventListener('click', () => {
@@ -2289,11 +2287,8 @@ function renderModuloEvolucao() {
       <button class="preset-btn" onclick="evolLimparFiltros()">limpar</button>
       <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">Os cards, o gráfico, a matriz e os itens estão neste recorte. As tabelas de canal, de faixa e de item continuam mostrando todas as opções, para você poder trocar.</div>
     </div>` : ''}
-    ${ITEM ? `<div class="contexto" style="border-color:var(--amber-2);">
-      <b>A tela inteira está falando de ${ITEM}.</b> Duas coisas mudam enquanto o item está fixado, porque a base do item é outra:
-      o gráfico passa a andar de <b>semana em semana</b> (segunda a domingo), e o valor é a <b>receita bruta do item</b> —
-      quantidade × preço, antes do desconto do pedido e sem a taxa de serviço. Por isso os números aqui não batem
-      centavo a centavo com a tela sem item fixado. Os pedidos são os <b>pedidos que levaram este item</b>.
+    ${ITEM ? `<div class="contexto" style="border-color:var(--amber-2);" title="O valor é quantidade × preço, antes do desconto do pedido e sem a taxa de serviço; por isso não bate centavo a centavo com a tela sem item. Os pedidos são os que levaram este item.">
+      <b>Só ${ITEM}:</b> semana a semana, receita bruta do item.
     </div>` : ''}
 
     <div class="cards">
@@ -2319,11 +2314,11 @@ function renderModuloEvolucao() {
     ${tabela('Por canal', ITEM ? 'Por onde este item sai.' : 'Onde a venda entra.', 'tabelaEvolCanal', porCanal, 'canal', totCanal)}
     ${tabela('Por faixa de horário', 'A faixa sai da hora da venda registrada no Saipos, não do turno do cadastro.', 'tabelaEvolFaixa', porFaixa, 'faixa', totFaixa)}
     ${matriz}
-    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, use o filtro de unidade lá em cima — é o mesmo controle do resto do painel.', 'tabelaEvolLoja', porLoja) : ''}
+    ${unsComDado.length > 1 ? tabela('Por loja', 'Para isolar uma loja, escolha a loja no topo.', 'tabelaEvolLoja', porLoja) : ''}
     ${blocoItens}
 
     <div class="caption-label" title="A faixa vem da hora da venda: no salão é a abertura da comanda, no delivery é a criação do pedido. O valor é o do PDV e não se compara direto com o bruto do portal do iFood. Ressalva aberta desde 20/08: o salão da Água Verde registra comandas antes das 11h com ticket alto — pendente de conferir na loja.">
-      Caixa do Saipos (${ITEM ? 'vw_venda_item_semana' : 'vw_venda_evolucao'}), Água Verde, Ahú e São Braz. O Boqueirão não entra.
+      Caixa do Saipos (PDV), Água Verde, Ahú e São Braz. O Boqueirão não entra.
     </div>`;
 
   // Uma medida so, uma cor so: a identidade vem do rotulo do eixo, nao da cor.
@@ -2707,38 +2702,26 @@ function renderLucroUni() {
 
     ${seletorPeriodo}
 
-    <div class="hero" style="border-color:${pctBenef >= 30 ? '#e8b04b' : '#3fb950'};">
-      <div class="hero-lbl">De cada real de lucro da rede, quanto veio do benefício do iFood</div>
+    <div class="hero" style="border-color:${pctBenef >= 30 ? 'var(--farol-perto)' : 'var(--farol-ok)'};">
+      <div class="hero-lbl" title="O benefício é comissão que o iFood deixou de cobrar, já diluída na receita; acaba quando os R$ 500 mil forem consumidos.">De cada real de lucro da rede, quanto veio do benefício do iFood</div>
       <div class="hero-val">${pct(pctBenef)}%</div>
-      <div class="hero-delta" style="color:#a5a49a;">
+      <div class="hero-delta" style="color:var(--tx-3);">
         ${rs(lucroRede)} de lucro · ${rs(benefRede)} de benefício · ${rs(semBenRede)} seriam o lucro pagando comissão cheia</div>
-      <div class="hero-frase">
-        O benefício não é dinheiro que entrou a mais: é comissão que o iFood <b>deixou de cobrar</b>,
-        já diluída na receita. Ele acaba quando os R$ 500 mil forem consumidos — por isso o número
-        que interessa para decidir preço é o da direita.</div>
-      <div class="hero-frase" style="margin-top:8px;">
-        <b>O caminho:</b> para dar o mesmo lucro pagando comissão cheia, o preço médio teria de
-        subir <b>${pct(pctPreco)}%</b> — ${rs(benefRede)} sobre ${rs(receitaRede)} de receita no
-        período. É o <b>mínimo</b>, não uma promessa: supõe vender exatamente o mesmo depois do
-        aumento.
+      <div class="hero-frase" title="${rs(benefRede)} sobre ${rs(receitaRede)} de receita no período; supõe vender exatamente o mesmo depois do aumento.">
+        Mesmo lucro com comissão cheia: preço médio <b>${pct(pctPreco)}%</b> maior, no mínimo ·
         <a href="javascript:void(0)" onclick="mostrarModulo('rateio')" style="color:var(--tx-3);"
-           title="Preço alvo produto a produto, com a conta aberta: ingrediente, embalagem, impostos, iFood, entrega, fixos e pró-labore.">Ver preço alvo por produto →</a></div>
+           title="Preço alvo produto a produto, com a conta aberta: ingrediente, embalagem, impostos, iFood, entrega, fixos e pró-labore.">ver preço alvo por produto →</a></div>
     </div>
 
     <div class="cards cards-3">${cardsUni}</div>
 
     <div class="section-label">Mês a mês</div>
     <div id="tabelaLucroUni"><table>
-      <thead><tr><th>Mês</th><th>Unidade</th><th>Receita</th><th>Mercadoria da AV</th>
+      <thead><tr><th>Mês</th><th>Unidade</th><th>Receita</th><th title="O que a filial comprou da Água Verde no mês, pela lista fechada; a mesma lista entra como receita da Água Verde. O repasse além disso é lucro subindo para a XP e não é receita de ninguém.">Mercadoria da AV</th>
         <th>Lucro</th><th>Benefício iFood</th><th>Lucro sem o benefício</th><th>% do lucro</th></tr></thead>
       <tbody>${res.filter(r => fechados.includes(r.mes)
         && (!ctxLoja || r.unidade === ctxLoja)).map(linhaTab).join('')}</tbody>
     </table></div>
-    <div class="contexto">
-      <b>Mercadoria da AV</b> é o que a filial comprou da Água Verde no mês, pela lista fechada —
-      e a mesma lista entra como receita da Água Verde. O dinheiro que a filial repassa além disso
-      é lucro subindo para a XP, e por isso não aparece como receita de ninguém: contaria duas vezes.
-    </div>
 
     <div class="section-label">O que sobrou em caixa, e por quê</div>
     <div class="cards cards-3">
@@ -2779,24 +2762,17 @@ function renderLucroUni() {
         <tr class="sub"><td><b>= deveria ter sobrado</b></td><td><b>${rs(chegou)}</b></td></tr>
         <tr class="liq"><td>Sobrou de verdade no caixa${xpDentro ? ' + XP' : ''}</td><td>${rs(sobrouCaixa)}</td></tr>
         ${Math.abs(ajJan) > 0.005 ? linhaPonte('(±) Ajuste da trava do corte (cofres)', ajJan, 'caixa do Saipos regravado antes do corte de 21/10') : ''}
-        <tr><td style="color:#8a897e;">Diferença de competência × caixa
-              <div style="color:#6f6e64; font-size:10.5px;">nota lançada num mês, dinheiro que andou em outro</div></td>
-            <td style="color:#8a897e;">${rs(sobrouCaixa - chegou - ajJan)}</td></tr>
+        <tr><td style="color:var(--tx-5);">Diferença de competência × caixa
+              <div style="color:var(--tx-6); font-size:10.5px;">nota lançada num mês, dinheiro que andou em outro</div></td>
+            <td style="color:var(--tx-5);">${rs(sobrouCaixa - chegou - ajJan)}</td></tr>
       </tbody>
     </table></div>
-    <div class="contexto">
-      A diferença que sobra vem de competência × caixa: o lucro conta a nota do mês em que ela
-      aconteceu, o caixa conta o dia em que o dinheiro andou. O "sem a XP" é o caixa do Placar:
-      bancos, cofres e cartão, sem a XP e as Participações.
-    </div>
 
-    <div class="footer">
-      Lucro = resultado da DRE: por competência, com as contas do mês já lançadas (pagas ou a pagar) e o rendimento das aplicações. Benefício iFood
-      = a comissão de 9,5% que o iFood deixou de cobrar nas lojas isentas (ficam fora o Boqueirão, a Comida
-      Brasileira AV e, desde 06/10/2026, a Marmita da Jane). De 05/10/2026 em diante: 9,5% da venda de cada pedido
-      (itens + entrega − desconto que a loja banca), como o iFood cobra. Até 04/10/2026: 9,5% do valor que o iFood
-      depositou — dá uns 12% a menos e não será refeito. Não é extrato do iFood. Fonte: vw_fin_resultado_unidade, vw_fin_saldo_conta_mensal, vw_fin_dfc_mensal.
+    <div class="footer" title="Benefício = a comissão de 9,5% que o iFood deixou de cobrar nas lojas isentas (fora o Boqueirão, a Comida Brasileira AV e, desde 06/10/2026, a Marmita da Jane). De 05/10/2026 em diante: 9,5% da venda de cada pedido (itens + entrega − desconto que a loja banca); até 04/10/2026: 9,5% do depositado, não se refaz.">
+      Lucro = resultado da DRE, por competência · benefício = a comissão de 9,5% que o iFood deixou de cobrar.
     </div>`;
+  // 12/11/2026 (lote 3 resultado-42): os dois parágrafos do herói viraram uma linha; as caixas de explicação foram para o
+  // title das colunas; o rodapé de 5 linhas virou uma, sem nomes de view
   // encaixarTabela recebe o ELEMENTO (nao o id) — mede o fundo atras da tabela
   // e marca .rolavel para a coluna fixa ganhar sombra so quando de fato rola.
   ['tabelaLucroUni', 'tabelaPonteLucro'].forEach(id => {
@@ -3456,12 +3432,8 @@ async function entrarIndicadores() {
   const lojasDoPerimetro = LOJAS.filter((_, i) => lojaPermitida(i)).length;
   const filtroAtivo = activeLojas().size < lojasDoPerimetro;
   const aviso = filtroAtivo
-    ? `<div class="contexto" style="border-color:#f5a623;">Atenção: há filtro de loja ativo — o placar abaixo
-       é do recorte filtrado, mas as metas valem para o conjunto. Limpe os filtros para o placar oficial.</div>`
-    : (PERIMETRO === 'rede'
-      ? `<div class="contexto" style="border-color:#f5a623;">Você está na visão <b>Rede iFood completa</b>, que inclui o Boqueirão.
-         As metas foram calibradas sem ele — compare com cuidado.</div>`
-      : '');
+    ? `<div class="contexto" style="border-color:var(--farol-perto);">Filtro de loja ativo: o placar é do recorte; as metas valem para o conjunto.</div>`
+    : '';   // 12/11/2026 (lote 3 resultado-45): saiu o aviso da visão "Rede iFood completa", desligada em 24/10
 
   // Onde esta o gap (por loja) — para os KPIs operacionais
   const notaPorLoja = {};
@@ -3533,13 +3505,12 @@ async function entrarIndicadores() {
       <div class="contexto" style="text-align:left; display:flex; gap:14px; align-items:flex-start;">
         <div style="width:14px; height:14px; border-radius:50%; background:${cor}; flex-shrink:0; margin-top:3px;" title="${rotulo}"></div>
         <div style="flex:1;">
-          <b>${nomeMeta(k)}</b> <span style="color:#8a897e; font-size:12px;">(${k.bloco.toLowerCase()})</span><br>
+          <b${k.descricao ? ` title="${trEscH(k.descricao)}"` : ''}>${nomeMeta(k)}</b> <span style="color:var(--tx-5); font-size:12px;">(${k.bloco.toLowerCase()})</span><br>
           <span style="font-size:20px; font-weight:bold;">${fmtKpi(k.unidade, v)}</span>
           ${metaSoRede(k) ? '' : `<span style="color:#a5a49a;">/ meta ${fmtMeta(k)}</span>`}
           <span style="color:${cor}; font-weight:bold;">· ${rotulo}</span> ${varTxt}
           ${gap}
           ${spark}
-          <div style="font-size:11px; color:#8a897e; margin-top:3px;">${k.descricao || ''}</div>
           ${acaoLinha(k.chave)}
         </div>
       </div>`;
@@ -3557,9 +3528,8 @@ async function entrarIndicadores() {
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Indicadores e metas</div>
   <div class="contexto" style="text-align:left;">
     <b>Placar da semana ${formatarDataCurta(sem.ini)} – ${formatarDataCurta(sem.fim)}</b>
-    (última semana completa seg–dom) · <b style="color:${naMeta >= 6 ? '#3fb950' : naMeta >= 4 ? '#f5a623' : '#ff6b6b'}">${naMeta} de ${METAS_KPI.filter((k) => !metaSoRede(k)).length} metas atingidas</b><br>
-    <span style="font-size:12px; color:#a5a49a;" title="A linha embaixo de cada indicador são as ${N_SEMANAS_SPARK} últimas semanas fechadas, da mais antiga à mais recente; o último ponto é esta semana. Indicador sem as 8 semanas completas aparece só com o número, sem linha.">As metas moram no banco (tabela metas_kpi) — o resumo de segunda-feira analisa como fechar cada gap. A linha em cada indicador são as ${N_SEMANAS_SPARK} últimas semanas.
-    Líquido/margem dependem da conciliação da semana estar completa no iFood.</span>
+    (última semana completa seg–dom) · <b style="color:${naMeta >= 6 ? 'var(--farol-ok)' : naMeta >= 4 ? 'var(--farol-perto)' : 'var(--farol-fora)'}">${naMeta} de ${METAS_KPI.filter((k) => !metaSoRede(k)).length} metas atingidas</b><br>
+    <span style="font-size:12px; color:var(--tx-3);" title="A linha embaixo de cada indicador são as ${N_SEMANAS_SPARK} últimas semanas fechadas, da mais antiga à mais recente; o último ponto é esta semana. Indicador sem as 8 semanas completas aparece só com o número, sem linha. Líquido e margem dependem da conciliação da semana estar completa no iFood.">A linha em cada indicador são as ${N_SEMANAS_SPARK} últimas semanas.</span>
   </div>
   ${aviso}
   ${chipsFarol}
@@ -4344,17 +4314,15 @@ function renderPlacar() {
     quebra = `<div class="contexto" style="border-color:var(--brand);">
         <b>Abrindo ${t.rot}</b> — ${atual.rot}. <button class="preset-btn" onclick="plcAbrir('${t.id}')">fechar</button>
       </div>
-      <div class="section-label">Por loja</div>
-      <div class="caption-label" style="text-align:center;">A mesma conta do cartão, uma loja de cada vez. O filtro de loja lá em cima não muda esta tabela — ela mostra sempre as três.</div>
+      <div class="section-label" title="A mesma conta do cartão, uma loja de cada vez; mostra sempre as três, qualquer que seja a loja do topo.">Por loja · as três</div>
       ${tabLoja}
-      <div class="section-label">Período a período</div>
-      <div class="caption-label" style="text-align:center;" title="A linha troca o período do Placar inteiro: cartões, comparação e quebra vão junto.">Clique num período para o Placar inteiro ir até ele.</div>
+      <div class="section-label" title="Clicar numa linha leva o Placar inteiro (cartões, comparação e quebra) até aquele período.">Período a período</div>
       ${tabPer}
       ${tabComp}${t.id === 'canal' ? fxPromoInfoHtml(atual.meses) : ''}
-      ${(t.telas || []).length ? `<div class="section-label">Onde ver por dentro</div>
-        <div class="caption-label" style="text-align:center;" title="As telas que já existem e detalham este número; elas dizem no topo de qual período e de qual loja vieram.">Abrem no mesmo período e na mesma loja.</div>
+      ${(t.telas || []).length ? `<div class="section-label" title="Abrem no mesmo período e na mesma loja.">Onde ver por dentro</div>
         <div class="periodo-presets" style="margin-top:8px;">${t.telas.map(([m, rot]) =>
-          `<button class="preset-btn" onclick="plcAbrirTela('${m}','${t.id}')">${rot} →</button>`).join('')}</div>` : ''}`;
+          `<button class="preset-btn" onclick="plcAbrirTela('${m}','${t.id}')" title="abre no mesmo período e na mesma loja">${rot} →</button>`).join('')}</div>` : ''}`;
+  // 12/11/2026 (lote 3 resultado-47): as três legendas de "como usar" saíram; o clique se ensina pelo cursor e pelo title
   }
 
   const segGrao = PLC_GRAOS.map(([g, rot]) =>
@@ -4478,7 +4446,8 @@ function renderFechamento() {
   });
   const fs = M.RESULTADO ? fxFarol(cem(a.resultado), M.RESULTADO.meta, M.RESULTADO.sentido) : ['neutro', ''];
   h += `<div class="fx-linha sobrou ${fs[0]}"><div class="fx-nome">Sobrou<small>meta: R$ ${M.RESULTADO ? M.RESULTADO.meta : '—'} ou mais de cada 100</small></div><div class="fx-num">R$ ${100 - somaArr}</div><div class="fx-barra"><i style="width:${Math.max(0, cem(a.resultado)) / maxv * 100}%"></i></div><div class="fx-jul">${j ? `${fxMesRot(ant)}: R$ ${Math.round(j.base ? j.resultado / j.base * 100 : 0)}` : ''} · ${fxPill(fs)}</div></div></div>`;
-  h += `<div class="fx-nota">Valores arredondados para o real, por isso a soma fecha em 100 no "Sobrou" — o rendimento entra somando, as outras linhas saindo.${a.temFato ? ` As taxas dos canais são o que o iFood e a Rede cobraram de fato no mês (cada cobrança com nome), não a diferença entre vendido e recebido — por isso o mês não oscila com o atraso dos repasses.${Math.abs(a.defasagem) > 500 ? ` Conferência: caiu na conta ${fxMil(Math.abs(a.defasagem))} ${a.defasagem > 0 ? 'a menos' : 'a mais'} do que a venda do mês menos essas cobranças — é repasse atravessando a virada do mês (e a taxa dos vales, que ainda não tem fonte).` : ''}` : ''}</div>`;
+  // 12/11/2026 (lote 3 resultado-43): uma linha; o resto no title
+  h += `<div class="fx-nota" title="Valores arredondados para o real; o rendimento entra somando, as outras linhas saindo.${a.temFato ? ' As taxas dos canais são o que o iFood e a Rede cobraram de fato no mês (cada cobrança com nome), não a diferença entre vendido e recebido.' : ''}">Arredondado para o real: a soma fecha em 100 no "Sobrou".${a.temFato && Math.abs(a.defasagem) > 500 ? ` Caiu na conta ${fxMil(Math.abs(a.defasagem))} ${a.defasagem > 0 ? 'a menos' : 'a mais'} que a venda menos as cobranças: repasse na virada do mês.` : ''}</div>`;
   // "DO QUE E' FEITO ESTE BALDE" — abre embaixo da secao 2, no mesmo lugar para
   // qualquer balde, e fecha no ✕. A composicao vem de plcComposicao, a MESMA do
   // Placar. O que nao aparece na lista de contas entra numa linha de resto com nome
@@ -4566,7 +4535,7 @@ function renderFechamento() {
     const dd = s => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
     h += `<div class="fx-tile" style="margin-top:12px"><div class="fx-rotulo">As contas batem com o banco?</div>
       <div class="fx-valor${difC.length ? ' neg' : ''}" style="font-size:20px">${okC.length} de ${comRef.length} contas batem${difC.length ? ` · ${difC.length} difere${difC.length > 1 ? 'm' : ''}` : ''}</div>
-      <div class="fx-extra">saldo do Saipos no fim do mês contra o saldo declarado pelo banco, conta a conta (a XP, contra o saldo da corretora). Conta que difere tem lançamento faltando ou sobrando — é o que a conferência da planilha antiga garantia.</div>
+      <div class="fx-extra" title="A XP confere contra o saldo da corretora. Conta que difere tem lançamento faltando ou sobrando.">saldo do Saipos no fim do mês contra o do banco, conta a conta.</div>
       <ul class="fx-lista">${comRef.map(r => { const d = Number(r.diferenca); return `<li><span>${r.conta_exibida}<small>saldo em ${dd(r.ref_fim_data)}${r.ancora_antes_do_fim ? ' — o extrato não cobre o fim do mês' : ''}${r.situacao === 'BATEU' && r.explicacao && Math.abs(d) > 0.015 ? ' — diferença de data já explicada: ' + r.explicacao : ''}</small></span><b>${r.situacao === 'BATEU' ? '✓ bate' : (d < 0 ? 'faltam R$ ' + fmt(-d) + ' de lançamento' : 'R$ ' + fmt(d) + ' lançados a mais')}</b></li>`; }).join('')}
       ${semC.length ? `<li><span>sem extrato para conferir<small>${semC.map(r => r.conta_exibida).join(', ')}</small></span><b>—</b></li>` : ''}</ul>
       ${difC.length ? `<div style="margin-top:10px;"><button class="preset-btn" onclick="mostrarModulo('concbanco')"
@@ -4608,7 +4577,7 @@ function renderFechamento() {
       const pal = l => l.sit === 'BATE' ? '✓ bate' : l.sit === 'SEM FONTE' ? 'sem fonte' : `${l.sit.toLowerCase()}: ${l.pct > 0 ? 'PDV acima' : 'PDV abaixo'} ${fxPct1(Math.abs(l.pct))} (${fxMil(Math.abs(l.valor_a - l.valor_b))})`;
       h += `<div class="fx-tile" style="margin-top:12px"><div class="fx-rotulo">A venda bate com o iFood, a Rede, os vales e o ePadoca? (prova dos nove)</div>
         <div class="fx-valor${ruins.length ? ' neg' : ''}" style="font-size:20px">${ruins.length ? `${ruins.length} de ${linhas.length} linhas para conferir` : aten.length ? `${linhas.length - aten.length} de ${linhas.length} batem · ${aten.length} em atenção` : `${linhas.length} de ${linhas.length} batem`}</div>
-        <div class="fx-extra">a venda bruta da DRE vem do PDV (Saipos); antes de o número sair, ela é conferida contra as fontes de fora, cada uma com a sua tolerância. "PDV acima" do iFood costuma ser cancelamento parcial contado pelo valor cheio; "PDV abaixo" da Rede é detalhe de pagamento faltando no Saipos.</div>
+        <div class="fx-extra" title="&quot;PDV acima&quot; do iFood costuma ser cancelamento parcial contado pelo valor cheio; &quot;PDV abaixo&quot; da Rede é detalhe de pagamento faltando no Saipos.">a venda do PDV (Saipos) contra as fontes de fora, cada uma com a sua tolerância.</div>
         <ul class="fx-lista">${linhas.map(l => `<li><span>${l.linha}<small>${l.fonte_a} ${fxMil(l.valor_a)} × ${l.fonte_b} ${fxMil(l.valor_b)} · tolerância ${fxPct1(fxN(l.tolerancia_pct))}</small></span><b>${pal(l)}</b></li>`).join('')}</ul>`;
       // A linha que nao bate tem tela: o de/para e' pela ORDEM da view (2 = iFood,
       // 3 e 4 = Rede), NAO pelo texto — o texto da linha muda e o botao sumiria em
@@ -4760,7 +4729,8 @@ function renderSemana() {
     + fxTile('Venda no iFood', a.ifItens, j ? fxVar(a.ifItens, j.ifItens, ra) : '', `${fxInt(a.ifPed)} pedidos entregues`, fxSpark(SEM.map(w => S[w].ifItens), rots, fxMil))
     + fxTile('Entrega paga pelos clientes', a.frete, j ? fxVar(a.frete, j.frete, ra) : '', 'taxa de entrega cobrada no iFood — ajuda a pagar os motoboys; já está dentro das vendas', fxSpark(SEM.map(w => S[w].frete), rots, fxMil))
     + fxTile('Promoção paga pelo iFood', a.promoIfood, j ? fxVar(a.promoIfood, j.promoIfood, ra) : '', 'desconto que o iFood banca, não nós', fxSpark(SEM.map(w => S[w].promoIfood), rots, fxMil))
-    + '</div><div class="fx-nota">A venda no iFood aqui é o valor dos itens pelo export do iFood; o PDV registra praticamente o mesmo número. Promoção paga pela loja é custo de verdade: o cliente pagou menos e o iFood desconta do repasse.</div>';
+    // 12/11/2026 (lote 3 resultado-44): uma linha por seção; o detalhe no title
+    + '</div><div class="fx-nota" title="O PDV registra praticamente o mesmo número. Promoção paga pela loja é custo de verdade: o cliente pagou menos e o iFood desconta do repasse.">Venda no iFood = valor dos itens pelo export do iFood.</div>';
   // 3
   const p = cmvPct(W), pj = j ? cmvPct(ANT) : null, p4 = cmv4(W), fC = fxFarol(p4, META_CMV, 'abaixo');
   const parcial = FX_S.parcial.filter(r => fxLojas().includes(r.unidade)); const pv = fxSoma(parcial, 'vendas'), pc = fxSoma(parcial, 'compras');
@@ -4771,14 +4741,15 @@ function renderSemana() {
     // a venda dele não está no divisor — a régua da DRE (que divide por tudo que entrou) não vale aqui.
     + fxTile('Média das últimas 4 semanas', 'R$ ' + Math.round(p4), fxLojas().includes('AGUA VERDE') ? 'sem farol: a compra do atacado está dentro e a venda dele não' : fxPill(fC) + ` · até R$ ${metaTxt}`, 'é este número que diz se a mercadoria está no lugar', fxSpark(SEM.map(w => cmv4(w)), rots, v => 'R$ ' + v.toFixed(0)))
     + (pv > 0.5 ? fxTile(`CMV parcial do mês (até ${fxDM(parcial[0].vendas_ate)})`, pc > 0 ? 'R$ ' + Math.round(pc / pv * 100) : '—', pc > 0 ? `compras ${fxMil(pc)} ÷ vendas ${fxMil(pv)}` : '', pc > 0 ? 'de cada R$ 100 vendidos no mês até agora; muda todo dia conforme as notas entram' : 'ainda sem nota de mercadoria lançada neste mês') : '')
-    + '</div><div class="fx-nota">Mercadoria aqui é o que foi comprado (notas emitidas, lançadas no Saipos), não o que foi consumido — uma compra grande pesa na semana em que a nota entra; por isso a média de 4 semanas é a régua. A mercadoria mandada às filiais sai da Água Verde e entra na filial que recebeu. O CMV pela ficha técnica fica fora até ser auditado.</div>';
+    + '</div><div class="fx-nota" title="Uma compra grande pesa na semana em que a nota entra. A mercadoria mandada às filiais sai da Água Verde e entra na filial que recebeu. O CMV pela ficha técnica fica fora até ser auditado.">Mercadoria = o que foi comprado (notas), não o consumido: a régua é a média de 4 semanas.</div>';
   // 4
   const cemM = a.fat ? a.margem / a.fat * 100 : 0, serieM = SEM.map(w => S[w].margem);
-  h += `<div class="fx-secao"><h3>4. A margem que fechou</h3><span>vendas − mercadoria − custo iFood</span></div><div class="fx-duas">
-    <div class="fx-destaque"><div class="fx-rotulo">Margem fechada da semana</div><div class="fx-valor-g${a.margem < 0 ? ' neg' : ''}">${fxMil(a.margem)}</div>
+  // 12/11/2026 (lote 3 resultado-14): "margem" fica só para a margem de contribuição (DRE/Placar); aqui é a sobra
+  h += `<div class="fx-secao"><h3>4. O que sobrou da venda</h3><span>vendas − mercadoria − custo iFood</span></div><div class="fx-duas">
+    <div class="fx-destaque"><div class="fx-rotulo">Sobra da semana</div><div class="fx-valor-g${a.margem < 0 ? ' neg' : ''}">${fxMil(a.margem)}</div>
       <p>Vendas ${fxMil(a.fat)} − mercadoria ${fxMil(a.compras)} − custo iFood ${fxMil(a.custoIfood)}. De cada R$ 100 vendidos, <b>R$ ${Math.round(cemM)}</b> ficaram para pagar pessoas, entrega, a casa e sobrar.</p>
-      ${j ? `<p>Semana anterior: ${fxMil(j.margem)} (R$ ${Math.round(j.fat ? j.margem / j.fat * 100 : 0)} de cada 100). A margem ${fxVar(a.margem, j.margem, ra)}.</p>` : ''}</div>
-    <div class="fx-tile"><div class="fx-rotulo">Margem, semana a semana</div><div class="fx-valor" style="font-size:20px">${SEM.slice(-3).map(w => fxMil(S[w].margem).replace('R$ ', '')).join(' · ')}</div><div class="fx-extra">últimas três semanas</div>${fxSpark(serieM, rots, fxMil)}<div class="fx-extra" style="margin-top:8px">Melhor: ${fxSemRot(SEM[serieM.indexOf(Math.max(...serieM))])} (${fxMil(Math.max(...serieM))}). Pior: ${fxSemRot(SEM[serieM.indexOf(Math.min(...serieM))])} (${fxMil(Math.min(...serieM))}).</div></div></div>`;
+      ${j ? `<p>Semana anterior: ${fxMil(j.margem)} (R$ ${Math.round(j.fat ? j.margem / j.fat * 100 : 0)} de cada 100). A sobra ${fxVar(a.margem, j.margem, ra)}.</p>` : ''}</div>
+    <div class="fx-tile"><div class="fx-rotulo">Sobra, semana a semana</div><div class="fx-valor" style="font-size:20px">${SEM.slice(-3).map(w => fxMil(S[w].margem).replace('R$ ', '')).join(' · ')}</div><div class="fx-extra">últimas três semanas</div>${fxSpark(serieM, rots, fxMil)}<div class="fx-extra" style="margin-top:8px">Melhor: ${fxSemRot(SEM[serieM.indexOf(Math.max(...serieM))])} (${fxMil(Math.max(...serieM))}). Pior: ${fxSemRot(SEM[serieM.indexOf(Math.min(...serieM))])} (${fxMil(Math.min(...serieM))}).</div></div></div>`;
   // 5 caixa
   const us = fxLojas(), cxs = us.map(fxCaixaLoja), fim = cxs[0].fim;
   h += `<div class="fx-secao"><h3>5. O caixa desta semana</h3><span>hoje ${fxDM(FX_S.hoje)} · semana de ${fxDM(FX_S.segAtual)} a ${fxDM(fim)} · saldo do banco = o do Fluxo projetado</span></div><div class="fx-tiles">`;
@@ -4793,7 +4764,7 @@ function renderSemana() {
       <div class="fx-mandar">${c.u !== 'AGUA VERDE' ? (c.sobra > 0 ? `Pode mandar para a Água Verde esta semana: <b>até ${fxMil(c.sobra)}</b>` : `Não pode mandar nada esta semana — faltam ${fxMil(Math.abs(c.sobra))}`) : `Próxima semana já tem <b>${fxMil(c.pagarProx)}</b> a pagar lançados.`}</div></div>`; });
   if (us.length > 1) { const entreL = cxs.reduce((s, c) => s + (c.recEntre || 0), 0); const sT = cxs.reduce((s, c) => s + c.sobra, 0) - entreL;
     h += `<div class="fx-caixa"><h4>Rede</h4><ul><li><span>Banco + cofres<small>saldo inicial do Fluxo projetado</small></span><b>${fxMil(cxs.reduce((s, c) => s + c.banco + c.cofre, 0))}</b></li><li><span>A receber até domingo (lançado + vendas esperadas)${entreL > 0.005 ? `<small>sem ${fxMil(entreL)} que a Água Verde recebe das filiais</small>` : ''}</span><b>+ ${fxMil(cxs.reduce((s, c) => s + c.recLanc + c.esperado, 0) - entreL)}</b></li><li><span>A pagar até domingo</span><b>− ${fxMil(cxs.reduce((s, c) => s + c.pagar, 0))}</b></li><li class="res ${sT >= 0 ? 'pos' : 'neg'}"><span>${sT >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(sT))}</b></li></ul><div class="fx-mandar">Filiais podem mandar para a AV: <b>${fxMil(cxs.filter(c => c.u !== 'AGUA VERDE' && c.sobra > 0).reduce((s, c) => s + c.sobra, 0))}</b> · próxima semana a pagar na rede: <b>${fxMil(cxs.reduce((s, c) => s + c.pagarProx, 0))}</b></div></div>`; }
-  h += '</div><div class="fx-nota">XP, Participações e cartões de crédito ficam fora — é o caixa do dia a dia. "Vendas que ainda devem cair" é a média do que caiu nas contas nas últimas 4 semanas, proporcional aos dias que faltam; não é promessa. Conta a pagar só aparece se está lançada no Saipos.</div>';
+  h += '</div><div class="fx-nota" title="&quot;Vendas que ainda devem cair&quot; é a média do que caiu nas contas nas últimas 4 semanas, proporcional aos dias que faltam. Conta a pagar só aparece se está lançada no Saipos.">Caixa do dia a dia: sem XP, Participações e cartões de crédito.</div>';
   // 6 despesas
   const L = fxLojas(), at = FX_S.despesas.filter(r => r.semana === W && L.includes(r.unidade));
   const ws4 = SEM.slice(Math.max(0, iW - 4), iW).length ? fechadas.slice(Math.max(0, iW - 4), iW) : [];
@@ -5178,8 +5149,7 @@ function renderModuloDFC() {
   alvo.innerHTML = plcCabecalhoQuebra('fluxo') + seletorLojaFin() + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Fluxo de Caixa — ${nomeLojaFin()}</div>
   <div class="caption-label" style="text-align:center;" title="Clique nas linhas com ▶ para abrir o detalhe.">
-    Caixa realizado mês a mês, todos os canais da loja escolhida no botão acima — os filtros de período e
-    loja do topo <b>não valem aqui</b>, eles são só do iFood.
+    Caixa realizado mês a mês, todos os canais da loja escolhida no topo.
   </div>
   ${iSel >= 0 ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -5222,7 +5192,7 @@ function renderModuloDFC() {
       <div style="height:${Math.max(200, saidasPorTipo.length * 30)}px;">
         <canvas id="chartDestinoSaidas"></canvas></div></div>
   </div>
-  <div class="caption-label" title="Aplicado é dinheiro da empresa, mas não está disponível para o dia a dia. A XP entra no Saipos pela saída do Itaú e pelo rendimento de cada mês (decisão de 03/09/2026). Jan a jul/2026 vieram da planilha de fluxo realizado, validados linha a linha; de agosto em diante a base vem do Saipos. Clique em SALDO INICIAL/FINAL para ver conta a conta.">Nas linhas de fluxo, o percentual cinza é a fatia da receita do mês.
+  <div class="caption-label" title="Aplicado é dinheiro da empresa, mas não está disponível para o dia a dia. A XP entra no Saipos pela saída do Itaú e pelo rendimento de cada mês (decisão de 03/09/2026). A base é o caixa do Saipos. Clique em SALDO INICIAL/FINAL para ver conta a conta.">Nas linhas de fluxo, o percentual cinza é a fatia da receita do mês.
   Nos saldos, a coluna Total mostra o saldo na ponta do período (não a soma dos meses).</div>`;
 
   // ---- graficos (proposta do chat financeiro, 13/08/2026) ----
@@ -5952,9 +5922,8 @@ function renderModuloDRE() {
         const difTot = caixaTot - compTot;
         ponteHtml = `
         <div class="section-label" style="margin-top:26px;">O lucro virou caixa? — ponte de ${rotuloMes(mesF)}</div>
-        <div class="caption-label" style="text-align:center;">
-          "No papel" = contas do mês (competência, como na DRE acima). "No caixa" = o que de fato entrou e saiu no mês.
-          A diferença é capital de giro: o que o mês quitou de trás ou empurrou para frente.
+        <div class="caption-label" style="text-align:center;" title="A diferença é capital de giro: o que o mês quitou de trás ou empurrou para frente.">
+          No papel = competência (como a DRE) · no caixa = o que entrou e saiu no mês.
         </div>
         <div id="tabelaPonte">
           <table>
@@ -5969,10 +5938,8 @@ function renderModuloDRE() {
           </table>
         </div>
         <div class="caption-label" style="text-align:center;">
-          "Pra onde foi o dinheiro" — do resultado do mês até o que sobrou nos bancos e cofres —
-          é a mesma conta, na mesma view, da seção <b>4. E no caixa?</b> do
-          <a href="javascript:void(0)" onclick="mostrarModulo('fechamento')" style="color:var(--info);">Placar · O mês em uma página</a>.
-          Um cálculo, um dono: mora lá.
+          Do resultado até o que sobrou nos bancos:
+          <a href="javascript:void(0)" onclick="mostrarModulo('fechamento')" style="color:var(--info);">Placar · O mês em uma página ›</a>
         </div>`;
       }
       const iA = iF - 1;
@@ -6018,19 +5985,14 @@ function renderModuloDRE() {
       <div class="cards cards-3">
         <div class="card ${resultado[iF] >= 0 ? 'pos' : 'neg'}"><div class="card-lbl">Resultado líquido do mês</div><div class="card-val">R$ ${fmt(resultado[iF])}</div>
           ${statusDe(resPct, metaMes('RESULTADO', iF))}${varRS(resultado)}</div>
-        <div class="card"><div class="card-lbl">Prime Cost (CMV + pessoal)</div><div class="card-val">${pct(primePct)}%</div>
+        <div class="card" title="Prime Cost = CMV + pessoal, os dois maiores custos da casa, em % de tudo que entrou."><div class="card-lbl">Prime Cost (CMV + pessoal)</div><div class="card-val">${pct(primePct)}%</div>
           ${statusDe(primePct, mPrime)}${varPP(primePct, antDe(primeArr))}</div>
-        ${pe ? `<div class="card"><div class="card-lbl">Ponto de equilíbrio</div><div class="card-val">R$ ${fmt(pe)}</div>
+        ${pe ? `<div class="card" title="(pessoal + comerciais + administrativas + outras) ÷ margem de contribuição %: quanto precisava faturar para empatar."><div class="card-lbl">Ponto de equilíbrio</div><div class="card-val">R$ ${fmt(pe)}</div>
           <div class="card-pct" style="color:${folga >= 0 ? 'var(--farol-ok)' : 'var(--farol-fora)'};">vendeu ${pct(Math.abs(folga))}% ${folga >= 0 ? 'acima' : 'ABAIXO'} do ponto</div></div>` : ''}
       </div>
-      <div class="caption-label" style="text-align:center;">
-        Os demais indicadores estão na própria tabela: o % ao lado de cada número é a fatia de tudo que entrou
-        (venda cheia + outras receitas da operação: atacado, listas das filiais, Boqueirão),
-        colorido pela meta (verde dentro, âmbar perto, vermelho fora). Prime Cost = CMV + pessoal, os dois maiores
-        custos da casa. Ponto de equilíbrio = (pessoal + comerciais + administrativas + outras) ÷ margem de
-        contribuição % — quanto precisava faturar para empatar. Metas editáveis na tabela <b>fin_metas_dre</b>;
-        quando a meta muda mês a mês, vale a do mês (<b>fin_metas_dre_mes</b>), a mesma do Placar e do Fechamento do mês.
-      </div>`;
+      <div class="caption-label" style="text-align:center;">Os demais indicadores estão na tabela, coloridos pela meta do mês.</div>`;
+      // 12/11/2026 (lote 3 resultado-41): a legenda de 7 linhas virou uma; Prime Cost e ponto de equilíbrio foram para o
+      // title do cartão; os nomes das tabelas de meta saíram da tela
     }
   }
 
@@ -6038,15 +6000,8 @@ function renderModuloDRE() {
   ${fechHtml}
   ${blocoBeneficioIfood(BENEF_FAROL || { f: null, semanas: [] })}
   <div class="section-label">DRE Gerencial — ${nomeLojaFin()}</div>
-  <div class="caption-label" style="text-align:center;">
-    Resultado mês a mês da empresa inteira, direto do Saipos desde jan/2026 — <b>não segue os filtros do topo</b>.
-    Receitas = venda cheia por canal (caixa das lojas + promoção paga pela loja); despesas por <b>competência</b> (data de emissão da NF).
-    Em cada célula: valor, <b>%</b> sobre tudo que entrou (venda cheia + outras receitas: atacado, listas das filiais, Boqueirão)
-    e <b>▲▼</b> (variação vs mês anterior). Na Água Verde a mercadoria inclui o que foi comprado para produzir as listas e o atacado;
-    nas filiais, a lista paga à Água Verde está dentro da mercadoria (linha Mercadorias AV).
-    Na visão Rede a lista entre as lojas não entra na receita nem na mercadoria: é a rede vendendo para ela mesma.
-    Marcação colorida só aparece quando a linha está <b>fora da meta</b> (âmbar = perto, vermelho = longe) —
-    sem marcação, está tudo dentro. Clique nas linhas com ▶ para abrir o detalhe.
+  <div class="caption-label" style="text-align:center;" title="Receitas = venda cheia por canal (caixa das lojas + promoção paga pela loja). % sobre tudo que entrou (venda cheia + atacado, listas das filiais, Boqueirão); ▲▼ = vs mês anterior. Na Água Verde a mercadoria inclui o comprado para as listas e o atacado; nas filiais, a lista paga à AV está na linha Mercadorias AV. Na Rede a lista entre lojas não entra. Cor só quando a linha está fora da meta (âmbar perto, vermelho longe).">
+    Venda cheia por canal · despesas por competência · % sobre tudo que entrou · ▶ abre o detalhe.
   </div>
   <div class="periodo-presets" style="margin-top:14px; display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
     <button class="preset-btn ${drePeriodo === 'ano' ? 'active' : ''}" onclick="drePeriodoSet('ano')">Ano completo</button>
@@ -6097,9 +6052,8 @@ function renderModuloDRE() {
     </table>
   </div>
   ${ponteHtml}
-  <div class="caption-label" title="Investimentos, retiradas e aportes ficam fora do resultado (são o destino do lucro). Meses futuros já lançados ficam no Fluxo projetado. A bolinha âmbar aparece a até 10% da meta e a vermelha além disso; as metas são editáveis em fin_metas_dre.">
-  Lançamentos e vendas do Saipos desde jan/2026. Desde 12/09/2026 as <b>taxas de canais</b> saem cobrança a cobrança da conciliação, não mais pela diferença entre vendido e recebido.
-  O <b>mês corrente parece pior do que vai fechar</b>: as despesas já estão quase todas lançadas e as vendas ainda estão acontecendo.</div>`;
+  <div class="caption-label" title="Investimentos, retiradas e aportes ficam fora do resultado (são o destino do lucro). Meses futuros já lançados ficam no Fluxo projetado. A bolinha âmbar aparece a até 10% da meta e a vermelha além disso. Desde 12/09/2026 as taxas de canais saem cobrança a cobrança da conciliação.">
+  Lançamentos e vendas do Saipos desde jan/2026.</div>`;
   encaixarColunaFixa('tabelaDRE');
 }
 
@@ -6735,14 +6689,22 @@ async function cpAtualizar() {
     if (!linha || linha.status === 'PENDENTE') fim = 'O pedido entrou na fila, mas ninguém atendeu — a máquina das rotinas pode estar desligada. A lista abaixo é a da última carga.';
     else if (linha.status === 'ERRO') fim = 'O Saipos não respondeu: ' + resumo + '. A lista abaixo é a da última carga.';
     else if (linha.status === 'RODANDO') fim = 'A carga do Saipos ainda está rodando — clique de novo em alguns minutos.';
-    // atendedor que ainda nao foi reiniciado trata o pedido como conciliacao (janela de 7 dias)
-    else if (!resumo.includes('Saipos completo')) fim = 'Atendido pela versão antiga do atendedor: só os últimos 7 dias do Saipos foram relidos. Reinicie a tarefa "Painel - Atender conciliacao" na máquina das rotinas.';
+    // atendedor que ainda nao foi reiniciado trata o pedido como conciliacao (janela de 7 dias). 12/11/2026: a tela diz
+    // o efeito para quem opera; a parte técnica (reiniciar a tarefa) fica só no console.
+    else if (!resumo.includes('Saipos completo')) {
+      console.warn('cpAtualizar: atendido pela versão antiga do atendedor (reiniciar a tarefa "Painel - Atender conciliacao")');
+      fim = 'Só os últimos 7 dias do Saipos foram relidos; o resto da lista é da última carga completa.';
+    }
   } catch (e) {
     fim = 'Não consegui pedir a atualização: ' + e.message;
   }
   CP_PEDIDO = null;
   CP_AVISO = fim;
   await (cpSentidoAtual() === 'RECEBER' ? entrarContasReceber() : entrarContasPagar());
+  // 12/11/2026 (usabilidade, T9): o retorno também na barra fixa — ✓ quando deu certo (antes a tela recarregava calada)
+  const hh = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  if (!fim) avisoAcao('ok', '✓ Saipos relido às ' + hh);
+  else avisoAcao('erro', '✗ ' + fim, () => cpAtualizar());
 }
 
 // ---- pecas comuns das duas telas ----
@@ -6780,6 +6742,8 @@ function cpPassa(f, r, sem) {
 const cpSoma = (l) => l.reduce((s, r) => s + r.valor, 0);
 
 const cpMil = (v) => Math.abs(v) < 50 ? '—' : (v / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+// 12/11/2026: R$ sem centavos (tabelaCpDias) — sai o "R$ mil" ao lado do R$ da lista
+const cpR0 = (v) => Math.abs(v) < 0.5 ? '—' : Math.round(v).toLocaleString('pt-BR');
 
 function cpBarra() {
   const hoje = trHoje();
@@ -6798,12 +6762,12 @@ function cpCartoes(sentido) {
   const base = cpDoSentido(sentido).filter(r => cpPassa(f, r, 'situacao'));
   let h = '<div class="cards">';
   for (const [k, rot0, cls] of CP_SIT[sentido]) {
-    const rot = rot0 || (CP.tudo ? 'Depois' : 'Até 45 dias');
+    const rot = rot0 || (CP.tudo ? 'Depois de 7 dias' : 'De 8 a 45 dias');
     const l = base.filter(r => r.situacao === k);
     const saiuBanco = k === 'VENCIDA' ? l.filter(r => r.saiuBanco) : [];
     h += `<div class="card ${cls}" style="cursor:pointer; ${f.situacao === k ? 'outline:2px solid var(--brand);' : ''}" onclick="cpFiltro('situacao','${k}')">
       <div class="card-lbl">${rot}</div><div class="card-val">R$ ${fmt(cpSoma(l))}</div>
-      <div class="card-pct">${l.length} título(s)${saiuBanco.length ? ` · <span style="color:var(--amber-2);">${saiuBanco.length} já ${saiuBanco.length === 1 ? 'saiu' : 'saíram'} do banco, falta a baixa</span>` : ''}</div></div>`;
+      <div class="card-pct">${l.length} título(s)${saiuBanco.length ? ` · <span style="color:var(--amber-2);">${saiuBanco.length} já ${saiuBanco.length === 1 ? 'saiu' : 'saíram'} do banco · robô dá a baixa</span>` : ''}</div></div>`;
   }
   return h + '</div>';
 }
@@ -6843,7 +6807,8 @@ function cpTabela(sentido) {
     : agr === 'grupo' ? grupoConta(r)
     : (CP_ORIGEM[r.origem] || { rot: r.origem || '—' }).rot;
   const rotuloDe = (k) => agr !== 'dia' ? trEscH(k)
-    : k === '0000-00-00' ? (sentido === 'PAGAR' ? 'Já venceu' : 'Atrasados')
+    // 12/11/2026: "Antes de hoje" (vencidas + aguardando conciliação), para não brigar com o cartão "Vencidas"
+    : k === '0000-00-00' ? (sentido === 'PAGAR' ? 'Antes de hoje (vencidas e aguardando conciliação)' : 'Atrasados')
     : `${ffDdmm(k)} (${SEM[new Date(k + 'T12:00:00').getDay()]})${k === hoje ? ' · hoje' : ''}`;
   const grupos = new Map();
   lista.forEach(r => { const k = chaveDe(r); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
@@ -6858,7 +6823,7 @@ function cpTabela(sentido) {
     const nota = r.situacao === 'AGUARDANDO EXTRATO' ? '<span style="color:var(--tx-3);" title="a conciliação do banco deste dia ainda não terminou (regra de 09/11)">aguardando a conciliação</span>' : '';
     // "no Saipos" e' o caso comum: so aparece a baixa quando ela foge disso
     const baixa = r.origem === 'SAIPOS' && !r.saiuBanco ? '' : r.saiuBanco
-      ? `<span style="color:var(--amber-2);" title="o débito já apareceu no extrato do banco">saiu do banco em ${ffDdmm(r.saiuBanco)} — dar baixa no Saipos</span>`
+      ? `<span style="color:var(--amber-2);" title="o débito já apareceu no extrato do banco">saiu do banco em ${ffDdmm(r.saiuBanco)} · robô dá a baixa</span>`
       : og.tela ? `<a href="javascript:void(0)" style="color:var(--tx-3);" onclick="${og.aba ? `sessionStorage.setItem('pesAbaPedida','${og.aba}');` : ''}mostrarModulo('${og.tela}')">${og.baixa} ›</a>`
       : `<span style="color:var(--tx-3);">${og.baixa}</span>`;
     const jaNoTitulo = r.fornecedor && String(r.descricao || '').toUpperCase().includes(String(r.fornecedor).toUpperCase());
@@ -6880,7 +6845,8 @@ function cpTabela(sentido) {
     return c * o.dir || (a.conta_exibida || '').localeCompare(b.conta_exibida || '', 'pt-BR') || a.valor - b.valor;
   });
   const th = (col, rot) => `<th onclick="cpOrdenar('${col}')" style="cursor:pointer; user-select:none;${o.col === col ? ' color:var(--tx-1);' : ''}" title="ordenar por esta coluna">${rot}${o.col === col ? (o.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  const cab = (comData) => `<tr>${comData ? th('vencimento', 'Vence') : ''}${th('descricao', sentido === 'PAGAR' ? 'Conta a pagar' : 'Título')}${th('conta', 'Banco')}${th('valor', 'Valor')}<th></th></tr>`;
+  // 12/11/2026 (usabilidade 07/11): cabeçalho dentro de <thead> e a coluna da baixa com título
+  const cab = (comData) => `<thead><tr>${comData ? th('vencimento', 'Vence') : ''}${th('descricao', sentido === 'PAGAR' ? 'Conta a pagar' : 'Título')}${th('conta', 'Banco')}${th('valor', 'Valor')}<th>Baixa</th></tr></thead>`;
   const so1 = ordem.length === 1;
   h += `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:4px 0 6px;"><span class="caption-label" style="margin:0 4px 0 0;">Agrupar por</span>
       ${AGR.map(([k, rot]) => `<button class="preset-btn ${agr === k ? 'active' : ''}" onclick="cpAgrupar('${k}')">${rot}</button>`).join(' ')}</div>
@@ -6893,7 +6859,7 @@ function cpTabela(sentido) {
         <summary><span class="cp-grupo-nome"${atraso ? ' style="color:var(--farol-fora);"' : ''}>${rotuloDe(k)}</span>
           <span class="cp-grupo-n">${l.length} título${l.length === 1 ? '' : 's'}</span>
           <b class="cp-grupo-v"${atraso ? ' style="color:var(--farol-fora);"' : ''}>R$ ${fmt(tot)}</b></summary>
-        <table>${cab(agr !== 'dia' || atraso)}${ordena(l).map(r => linha(r, agr !== 'dia' || atraso)).join('')}</table>
+        <table>${cab(agr !== 'dia' || atraso)}<tbody>${ordena(l).map(r => linha(r, agr !== 'dia' || atraso)).join('')}</tbody></table>
       </details>`; }).join('')}</div>`;
   return h;
 }
@@ -6953,7 +6919,7 @@ function cpProximosDias() {
   // o que ainda vai sair do banco: a pagar, sem o que ja saiu e so falta a baixa
   const itens = CP.itens.filter(r => r.sentido === 'PAGAR' && r.valor > 0 && !r.saiuBanco && cpDaLoja(r));
   const grupoDe = (tipo) => CP_GRUPOS.findIndex(g => g[1](tipo));
-  const faixas = [['0000-01-01', d(-1), 'Já venceu', 'vencidas e as que aguardam o extrato'], [hoje, hoje, 'Hoje', '']];
+  const faixas = [['0000-01-01', d(-1), 'Antes de hoje', 'vencidas e as que aguardam a conciliação'], [hoje, hoje, 'Hoje', '']];
   for (let i = 1; i <= 7; i++) faixas.push([d(i), d(i), rotDia(d(i)), '']);
   faixas.push([d(8), d(30), `${ffDdmm(d(8))} a ${ffDdmm(d(30))}`, '']);
   faixas.push([d(31), d(45), `${ffDdmm(d(31))} a ${ffDdmm(d(45))}`, '']);
@@ -6974,19 +6940,20 @@ function cpProximosDias() {
     totPrev += prev;
     const fx = de < hoje ? null : cpFluxoPagar(de, ate);
     const ativa = f.faixa && f.faixa.de === de && f.faixa.ate === ate;
+    // 12/11/2026 (usabilidade 07/11): uma moeda só (R$ sem centavos, como o resto da tela de decisão), a quantidade
+    // de contas numa coluna própria e o total com class="liq"
     return `<tr onclick="cpFaixa('${de}','${ate}','${rot}')" style="cursor:pointer;${ativa ? ' outline:2px solid var(--brand);' : ''}" title="${n} conta(s)${dica ? ' · ' + dica : ''} — clique para ver a lista">
-      <td><b${de < hoje && soma > 50 ? ' style="color:var(--farol-fora);"' : ''}>${rot}</b> <span style="color:var(--tx-5); font-size:11px;">${n}</span></td>
-      <td><b>${cpMil(soma)}</b></td>${v.map(x => `<td>${cpMil(x)}</td>`).join('')}${FXL ? `<td style="color:var(--tx-4);">${cpMil(prev)}</td><td>${de < hoje ? '<span style="color:var(--tx-5); font-size:11px;">no hoje</span>' : `<b>${fx == null ? '—' : cpMil(fx)}</b>`}</td>` : ''}</tr>`;
+      <td><b${de < hoje && soma > 50 ? ' style="color:var(--farol-fora);"' : ''}>▸ ${rot}</b></td><td>${n}</td>
+      <td><b>${cpR0(soma)}</b></td>${v.map(x => `<td>${cpR0(x)}</td>`).join('')}${FXL ? `<td style="color:var(--tx-4);">${cpR0(prev)}</td><td>${de < hoje ? '<span style="color:var(--tx-5); font-size:11px;">no hoje</span>' : `<b>${fx == null ? '—' : cpR0(fx)}</b>`}</td>` : ''}</tr>`;
   }).join('');
   const total = tot.reduce((a, x) => a + x, 0);
   return `
   <div class="section-label">Os próximos dias, por grupo de conta</div>
   <div id="tabelaCpDias" class="cel-cartao"><table>
-    <thead><tr><th>Vence</th><th>${FXL ? 'Títulos' : 'Total'}</th>${CP_GRUPOS.map(g => `<th>${g[0]}</th>`).join('')}${FXL ? '<th title="o que o Fluxo prevê e ainda não virou título: mercadoria por fornecedor, motoboys, diaristas, bônus">Previsto sem título</th><th title="o mesmo A pagar do Fluxo projetado nesses dias">A pagar no Fluxo</th>' : ''}</tr></thead>
+    <thead><tr><th>Vence</th><th>Contas</th><th title="soma dos títulos a pagar (fora o que já saiu do banco e só falta a baixa)">Com título (R$)</th>${CP_GRUPOS.map(g => `<th${g[0] === 'Pessoas' ? ' title="folha, pró-labore e retiradas"' : ''}>${g[0]} (R$)</th>`).join('')}${FXL ? '<th title="o que o Fluxo prevê e ainda não virou título: mercadoria por fornecedor, motoboys, diaristas, bônus">Previsto sem título (R$)</th><th title="o mesmo A pagar do Fluxo projetado nesses dias (hoje inclui o que já venceu e o que foi pago hoje no Saipos)">A pagar no Fluxo (R$)</th>' : ''}</tr></thead>
     <tbody>${linhas}
-    <tr style="border-top:2px solid var(--line);"><td><b>Até ${ffDdmm(d(45))}</b></td><td><b>${cpMil(total)}</b></td>${tot.map(x => `<td><b>${cpMil(x)}</b></td>`).join('')}${FXL ? `<td><b>${cpMil(totPrev)}</b></td><td></td>` : ''}</tr></tbody></table></div>
-  <div class="caption-label" style="text-align:left;">Em R$ mil. Clique numa linha para ver as contas dela na lista lá embaixo. Pessoas = folha, pró-labore e retiradas.
-    Fora: o que já saiu do banco e só falta a baixa no Saipos. ${FXL ? '<b>Previsto sem título</b> = o que o Fluxo prevê e ainda não tem título (mercadoria por fornecedor, motoboys, diaristas, bônus); <b>A pagar no Fluxo</b> = o mesmo total do Fluxo projetado nesses dias (hoje inclui o que já venceu e o que foi pago hoje no Saipos).' : 'O que costuma sair e ninguém lança antes (mercadoria, motoboys, diaristas) não está aqui — está como estimativa no Fluxo projetado.'}</div>`;
+    <tr class="liq"><td><b>Até ${ffDdmm(d(45))}</b></td><td></td><td><b>${cpR0(total)}</b></td>${tot.map(x => `<td><b>${cpR0(x)}</b></td>`).join('')}${FXL ? `<td><b>${cpR0(totPrev)}</b></td><td></td>` : ''}</tr></tbody></table></div>
+  <div class="caption-label" style="text-align:left;">Clique numa linha para ver as contas dela na lista.${FXL ? '' : ' Mercadoria, motoboys e diaristas sem título estão no Fluxo projetado.'}</div>`;
 }
 
 // as maiores contas ate o dia mais apertado do caixa: cada uma e' uma decisao (adiar, renegociar, conferir)
@@ -7002,15 +6969,18 @@ function cpMaioresAteAperto() {
     const P = projCalc(PROJ_RECEB_LOJA ? CP.loja : '');   // o dia mais apertado DA LOJA escolhida
     if (P.menorSaldo < 0 && P.menorDia > hoje) { ate = P.menorDia; porque = `até ${ffDdmm(P.menorDia)}, o dia mais apertado do caixa (${fxMil(P.menorSaldo)})`; }
   }
-  const l = CP.itens.filter(r => r.sentido === 'PAGAR' && r.valor > 0 && !r.saiuBanco && cpDaLoja(r) && r.vencimento <= ate)
+  // 12/11/2026 (usabilidade 07/11): só o que ainda vai vencer (de hoje em diante) — a vencida já está na lista e no
+  // cartão; entram a coluna Banco e a linha de total; "Conta" virou "Conta a pagar", o mesmo nome da lista
+  const l = CP.itens.filter(r => r.sentido === 'PAGAR' && r.valor > 0 && !r.saiuBanco && cpDaLoja(r) && r.vencimento >= hoje && r.vencimento <= ate)
     .sort((a, b) => b.valor - a.valor).slice(0, 5);
   if (!l.length) return '';
   return `
-  <div class="section-label">As 5 maiores contas ${porque}</div>
+  <div class="section-label">As 5 maiores contas a vencer ${porque}</div>
   <div id="tabelaCpMaiores" class="cel-cartao"><table>
-    <thead><tr><th>Vence</th><th>Valor</th><th>Conta</th><th>Fornecedor</th></tr></thead>
-    <tbody>${l.map(r => `<tr><td style="white-space:nowrap;">${ffDdmm(r.vencimento)}</td><td><b>${fmt(r.valor)}</b></td>
-      <td style="text-align:left; white-space:normal;">${trEscH(r.descricao.replace(/\s*\(parc\. 100000\/100000\)/, ''))}</td><td style="text-align:left; white-space:normal;">${trEscH(r.fornecedor || '—')}</td></tr>`).join('')}</tbody></table></div>
+    <thead><tr><th>Conta a pagar</th><th>Valor</th><th>Vence</th><th>Banco</th><th>Fornecedor</th></tr></thead>
+    <tbody>${l.map(r => `<tr><td style="text-align:left; white-space:normal;">${trEscH(r.descricao.replace(/\s*\(parc\. 100000\/100000\)/, ''))}</td><td><b>${fmt(r.valor)}</b></td>
+      <td style="white-space:nowrap;">${ffDdmm(r.vencimento)}</td><td style="white-space:nowrap;">${trEscH(r.conta_exibida || '—')}</td><td style="text-align:left; white-space:normal;">${trEscH(r.fornecedor || '—')}</td></tr>`).join('')}
+    <tr class="liq"><td><b>Total</b></td><td><b>${fmt(cpSoma(l))}</b></td><td></td><td></td><td></td></tr></tbody></table></div>
   <div class="caption-label" style="text-align:left;">Adiar, renegociar ou conferir uma delas é o que muda o caixa nesse período.</div>`;
 }
 
@@ -7027,10 +6997,15 @@ function renderContasPagar() {
   ${cpBarra()}
   ${cpCartoes('PAGAR')}
   ${CP.temMotor ? (FXL ? `<div id="cpHojeWrap">${cpHojeLimpo()}</div>` : `<div id="projCaixaWrap">${blocoCaixaDoDia()}</div>`) : ''}
-  ${cpProximosDias()}
-  ${cpMaioresAteAperto()}
   <div class="section-label">Todas as contas a pagar</div>
   ${cpTabela('PAGAR')}
+  ${(() => {
+    // 12/11/2026 (usabilidade 07/11, T1/T3): a lista do que pagar sobe para logo depois dos cartões; "os próximos dias"
+    // e "as 5 maiores" (planejamento, não o pagar de hoje) ficam num recolhido "Planejar a semana", a um clique
+    const plano = cpProximosDias() + cpMaioresAteAperto();
+    const f = CP.filtros.PAGAR;
+    return plano ? `<details class="detalhes-extra"${f.faixa ? ' open' : ''}><summary>Planejar a semana — os próximos dias por grupo de conta e as maiores contas</summary>${plano}</details>` : '';
+  })()}
   ${comissao ? `<details class="detalhes-extra"><summary>Comissão do atacado — ${(() => { const pend = (PROJ_COM_PAG || []).filter(x => ['EM_ABERTO', 'PAGO_DIFERENTE', 'PAGO_SEM_BANCO'].includes(x.situacao)).length;
         return !PROJ_COM_PAG ? 'o valor da semana para lançar no Saipos' : pend ? `<span style="color:var(--amber-2);">${pend} pendência${pend > 1 ? 's' : ''}</span>` : '<span style="color:var(--farol-ok);">✓ tudo pago até a última semana fechada</span>'; })()}</summary>${comissao}</details>` : ''}
   ${bonus ? `<details class="detalhes-extra"><summary>Bônus do iFood — o que vai para a aplicação, semana a semana</summary>${bonus}</details>` : ''}`;
@@ -7181,7 +7156,7 @@ function renderContasReceber() {
       ${u === 'REDE' && fora.v.some(v => v > 0.005) ? `<tr style="opacity:.75;"><td>Filiais pagam à Água Verde <span style="color:var(--tx-5); font-size:11px;">fora da Rede</span></td>${fora.v.map((v, j) => cel(`__fora|${j}`, v)).join('')}
         <td style="text-align:left; white-space:normal; color:var(--tx-3); font-size:12px;">cobrança das listas e do bônus</td></tr>` : ''}</tbody></table></div>
     <div id="crFxlDet">${det}</div>
-    <div class="caption-label" style="text-align:left;">Em R$ mil. A primeira coluna é o mesmo "A receber" do Fluxo projetado, hoje até ${ffDdmm(ate7)}. Clique num valor para ver o que o compõe.</div>`;
+    <div class="caption-label" style="text-align:left;" title="A primeira coluna é o mesmo A receber do Fluxo projetado, hoje até ${ffDdmm(ate7)}.">Em R$ mil · clique num valor para ver o que o compõe.</div>`;
   } else if (CP.temMotor) {
     const lj = PROJ_RECEB_LOJA ? CP.loja : '';
     const P = projCalc(lj);
@@ -7240,9 +7215,9 @@ function renderContasReceber() {
   ${blocoAtraso}
   <div class="section-label">Todos os títulos a receber</div>
   ${cpCartoes('RECEBER')}
-  ${cpTabela('RECEBER')}
-  <div class="caption-label" style="text-align:left;">Aqui só o que tem título: boletos do atacado, cobranças das filiais e do Boqueirão e o que está lançado a receber no Saipos.
-    iFood, cartão e dinheiro não têm título — ${projEntraFrase() ? projEntraFrase() : 'entram pela média'}, na tabela de cima.${PROJ_FORA_MEDIA ? ' A provisão mensal do Boqueirão (origem “Provisão”) é estimativa: vira a cobrança quando a lista do mês fecha e some quando o pagamento entra.' : ''}</div>`;
+  ${cpTabela('RECEBER')}`;
+  // 12/11/2026 (lote 3 dinheiro-16): saiu a legenda "Aqui só o que tem título…" — a coluna "Como sabemos" da tabela de
+  // cima já diz de onde vem cada linha (e o iFood não entra mais "pela média" com o Fluxo limpo)
 }
 
 // Quadro semanal do benefício do iFood (comissão zero) — feito para a Hellen:
@@ -7295,24 +7270,25 @@ function blocoBeneficio() {
     const v = (u) => Number((rs.find(r => r.unidade === u) || {}).beneficio || 0);
     const tot = v('AGUA VERDE') + v('AHU') + v('SÃO BRAZ');
     const fechada = rs.every(r => r.semana_fechada);
-    const status = !fechada ? '<span style="color:#8a897e">em andamento</span>'
-      : (pendentes.has(sem) ? '<span style="color:#e8b04b;font-weight:700">pendente → XP</span>'
-                            : '<span style="color:#3fb950">enviada à XP</span>');
+    const status = !fechada ? '<span style="color:var(--tx-3)">em andamento</span>'
+      : (pendentes.has(sem) ? '<span style="color:var(--farol-perto);font-weight:700">pendente → XP</span>'
+                            : '<span style="color:var(--farol-ok)">enviada à XP</span>');
     return `<tr><td>${ddmm(sem)} a ${ddmm(new Date(new Date(sem + 'T12:00:00').getTime() + 6 * 86400000).toISOString())}</td>
-      <td style="text-align:right">${reais(v('AGUA VERDE'))}</td><td style="text-align:right">${reais(v('AHU'))}</td>
-      <td style="text-align:right">${reais(v('SÃO BRAZ'))}</td><td style="text-align:right;font-weight:700">${reais(tot)}</td>
+      <td>${reais(v('AGUA VERDE'))}</td><td>${reais(v('AHU'))}</td>
+      <td>${reais(v('SÃO BRAZ'))}</td><td style="font-weight:700">${reais(tot)}</td>
       <td>${status}</td></tr>`;
   }).join('');
+  // 12/11/2026 (lote 3 dinheiro-12): o parágrafo da regra saiu da tela; a definição foi para o title do título da coluna
+  // Semana. Fica o título e o "pendente para a XP".
+  const regraBonus = 'A comissão que o iFood deixou de cobrar em cada loja. Da semana de 05/10/2026 em diante: 9,5% da venda '
+    + '(itens + entrega − desconto que a loja banca). Até a semana de 28/09: 9,5% do depositado (já pagas, não se refazem). '
+    + 'Não é dinheiro do fluxo: as filiais pagam a parte delas à Água Verde e a AV manda o total para a XP toda quarta.';
   return `
   <div class="section-label">Bônus de comissão do iFood — o que vai para a XP, semana a semana</div>
-  <div class="contexto">A comissão que o iFood deixou de cobrar em cada loja. <b>Da semana de 05/10/2026 em diante: 9,5% da
-    venda</b> (itens + entrega − desconto que a loja banca), como o iFood cobra — dá uns 12% a mais.
-    <b>Até a semana de 28/09: 9,5% do valor depositado; já foram pagas e não serão refeitas.</b> Pela regra do Fabio,
-    <b>não é dinheiro do fluxo</b>: as filiais pagam a parte delas à Água Verde (cobranças abaixo) e a AV manda o
-    total para a XP toda quarta. ${totalXp > 0 ? `<b style="color:#e8b04b">Pendente para a XP agora: ${reais(totalXp)}.</b>` : '<b style="color:#3fb950">Nada pendente para a XP.</b>'}</div>
+  <div class="contexto">${totalXp > 0 ? `<b style="color:var(--farol-perto)">Pendente para a XP agora: ${reais(totalXp)}.</b>` : '<b style="color:var(--farol-ok)">Nada pendente para a XP.</b>'}</div>
   <div id="tabelaBeneficio" style="overflow-x:auto"><table>
-    <thead><tr><th>Semana</th><th style="text-align:right">Água Verde</th><th style="text-align:right">Ahú</th>
-    <th style="text-align:right">São Braz</th><th style="text-align:right">Total</th><th>Situação</th></tr></thead>
+    <thead><tr><th title="${regraBonus}">Semana</th><th>Água Verde</th><th>Ahú</th>
+    <th>São Braz</th><th>Total</th><th>Situação</th></tr></thead>
     <tbody>${linhas}</tbody></table></div>
   ${cobrAbertas.length ? `<div class="contexto" style="margin-top:8px">Cobranças das filiais em aberto: ${cobrAbertas.map(c =>
     `${c.unidade} ${reais(c.valor_total)} (vence ${ddmm(c.vencimento)})`).join(' · ')}.</div>` : ''}`;
@@ -7488,28 +7464,22 @@ function blocoComissaoAtacado() {
   const ultPaga = ult && ['JANE', 'FABIO'].every(pe => (comPag(ult.semana_ini, pe) || {}).situacao === 'PAGO')
     ? [comPag(ult.semana_ini, 'JANE').saiu_banco_em, comPag(ult.semana_ini, 'FABIO').saiu_banco_em].sort().pop() : null;
   const linhas = PROJ_COM_ATACADO.slice(0, 5).map(r => `<tr>
-      <td>${ddmm(r.semana_ini)} a ${ddmm(r.semana_fim)}${r.semana_fechada ? '' : ' <span style="color:#8a897e">(em andamento)</span>'}</td>
-      <td style="text-align:right">${reais(r.base_revenda)}${pend(r) > 0 ? `<br><span style="color:#e8b04b;font-size:11px" title="PIX do iFood Pago já no extrato, ainda sem lançamento no Saipos">+ ${reais(pend(r))} no banco</span>` : ''}</td>
-      <td style="text-align:right;font-weight:${r.semana_fechada ? 700 : 400}"${comAjuste(r.semana_ini, 'JANE') ? ` title="${trEscH(comAjuste(r.semana_ini, 'JANE').ajuste)}"` : ''}>${reais(comValor(r, 'JANE'))}${comMarca(r.semana_ini, 'JANE')}</td>
-      <td style="text-align:right;font-weight:${r.semana_fechada ? 700 : 400}"${comAjuste(r.semana_ini, 'FABIO') ? ` title="${trEscH(comAjuste(r.semana_ini, 'FABIO').ajuste)}"` : ''}>${reais(comValor(r, 'FABIO'))}${comMarca(r.semana_ini, 'FABIO')}</td>
+      <td>${ddmm(r.semana_ini)} a ${ddmm(r.semana_fim)}${r.semana_fechada ? '' : ' <span style="color:var(--tx-3)">(em andamento)</span>'}</td>
+      <td>${reais(r.base_revenda)}${pend(r) > 0 ? `<br><span style="color:var(--farol-perto);font-size:11px" title="PIX do iFood Pago já no extrato, ainda sem lançamento no Saipos">+ ${reais(pend(r))} no banco</span>` : ''}</td>
+      <td style="font-weight:${r.semana_fechada ? 700 : 400}"${comAjuste(r.semana_ini, 'JANE') ? ` title="${trEscH(comAjuste(r.semana_ini, 'JANE').ajuste)}"` : ''}>${reais(comValor(r, 'JANE'))}${comMarca(r.semana_ini, 'JANE')}</td>
+      <td style="font-weight:${r.semana_fechada ? 700 : 400}"${comAjuste(r.semana_ini, 'FABIO') ? ` title="${trEscH(comAjuste(r.semana_ini, 'FABIO').ajuste)}"` : ''}>${reais(comValor(r, 'FABIO'))}${comMarca(r.semana_ini, 'FABIO')}</td>
       <td>${ddmm(r.pagamento)}</td></tr>`).join('');
+  // 12/11/2026 (usabilidade 07/11): o parágrafo de 4 linhas virou uma linha de resultado + ação; a regra da base
+  // (quinta a quarta, final só na quinta) foi para o title do título "Base revenda"
   return `
   <div class="section-label">Comissão do atacado — 7,5% Jane + 7,5% Fabio sobre a revenda</div>
-  <div class="contexto">Base: o que entrou no banco como <b>Receitas Revenda</b> na semana (quinta a quarta).
-    <b>O número de uma semana só é final na quinta</b> — os valores do último dia entram
-    durante a tarde de quarta, e é por isso que o pagamento é na quinta.
-    ${ultPaga ? `Última semana fechada (${ddmm(ult.semana_ini)} a ${ddmm(ult.semana_fim)}): <b style="color:var(--farol-ok)">✓ paga</b> à Jane e ao Fabio
-      (saiu do banco em ${ddmm(ultPaga)}).` : ''}
-    ${pendCom.length ? `<br><b style="color:var(--amber-2)">Pendente:</b> ${pendCom.map(x => `${x.pessoa === 'JANE' ? 'Jane' : 'Fabio'}, semana de ${ddmm(x.semana_ini)} — ${comTexto(x)}`).join(' · ')}.` : ''}
-    ${ult && !ultPaga ? `Última semana fechada (${ddmm(ult.semana_ini)} a ${ddmm(ult.semana_fim)}):
-    <b>lançar ${reais(cada(ult))} para a Jane e ${reais(cada(ult))} para o Fabio</b>,
-    vencimento ${ddmm(ult.pagamento)}. A linha de provisão daquela semana no Saipos deve ser ajustada para esse valor.` : ''}
-    ${ult && pend(ult) > 0 ? `<br><b style="color:#e8b04b">Atenção:</b> ${reais(pend(ult))} do iFood Pago já entrou no banco nessa semana e
-    ainda não está lançado no Saipos (o robô da conciliação lança por volta do meio-dia). O valor acima já conta com ele;
-    no Saipos a base ainda aparece como ${reais(ult.base_revenda)}.` : ''}</div>
+  <div class="contexto">${ultPaga ? `Semana ${ddmm(ult.semana_ini)} a ${ddmm(ult.semana_fim)}: <b style="color:var(--farol-ok)">✓ paga</b> à Jane e ao Fabio em ${ddmm(ultPaga)}.` : ''}
+    ${ult && !ultPaga ? `Semana ${ddmm(ult.semana_ini)} a ${ddmm(ult.semana_fim)}: <b>${reais(cada(ult))} para a Jane e ${reais(cada(ult))} para o Fabio</b>, vencimento ${ddmm(ult.pagamento)} · a provisão da semana no Saipos vai a esse valor.` : ''}
+    ${pendCom.length ? `<br><b style="color:var(--farol-perto)">Pendente:</b> ${pendCom.map(x => `${x.pessoa === 'JANE' ? 'Jane' : 'Fabio'}, semana de ${ddmm(x.semana_ini)} — ${comTexto(x)}`).join(' · ')}.` : ''}
+    ${ult && pend(ult) > 0 ? `<br><span style="color:var(--farol-perto)">Já conta ${reais(pend(ult))} do iFood Pago que está no banco e ainda não no Saipos.</span>` : ''}</div>
   <div id="tabelaComAtacado" style="overflow-x:auto"><table>
-    <thead><tr><th>Semana</th><th style="text-align:right">Base revenda</th>
-    <th style="text-align:right">Jane (7,5%)</th><th style="text-align:right">Fabio (7,5%)</th><th>Pagar em</th></tr></thead>
+    <thead><tr><th>Semana</th><th title="O que entrou no banco como Receitas Revenda na semana (quinta a quarta). O número só é final na quinta: o último dia entra à tarde de quarta.">Base revenda</th>
+    <th>Jane (7,5%)</th><th>Fabio (7,5%)</th><th>Pagar em</th></tr></thead>
     <tbody>${linhas}</tbody></table></div>`;
 }
 
@@ -8486,9 +8456,9 @@ function blocoFluxoLimpo() {
   // ---- o quadro: por loja, hoje e 7 dias ----
   let h = `<div class="section-label">Caixa de hoje — ${dm(d0.dia)}</div>
     <div id="tabelaFxlQuadro" style="overflow-x:auto;"><table><thead>
-      <tr><th rowspan="2">Loja</th><th rowspan="2">Saldo inicial</th><th colspan="3" style="background:${corHoje}; text-align:center;">Hoje</th>
+      <tr><th rowspan="2">Loja</th><th rowspan="2" title="bancos + cofre no fim do último dia com extrato completo de cada conta; o que o Saipos mostra pago ou recebido depois disso entra em hoje">Saldo inicial</th><th colspan="3" style="background:${corHoje}; text-align:center;">Hoje</th>
         <th colspan="3" style="background:${cor7}; text-align:center;">Até ${dm(d7.dia)} (7 dias)</th></tr>
-      <tr><th style="background:${corHoje};">A receber</th><th style="background:${corHoje};">A pagar</th><th style="background:${corHoje};">Saldo final</th>
+      <tr><th style="background:${corHoje};" title="títulos do Saipos + o previsto sem título; nada conta duas vezes e o que já mexeu no banco hoje não entra">A receber</th><th style="background:${corHoje};" title="títulos do Saipos + o previsto sem título; nada conta duas vezes e o que já mexeu no banco hoje não entra">A pagar</th><th style="background:${corHoje};" title="inicial + a receber − a pagar; o mesmo número do dia a dia abaixo">Saldo final</th>
         <th style="background:${cor7};">A receber</th><th style="background:${cor7};">A pagar</th><th style="background:${cor7};">Saldo final</th></tr></thead><tbody>`;
   finLinhas().forEach(([u, nome]) => {
     const x0 = d0.unidades[u], x7 = d7.unidades[u];
@@ -8510,15 +8480,14 @@ function blocoFluxoLimpo() {
       parc.forEach((p) => { const k = `${p.ultimo_extrato_parcial_dia || ''}|${p.hora_extrato || ''}|${p.data_partida}`; (grupos[k] = grupos[k] || []).push(p); });
       const frasesParc = Object.values(grupos).map((g) => {
         const p = g[0];
-        return `${g.map((x) => trEscH(x.conta)).join(', ')}: o extrato de ${p.ultimo_extrato_parcial_dia ? dm(p.ultimo_extrato_parcial_dia) : 'hoje'} é parcial${p.hora_extrato ? ` (baixado às ${hhmm(p.hora_extrato)} de ${dm(String(p.hora_extrato).slice(0, 10))})` : ''}, então o saldo inicial é o do fim de ${dm(p.data_partida)}, e o que o Saipos mostra pago ou recebido depois disso entra em hoje.`;
+        // 12/11/2026 (lote 3 dinheiro-9): alerta de uma linha; a hora do extrato e a regra no title
+        return `<span title="extrato de ${p.ultimo_extrato_parcial_dia ? dm(p.ultimo_extrato_parcial_dia) : 'hoje'}${p.hora_extrato ? ` baixado às ${hhmm(p.hora_extrato)} de ${dm(String(p.hora_extrato).slice(0, 10))}` : ''}; o que o Saipos mostra pago ou recebido depois disso entra em hoje">Extrato parcial: ${g.map((x) => trEscH(x.conta)).join(', ')} · saldo inicial do fim de ${dm(p.data_partida)}</span>`;
       });
       return (frasesParc.length ? `<div class="contexto" style="text-align:left;">${frasesParc.join('<br>')}</div>` : '')
         + (atr.length ? `<div class="contexto" style="text-align:left; border-color:var(--amber-2);"><b style="color:var(--amber-2);">Extrato atrasado:</b>
           ${atr.map((p) => `${trEscH(p.conta)} — o último é de ${dm(p.data_partida)}`).join(' · ')}. O que entrou e saiu depois disso ainda não está no número.</div>` : '');
     })()}
-    <div class="caption-label" style="text-align:left;">Em R$. <b>Saldo inicial</b> = bancos + cofre no fim do último dia com extrato completo de cada conta; o que o Saipos mostra pago ou recebido depois disso entra em hoje.
-      <b>A receber</b> e <b>A pagar</b> = os títulos do Saipos + o que está previsto e ainda não tem título (nada conta duas vezes; o que já mexeu no banco hoje não entra).
-      <b>Saldo final</b> = inicial + a receber − a pagar. É o mesmo número das linhas abaixo. Clique num valor para ver o que o compõe.</div>`;
+    <div class="caption-label" style="text-align:left;">Em R$ · clique num valor para ver o que o compõe.</div>`;
   const ab = FXL.aberto && FXL.aberto.startsWith('Q|') && FXL.aberto.split('|');
   if (ab) {
     const [, u, de, ate, lado] = ab;
@@ -9283,9 +9252,8 @@ function renderModuloConciliacao() {
     <div class="contexto" style="border-color:#ff6b6b; text-align:left;">
       <b>A base pode estar desatualizada.</b> Última importação:
       ${impSaipos ? new Date(impSaipos.importado_em).toLocaleString('pt-BR') + ` (${horasDesdeImport}h atrás)` : 'nunca'}.
-      <div style="font-size:12px; color:#a5a49a; margin-top:6px;">
-        A rotina roda todo dia às 07:30 (tarefa "Painel - Importar Saipos DFC"). Se o PC estiver desligado nesse horário,
-        rode manualmente o <b>importar_saipos.bat</b> — enquanto isso, tudo o que aparece no painel é do último dia importado.
+      <div style="font-size:12px; color:var(--tx-3); margin-top:6px;">
+        Enquanto não chegar a próxima carga, o painel mostra o último dia importado.
       </div>
     </div>`;
   }
@@ -9393,10 +9361,8 @@ function renderModuloConciliacao() {
           banco ${r.extrato_valor === null ? '—' : 'R$ ' + fmt(r.extrato_valor)} · diferença <b>R$ ${fmt(r.diferenca)}</b>
           — ${(SIT[r.situacao] || [''])[0]}</div>
       </div>`).join('')}
-      <div style="font-size:12px; color:#a5a49a; margin-top:6px;">
-        Regra do dono (19/08): a fatura é uma transferência Itaú → cartão, e o que prova é a linha <b>BUSINESS</b> do extrato.
-        Cada cartão tem um contrato no memo (0503-3179 = AV 6950, 4005-3752 = AV 1540, 4004-1773 = Ahú, 7502-4440 = São Braz).
-        Fonte: vw_fin_cartao_fatura_conferencia.
+      <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="Regra do dono (19/08): a fatura é uma transferência Itaú → cartão; cada cartão tem um contrato no memo do extrato.">
+        O que prova a fatura é a linha BUSINESS do extrato do Itaú.
       </div>
     </div>`;
   }
@@ -9431,8 +9397,8 @@ function renderModuloConciliacao() {
   alvo.innerHTML = `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Conferência da base — Água Verde, Ahú e São Braz</div>
   <div class="caption-label" style="text-align:center;">
-    Checagem diária da base: <b>se algo não bater, aparece aqui.</b> A conciliação com o extrato do banco é feita
-    fora do painel (Saipos/OFX) — aqui conferimos a consistência interna e apontamos o que provavelmente falta lançar lá.
+    Checagem diária da base: <b>se algo não bater, aparece aqui.</b> Banco × Saipos linha a linha:
+    <a href="javascript:void(0)" onclick="mostrarModulo('concbanco')" style="color:var(--info);">Conciliação bancária ›</a>
   </div>
   <div class="cards">
     <div class="card ${alertas === 0 ? 'pos' : 'neg'}"><div class="card-lbl">Pontos de atenção</div>
