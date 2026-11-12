@@ -63,7 +63,7 @@ function tabelaLiquidoPorLoja(ant) {
       if (prev && Math.abs(prev.liq) > 0.005) {
         const v = (o.liq - prev.liq) / Math.abs(prev.liq) * 100;
         const palavra = v > 0.05 ? 'subiu' : v < -0.05 ? 'caiu' : 'estável';
-        const cor = palavra === 'estável' ? '#8a897e' : (v > 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
+        const cor = palavra === 'estável' ? 'var(--tx-4)' : (v > 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
         varTxt = `<span style="color:${cor}; font-weight:bold;">${palavra}${palavra !== 'estável' ? ' ' + pct(Math.abs(v)) + '%' : ''}</span>`;
       }
       return { nome: LOJAS[i], idx: i, ...o, varTxt };
@@ -77,29 +77,29 @@ function tabelaLiquidoPorLoja(ant) {
   <div class="caption-label" style="text-align:center;">Clique numa loja para ver só ela.</div>
   <div id="tabelaLojasResumo">
     <table>
-      <tr><th>Loja</th><th>Pedidos</th><th>Bruto</th><th title="Ordenado do maior para o menor líquido do período.">Líquido</th><th>vs período anterior</th></tr>
+      <thead><tr><th>Loja</th><th>Pedidos</th><th>Bruto</th><th title="Ordenado do maior para o menor líquido do período.">Líquido</th><th>vs período anterior</th></tr></thead><tbody>
       ${lista.map(x => `<tr style="cursor:pointer;" title="Ver só ${x.nome}: o painel inteiro passa a mostrar apenas esta loja. Clique de novo para voltar a todas." onclick="focarLojaNoFiltro(${x.idx})"><td>${x.nome}</td><td>${x.ped.toLocaleString('pt-BR')}</td>
         <td>R$ ${fmt(x.bruto)}</td><td><b>R$ ${fmt(x.liq)}</b></td><td>${x.varTxt}</td></tr>`).join('')}
       ${(() => { const t = lista.reduce((a, x) => ({ ped: a.ped + x.ped, bruto: a.bruto + x.bruto, liq: a.liq + x.liq }), { ped: 0, bruto: 0, liq: 0 });
         return `<tr class="liq"><td>TOTAL</td><td>${t.ped.toLocaleString('pt-BR')}</td>
           <td>R$ ${fmt(t.bruto)}</td><td><b>R$ ${fmt(t.liq)}</b></td><td></td></tr>`; })()}
-    </table>
+    </tbody></table>
   </div>`;
 }
 
 // Variacao compacta em texto (subiu/caiu + cor), para tabelas.
 // tipo: maiorMelhor | menorMelhor | neutro
 function variacaoSpan(atual, anterior, tipo = 'maiorMelhor') {
-  if (anterior === null || anterior === undefined || !isFinite(anterior)) return '<span style="color:#8a897e;">—</span>';
+  if (anterior === null || anterior === undefined || !isFinite(anterior)) return '<span style="color:var(--tx-4);">—</span>';
   if (Math.abs(anterior) < 0.005) {
     return Math.abs(atual) < 0.005
-      ? '<span style="color:#8a897e;">—</span>'
-      : '<span style="color:#8a897e;">apareceu agora</span>';
+      ? '<span style="color:var(--tx-4);">—</span>'
+      : '<span style="color:var(--tx-4);">apareceu agora</span>';
   }
   const v = (atual - anterior) / Math.abs(anterior) * 100;
-  if (Math.abs(v) < 0.05) return '<span style="color:#8a897e;">estável</span>';
+  if (Math.abs(v) < 0.05) return '<span style="color:var(--tx-4);">estável</span>';
   const subiu = v > 0;
-  let cor = '#8a897e';
+  let cor = 'var(--tx-4)';
   if (tipo === 'maiorMelhor') cor = subiu ? 'var(--farol-ok)' : 'var(--farol-fora)';
   else if (tipo === 'menorMelhor') cor = subiu ? 'var(--farol-fora)' : 'var(--farol-ok)';
   return `<span style="color:${cor}; font-weight:bold;">${subiu ? '▲' : '▼'} ${subiu ? 'subiu' : 'caiu'} ${pct(Math.abs(v))}%</span>`;
@@ -169,7 +169,7 @@ function extratoFinanceiro(m, a) {
   return `<div class="section-label">Para onde foi o dinheiro (antes dos custos próprios)</div>
   <div id="extratoFin">
     <table>
-      <tr><th>Item</th><th>Valor · % do bruto</th><th>vs período anterior</th></tr>
+      <thead><tr><th>Item</th><th>Valor · % do bruto</th><th>vs período anterior</th></tr></thead><tbody>
       ${linha('Venda dos produtos' + marcaPior('itens'), m.itens, m.itensPct, variacaoSpan(m.itens, a && a.itens))}
       ${linha('Taxa de entrega paga pelo cliente' + marcaPior('frete'), m.frete, m.fretePct, variacaoSpan(m.frete, a && a.frete))}
       ${linha('<b>= Faturamento bruto</b> <span style="font-size:11px;color:var(--tx-4);">venda cheia, com frete</span>', m.bruto, 100, variacaoSpan(m.bruto, a && a.bruto), 'sub')}
@@ -184,7 +184,7 @@ function extratoFinanceiro(m, a) {
       ${linha('− Anúncios', m.anuncios, m.anunciosPct, variacaoSpan(m.anuncios, a && a.anuncios, 'neutro'), '', -1)}
       ${linha('<b>= Total investido em marketing</b>' + faroLinha('mkt_por_pedido', m.custoMktPorPedido), m.totalMkt, m.totalMktPct, variacaoSpan(m.totalMkt, a && a.totalMkt, 'neutro'), 'sub', -1)}
       ${linha('<b>= LÍQUIDO — o que sobra para a loja</b>' + faroLinha('margem_pct', m.liquidoPct), m.liquido, m.liquidoPct, variacaoSpan(m.liquido, a && a.liquido), 'liq')}
-    </table>
+    </tbody></table>
   </div>`;
 }
 
@@ -238,7 +238,7 @@ function linhaContexto(ant) {
   // 12/09/2026: este texto dizia que a visao consolidada "nascera"; virou link para ela
   // e, no mesmo dia, a consolidada foi aposentada — a Evolucao de vendas mostra o iFood ao
   // lado do salao, do site e do balcao com os mesmos numeros, e e para la que o link leva.
-  const canais = `<div style="margin-top:6px; color:#8a897e; font-size:11.5px;">
+  const canais = `<div style="margin-top:6px; color:var(--tx-4); font-size:11.5px;">
     Canal iFood. <a href="javascript:void(0)" onclick="mostrarModulo('evolucao')" style="color:var(--tx-3);">Ver ao lado do salão, site e balcão &rsaquo;</a>
   </div>`;
 
@@ -250,7 +250,7 @@ function linhaContexto(ant) {
 
 function blocoAbertura(m, a, ant) {
   const variacao = (a && Math.abs(a.liquido) > 0.005) ? (m.liquido - a.liquido) / Math.abs(a.liquido) * 100 : null;
-  const cor = variacao === null ? '#8a897e' : (variacao >= 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
+  const cor = variacao === null ? 'var(--tx-4)' : (variacao >= 0 ? 'var(--farol-ok)' : 'var(--farol-fora)');
   const seta = variacao === null ? '' : (variacao >= 0 ? '▲' : '▼');
   const deltaTexto = variacao === null
     ? 'Sem período anterior para comparar'
@@ -259,7 +259,7 @@ function blocoAbertura(m, a, ant) {
   // 12/11/2026 (auditoria lote 3, canal-32/39): o hero fica só com o número e a variação — bruto, pedidos e custo do
   // iFood já estão nos cartões e no extrato logo abaixo
   return `<div class="hero" style="border-color:${cor};">
-    <div class="hero-lbl">O que sobrou para a loja no período</div>
+    <div class="hero-lbl">Sobrou do iFood (antes dos custos da loja)</div>
     <div class="hero-val">R$ ${fmt(m.liquido)}</div>
     <div class="hero-delta" style="color:${cor};">${deltaTexto}</div>
   </div>
@@ -2390,7 +2390,7 @@ function renderModuloRelatorios(idSelecionado, abaIdx = 0) {
   const gerador = `
   <div class="contexto" style="text-align:left;">
     <b>Gerar relatório de qualquer período</b> — números e alertas calculados na hora, com os filtros de
-    unidade/marca atuais. <span style="color:#8a897e;">(A análise interpretada e as ações recomendadas
+    unidade/marca atuais. <span style="color:var(--tx-4);">(A análise interpretada e as ações recomendadas
     continuam vindo do resumo automático de segunda-feira.)</span>
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px;">
       <label style="font-size:12px; color:var(--tx-3);">De <input type="date" id="relIni" value="${isoD(segPassada)}"
@@ -2492,7 +2492,7 @@ async function gerarRelatorioAdHoc() {
       const v = (atual - anterior) / Math.abs(anterior) * 100;
       const palavra = v > 0.05 ? 'subiu' : v < -0.05 ? 'caiu' : 'estável';
       const bom = tipo === 'neutro' ? null : (tipo === 'maiorMelhor' ? v > 0 : v < 0);
-      const cor = palavra === 'estável' || bom === null ? '#8a897e' : (bom ? 'var(--farol-ok)' : 'var(--farol-fora)');
+      const cor = palavra === 'estável' || bom === null ? 'var(--tx-4)' : (bom ? 'var(--farol-ok)' : 'var(--farol-fora)');
       varTxt = `<span style="color:${cor};">${palavra}${palavra !== 'estável' ? ' ' + pct(Math.abs(v)) + '%' : ''}</span>`;
     }
     return `<tr><td>${nome}</td><td>${f(atual)}</td><td>${anterior !== null ? f(anterior) : '—'}</td><td>${varTxt}</td></tr>`;
@@ -2514,7 +2514,7 @@ async function gerarRelatorioAdHoc() {
 
   alvo.innerHTML = `<div class="relatorio-corpo" style="margin-top:12px;">
     <h2>Relatório de ${formatarDataCurta(ini)} a ${formatarDataCurta(fim)} (${dias} dias)</h2>
-    <p style="color:#8a897e;" title="Números do banco, sem análise interpretada. Recorte atual de unidades e marcas aplicado.">Comparação: ${temAnterior ? `${formatarDataCurta(iniAnt)} a ${formatarDataCurta(fimAnt)}` : 'sem período anterior disponível'}.</p>
+    <p style="color:var(--tx-4);" title="Números do banco, sem análise interpretada. Recorte atual de unidades e marcas aplicado.">Comparação: ${temAnterior ? `${formatarDataCurta(iniAnt)} a ${formatarDataCurta(fimAnt)}` : 'sem período anterior disponível'}.</p>
     <h3>Resultado</h3>
     <table>
       <tr><th>Indicador</th><th>Período</th><th>Anterior</th><th>Variação</th></tr>
@@ -2536,7 +2536,7 @@ async function gerarRelatorioAdHoc() {
     <h3>Pontos de atenção (regras automáticas)</h3>
     <p style="color:var(--tx-5); font-size:11.5px; margin:0 0 4px;">A tela abre no período padrão dela, não neste.</p>
     <ul>${alertas.join('')}</ul>
-    <p style="color:#8a897e; font-size:11.5px;">Líquido antes dos custos próprios (insumos, equipe, aluguel).
+    <p style="color:var(--tx-4); font-size:11.5px;">Líquido antes dos custos próprios (insumos, equipe, aluguel).
     Negociações e avaliações existem na base a partir de jun-jul/2026.</p>
   </div>`;
 }
@@ -2622,7 +2622,7 @@ function renderModuloContestacoes() {
 
   const soma = (l) => l.reduce((s, r) => s + r.valor, 0);
   const dt = (v) => v ? formatarDataCurta(String(v).slice(0, 10)) : '—';
-  const parcial = (r) => r.cancelamento_tipo === 'PARCIAL' ? ' <span style="color:#8a897e; font-size:10px;">(parcial)</span>' : '';
+  const parcial = (r) => r.cancelamento_tipo === 'PARCIAL' ? ' <span style="color:var(--tx-4); font-size:10px;">(parcial)</span>' : '';
   const quem = (r) => r.contestado_rotina
     ? '<span style="color:var(--farol-ok);">rotina</span>' : '<span style="color:var(--tx-3);" title="Sem registro na tabela da rotina">—</span>';
   const turnoDe = (r) => { const h = /^(\d{2}):/.exec(r.hora || ''); return h ? (avalTurno(+h[1]) || '—') : '—'; };
@@ -3475,7 +3475,7 @@ function renderModuloFrete(linhas) {
         <td>${reais(md(l, 'custo'))}</td>
         <td>${reais(md(l, 'frete'))}</td>
         <td><b>${reais(md(l, 'ticket'))}</b></td>
-        <td style="color:${poucas ? '#8a897e' : cor}; font-weight:600;">${reais(r)}</td>
+        <td style="color:${poucas ? 'var(--tx-4)' : cor}; font-weight:600;">${reais(r)}</td>
       </tr>`;
     }).join('');
     const pond = (c) => totalEntregas ? ls.reduce((a, l) => a + l[c], 0) / totalEntregas : 0;
@@ -5066,7 +5066,7 @@ function renderModuloQualidade() {
         <td>${num(r.pct_atrasados_5min)}%</td>
         <td>${num(r.tempo_medio_atraso_min, 0)} min</td>
         <td>${num(r.pct_cancelamentos_super, 2)}%</td>
-        <td>${num(r.media_avaliacoes, 2)}${r.qtd_avaliacoes ? ' <span style="color:#8a897e; font-size:10px;">(' + r.qtd_avaliacoes + ')</span>' : ''}</td>
+        <td>${num(r.media_avaliacoes, 2)}${r.qtd_avaliacoes ? ' <span style="color:var(--tx-4); font-size:10px;">(' + r.qtd_avaliacoes + ')</span>' : ''}</td>
         <td>${num(r.pct_respostas_negociacoes)}%</td></tr>`;
     }).join('')}
   </table></div>
