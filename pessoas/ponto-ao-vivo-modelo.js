@@ -195,6 +195,8 @@
   // refeicoes = { disponivel:true, porPessoa: Map|objeto { [pessoaId]: [{ tipo, produto, quantidade, hora:'HH:MM' }] } }
   // Qualquer outra coisa => estado 'indisponivel' (NUNCA "não lançou": ausência de fonte não prova ausência de refeição).
   function celulaRefeicao(refeicoes, id) {
+    // unidade sem cobertura do dia consultado: dados pendentes, vale ANTES de itens/disponivel (nunca atribui nem diz "não lançou")
+    if (ehObj(refeicoes) && Array.isArray(refeicoes.indisponiveis) && refeicoes.indisponiveis.includes(id)) return { estado: 'pendente', itens: [] };
     if (!ehObj(refeicoes) || refeicoes.disponivel !== true) return { estado: 'indisponivel', itens: [] };
     const m = refeicoes.porPessoa;
     const bruto = m instanceof Map ? m.get(id) : (ehObj(m) ? m[id] : undefined);

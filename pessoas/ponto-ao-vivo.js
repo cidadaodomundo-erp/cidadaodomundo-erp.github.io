@@ -52,7 +52,8 @@
   }
   function textoRefeicao(r) {
     if (r.estado === 'indisponivel') return 'fonte indisponível';
-    if (r.estado === 'nao_lancou') return 'não lançou';
+    if (r.estado === 'pendente') return 'dados pendentes';
+    if (r.estado === 'nao_lancou') return 'não localizada na leitura';
     if (r.estado === 'sem_vinculo') return 'sem vínculo de refeição';
     return r.itens.map((i) => (i.quantidade > 1 ? i.quantidade + '× ' : '') + (i.tipo || 'refeição') + (i.produto ? ' ' + i.produto : '') + (i.hora ? ' às ' + i.hora : '')).join(' · ');
   }
@@ -233,7 +234,7 @@
       if (!vivo()) return;
       if (deps.sessaoId() !== sid || st.dia !== dia || deps.lojaAtual() !== atual) return;
       if (!respostaValida(resp, dia)) return falha('dadosinvalidos');
-      const refDe = (x) => (ehObj(x) && x.disponivel === true && ehObj(x.porPessoa) ? { disponivel: true, porPessoa: x.porPessoa, identificados: Array.isArray(x.identificados) ? x.identificados : undefined } : null);
+      const refDe = (x) => (ehObj(x) && x.disponivel === true && ehObj(x.porPessoa) ? { disponivel: true, porPessoa: x.porPessoa, identificados: Array.isArray(x.identificados) ? x.identificados : undefined, indisponiveis: Array.isArray(x.indisponiveis) ? x.indisponiveis : undefined } : null);
       let resultado;
       try {
         resultado = M.cruzar({

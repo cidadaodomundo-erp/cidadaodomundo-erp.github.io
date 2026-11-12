@@ -52,7 +52,10 @@ function mkFetch(o = {}) {
     if (tabela !== undefined) {
       if (o.rest) { const x = o.rest(p); if (x) return x; }
       const sd = u.searchParams.get('shift_date');
-      const linhas = sd ? tabela.filter((r) => 'eq.' + r.shift_date === sd) : tabela;
+      const un = u.searchParams.get('unidade'), ok = (r) => !un || un.includes('"' + r.unidade + '"');
+      let linhas = sd && sd.startsWith('lte.') ? tabela.filter((r) => ok(r) && r.shift_date <= sd.slice(4)).sort((a, b) => (a.shift_date < b.shift_date ? 1 : -1))
+        : sd ? tabela.filter((r) => 'eq.' + r.shift_date === sd) : tabela;
+      if (sd && sd.startsWith('lte.') && !u.searchParams.get('offset')) linhas = linhas.slice(0, Number(u.searchParams.get('limit')));
       const lim = Number(u.searchParams.get('limit')), off = Number(u.searchParams.get('offset'));
       return R(linhas.slice(off, off + lim));
     }
@@ -318,6 +321,29 @@ test('refeição: falha de leitura, de vínculos ou cadastro vazio = INDISPONÍV
     assert.ok(r.corpo.avisos.some((a) => /Refeição/.test(a)));
     assert.equal(r.corpo.batidas.length, 2, 'ponto continua');
   }
+});
+
+// ---------- cobertura por unidade e dia ----------
+const REDE = { query: { dia: DIA, unidade: 'REDE' }, painel: [{ lojas: ['AGUA VERDE', 'AHU', 'REDE'], loja_inicial: 'REDE', travado: false }] };
+const antigoAHU = (d) => ({ vendas: VENDAS.concat([{ id_sale: 9, shift_date: d, unidade: 'AHU', comanda_id: 1, nome_venda: '', cliente_nome: '', cancelada: false, hora_venda: '12:00:00' }]),
+  itens: ITENS.concat([IT({ id_sale: 9, id_sale_item: 9, shift_date: d, unidade: 'AHU' })]) });
+test('cobertura REDE: unidade coberta mantém refeições; a outra (dados só até 10/11) fica pendente, sem contaminar nem invalidar a rede', async () => {
+  const r = await rodar({ ...REDE, ...antigoAHU('2026-11-10'), ctx: { query: REDE.query } }); const rf = r.corpo.refeicoes;
+  assert.equal(rf.disponivel, true); assert.deepEqual(rf.indisponiveis, [3]); assert.deepEqual(Object.keys(rf.porPessoa).sort(), ['1', '2']);
+  assert.ok(r.corpo.avisos.includes('Refeições de AHU: dados recebidos até 10/11; dia consultado ainda não disponível.'));
+  assert.ok(!r.corpo.avisos.some((a) => /AGUA VERDE/.test(a) && /Refeições de/.test(a)));
+});
+test('cobertura: sem registro algum, só uma das fontes ou falha de fonte = pendente; histórico <= dia ignora dado futuro', async () => {
+  const futuro = { vendas: VENDAS.map((x) => ({ ...x, shift_date: '2026-11-13' })), itens: ITENS.map((x) => ({ ...x, shift_date: '2026-11-13' })) };
+  const casos = [{ vendas: [{ ...VENDAS[0], shift_date: '2026-11-01' }], itens: [] }, { itens: [] }, futuro, { rest: (p) => (p.endsWith('vendas_saipos') ? R({}, 500) : null) }];
+  for (const o of casos) { const r = await rodar(o); assert.deepEqual(r.corpo.refeicoes.indisponiveis ?? [1, 2], [1, 2], JSON.stringify(Object.keys(o))); assert.ok(r.status === 200); }
+  const r = await rodar(casos[2]); assert.deepEqual(r.corpo.refeicoes.indisponiveis, [1, 2]); assert.deepEqual(r.corpo.refeicoes.porPessoa, {});
+  assert.ok(r.corpo.avisos.includes('Refeições de AGUA VERDE: dados do dia consultado ainda não disponíveis.'));
+});
+test('cobertura: 401 do REST continua erro limpo; dado correto do dia com zero refeição de alguém não inventa pendência', async () => {
+  const r401 = await rodar({ rest: (p) => (p.endsWith('vendas_saipos') ? R([], 401) : null) }); assert.equal(r401.status, 401); assert.deepEqual(r401.corpo, { erro: 'nao_autenticado' });
+  const ok = await rodar(); assert.deepEqual(ok.corpo.refeicoes.indisponiveis, []); assert.ok(!ok.corpo.avisos.some((a) => /^Refeições de/.test(a)));
+  assert.ok(!JSON.stringify(ok.corpo.refeicoes).includes('segredo'));
 });
 
 const PE = [{ id: 1, nome: 'Ana Teste', unidade: 'AGUA VERDE' }, { id: 2, nome: 'Bia Souza', unidade: 'AGUA VERDE' }, { id: 3, nome: 'Ana Teste', unidade: 'AHU' }];

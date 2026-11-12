@@ -108,7 +108,7 @@ test('refeição só aparece quando uma fonte real é injetada; sem lançamento 
   await t.c.entrar(); await settle();
   const l = linhasTab(t.raiz);
   assert.equal(l.find((x) => x['Pessoa'] === 'Ana Teste')['Refeição'], 'almoço às 12:00');
-  assert.equal(l.find((x) => x['Pessoa'] === 'Bia')['Refeição'], 'não lançou');
+  assert.equal(l.find((x) => x['Pessoa'] === 'Bia')['Refeição'], 'não localizada na leitura');
   assert.ok(!/Refeição: fonte ainda não ligada/.test(fonteTxt(t.raiz)));
 });
 
@@ -238,6 +238,15 @@ test('direto, refeição indisponível: coluna diz "fonte indisponível" e a fon
   const t = mk({ direta: async () => RESP({ refeicoes: { disponivel: false, porPessoa: {}, identificados: [] } }) });
   await t.c.entrar(); await settle();
   assert.ok(linhasTab(t.raiz).every((x) => x['Refeição'] === 'fonte indisponível')); assert.match(fonteTxt(t.raiz), /Refeição: leitura indisponível agora/);
+});
+test('direto, unidade sem cobertura: backend→controller→modelo→texto preserva indisponiveis (pendente), sem "não lançou"', async () => {
+  const ref = { disponivel: true, porPessoa: { 1: [{ tipo: 'almoço', produto: 'prato', quantidade: 1, hora: '12:10' }] }, identificados: [1, 3], indisponiveis: [3] };
+  const t = mk({ direta: async () => RESP({ refeicoes: ref, avisos: ['Refeições de AHU: dados recebidos até 10/11; dia consultado ainda não disponível.'] }) });
+  await t.c.entrar(); await settle();
+  const l = linhasTab(t.raiz);
+  assert.equal(l.find((x) => x['Pessoa'] === 'Ana Teste')['Refeição'], 'almoço prato às 12:10');
+  assert.equal(l.find((x) => x['Pessoa'] === 'Caio Novo')['Refeição'], 'dados pendentes');
+  assert.ok(!/não lançou/.test(tudo(t.raiz))); assert.match(tudo(t.raiz), /dados recebidos até 10\/11/);
 });
 test('direto, falha da leitura: erro explícito, NENHUM fallback para a tabela em lote nem para o cadastro', async () => {
   const t = mk({ batidas: [B()], direta: async () => { throw Object.assign(new Error('HTTP 502'), { status: 502 }); } });

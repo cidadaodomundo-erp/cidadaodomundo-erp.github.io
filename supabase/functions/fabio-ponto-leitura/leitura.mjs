@@ -293,6 +293,28 @@ export const vendasPath = (variantes, dia) => 'vendas_saipos?select=id_sale,shif
 export const itensPath = (variantes, dia) => 'saipos_itens_venda?select=id_sale,id_sale_item,shift_date,unidade,produto,quantidade,preco_unit,deletado,observacao&shift_date=eq.' + dia
   + '&unidade=in.' + lista(variantes) + '&preco_unit=eq.0&deletado=not.is.true&order=id_sale.asc,id_sale_item.asc';
 
+// ---------- cobertura da fonte por unidade e dia (REST/RLS do chamador, sem SQL novo) ----------
+export const coberturaPath = (tabela, variantes, dia) => tabela + '?select=shift_date' + (tabela === 'saipos_itens_venda' ? ',importado_em' : '')
+  + '&shift_date=lte.' + dia + '&unidade=in.' + lista(variantes) + '&order=shift_date.desc&limit=1';
+// último shift_date <= dia da unidade nessa fonte; vazio/falha/formato ruim => null (pendente, nunca zero). Só 401 propaga.
+async function ultimoDiaFonte(c, headers, tabela, variantes, dia) {
+  let r;
+  try { r = await comTimeout(c.fetchImpl, c.supabaseUrl + '/rest/v1/' + coberturaPath(tabela, variantes, dia), { headers }, c.timeoutMs); }
+  catch (e) { return null; }
+  if (r.status === 401) throw new ErroLeitura('nao_autenticado', 401);
+  if (!r.ok) return null;
+  let j; try { j = await r.json(); } catch (e) { return null; }
+  const d = Array.isArray(j) && j.length === 1 && ehObj(j[0]) && typeof j[0].shift_date === 'string' ? j[0].shift_date.slice(0, 10) : null;
+  return d && dataValida(d) && d <= dia ? d : null;
+}
+// por unidade: coberta só se vendas E itens têm registro do próprio dia; ultimoDia = o mais antigo dos dois (ou null)
+export async function coberturaUnidade(c, headers, un, dia) {
+  const v = variantesUnidade(un);
+  const [a, b] = await Promise.all([ultimoDiaFonte(c, headers, 'vendas_saipos', v, dia), ultimoDiaFonte(c, headers, 'saipos_itens_venda', v, dia)]);
+  return { ok: a === dia && b === dia, ultimoDia: a && b ? (a < b ? a : b) : null };
+}
+const ddmm = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
+
 // ---------- refeição ----------
 const DIAS_SEMANA = /^(SEGUNDA|TERCA|QUARTA|QUINTA|SEXTA|SABADO|DOMINGO)\s*-/;
 export function ehItemRefeicao(item, venda) {
@@ -501,9 +523,18 @@ async function executar(c) {
       const [vendas, itens] = await Promise.all([paginar({ ...base, headers }, vendasPath(variantes, d)), paginar({ ...base, headers }, itensPath(variantes, d))]);
       return construirRefeicoes({ vendas, itens, vinculos, pessoas, dia: d });
     };
-    const r = await lerDia(dia);
+    const [r, cobs] = await Promise.all([lerDia(dia), Promise.all(unidades.map((un) => coberturaUnidade({ ...base }, headers, un, dia)))]);
+    const pend = new Set(); const avisosCob = [];
+    unidades.forEach((un, i) => {
+      if (cobs[i].ok) return;
+      pend.add(un);
+      avisosCob.push('Refeições de ' + un + ': ' + (cobs[i].ultimoDia ? 'dados recebidos até ' + ddmm(cobs[i].ultimoDia) + '; dia consultado ainda não disponível.' : 'dados do dia consultado ainda não disponíveis.'));
+    });
+    const indisponiveis = pessoas.filter((p) => pend.has(unidadeCanonica(p.unidade))).map((p) => p.id);
+    const porPessoa = { ...r.porPessoa }; for (const id of indisponiveis) delete porPessoa[id];   // pendente nunca recebe atribuição
     if (r.semVinculos) avisos.push('Refeição: nenhum vínculo confirmado no cadastro; ninguém pode ser identificado.');
-    else refeicoes = { disponivel: true, porPessoa: r.porPessoa, identificados: r.identificados, categorias: r.categorias };
+    else refeicoes = { disponivel: true, porPessoa, identificados: r.identificados, categorias: r.categorias, indisponiveis };
+    avisos.push(...avisosCob);
     avisos.push(...r.avisos);
   } catch (e) {
     if (e instanceof ErroLeitura && e.status === 401) throw e;
