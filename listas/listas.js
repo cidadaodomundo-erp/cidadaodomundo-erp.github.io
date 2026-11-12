@@ -96,7 +96,7 @@ function renderModuloListasFin() {
   window._trFinListas = listasMes || [];
 
   if (!mensal.length) {
-    alvo.innerHTML = '<div class="contexto">Sem listas importadas — rode <b>script/import_listas.py</b>.</div>';
+    alvo.innerHTML = '<div class="contexto">Nenhuma lista ainda.</div>';
     return;
   }
 
@@ -114,18 +114,15 @@ function renderModuloListasFin() {
 
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Listas · Financeiro</div>
-    <div class="caption-label" style="text-align:center;">
-      O dinheiro das transferências: fechamento do mês (a Rita valida), contas a pagar
-      (Água Verde e Michiro) e a conta mês a mês. O ciclo do pedido vive em <b>Listas · Pedidos</b>.
-    </div>
+    <div class="caption-label" style="text-align:center;">Fechamento das listas por filial.</div>
+    <!-- 12/11/2026 (auditoria de usabilidade 07/11): o que trava o mês (itens escritos à mão) sobe para cá, logo abaixo
+         do título; trTelaFechamento escreve aqui quando a caixa existe -->
+    <div id="trFinAvulsos"></div>
 
     <div class="section-label">${parciais.length ? mesTxt(parciais[0].mes).toUpperCase() : 'MÊS'} EM ANDAMENTO — fechamento parcial por filial</div>
-    <div class="caption-label" style="text-align:center;">
-      Clique na filial para abrir as listas do mês; clique na lista para ver os itens.
-      "Frete Michiro" de Ahú/S.Braz é pago direto por elas (não entra no devido); o do Boqueirão a Água Verde recobra.
-    </div>
+    <div class="caption-label" style="text-align:center;">Clique na filial para ver as listas; na lista, os itens.</div>
     ${parciais.length ? `<div id="tabelaTrParcial"><table>
-      <tr><th>Filial</th><th>Listas</th><th>Itens (R$)</th><th>Frete Michiro</th><th>Royalty</th><th>Parcial devido</th></tr>
+      <tr><th>Filial</th><th>Listas</th><th>Itens</th><th>Frete Michiro</th><th>Royalty</th><th>Parcial devido</th></tr>
       ${parciais.map((r, ix) => {
         const doMes = (listasMes || []).filter(l => l.unidade === r.unidade);
         // Sem conferir = a filial ainda nao registrou o recebimento (12/09/2026).
@@ -135,33 +132,36 @@ function renderModuloListasFin() {
         return `<tr onclick="trFinToggle(${ix})" style="cursor:pointer;" title="clique para abrir as listas">
         <td>▸ ${r.unidade}</td><td>${r.listas}${semConferir ? ` <span class="tr-tag" title="Listas deste mês que a filial ainda não conferiu — o valor delas ainda pode mudar.">${semConferir} sem conferir</span>` : ''}</td>
         <td>R$ ${fmt(nu(r.valor_lista))}</td>
-        <td>${nu(r.frete) ? 'R$ ' + fmt(nu(r.frete)) : (freteDir ? `<span style="color:#8a897e;">R$ ${fmt(freteDir)} (pago direto)</span>` : '—')}</td>
-        <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) + ' <span style="color:#8a897e; font-size:11px;">(regra)</span>' : '—'}</td>
+        <td>${nu(r.frete) ? 'R$ ' + fmt(nu(r.frete)) : (freteDir ? `<span style="color:var(--tx-4);">R$ ${fmt(freteDir)} (pago direto)</span>` : '—')}</td>
+        <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) : '—'}</td>
         <td><b>R$ ${fmt(nu(r.total_devido))}</b></td></tr>
-        <tr id="trFinFil_${ix}" hidden><td colspan="6" style="text-align:left; white-space:normal; padding:8px 14px;">
+        <tr id="trFinFil_${ix}" style="display:none;"><td colspan="6" style="text-align:left; white-space:normal; padding:8px 14px;">
           ${doMes.length ? doMes.map(l => `
-            <div onclick="trFinVerLista(${l.id}); event.stopPropagation();" style="cursor:pointer; padding:5px 0; border-bottom:1px solid #34332f;" title="clique para ver os itens">
+            <div onclick="trFinVerLista(${l.id}); event.stopPropagation();" style="cursor:pointer; padding:5px 0; border-bottom:1px solid var(--line);" title="clique para ver os itens">
               ▸ Lista <b>#${l.id}</b> · ${l.data_pedido ? l.data_pedido.slice(8,10)+'/'+l.data_pedido.slice(5,7) : '—'}
               · ${l.status} · ${l.itens} itens · <b>R$ ${fmt(nu(l.total_lista))}</b>
               ${nu(l.itens_divergentes) ? `<span class="tr-tag">· ${l.itens_divergentes} diferença(s)</span>` : ''}
               <div id="trFinLista_${l.id}" hidden style="margin:6px 0 4px 14px; font-size:12.5px;"></div>
-            </div>`).join('') : '<span style="color:#8a897e;">nenhuma lista neste mês</span>'}
+            </div>`).join('') : '<span style="color:var(--tx-4);">nenhuma lista neste mês</span>'}
         </td></tr>`;
       }).join('')}
+      ${parciais.length > 1 ? `<tr class="liq"><td><b>Total das ${parciais.length} filiais</b></td>
+        <td>${parciais.reduce((s, r) => s + nu(r.listas), 0)}</td>
+        <td>R$ ${fmt(parciais.reduce((s, r) => s + nu(r.valor_lista), 0))}</td>
+        <td>${parciais.some(r => nu(r.frete)) ? 'R$ ' + fmt(parciais.reduce((s, r) => s + nu(r.frete), 0)) : '—'}</td>
+        <td>${parciais.some(r => nu(r.royalty)) ? 'R$ ' + fmt(parciais.reduce((s, r) => s + nu(r.royalty), 0)) : '—'}</td>
+        <td><b>R$ ${fmt(parciais.reduce((s, r) => s + nu(r.total_devido), 0))}</b></td></tr>` : ''}
     </table></div>` : '<div class="contexto">Nenhuma lista fechada ainda neste mês — a primeira conferência acende esta tabela.</div>'}
 
     <div id="trOperacao"><div class="contexto">Carregando a operação...</div></div>
 
     <details style="margin-top:26px;">
-      <summary style="cursor:pointer; color:#a5a49a;" class="section-label">Histórico fechado — abrir para consulta${
-        atrasados ? ` <span style="color:#ff6b6b;">(${atrasados} mês(es) sem fechar)</span>` : ''}</summary>
-      <div class="caption-label" style="text-align:center; margin-top:10px;">
-        Do corte de ago/26 em diante; o anterior vive nas planilhas aposentadas (e no banco, para consulta).
-        <b>Devido, Pago e Falta</b> são os mesmos de <b>Contas a pagar</b>: o pagamento é lido do lançamento do Saipos.
-      </div>
+      <summary style="cursor:pointer; color:var(--tx-3);" class="section-label">Histórico fechado — abrir para consulta${
+        atrasados ? ` <span style="color:var(--farol-fora);">(${atrasados} mês(es) sem fechar)</span>` : ''}</summary>
+      <div class="caption-label" style="text-align:center; margin-top:10px;">Pago lido do Saipos, o mesmo de Contas a pagar.</div>
       <div id="tabelaTrMensal">${trHistTabelaHtml()}</div>
       ${trHistNotas(historico, mesTxt)}
-      ${derivas.length ? `<div class="caption-label" style="color:#ff6b6b;" title="A conta é o custo recalculado hoje menos o valor congelado no fechamento do mês. Diferença positiva quer dizer que a filial foi cobrada a menos do que o custo de hoje; negativa, a mais.">⚠ A planilha reescreveu depois o custo de ${derivas.length} mês(es) já fechado(s): R$ ${fmt(Math.abs(derivaTotal))} ${derivaTotal >= 0 ? 'cobrado a menos' : 'cobrado a mais'} — vale o valor congelado no fechamento.</div>` : ''}
+      ${derivas.length ? `<div class="caption-label" style="color:var(--farol-fora);" title="A conta é o custo recalculado hoje menos o valor congelado no fechamento do mês. Diferença positiva quer dizer que a filial foi cobrada a menos do que o custo de hoje; negativa, a mais.">⚠ Custo de ${derivas.length} mês(es) fechado(s) mudou depois (R$ ${fmt(Math.abs(derivaTotal))} ${derivaTotal >= 0 ? 'a menos' : 'a mais'}): vale o congelado.</div>` : ''}
     </details>`;
   entrarOperacaoListas();
 }
@@ -226,7 +226,7 @@ function trHistTabelaHtml() {
     <td>${trHistMesTxt(r.mes)}</td><td>${r.unidade}</td><td>${r.listas}</td>
     <td>R$ ${fmt(nu(r.valor_lista))}</td>
     <td>${nu(r.frete) ? 'R$ ' + fmt(nu(r.frete)) : '—'}</td>
-    <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) + ' <span style="color:#8a897e; font-size:11px;">(regra)</span>' : '—'}</td>
+    <td>${nu(r.royalty) ? 'R$ ' + fmt(nu(r.royalty)) : '—'}</td>
     <td><b>R$ ${fmt(trHistDevido(r))}</b>${trHistDevidoAviso(r)}</td>
     ${trHistCelulas(r)}
   </tr>`).join('')}
@@ -277,8 +277,9 @@ function trHistNotas(historico, mesTxt) {
 
 // drill do quadro do mes (09/09/2026): filial -> listas -> itens da lista
 function trFinToggle(ix) {
+  // style.display (12/11/2026): no celular a linha vira cartão e o display:block do núcleo vencia o "hidden"
   const el = document.getElementById('trFinFil_' + ix);
-  if (el) el.hidden = !el.hidden;
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 async function trFinVerLista(id) {
   const el = document.getElementById('trFinLista_' + id);
@@ -304,11 +305,11 @@ async function trFinVerLista(id) {
         <td style="text-align:left; padding:2px 10px 2px 0;">${i.item} <span class="dre-av">${i.un_medida || ''}</span>${trEmbRotulo(mapa, i.item)}${i.avulso ? ' <span class="tr-tag">🆕</span>' : ''}${i.editado ? ' <span class="tr-tag">✏️</span>' : ''}${i.observacao ? ` <span class="tr-tag">${i.observacao}</span>` : ''}</td>
         <td style="padding:2px 8px;">${Number(i.qtd_solicitada || 0)}</td>
         <td style="padding:2px 8px;">${trSepTxt(i, cat[i.item], Number(i.qtd_separada ?? 0))}</td>
-        <td style="padding:2px 8px;${dif ? ' color:#ff6b6b; font-weight:700;' : ''}">${trRecTxt(i, cat[i.item], Number(i.qtd_recebida ?? 0))}</td>
+        <td style="padding:2px 8px;${dif ? ' color:var(--farol-fora); font-weight:700;' : ''}">${trRecTxt(i, cat[i.item], Number(i.qtd_recebida ?? 0))}</td>
         ${comValor ? trColunasValor(i, precos) : ''}
       </tr>`; }).join('')}
-      ${comValor ? `<tr><td colspan="5" style="text-align:right; padding:2px 8px;"><b>Total dos itens</b></td>
-        <td style="text-align:right; padding:2px 8px; white-space:nowrap;"><b>R$ ${fmt(somaItens)}</b></td></tr>` : ''}
+      ${comValor ? `<tr><td colspan="5" style="text-align:left; padding:2px 8px;"><b>Total dos itens</b></td>
+        <td style="text-align:left; padding:2px 8px; white-space:nowrap;"><b>R$ ${fmt(somaItens)}</b></td></tr>` : ''}
     </table>`;
     el.dataset.pronto = '1';
     return;
@@ -371,10 +372,10 @@ async function entrarOperacaoListas() {
         As filiais pedem, a Água Verde separa, quem recebe confere — tudo por aqui, com login individual
         (o mesmo do módulo Reembolsos).
         <div style="margin-top:10px;">
-          <input id="trEmail" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="seu nome (ex.: rita)" style="width:100%; margin-bottom:6px; background:#232321; border:1px solid #34332f; border-radius:8px; color:#fff; padding:8px 10px;">
-          <input id="trSenha" type="password" placeholder="senha" style="width:100%; margin-bottom:8px; background:#232321; border:1px solid #34332f; border-radius:8px; color:#fff; padding:8px 10px;">
+          <input id="trEmail" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="seu nome (ex.: rita)" class="trc-in" style="width:100%; margin-bottom:6px; border-radius:8px; padding:8px 10px;">
+          <input id="trSenha" type="password" placeholder="senha" class="trc-in" style="width:100%; margin-bottom:8px; border-radius:8px; padding:8px 10px;">
           <button class="preset-btn" onclick="trFazerLogin()">Entrar</button>
-          <div id="trLoginErro" style="display:none; color:#ff6b6b; font-size:12px; margin-top:6px;"></div>
+          <div id="trLoginErro" style="display:none; color:var(--farol-fora); font-size:12px; margin-top:6px;"></div>
         </div>
       </div>`;
     return;
@@ -382,8 +383,8 @@ async function entrarOperacaoListas() {
   if (!TR_OP) {
     const [rp, ru, rv] = await Promise.all([trRpc('tr_meu_papel'), trRpc('tr_minha_unidade'), trRpc('tr_vejo_valores')]);
     if (!rp.ok) {
-      alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">Logado como ${sessao.email}, mas o banco não reconheceu o papel (${await trErroDe(rp)}).
-        Confira o cadastro em tr_usuarios. <button class="preset-btn" onclick="trSair()">sair</button></div>`;
+      alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui ler o seu acesso às listas (${await trErroDe(rp)}).
+        Avise o Neto. <button class="preset-btn" onclick="trSair()">sair</button></div>`;
       return;
     }
     TR_OP = { papel: await rp.json(), unidade: ru.ok ? await ru.json() : null,
@@ -392,10 +393,9 @@ async function entrarOperacaoListas() {
     // caso do Fabio). Sem isto a tela caia na fila de separacao, que ele nao
     // pode operar — melhor dizer o que falta do que abrir uma tela quebrada.
     if (!TR_OP.papel) {
-      alvo.innerHTML = `<div class="contexto">Você está logado como <b>${sessao.email}</b>, mas este login
-        ainda não tem papel na operação das listas — por isso não dá para pedir, separar nem conferir.
-        As tabelas acima continuam valendo. Para ganhar acesso, é o Neto cadastrar o e-mail em
-        <b>tr_usuarios</b>. <button class="preset-btn" onclick="trSair()">sair</button></div>`;
+      alvo.innerHTML = `<div class="contexto">Este login ainda não tem acesso à operação das listas — não dá para pedir,
+        separar nem conferir. As tabelas acima continuam valendo. Para ganhar acesso, avise o Neto.
+        <button class="preset-btn" onclick="trSair()">sair</button></div>`;
       TR_OP = null;
       return;
     }
@@ -431,19 +431,21 @@ function trRenderOperacao() {
   // cada modulo mostra so as suas telas (a permissao continua a mesma)
   telas = telas.filter(([id]) => TR_TELAS_MODULO[TR_MODULO].includes(id));
   if (!telas.length) {
-    alvo.innerHTML = `<div class="contexto">Logado como <b>${rmbSessao().email}</b> (papel ${papel}).
-      ${TR_MODULO === 'pedidos' ? 'As telas do seu papel ficam no módulo <b>Listas · Financeiro</b>.'
+    alvo.innerHTML = `<div class="contexto">
+      ${TR_MODULO === 'pedidos' ? 'As telas do seu acesso ficam no módulo <b>Listas · Financeiro</b>.'
         : 'O que a filial deve das listas fica no módulo <b>Contas a pagar</b>; o pedido e a conferência, em <b>Listas · Pedidos</b>.'}
       <button class="preset-btn" onclick="trSair()">sair</button></div>`;
     return;
   }
   if (!trTela || !telas.some(([id]) => id === trTela)) trTela = telas[0][0];
+  // 12/11/2026 (auditoria de usabilidade 07/11): saiu a faixa "Logado: e-mail · papel" do meio da tela. Na casca o
+  // "Sair" mora no rodapé do menu; aberta solta (sem a casca), fica só o "sair" num canto. Com uma aba só, sem barra.
+  const naCasca = typeof NA_CASCA !== 'undefined' && NA_CASCA;
   alvo.innerHTML = `
-    <div class="caption-label">Logado: <b>${rmbSessao().email}</b> · papel <b>${papel}</b>${unidade ? ' · ' + unidade : ''}
-      <button class="preset-btn" style="margin-left:8px;" onclick="trSair()">sair</button></div>
-    <div class="periodo-presets" style="margin:8px 0;">
+    ${naCasca ? '' : `<div style="display:flex; justify-content:flex-end;"><button class="preset-btn" onclick="trSair()">sair</button></div>`}
+    ${telas.length > 1 ? `<div class="periodo-presets" style="margin:8px 0;">
       ${telas.map(([id, rotulo]) => `<button class="preset-btn ${trTela === id ? 'active' : ''}" onclick="trTelaSet('${id}')">${rotulo}</button>`).join('')}
-    </div>
+    </div>` : ''}
     <div id="trTelaConteudo"><div class="contexto">Carregando...</div></div>`;
   // ilha clara cobre o MODULO Listas · Pedidos inteiro (titulo, abas e todas
   // as telas — aprovado tela a tela pelo dono em 05/09); o Financeiro segue escuro
@@ -481,7 +483,7 @@ async function trTelaPedido(unidadeEscolhida) {
       <b>O que você vai pedir para ${unidade}?</b><br>
       <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
         <button class="preset-btn tr-btn-cheio" style="padding:14px 18px;" onclick="trPedidoOrigem='CIDADAO'; trTelaPedido('${unidade}')">🏭 Produção Cidadão<br><span style="font-weight:400; font-size:12px;">o que a Água Verde produz — cobrado na lista</span></button>
-        <button class="preset-btn" style="padding:14px 18px; border-color:#4a90d9;" onclick="trPedidoOrigem='FORNECEDOR'; trTelaPedido('${unidade}')">🛒 Fornecedor<br><span style="font-weight:400; font-size:12px;">a Rita compra e entrega — sem cobrança na lista</span></button>
+        <button class="preset-btn" style="padding:14px 18px; border-color:var(--info);" onclick="trPedidoOrigem='FORNECEDOR'; trTelaPedido('${unidade}')">🛒 Fornecedor<br><span style="font-weight:400; font-size:12px;">a Rita compra e entrega — sem cobrança na lista</span></button>
       </div></div>`;
     return;
   }
@@ -493,7 +495,7 @@ async function trTelaPedido(unidadeEscolhida) {
     trAcompanhaRegras(),
     trTabelaSituacao(unidade),
   ]);
-  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
   let itens = await r.json();
   const grade = itens;
   if (origemPedido) itens = itens.filter(i => (i.origem || 'CIDADAO') === origemPedido);
@@ -514,13 +516,13 @@ async function trTelaPedido(unidadeEscolhida) {
   // tela juntos, como no modelo aprovado), so enquanto a tela de pedido esta ativa
   alvo.innerHTML = `
     <div class="caption-label">Pedido para <b>${unidade}</b>${origemPedido ? (origemPedido === 'FORNECEDOR'
-        ? ' · <b style="color:#4a90d9;">🛒 FORNECEDOR</b> (a Rita compra e entrega — sem cobrança)'
-        : ' · <b style="color:#c8102e;">🏭 PRODUÇÃO CIDADÃO</b>')
+        ? ' · <b style="color:var(--info);">🛒 FORNECEDOR</b> (a Rita compra e entrega — sem cobrança)'
+        : ' · <b style="color:var(--brand);">🏭 PRODUÇÃO CIDADÃO</b>')
         + ` <button class="preset-btn" onclick="trPedidoOrigem=null; trTelaPedido('${unidade}')">trocar</button>` : ''}
       — preencha só o que precisa; itens em branco ficam fora.
       ${trTabelaFrasePedido(sit, dataCusto)}</div>
     ${trPedidoJaEnviadoHtml(ab, 'O que você preencher abaixo vira um pedido <b>novo</b>.')}
-    <input id="trPedidoBusca" type="search" class="trc-in" placeholder="buscar item... (o que você digitou continua guardado)" oninput="trPedidoFiltra()"
+    <input id="trPedidoBusca" type="search" class="trc-in" placeholder="buscar item" oninput="trPedidoFiltra()"
       style="width:100%; max-width:360px; margin:8px 0; border-radius:8px; padding:8px 10px;">
     <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:0 18px;">
       ${linhas.map((i, idx) => `
@@ -530,13 +532,12 @@ async function trTelaPedido(unidadeEscolhida) {
             <input type="number" min="0" step="${i.emb_fator ? '0.5' : 'any'}" inputmode="decimal" id="trq_${idx}" class="trc-in"
               oninput="trqTem(this); trEmbHint(${idx})"
               style="width:72px; text-align:right;"><br>
-            <span class="tr-det" style="font-size:10.5px;">${trLinhaUnidade(i)}</span>
+            <span class="tr-det" style="font-size:11px;">${trLinhaUnidade(i)}</span>
           </span>
         </label>`).join('')}
     </div>
     <div class="section-label tr-secao" style="margin-top:16px;">PRECISA DE ALGO FORA DA GRADE?</div>
-    <div class="caption-label">Escreva o nome do item, a quantidade e a unidade. Ele entra no pedido <b>sem preço</b> —
-      o preço é definido quando o item for vinculado à base (antes do fechamento do mês), e daí ele passa a aparecer na grade.</div>
+    <div class="caption-label">Entra sem preço; o preço vem antes do fechamento do mês.</div>
     <div id="trAvulsos"></div>
     <button class="preset-btn" onclick="trAddAvulso()">+ item fora da grade</button>
     <div style="margin-top:14px;">
@@ -564,7 +565,7 @@ function trGuia() {
     { sel: 'button[onclick^="trRevisarPedido"]', texto: '<b>Conferir e enviar</b> mostra o resumo do pedido antes de mandar para a Água Verde.' },
     { sel: '#tabelaTrOpFila button[onclick^="trListaAberta"]', texto: '<b>abrir</b> mostra os itens da lista para separar. A fila vem da mais antiga para a mais nova; <b>Parada há</b> se destaca a partir de 2 dias.' },
     { sel: '#tabelaTrPesoFora', texto: '<b>Peso diferente do combinado</b>: itens que vêm saindo com peso diferente da embalagem combinada. Vale rever com o Neto.' },
-    { sel: '#trTelaConteudo span > button[onclick^="trListaAberta"][onclick$="trTelaConferencia();"]', texto: '<b>conferir</b> abre a lista que chegou: confira item a item o que recebeu.' },
+    { sel: '#tabelaTrConfAguardando button[onclick^="trListaAberta"]', texto: '<b>conferir</b> abre a lista que chegou: confira item a item o que recebeu.' },
   ]);
   guiaTalvez('listas');
 }
@@ -698,7 +699,7 @@ function trRevisarPedido() {
   if (erros.length) {
     box.hidden = false;
     box.innerHTML = `<b>Corrija antes de enviar</b> — embalagem sai inteira ou pela metade:<br>${erros.join('<br>')}`;
-    msg.textContent = `${erros.length} ${erros.length === 1 ? 'item' : 'itens'} para corrigir — veja abaixo (campo em vermelho)`; msg.style.color = '#ff6b6b';
+    msg.textContent = `${erros.length} ${erros.length === 1 ? 'item' : 'itens'} para corrigir — veja abaixo (campo em vermelho)`; msg.style.color = 'var(--farol-fora)';
     box.scrollIntoView({ block: 'nearest' });
     return;
   }
@@ -1252,7 +1253,7 @@ async function trEditarPedido(id, aviso) {
     </div>
 
     <div class="section-label tr-secao" style="margin-top:18px;">INCLUIR O QUE FALTOU</div>
-    <input id="trEditBusca" type="search" class="trc-in" placeholder="buscar item... (o que você digitou continua guardado)" oninput="trEditFiltra()"
+    <input id="trEditBusca" type="search" class="trc-in" placeholder="buscar item" oninput="trEditFiltra()"
       style="width:100%; max-width:360px; margin:8px 0; border-radius:8px; padding:8px 10px;">
     <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:0 18px;">
       ${novos.map((i, idx) => `
@@ -1262,7 +1263,7 @@ async function trEditarPedido(id, aviso) {
             <input type="number" min="0" step="${i.emb_fator ? '0.5' : 'any'}" inputmode="decimal" id="trn_${idx}" class="trc-in"
               oninput="trqTem(this); trEditHint(${idx})"
               style="width:72px; text-align:right;"><br>
-            <span class="tr-det" style="font-size:10.5px;">${trLinhaUnidade(i)}</span>
+            <span class="tr-det" style="font-size:11px;">${trLinhaUnidade(i)}</span>
           </span>
         </label>`).join('')}
     </div>
@@ -1357,7 +1358,7 @@ async function trSalvarEdicaoGrava() {
     set innerHTML(h) { alvos().forEach(e => { e.innerHTML = h; }); },
     style: { set color(c) { alvos().forEach(e => { e.style.color = c; }); } },
   };
-  msg.textContent = 'Salvando...'; msg.style.color = '#8a897e';
+  msg.textContent = 'Salvando...'; msg.style.color = 'var(--tx-4)';
   const { id, itens, fatores } = window._trEdit;
   // linha MEXIDA = a pessoa digitou no campo (marca posta pelo oninput, trEditConv)
   const mexido = (campo) => !!campo && campo.value !== '' && campo.dataset.mexido === '1';
@@ -1378,7 +1379,7 @@ async function trSalvarEdicaoGrava() {
   });
   if (erros.length) {
     msg.innerHTML = '<b>Nada foi salvo.</b> Embalagem sai inteira ou pela metade (campo em vermelho):<br>' + erros.join('<br>');
-    msg.style.color = '#ff6b6b';
+    msg.style.color = 'var(--farol-fora)';
     if (primeiroRuim) primeiroRuim.scrollIntoView({ block: 'center' });
     return;
   }
@@ -1406,7 +1407,7 @@ async function trSalvarEdicaoGrava() {
     const r = v <= 0
       ? await trFetch(`tr_lista_itens?id=eq.${i.id}`, { method: 'DELETE' })
       : await trFetch(`tr_lista_itens?id=eq.${i.id}`, { method: 'PATCH', body: JSON.stringify(corpo) });
-    if (!r.ok) { msg.textContent = `Item ${i.item}: ` + await trErroDe(r); msg.style.color = '#ff6b6b'; return; }
+    if (!r.ok) { msg.textContent = `Item ${i.item}: ` + await trErroDe(r); msg.style.color = 'var(--farol-fora)'; return; }
     gravado[i.id] = { obs: 'observacao' in corpo ? corpo.observacao : i.observacao, auto: corpo.qtd_auto ?? i.qtd_auto };
   }
   // 2. os que faltaram, preenchidos na grade (duas embalagens somam na mesma linha)
@@ -1452,7 +1453,7 @@ async function trSalvarEdicaoGrava() {
     qtd_solicitada: a.qtd_solicitada, observacao: null, editado: true, qtd_auto: null })));
   if (rows.length) {
     const r = await trFetch('tr_lista_itens', { method: 'POST', body: JSON.stringify(rows) });
-    if (!r.ok) { msg.textContent = 'Itens novos falharam: ' + await trErroDe(r); msg.style.color = '#ff6b6b'; return; }
+    if (!r.ok) { msg.textContent = 'Itens novos falharam: ' + await trErroDe(r); msg.style.color = 'var(--farol-fora)'; return; }
     // entrou: limpa o que foi incluido, para "salvar de novo" nunca duplicar o prato
     (window._trEditNovos || []).forEach((_, idx) => { const el = document.getElementById('trn_' + idx); if (el) el.value = ''; });
     for (let k = 1; k <= trAvulsoN; k++) { const el = document.getElementById('trav_n_' + k); if (el) el.value = ''; }
@@ -1477,7 +1478,7 @@ async function trSalvarEdicaoGrava() {
           observacao: trObsPote(g.obs, undefined, auto), editado: true }) });
     if (!r.ok) {
       msg.textContent = `Os itens novos entraram, mas o pote não somou (${await trErroDe(r)}). Some ${pt.n} na linha ${pi} acima e salve de novo.`;
-      msg.style.color = '#ff6b6b'; return;
+      msg.style.color = 'var(--farol-fora)'; return;
     }
   }
   msg.textContent = 'Alterações salvas — a separação já vê a lista corrigida.'; msg.style.color = '#3fb950';
@@ -1881,7 +1882,7 @@ async function trTelaSeparacao() {
     trFetch('vw_tr_fila_separacao?order=data_pedido' + trFiltroVista('&')),
     trFetch('vw_tr_peso_fora_do_combinado?order=item&select=item,emb_nome,un_medida,peso_combinado,envios,embalagens,peso_medio,desvio_pct'),
   ]);
-  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
   const fila = await r.json();
   const alerta = ra.ok ? await ra.json() : [];
   // "Parada ha N dias" (12/09/2026): a fila ja vem da mais antiga para a mais nova,
@@ -1901,19 +1902,25 @@ async function trTelaSeparacao() {
   };
   // 04/11/2026: o alerta de peso foi ao topo às 18:00 e, às 18:20, o dono preferiu "separar ele da grade
   // dos pedidos, aparecer logo abaixo": vem logo depois da fila, num quadro próprio (trPesoAlertaHtml)
+  // 12/11/2026 (auditoria de usabilidade 07/11): status em palavra de operador, "Separados N de M" numa coluna só,
+  // valor só para quem vê valores, linha de total e a legenda do excluir em uma linha (o confirm já explica)
+  const statusTxt = { SOLICITADA: 'pedida', SEPARADA: 'separada', ENVIADA: 'enviada', RECEBIDA: 'recebida', FECHADA: 'fechada' };
+  const veValor = TR_OP.veValores !== false;
   alvo.innerHTML = (fila.length ? `
     <div id="tabelaTrOpFila"><table>
-      <tr><th>Lista</th><th>Filial</th><th>Pedida em</th><th title="Dias corridos desde o pedido. A partir de 2 dias avisa; de 3 em diante aponta.">Parada há</th><th>Status</th><th>Itens</th><th>Separados</th><th>Valor estimado</th><th></th></tr>
+      <tr><th>Lista</th><th>Filial</th><th>Pedida em</th><th title="Dias corridos desde o pedido. A partir de 2 dias avisa; de 3 em diante aponta.">Parada há</th><th>Status</th><th>Separados</th>${veValor ? '<th>Valor estimado</th>' : ''}<th>Ação</th></tr>
       ${fila.map(l => `<tr>
         <td>#${l.id}</td><td>${l.unidade}</td><td>${l.data_pedido ? l.data_pedido.slice(8,10)+'/'+l.data_pedido.slice(5,7) : '—'}</td>
         <td>${paradaHa(l.data_pedido)}</td>
-        <td>${l.status}</td><td>${l.itens}</td><td>${l.itens_separados}</td>
-        <td>R$ ${fmt(Number(l.valor_estimado || 0))}</td>
+        <td>${statusTxt[l.status] || String(l.status || '').toLowerCase()}</td><td>${Number(l.itens_separados) || 0} de ${Number(l.itens) || 0}</td>
+        ${veValor ? `<td>R$ ${fmt(Number(l.valor_estimado || 0))}</td>` : ''}
         <td><button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaSeparacao();">abrir</button>
           ${['SOLICITADA', 'SEPARADA'].includes(l.status) ? `<button class="preset-btn" onclick="trExcluirLista(${l.id}, '${l.unidade}')">🗑 excluir</button>` : ''}</td></tr>`).join('')}
+      ${fila.length > 1 ? `<tr class="liq"><td><b>${fila.length} listas</b></td><td></td><td></td><td></td><td></td>
+        <td>${fila.reduce((s, l) => s + (Number(l.itens_separados) || 0), 0)} de ${fila.reduce((s, l) => s + (Number(l.itens) || 0), 0)}</td>
+        ${veValor ? `<td><b>R$ ${fmt(fila.reduce((s, l) => s + Number(l.valor_estimado || 0), 0))}</b></td>` : ''}<td></td></tr>` : ''}
     </table></div>
-    <div class="caption-label">Excluir é para pedido lançado errado — some para todo mundo, sem volta.
-      De ENVIADA em diante não dá mais (já tem frete e conferência no meio): fale com o Neto.</div>` :
+    <div class="caption-label">Excluir: só pedido lançado errado, até separada.</div>` :
     '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>') + trPesoAlertaHtml(alerta);
   trGuia();
 }
@@ -2187,42 +2194,56 @@ async function trTelaConferencia() {
       trFetch(`tr_listas?status=in.(RECEBIDA,FECHADA)&fonte=eq.PAINEL${filtro}&order=id.desc&limit=40&select=id,unidade,data_pedido,data_entrega,status,recebido_por`),
       trFetch(`vw_tr_listas?fonte=eq.PAINEL&status=in.(RECEBIDA,FECHADA)${filtro}&order=id.desc&limit=40&select=id,total_lista`),
     ]);
-    if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+    if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
     const listas = await r.json();
     const valores = {};
     if (rv.ok) (await rv.json()).forEach(v => { valores[v.id] = v.total_lista; });
+    // 12/11/2026 (auditoria 07/11: "não está tabulado"): a pilha de caixas virou grade
+    const veValorF = TR_OP.veValores !== false;
     alvo.innerHTML = chips + (listas.length ? `
-      <div class="caption-label">As últimas ${listas.length} listas já conferidas${TR_OP.unidade ? ' da sua loja' : trFilialVista() ? ' de ' + trFilialVista() : ''} — só leitura, o histórico de quem pediu.</div>
-      ${listas.map(l => `<div class="contexto" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span>Lista <b>#${l.id}</b> · ${l.unidade} · entrega ${l.data_entrega ? l.data_entrega.slice(8,10)+'/'+l.data_entrega.slice(5,7) : '—'}${dinheiro(valores[l.id])}
-          ${l.recebido_por ? `<span class="tr-det">· conferida por ${l.recebido_por}</span>` : ''}</span>
-        <button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaConferencia();">ver</button></div>`).join('')}` :
+      <div class="caption-label">As últimas ${listas.length} listas já conferidas${TR_OP.unidade ? ' da sua loja' : trFilialVista() ? ' de ' + trFilialVista() : ''} — só leitura.</div>
+      <div id="tabelaTrConfFinalizadas"><table>
+        <tr><th>Lista</th><th>Filial</th><th>Entrega</th>${veValorF ? '<th>Valor</th>' : ''}<th>Conferida por</th><th>Ação</th></tr>
+        ${listas.map(l => `<tr>
+          <td>#${l.id}</td><td>${l.unidade}</td><td>${l.data_entrega ? l.data_entrega.slice(8,10)+'/'+l.data_entrega.slice(5,7) : '—'}</td>
+          ${veValorF ? `<td>${valores[l.id] == null ? '—' : 'R$ ' + fmt(Number(valores[l.id]))}</td>` : ''}
+          <td>${l.recebido_por || '—'}</td>
+          <td><button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaConferencia();">ver</button></td></tr>`).join('')}
+      </table></div>` :
       '<div class="contexto">Nenhuma lista finalizada ainda — a primeira aparece aqui assim que uma conferência fechar.</div>');
     return;
   }
   // fonte=PAINEL: as 1.118 listas da era planilha estao ENVIADA no banco (historico
   // congelado) e poluiam a fila — aqui e so o modulo operante, mais nova primeiro.
   // "Em preparo": o que a central ainda esta montando, com o parcial ao vivo.
+  // 12/11/2026 (auditoria 07/11): "Em preparo" repetia a Fila de separação para quem tem a Fila (dono e compras);
+  // fica só para a filial, que não tem a Fila. As listas aguardando viraram grade.
   const filtroFila = trFilialVista() ? `unidade=eq.${encodeURIComponent(trFilialVista())}&` : '';
+  const verPreparo = TR_OP.papel === 'FILIAL';
+  const veValorA = TR_OP.veValores !== false;
   const [r, rv, rp] = await Promise.all([
     trFetch(`tr_listas?status=eq.ENVIADA&fonte=eq.PAINEL${filtro}&order=data_entrega.desc,id.desc&select=id,unidade,data_pedido,data_entrega`),
     trFetch(`vw_tr_listas?fonte=eq.PAINEL&status=eq.ENVIADA${filtro}&select=id,total_lista`),
-    trFetch(`vw_tr_fila_separacao?${filtroFila}status=in.(SOLICITADA,SEPARADA)&order=id.desc&select=id,unidade,status,itens,valor_estimado`),
+    verPreparo ? trFetch(`vw_tr_fila_separacao?${filtroFila}status=in.(SOLICITADA,SEPARADA)&order=id.desc&select=id,unidade,status,itens,valor_estimado`) : null,
   ]);
-  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
   const listas = await r.json();
   const valores = {};
   if (rv.ok) (await rv.json()).forEach(v => { valores[v.id] = v.total_lista; });
-  const preparo = rp.ok ? await rp.json() : [];
+  const preparo = rp && rp.ok ? await rp.json() : [];
   alvo.innerHTML = chips + (preparo.length ? `
     <div class="caption-label">🧺 Em preparo na central — o parcial cresce enquanto a lista é montada:</div>
     ${preparo.map(l => `<div class="contexto" style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
       <span>Lista <b>#${l.id}</b> · ${l.unidade} · ${l.status === 'SOLICITADA' ? 'pedida, aguardando separação' : 'em separação'}
         · ${l.itens} itens${dinheiro(l.valor_estimado, true)}</span></div>`).join('')}` : '') + (listas.length ? `
-    <div class="caption-label">Listas enviadas aguardando a conferência do recebimento — confira ITEM A ITEM, é o zero que dói.</div>
-    ${listas.map(l => `<div class="contexto" style="display:flex; justify-content:space-between; align-items:center;">
-      <span>Lista <b>#${l.id}</b> · ${l.unidade} · entrega ${l.data_entrega ? l.data_entrega.slice(8,10)+'/'+l.data_entrega.slice(5,7) : '—'}${dinheiro(valores[l.id], true)}</span>
-      <span>${['DONO', 'SEPARACAO'].includes(TR_OP.papel) ? `<button class="preset-btn" onclick="trEditarPedido(${l.id})">✏️ corrigir</button> ` : ''}<button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaConferencia();">conferir</button></span></div>`).join('')}` :
+    <div class="caption-label">Enviadas, aguardando a conferência — confira item a item.</div>
+    <div id="tabelaTrConfAguardando"><table>
+      <tr><th>Lista</th><th>Filial</th><th>Entrega</th>${veValorA ? '<th>Valor (≈)</th>' : ''}<th>Ação</th></tr>
+      ${listas.map(l => `<tr>
+        <td>#${l.id}</td><td>${l.unidade}</td><td>${l.data_entrega ? l.data_entrega.slice(8,10)+'/'+l.data_entrega.slice(5,7) : '—'}</td>
+        ${veValorA ? `<td>${valores[l.id] == null ? '—' : '≈ R$ ' + fmt(Number(valores[l.id]))}</td>` : ''}
+        <td>${['DONO', 'SEPARACAO'].includes(TR_OP.papel) ? `<button class="preset-btn" onclick="trEditarPedido(${l.id})">✏️ corrigir</button> ` : ''}<button class="preset-btn" onclick="trListaAberta=${l.id}; trTelaConferencia();">conferir</button></td></tr>`).join('')}
+    </table></div>` :
     '<div class="contexto">Nenhuma lista aguardando conferência.</div>');
   trGuia();
 }
@@ -2243,8 +2264,8 @@ async function trPrecosDaLista(id, busca) {
 function trColunasValor(i, precos) {
   const u = precos[i.id];
   if (u == null) return '<td>—</td><td>—</td>';
-  return `<td style="text-align:right; white-space:nowrap;">R$ ${fmt(u)}<span class="tr-det">/${(i.un_medida || 'un').toLowerCase()}</span></td>
-    <td style="text-align:right; white-space:nowrap;"><b>R$ ${fmt(trQtdCobrada(i) * u)}</b></td>`;
+  return `<td style="white-space:nowrap;">R$ ${fmt(u)}<span class="tr-det">/${(i.un_medida || 'un').toLowerCase()}</span></td>
+    <td style="white-space:nowrap;"><b>R$ ${fmt(trQtdCobrada(i) * u)}</b></td>`;
 }
 async function trVerFinalizada(id) {
   const alvo = document.getElementById('trTelaConteudo');
@@ -2278,8 +2299,8 @@ async function trVerFinalizada(id) {
         <td${d ? ' style="color:#b3261e; font-weight:700;"' : ''}>${d ? (d > 0 ? '+' : '') + trNum(d, 3) : '—'}</td>
         ${comValor ? trColunasValor(i, precos) : ''}
       </tr>`; }).join('')}
-      ${comValor ? `<tr><td colspan="6" style="text-align:right;"><b>Total dos itens</b> <span class="tr-det">(recebido × unitário)</span></td>
-        <td style="text-align:right; white-space:nowrap;"><b>R$ ${fmt(somaItens)}</b></td></tr>` : ''}
+      ${comValor ? `<tr><td colspan="6"><b>Total dos itens</b> <span class="tr-det">(recebido × unitário)</span></td>
+        <td style="white-space:nowrap;"><b>R$ ${fmt(somaItens)}</b></td></tr>` : ''}
     </table></div>`;
 }
 
@@ -2515,9 +2536,9 @@ async function trFecharConferenciaGrava(id) {
     msg.innerHTML = '<b>Nada foi registrado.</b> Corrija o campo em vermelho:<br>' + ruins.join('<br>');
     msg.style.color = 'var(--farol-fora)'; return;
   }
-  msg.textContent = 'Registrando...'; msg.style.color = '#8a897e';
+  msg.textContent = 'Registrando...'; msg.style.color = 'var(--tx-4)';
   const rs = await trFetch(`tr_listas?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'RECEBIDA' }) });
-  if (!rs.ok) { msg.textContent = 'Não deu: ' + await trErroDe(rs); msg.style.color = '#ff6b6b'; return; }
+  if (!rs.ok) { msg.textContent = 'Não deu: ' + await trErroDe(rs); msg.style.color = 'var(--farol-fora)'; return; }
   for (const [idx, i] of (window._trItensConf || []).entries()) {
     // campo em embalagens grava convertido na unidade de controle, sem a ida e
     // volta arredondada que gravava 9,88 no lugar de 10 potes (trConfQtd)
@@ -2526,10 +2547,10 @@ async function trFecharConferenciaGrava(id) {
     // linha contada grava junto quantas embalagens chegaram; as outras, so o recebido
     const corpo = i._cont ? { qtd_recebida: v, emb_recebida: Number(el.value || 0) } : { qtd_recebida: v };
     const r = await trFetch(`tr_lista_itens?id=eq.${i.id}`, { method: 'PATCH', body: JSON.stringify(corpo) });
-    if (!r.ok) { msg.textContent = `Item ${i.item}: ` + await trErroDe(r); msg.style.color = '#ff6b6b'; return; }
+    if (!r.ok) { msg.textContent = `Item ${i.item}: ` + await trErroDe(r); msg.style.color = 'var(--farol-fora)'; return; }
   }
   const rf = await trRpc('tr_fechar_lista', { p_id: id });
-  if (!rf.ok) { msg.textContent = 'Quantidades salvas, mas não fechou: ' + await trErroDe(rf); msg.style.color = '#ff6b6b'; return; }
+  if (!rf.ok) { msg.textContent = 'Quantidades salvas, mas não fechou: ' + await trErroDe(rf); msg.style.color = 'var(--farol-fora)'; return; }
   // a lista ja esta fechada. Se so a leitura das diferencas falhar, o quadro sai SEM dizer se
   // bateu ou nao (divs = null) — a tela antiga dizia "bateu 100%" tambem nesse caso
   let divs = null;
@@ -2547,7 +2568,7 @@ async function trTelaContas() {
   // as remessas do beneficio iFood -> XP, que vivem no Fluxo Projetado — aqui
   // misturados confundiam (apareciam com "itens 0,00").
   const r = await trFetch(`vw_tr_contas_pagar?tipo=in.(LISTA,MENSAL,FRETE_MES)&order=vencimento${filtro}`);
-  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
   const contas = await r.json();
   const dono = TR_OP.papel === 'DONO';
   const abertas = contas.filter(c => c.status !== 'PAGA');
@@ -2584,7 +2605,7 @@ async function trTelaContas() {
         <td>${Number(c.royalty) ? fmt(-Number(c.royalty)) : '—'}</td><td><b>${fmt(-Number(c.valor_total || 0))}</b></td>
         <td>${Number(c.valor_pago) ? fmt(Number(c.valor_pago)) : '—'}</td>
         <td><b>${c.status === 'PAGA' ? '—' : fmt(-falta(c))}</b></td>
-        <td${c.vencida && c.status !== 'PAGA' ? ' style="color:#ff6b6b; font-weight:bold;"' : ''}>${c.vencimento ? c.vencimento.slice(8,10)+'/'+c.vencimento.slice(5,7) : '—'}${c.vencida && c.status !== 'PAGA' ? ' VENCIDA' : ''}</td>
+        <td${c.vencida && c.status !== 'PAGA' ? ' style="color:var(--farol-fora); font-weight:bold;"' : ''}>${c.vencimento ? c.vencimento.slice(8,10)+'/'+c.vencimento.slice(5,7) : '—'}${c.vencida && c.status !== 'PAGA' ? ' VENCIDA' : ''}</td>
         <td>${c.status === 'EM ABERTO' && Number(c.valor_pago) > 0 ? 'PAGA EM PARTE' : c.status}${c.pago_em ? ' em ' + c.pago_em.slice(8,10)+'/'+c.pago_em.slice(5,7) : ''}</td>
         <td>${c.validado_por ? c.validado_por + (c.validado_em ? ' em ' + c.validado_em.slice(8,10)+'/'+c.validado_em.slice(5,7) : '') : '—'}</td>
         ${dono ? `<td style="white-space:nowrap;">${c.status !== 'PAGA' ? `R$ <input type="number" min="0" step="0.01" inputmode="decimal" id="trpg_v_${c.id}" class="trc-in" value="${falta(c).toFixed(2)}" style="width:96px; text-align:right;">
@@ -2705,7 +2726,7 @@ async function trTelaFechamento() {
     trFetch('tr_regras_unidade?select=unidade,dia_pagamento,vigencia_inicio&order=unidade,vigencia_inicio.desc'),
     trFetch('vw_tr_avulsos_pendentes?select=id,id_lista,unidade,status_lista,item,un_medida,qtd,avulso'),
   ]);
-  if (!rv.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(rv)}</div>`; return; }
+  if (!rv.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(rv)}</div>`; return; }
   const esperando = await rv.json();
   window._trFechEsperando = esperando;   // a faixa do topo (20/10/2026) valida daqui
   const avulsos = ra.ok ? await ra.json() : [];
@@ -2718,40 +2739,43 @@ async function trTelaFechamento() {
   const mesPassado = (() => { const h = trHoje(); const d = new Date(h.slice(0,4), Number(h.slice(5,7)) - 1, 1);
     d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
 
+  // 12/11/2026: saíram a faixa vazia (#trFechFaixa) e o select escondido (#trFechUn); a lista de filiais dos cartões
+  // vem daqui (as regras vigentes por filial), como vinha do select.
+  window._trFechUnidades = regras.map(g => g.unidade);
+  const blocoAvulsos = trAvulsosBloco(avulsos, avulsosExtra);
+  // o que trava o mês sobe para o alto da tela (logo abaixo do título); sem a caixa do alto, fica aqui
+  const caixaAlto = document.getElementById('trFinAvulsos');
+  if (caixaAlto) caixaAlto.innerHTML = blocoAvulsos;
+  const mesRef = m => { const s = String(m || '').slice(0, 7); return s ? MESES_ABREV[Number(s.slice(5, 7)) - 1] + '/' + s.slice(2, 4) : '—'; };
   alvo.innerHTML = `
-    <div id="trFechFaixa"></div>
     <!-- 04/11/2026 (dono: "essa tabela de cima fechar mês tem necessidade? fechar cada bloco de cada empresa já não faz
          a mesma coisa?"): faz — o "fechar o mês" de cada cartão chama o mesmo tr_fechar_mes. Do quadro de cima fica só o
-         MÊS, que escolhe o mês dos cartões. O select de filial fica escondido: é dele que sai a lista de filiais dos cartões. -->
+         MÊS, que escolhe o mês dos cartões. -->
     <div style="text-align:center; margin:4px 0 6px;">
       <label for="trFechMes" style="font-size:13px; color:var(--tx-2);">Mês:</label>
-      <input type="month" id="trFechMes" min="${TR_FECH_DOC_INICIO}" value="${mesPassado}" style="background:#232321; border:1px solid #34332f; border-radius:6px; color:#fff; padding:4px 6px; margin-left:6px;">
-      <select id="trFechUn" hidden>
-        ${regras.map(g => `<option value="${g.unidade}">${g.unidade}</option>`).join('')}
-      </select>
+      <input type="month" id="trFechMes" class="trc-in" min="${TR_FECH_DOC_INICIO}" value="${mesPassado}" style="margin-left:6px;">
       <div id="trFechMsg" style="font-size:12px; margin-top:6px;"></div>
     </div>
 
     <div id="trFechGeral"></div>
 
-    ${trAvulsosBloco(avulsos, avulsosExtra)}
+    ${caixaAlto ? '' : blocoAvulsos}
 
     <div class="section-label">Esperando validação</div>
     ${!esperando.length ? '<div class="contexto">Nada esperando. Todo mês fechado já virou conta a pagar.</div>' : `
-    <div class="caption-label">Confira o total e as diferenças antes de validar. Depois de validado vira conta a pagar
-      — a regra atual cobra o que <b>saiu</b> da Água Verde; diferença é acerto do dono.</div>
+    <div class="caption-label">Validado vira conta a pagar; diferença é acerto do dono.</div>
     <div id="tabelaTrFech"><table>
-      <tr><th>Filial</th><th>Mês</th><th>Listas</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Vence</th><th>Diferenças</th><th></th></tr>
+      <tr><th>Filial</th><th>Mês</th><th>Listas</th><th>Itens</th><th>Frete</th><th>Royalty</th><th>Total</th><th>Vence</th><th>Diferenças</th><th>Ação</th></tr>
       ${esperando.map(f => `<tr>
-        <td>${f.unidade}</td><td>${(f.mes_referencia || '').slice(0, 7)}</td>
-        <td>${f.qtd_listas} lista(s)<br><span style="color:#8a897e; font-size:11px;">${f.itens} itens</span></td>
-        <td>${fmt(-Number(f.valor_itens || 0))}</td>
-        <td>${Number(f.frete) ? fmt(-Number(f.frete)) : '—'}</td>
-        <td>${Number(f.royalty) ? fmt(-Number(f.royalty)) : '—'}</td>
-        <td><b>${fmt(-Number(f.valor_total || 0))}</b></td>
+        <td>${f.unidade}</td><td>${mesRef(f.mes_referencia)}</td>
+        <td>${f.qtd_listas} lista(s)<br><span style="color:var(--tx-4); font-size:11px;">${f.itens} itens</span></td>
+        <td>R$ ${fmt(-Number(f.valor_itens || 0))}</td>
+        <td>${Number(f.frete) ? 'R$ ' + fmt(-Number(f.frete)) : '—'}</td>
+        <td>${Number(f.royalty) ? 'R$ ' + fmt(-Number(f.royalty)) : '—'}</td>
+        <td><b>R$ ${fmt(-Number(f.valor_total || 0))}</b></td>
         <td>${f.vencimento ? f.vencimento.slice(8,10)+'/'+f.vencimento.slice(5,7) : '—'}</td>
-        <td${Number(f.itens_divergentes) ? ' style="color:#f5a623;"' : ''}>${Number(f.itens_divergentes)
-            ? f.itens_divergentes + ' item(ns) · ' + fmt(Number(f.valor_divergencia || 0))
+        <td${Number(f.itens_divergentes) ? ' style="color:var(--farol-perto);"' : ''}>${Number(f.itens_divergentes)
+            ? f.itens_divergentes + ' item(ns) · R$ ' + fmt(Number(f.valor_divergencia || 0))
             : 'bateu 100%'}</td>
         <td><button class="preset-btn" onclick="trValidarFechamento(${f.id})">validar</button></td></tr>`).join('')}
     </table></div>`}`;
@@ -2821,7 +2845,11 @@ function trAvulsosBloco(avulsos, extra) {
   const feitos = '';
   if (!lista.length) return feitos ? `<div class="contexto" style="margin-top:12px; text-align:left;">${feitos}</div>` : '';
   const n = lista.length;
-  const topo = `<b>⚠️ ${n} ${n === 1 ? 'item escrito' : 'itens escritos'} à mão, sem preço</b> — o mês não fecha com ${n === 1 ? 'ele' : 'eles'}.`;
+  // de qual mês (auditoria 07/11: parecia ser do mês já fechado): a data vem das listas do mês corrente, quando a lista é dele
+  const doMesAtual = new Set((window._trFinListas || []).map(l => l.id));
+  const mesDele = lista.length && lista.every(a => doMesAtual.has(a.id_lista)) && typeof MESES_ABREV !== 'undefined'
+    ? MESES_ABREV[Number(trHoje().slice(5, 7)) - 1] + ': ' : '';
+  const topo = `<b>⚠️ ${mesDele}${n} ${n === 1 ? 'item escrito' : 'itens escritos'} à mão, sem preço</b> — o mês não fecha com ${n === 1 ? 'ele' : 'eles'}.`;
   if (!extra || !extra.pode || extra.semFuncoes) {
     // sem papel de correção: quem corrige é a Rita (a mesma frase de tr_fechar_lista); com papel
     // mas sem as funções no banco (SQL de 18/10 ainda não aplicado): é com o Neto, como antes
@@ -2884,8 +2912,7 @@ function trAvulsosBloco(avulsos, extra) {
   };
   return `
     <div class="contexto" style="border-color:var(--farol-perto); margin-top:12px; text-align:left;">${topo}
-      <div style="margin-top:4px; font-size:12px;">Escolha o item que a filial quis dizer <b>e marque se cobra ou não</b>: as sugestões vêm do nome que ela escreveu; digitando, aparece a grade ativa. O preço vem da grade (fornecedor: da nota, sem os 19%), ninguém digita. Se a filial escreveu em outra unidade (ex.: pacote) e o item é em KG, diga quanto 1 pacote dá em KG: pedido, separado e recebido mudam pelo mesmo número.
-        Sugestão "da base" entra na grade na hora, sem aparecer no pedido das filiais. Não é item de lista? Escreva o motivo e tire. Nome que não está em lugar nenhum fica aqui: item novo é com o Neto.</div>
+      <div style="margin-top:4px; font-size:12px;" title="As sugestões vêm do nome que a filial escreveu; digitando, aparece a grade ativa. Fornecedor: preço da nota, sem os 19%. Outra unidade (ex.: pacote) pede quanto 1 dá na unidade do item. Sugestão da base entra na grade sem aparecer no pedido das filiais. Nome que não está em lugar nenhum: item novo é com o Neto.">Escolha o item e <b>marque se cobra</b> — o preço vem da grade. Não é item de lista? Escreva o motivo e tire.</div>
       <div id="trAvulsoMsg" style="font-size:12px; margin-top:4px;"></div>
       <div style="margin-top:6px;">${lista.map(cartao).join('')}</div>
       ${feitos ? `<div style="border-top:1px solid var(--line); padding-top:8px; margin-top:4px;">${feitos}</div>` : ''}
@@ -3046,7 +3073,7 @@ function trFechGeralMontar() {
 // total, o que trava — e, em cada uma, ver o documento, gerar o PDF e fechar.
 async function trFechGeral() {
   const inp = document.getElementById('trFechMes');
-  const sel = document.getElementById('trFechUn');
+  const unidadesRegra = window._trFechUnidades || [];   // as filiais com regra vigente (trTelaFechamento)
   if (!inp || !inp.value || !document.getElementById('trFechGeral')) return;
   const mes = inp.value;                       // AAAA-MM
   window._trFechMesSel = mes;
@@ -3067,7 +3094,7 @@ async function trFechGeral() {
     return;
   }
   const linhas = await r.json();
-  const filiais = [...new Set([...(sel ? [...sel.options].map(o => o.value) : []), ...linhas.map(x => x.unidade)])].filter(Boolean);
+  const filiais = [...new Set([...unidadesRegra, ...linhas.map(x => x.unidade)])].filter(Boolean);
   window._trFechGeral = { mes, filiais, linhas };
   const nu = (v) => Number(v) || 0;
   const linha = (rot, val) => `<div style="display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--line);"><span style="white-space:nowrap;">${rot}</span><span style="text-align:right; color:var(--tx-1);">${val}</span></div>`;
@@ -3078,6 +3105,10 @@ async function trFechGeral() {
     const cab = `<div class="card-lbl">${trEscH(u)} · <b style="color:${s.cor};">${s.txt}</b></div>`;
     if (!x) return `<div class="card neutral" style="text-align:left;">${cab}</div>`;
     const comValor = x.valor_total != null;      // login sem valores recebe os R$ vazios
+    // 12/11/2026 (auditoria 07/11: "fechar num lugar, validar em outro"): o cartão "fechado — falta validar" ganha o
+    // mesmo "validar" da tabela Esperando validação (mesma função, mesmo documento)
+    const espera = x.cobranca_status === 'EM VALIDACAO'
+      ? (window._trFechEsperando || []).find(z => z.unidade === u && String(z.mes_referencia || '').slice(0, 7) === mes) : null;
     const abertas = nu(x.listas_abertas), entregas = nu(x.frete_entregas), diretas = nu(x.frete_direto_entregas);
     const frete = x.frete_na_conta || nu(x.frete)
       ? `R$ ${fmt(nu(x.frete))}${entregas ? ' ' + cinza(`(${entregas} ${entregas === 1 ? 'entrega' : 'entregas'})`) : ''}`
@@ -3099,9 +3130,10 @@ async function trFechGeral() {
       ${(x.avisos || []).length ? `<div style="margin-top:6px; font-size:12.5px; color:var(--farol-perto);">${x.avisos.map(t => '• ' + trEscH(t)).join('<br>')}</div>` : ''}
       ${comValor ? `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
         <button class="preset-btn" onclick="trFechDocVer(${ix})">ver o documento</button>
-        <button class="preset-btn" onclick="trFechDocPdf(${ix})">Gerar PDF</button>
-        <button class="preset-btn" onclick="trConfListaPdf(${ix})" title="Uma lista por folha e, no fim, o resumo do mês com o mesmo total do documento">Conferência por lista</button>
+        <button class="preset-btn" onclick="trFechDocPdf(${ix})">PDF do mês</button>
+        <button class="preset-btn" onclick="trConfListaPdf(${ix})" title="Uma lista por folha e, no fim, o resumo do mês com o mesmo total do documento">PDF lista a lista</button>
         ${x.pode_fechar ? `<button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trFechFecharDaqui(${ix})">fechar o mês</button>` : ''}
+        ${espera ? `<button class="preset-btn" style="border-color:var(--farol-ok); color:var(--tx-1);" onclick="trValidarFechamento(${espera.id})">validar</button>` : ''}
       </div>` : ''}
     </div>`;
   });
@@ -3111,10 +3143,8 @@ async function trFechGeral() {
   const av = window._trFechAviso; window._trFechAviso = null;
   // 29/10/2026: o resultado do fechamento vai à barra do resultado (a faixa se redesenhava e o recado sumia)
   if (av) avisoAcao(av.ok ? 'ok' : 'erro', `${av.ok ? '✓' : '✗'} ${av.txt} Às ${avisoHora()}.`);
-  const fx = document.getElementById('trFechFaixa');
-  // 04/11/2026 (dono: "gosto dos cards por filial… não tem como deixar somente eles?"): a faixa de cima repetia o
-  // "fechar" dos cartões — fica vazia; o que trava e os avisos já estão em cada cartão
-  if (fx) fx.innerHTML = '';
+  // 04/11/2026 (dono: "gosto dos cards por filial… não tem como deixar somente eles?"): a faixa de cima saiu (12/11 o
+  // resto dela também); o que trava e os avisos já estão em cada cartão
   const temPrevia = linhas.some(x => x.situacao === 'PREVIA');
   alvo.innerHTML = `
     <div class="section-label">${temPrevia || !linhas.length ? 'Conferência antes de fechar' : 'Fechamento'} — ${trFechMesTxt(mes)}</div>
@@ -3125,7 +3155,6 @@ async function trFechGeral() {
       : linhas.some(x => x.origem === 'CONGELADO')
       ? 'O total de cada filial é o valor em que o mês foi fechado — o mesmo do Histórico.'
       : 'O total de cada filial é o que ficou gravado no fechamento — o mesmo de Contas a pagar.'}</div>
-    ${av && !fx ? `<div class="contexto" style="margin:8px auto; border-color:${av.ok ? 'var(--farol-ok)' : 'var(--farol-fora)'};">${trEscH(av.txt)}</div>` : ''}
     <div class="cards" style="grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); align-items:start;">${cartoes.join('')}</div>
     ${soma}
     <div id="trFechDocTela"></div>`;
@@ -3661,23 +3690,13 @@ async function trFechFecharDaqui(ix) {
   } catch (e) { /* sem a leitura de volta o aviso diz que nao conferiu */ }
   const bate = gravado && gravado.origem === 'COBRANCA' && Math.round(nu(gravado.valor_total) * 100) === Math.round(nu(r.valor_total) * 100);
   window._trFechAviso = bate
-    ? { ok: true, txt: `${un} fechado em R$ ${fmt(nu(gravado.valor_total))} — igual à prévia. Falta validar, logo abaixo, para virar conta a pagar.` }
+    ? { ok: true, txt: `${un} fechado em R$ ${fmt(nu(gravado.valor_total))} — igual à prévia. Falta validar, no cartão, para virar conta a pagar.` }
     : { ok: false, txt: `${un} fechou${gravado && gravado.origem === 'COBRANCA' ? ' em R$ ' + fmt(nu(gravado.valor_total)) : ''}, mas não consegui confirmar que é o mesmo valor da prévia (R$ ${fmt(nu(r.valor_total))}) — confira antes de validar.` };
   trTelaFechamento();
 }
 
-async function trFecharMes() {
-  const msg = document.getElementById('trFechMsg');
-  const un = document.getElementById('trFechUn').value;
-  const m = document.getElementById('trFechMes').value;
-  if (!un || !m) { msg.textContent = 'Escolha a filial e o mês.'; msg.style.color = '#f5a623'; return; }
-  msg.textContent = '';
-  avisoAcao('enviando', `Fechando o mês de ${un}…`);
-  const r = await trRpcSeguro('tr_fechar_mes', { p_unidade: un, p_mes: m + '-01' });
-  if (!r.ok) return avisoAcao('erro', `✗ O mês de ${un} NÃO fechou: ${await trErroDe(r)}. Tente de novo.`);
-  avisoAcao('ok', `✓ Mês de ${un} fechado — às ${avisoHora()}. Agora confira abaixo e valide para virar conta a pagar.`);
-  setTimeout(trTelaFechamento, 1200);
-}
+// trFecharMes (o "fechar" do quadro de cima, com o select de filial) saiu em 12/11/2026: sem botão desde 04/11; o
+// cartão de cada filial fecha por trFechFecharDaqui
 
 async function trValidarFechamento(id) {
   const msg = document.getElementById('trFechMsg');
@@ -3694,7 +3713,7 @@ async function trTelaCmv() {
   const alvo = document.getElementById('trTelaConteudo');
   const filtro = trFiltroVista('&');
   const r = await trFetch(`vw_tr_cmv_semanal?order=semana.desc${filtro}&limit=24`);
-  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:#ff6b6b;">${await trErroDe(r)}</div>`; return; }
+  if (!r.ok) { alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">${await trErroDe(r)}</div>`; return; }
   const cmv = await r.json();
   alvo.innerHTML = `
     <div class="caption-label">O que cada filial recebeu da central, semana a semana (é o motivo do prazo de 7 dias:
