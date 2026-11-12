@@ -125,11 +125,11 @@ function agDesenhar() {
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
     // 12/11/2026 (dono 01:30): "desde dd/mm (N dias)" e "prazo dd/mm" com farol em cada cartão
-    add({ dep: !espera, dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
+    add({ dep: !espera, grupo: espera ? 'anda' : 'dep', dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
       desde: String(p.desde || '').slice(0, 10), prazo: p.prazo || '' });
   });
   // 12/11/2026 (dono 01:09): o que o robô conferiu na fonte e fechou (últimas 24 h)
-  if (Array.isArray(conf)) conf.forEach((c) => add({ dia: hoje, txt: `<span style="color:var(--farol-ok);">✓ conferido ${agHm(c.resolvido_em)}:</span> ${agE(c.o_que)}`, frente: c.frente }));
+  if (Array.isArray(conf)) conf.forEach((c) => add({ grupo: 'anda', dia: hoje, txt: `<span style="color:var(--farol-ok);">✓ conferido ${agHm(c.resolvido_em)}:</span> ${agE(c.o_que)}`, frente: c.frente }));
   // 2) reembolso que só eu aprovo (o da Hellen)
   if (ok(rmb, 'reembolsos')) rmb.forEach((g) => (AG.sinal++, add({ dep: true, dia: hoje, txt: `Aprovar o reembolso de <b>${agR(g.valor)}</b> (${agE(agNome(g.pessoa))}: ${agE(g.descricao)})`, ir: 'reembolsos', tipo: 'alerta' })));
   // 3) contas a pagar: vencidas hoje, e o total de cada dia
@@ -205,24 +205,31 @@ function agDesenhar() {
     });
     return b;
   };
-  // 07/11/2026 (dono 03:44): em cima só o que exige ação dele (é o que conta no sinal do menu); o resto, recolhido
-  const dep = itens.filter((x) => x.dep), saber = itens.filter((x) => !x.dep);
-  h += `<div class="ag-bloco">Depende de você</div>` + porDia(dep, '✓ nada depende de você hoje');
-  let aberto = false; try { aberto = sessionStorage.getItem('agSaberAberto') === '1'; } catch (e) {}
-  if (saber.length) h += `<details class="ag-saber"${aberto ? ' open' : ''} ontoggle="try{sessionStorage.setItem('agSaberAberto',this.open?'1':'0')}catch(e){}">
-      <summary class="ag-bloco">Para saber <span class="f">· ${saber.length} ${saber.length === 1 ? 'item' : 'itens'}, sem ação sua</span></summary>${porDia(saber, '')}</details>`;
+  // 12/11/2026 02:04 (dono: "o para saber ficou escondido e misturado com cartões respondidos e em andamento"): três cartões
+  // clicáveis no topo, como o Contas a pagar — Depende de você (o que conta no número do menu), Em andamento (respondido,
+  // feito conferindo, conferido nas últimas 24 h) e Para saber (o que não pede nada). Um aberto por vez; a escolha fica na aba.
+  const grp = (x) => x.grupo || (x.dep ? 'dep' : 'saber');
+  const G = { dep: itens.filter((x) => grp(x) === 'dep'), anda: itens.filter((x) => grp(x) === 'anda'), saber: itens.filter((x) => grp(x) === 'saber') };
+  let f = 'dep'; try { f = sessionStorage.getItem('agFiltro') || 'dep'; } catch (e) {}
+  if (!G[f]) f = 'dep';
+  const ROT = { dep: ['Depende de você', 'pede uma ação sua'], anda: ['Em andamento', 'respondido ou feito, esperando aplicar ou conferir'], saber: ['Para saber', 'sem ação sua'] };
+  const corC = { dep: G.dep.length ? 'neg' : 'pos', anda: 'blue', saber: 'neutral' };
+  h += `<div class="cards cards-3 ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
+      <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${G[k].length}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}</div>`;
+  h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
   alvo.innerHTML = h;
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
   agEquipeMontar().then(agGuia);
 }
+function agFiltrar(k) { try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
 // GUIA DE PRIMEIRO ACESSO (07/11/2026, exemplo do padrão novo; mecanismo no nucleo.js): abre uma vez por login; "?" revê
 function agGuia() {
   guiaRegistrar('agenda', [
     { sel: '.ag-bloco', texto: '<b>Depende de você</b>: só o que pede uma ação sua, de hoje e dos próximos dias. É isto que conta no número vermelho do menu.' },
     { sel: '.ag-lin button[onclick^="agFeito"]', texto: 'Fez? Toque em <b>Feito</b>: sai do número do menu e o robô confere na fonte. Conferido, fecha com "✓ conferido"; se faltar algo, volta para você dizendo o quê.' },
     { sel: '.ag-lin .preset-btn[onclick^="agIr"]', texto: '<b>abrir</b> leva direto à tela onde se resolve aquilo.' },
-    { sel: 'details.ag-saber > summary', texto: '<b>Para saber</b>: o que não pede nada de você (aguardando conciliação, contas dos próximos dias). Fica fechado; toque para abrir.' },
+    { sel: '.ag-filtros', texto: 'Três cartões: <b>Depende de você</b>, <b>Em andamento</b> (respondido ou feito, esperando aplicar ou conferir) e <b>Para saber</b>. Toque num cartão para ver só ele.' },
     { sel: '#tabelaAgEquipe', texto: '<b>Agenda da equipe</b>: clique na pessoa para ver a agenda dela, do jeito que ela vê.' },
   ]);
   guiaTalvez('agenda');
