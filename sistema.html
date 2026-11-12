@@ -255,11 +255,11 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261112c"></script>
-<script src="casca/paginas.js?v=20261112-chegada1"></script>
-<script src="casca/modulos.js?v=20261112b"></script>
+<script src="casca/menu.js?v=20261112d"></script>
+<script src="casca/paginas.js?v=20261112-plano1"></script>
+<script src="casca/modulos.js?v=20261112c"></script>
 <script src="casca/setores-fabio.js?v=20261112c"></script>
-<script src="casca/busca.js?v=20261112b"></script>
+<script src="casca/busca.js?v=20261112c"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -645,7 +645,7 @@ function moldura(chave) {
     f.title = url === 'painel' ? 'Painel' : (ITENS[chave] || {}).rotulo || url;
     f.setAttribute('allow', 'fullscreen; screen-wake-lock; clipboard-write');
     if (url === 'painel') { PAINEL_PRONTO = false; PAINEL_ALVO = chave; f.src = urlDoPainel(chave); }
-    else f.src = ABA_PEDIDA ? url.replace('#', '?aba=' + encodeURIComponent(ABA_PEDIDA) + '#') : url;
+    else f.src = ABA_PEDIDA ? (url.includes('#') ? url.replace('#', '?aba=' + encodeURIComponent(ABA_PEDIDA) + '#') : url + '?aba=' + encodeURIComponent(ABA_PEDIDA)) : url;
     f.hidden = true;
     $('vista').appendChild(f);
     MOLDURAS[url] = f;
@@ -658,6 +658,9 @@ function mostrarSo(el) {
 }
 
 function abrir(chave, deDentro) {
+  // 12/11/2026 (dono 16:39: "junção do em desenvolvimento com a agenda"): o Plano virou o bloco Desenvolvimentos da agenda
+  if (chave === 'plano') { const f = MOLDURAS[PAGINAS.agenda]; ABA_PEDIDA = 'desenvolvimentos'; abrir('agenda', deDentro); ABA_PEDIDA = null;
+    try { if (f && f.contentWindow.agIrDesenv) f.contentWindow.agIrDesenv(); } catch (e) {} return; }
   // item de junção: abre a primeira aba que o login pode abrir (Motoboys → Financeiro da logística ou Acertos)
   if (JUNCOES[chave]) { const a = alvoMenu(chave); if (a && a !== chave) { abrir(a, deDentro); return; } }
   const it = ITENS[chave];
@@ -923,7 +926,7 @@ async function montar() {
   [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
-  const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
+  const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').replace(/^plano$/, 'agenda/desenvolvimentos').split('/');
   const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link && !semPagina(k));
   if (pedido && alvoMenu(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
   else if (PODE && minhas.length) abrir(minhas[0]);     // acesso restrito abre direto no que é dele, como o painel

@@ -4,7 +4,6 @@
 // em painel_telas.responde já entram sozinhos). Sem acento e sem maiúscula não importa: a casca normaliza.
 // Tela nova no menu: acrescentar uma linha aqui com o jeito que a equipe fala.
 window.CASCA_BUSCA = {
-  plano: ['plano de acao', 'em desenvolvimento', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'plano de saida', 'prioridades'],
   hoje: ['hoje', 'semana em curso', 'como esta a semana', 'resumo da semana', 'dia da rede'],
   estasemana: ['semana atual', 'como esta a semana', 'resumo da semana'],
   placar: ['fechamento do mes', 'fechar o mes', 'mes fechado', 'mes em uma pagina', 'faturamento', 'vendas do mes', 'resultado', 'quanto vendemos', 'meta do mes', 'receita'],
@@ -76,7 +75,8 @@ window.CASCA_BUSCA = {
   relatorios: ['resumo semanal', 'relatorio'],
   conciliacao: ['base', 'conferencia da base', 'auditoria'],
   atividades: ['atividades da equipe', 'tarefas', 'whatsapp', 'avisos', 'quem fez'],
-  agenda: ['agenda', 'minha agenda', 'o que fazer', 'pendencias', 'depende de mim', 'hoje'],
+  agenda: ['agenda', 'minha agenda', 'o que fazer', 'pendencias', 'depende de mim', 'hoje',
+    'plano', 'plano de acao', 'em desenvolvimento', 'desenvolvimentos', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'prioridades'],   // 12/11: o Plano entrou na agenda
   notasfaltam: ['notas', 'nota fiscal', 'nf', 'sem conta', 'sem entrada', 'entrada no estoque', 'conta a pagar da nota', 'compras'],
   rotinas: ['rotina', 'robo', 'mini pc', 'automacao'],
   telas: ['telas', 'menu', 'uso do painel'],

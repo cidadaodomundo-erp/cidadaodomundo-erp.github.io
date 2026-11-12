@@ -16,7 +16,6 @@ window.CASCA_MODULOS_CFG = {
     macertos: 'Motoboys · Acertos',
     contestacoes: 'Cancelamentos · Contestações',
     reembolsos: 'Pedir reembolso',
-    plano: 'Em desenvolvimento',   // dono 07/11 03:59: o plano, com a evolução em cima (o Fabio acompanha)
   },
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
@@ -33,7 +32,7 @@ window.CASCA_MODULOS_CFG = {
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'plano', 'vendasagora', 'atividades'] },   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'vendasagora', 'atividades'] },   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },

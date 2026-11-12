@@ -98,7 +98,7 @@ window.CASCA_PAGINAS = {
   projecao: 'gestao/index.html#projecao',
   rede: 'gestao/index.html#rede',
   // 05/11/2026 (último bloco): Sistema
-  plano: 'sistema/index.html#plano',
+  // plano: saiu do menu em 12/11/2026 (dono 16:39); #plano abre a agenda no bloco Desenvolvimentos (sistema.html, abrir)
   rotinas: 'sistema/index.html#rotinas',
   telas: 'sistema/index.html#telas',
   // 12/11/2026 (Fabio, etapa 1 do Delivery): telas do agrupamento "Sistema operacional do Fábio" que passam a abrir a

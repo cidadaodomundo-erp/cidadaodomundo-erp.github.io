@@ -416,19 +416,36 @@ async function agPlanoMontar(reler) {
     const linhaB = (d) => { const E = AGPL_ESTADO[d.estado] || [d.estado, 'var(--tx-3)'];
       const pos = Number(d.etapa_ordem) === 1 && d.ordem != null ? `<b>${d.ordem}º</b> ` : '';
       const mudou = d.atualizado_em && d.atualizado_em >= semana ? ' <span style="color:var(--info);">· mudou esta semana</span>' : '';
-      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t">${pos}<b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span>${mudou}</span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${d.detalhe ? `<div class="ag-ctx">${agE(d.detalhe)}</div>` : ''}</div>`; };
+      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t">${pos}<b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span>${mudou}</span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${agDevDet(d)}</div>`; };
     const cont = Object.keys(AGPL_ESTADO).map((k) => [k, D.filter((d) => d.estado === k).length]).filter(([, n]) => n).map(([k, n]) => `${AGPL_ESTADO[k][0].toLowerCase()} ${n}`).join(' · ');
     const etapas = [];
     D.forEach((d) => { const nome = d.etapa || '8. Novo: a ordenar', eo = d.etapa_ordem == null ? 8 : Number(d.etapa_ordem);
       let e = etapas.find((x) => x.nome === nome); if (!e) { e = { nome, eo, itens: [] }; etapas.push(e); } e.itens.push(d); });
     etapas.sort((a, b) => a.eo - b.eo);
-    h += `<div class="ag-bloco">Desenvolvimentos <span class="f">· ${cont}</span></div>`
+    const nPr = D.filter((d) => d.estado === 'PRONTO').length;
+    h += `<div class="ag-bloco" id="agDesenv">Desenvolvimentos <span class="f">· evolução: ${nPr} de ${D.length} prontos (${Math.round(100 * nPr / D.length)}%) · ${cont}</span></div>`
       + etapas.map((e) => { const tit = `${agE(e.nome)} <span class="f">(${e.itens.length})</span>`, corpo = e.itens.map(linhaB).join('');
         return e.eo === 6 || e.eo === 9
           ? `<details style="margin:6px 2px;"><summary style="cursor:pointer;color:var(--tx-3);font-size:13px;font-weight:700;">${tit}</summary>${corpo}</details>`
           : `<div style="margin:10px 2px 4px;color:var(--tx-2);font-size:13px;font-weight:700;">${tit}</div>${corpo}`; }).join('');
   }
   box.innerHTML = h;
+  if (AG_DESENV_IR) { AG_DESENV_IR = false; agIrDesenv(); }
+}
+// 12/11/2026 (dono 16:39: "junção do em desenvolvimento com a agenda"): o Plano entrou aqui. #plano na casca abre a agenda
+// com ?aba=desenvolvimentos e a tela rola até o bloco. O cartão mostra uma linha; o detalhe (o que é, andamento de hoje,
+// depende de, prova do pronto) abre ao clicar. Colunas andamento/andamento_em/dependencia/evidencia: aparecem quando a view tiver.
+let AG_DESENV_IR = (() => { try { return new URLSearchParams(location.search).get('aba') === 'desenvolvimentos'; } catch (e) { return false; } })();
+function agIrDesenv() { const el = document.getElementById('agDesenv'); if (el) setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 200); else AG_DESENV_IR = true; }
+function agDevDet(d) {
+  const quando = (t) => t ? agDm(String(t).slice(0, 10)) : '';
+  const L = [];
+  if (d.detalhe) L.push(`<div>${agE(d.detalhe)}</div>`);
+  if (d.andamento) L.push(`<div><b>Andamento${d.andamento_em ? ' ' + quando(d.andamento_em) : ''}:</b> ${agE(d.andamento)}</div>`);
+  if (d.dependencia) L.push(`<div><b>Depende de:</b> ${agE(d.dependencia)}</div>`);
+  if (d.estado === 'PRONTO' && d.evidencia) L.push(`<div style="color:var(--farol-ok);"><b>✓ Pronto — prova:</b> ${agE(d.evidencia)}</div>`);
+  if (!L.length) return '';
+  return `<details class="ag-ctx" style="flex-basis:100%;"><summary style="cursor:pointer;">${d.andamento ? 'andamento' : 'detalhe'}</summary>${L.join('')}</details>`;
 }
 
 // =====================================================================================================================

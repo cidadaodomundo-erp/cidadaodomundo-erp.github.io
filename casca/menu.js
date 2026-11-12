@@ -9,11 +9,6 @@ window.CASCA_MENU = [
   "nome": "Começar por aqui",
   "itens": [
    {
-    "chave": "plano",
-    "rotulo": "Plano",
-    "icone": "🗺️"
-   },
-   {
     "chave": "estasemana",
     "rotulo": "Esta semana",
     "icone": "🏠"
