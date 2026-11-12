@@ -47,7 +47,7 @@ function mkFetch(o = {}) {
     if (p === '/auth/v1/user') return o.auth || R({ id: 'u1', email: 'x@y.z' });
     if (p === '/rest/v1/rpc/pode_ver_pessoal') return R(o.ver === undefined ? true : o.ver);
     if (p === '/rest/v1/rpc/pode_cadastrar_pessoal') return R(o.cad === undefined ? true : o.cad);
-    if (p === '/rest/v1/rpc/painel_minhas_lojas') return R(o.painel === undefined ? { lojas: ['AGUA VERDE', 'AHU'], loja_inicial: 'AGUA VERDE', travado: false } : o.painel);
+    if (p === '/rest/v1/rpc/painel_minhas_lojas') return R(o.painel === undefined ? [{ lojas: ['AGUA VERDE', 'AHU'], loja_inicial: 'AGUA VERDE', travado: false }] : o.painel);   // formato real: RETURNS TABLE => array de 1 linha
     const tabela = { '/rest/v1/rh_pessoa': o.pessoas || PESSOAS, '/rest/v1/vendas_saipos': o.vendas || VENDAS, '/rest/v1/saipos_itens_venda': o.itens || ITENS }[p];
     if (tabela !== undefined) {
       if (o.rest) { const x = o.rest(p); if (x) return x; }
@@ -121,6 +121,21 @@ test('exige pode_ver_pessoal E pode_cadastrar_pessoal === true; qualquer outra c
     const r = await rodar({ ver, cad });
     assert.equal(r.status, 403, JSON.stringify([ver, cad]));
     assert.ok(r.f.chamadas.every((c) => c.path.startsWith('/auth/') || c.path.includes('/rpc/')));
+  }
+});
+test('painel_minhas_lojas real (array de 1 linha): autoriza só as lojas da linha; REDE só se estiver nela', async () => {
+  const linha = (lojas) => [{ lojas, loja_inicial: lojas[0] || null, travado: false }];
+  assert.equal((await rodar({ painel: linha(['AGUA VERDE']) })).status, 200);
+  assert.equal((await rodar({ painel: linha(['AHU']) })).status, 403, 'unidade fora da linha');
+  assert.equal((await rodar({ painel: linha(['REDE', 'AGUA VERDE']), ctx: { query: { dia: DIA, unidade: 'REDE' } } })).status, 200);
+  assert.equal((await rodar({ painel: linha(['AGUA VERDE']), ctx: { query: { dia: DIA, unidade: 'REDE' } } })).status, 403);
+  assert.equal((await rodar({ painel: { lojas: ['AGUA VERDE'], loja_inicial: 'AGUA VERDE', travado: true } })).status, 200, 'objeto válido segue aceito (compatibilidade)');
+});
+test('painel_minhas_lojas: array com 0 ou 2+ linhas, linha sem lojas, lojas fora de text[] ou tipo errado = 403', async () => {
+  const ok = { lojas: ['AGUA VERDE'], loja_inicial: 'AGUA VERDE', travado: false };
+  for (const painel of [[], [ok, ok], [{}], [{ lojas: 'AGUA VERDE' }], [{ lojas: ['AGUA VERDE', 7] }], [null], ['AGUA VERDE'], [[ok]], null, 'AGUA VERDE', 7, { lojas: [1] }]) {
+    const r = await rodar({ painel }); assert.equal(r.status, 403, JSON.stringify(painel));
+    assert.ok(!r.f.chamadas.some((x) => x.host === 'api.flashapp.services' || x.path.endsWith('/rh_pessoa')));
   }
 });
 test('painel_minhas_lojas inválido, unidade fora da lista ou REDE sem permissão: 403; unidade inexistente: 400', async () => {

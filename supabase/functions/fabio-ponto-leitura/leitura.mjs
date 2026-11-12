@@ -132,8 +132,11 @@ async function rpc(c, headers, fn) {
 export async function exigirPermissoes(c, headers) {
   const [ver, cad, painel] = await Promise.all([rpc(c, headers, 'pode_ver_pessoal'), rpc(c, headers, 'pode_cadastrar_pessoal'), rpc(c, headers, 'painel_minhas_lojas')]);
   if (ver !== true || cad !== true) throw new ErroLeitura('sem_permissao', 403);
-  if (!ehObj(painel) || !Array.isArray(painel.lojas)) throw new ErroLeitura('sem_permissao', 403);
-  return painel;
+  // painel_minhas_lojas() RETURNS TABLE(lojas text[], loja_inicial text, travado boolean) => o PostgREST devolve ARRAY de 1 linha.
+  // Aceita exatamente 1 elemento objeto válido (ou, por compatibilidade, o próprio objeto válido); 0, 2+ ou tipo errado = 403.
+  const linha = Array.isArray(painel) ? (painel.length === 1 ? painel[0] : null) : painel;
+  if (!ehObj(linha) || !Array.isArray(linha.lojas) || !linha.lojas.every((l) => typeof l === 'string')) throw new ErroLeitura('sem_permissao', 403);
+  return linha;
 }
 // unidade pedida precisa estar na lista do chamador; REDE só se a lista tiver REDE (e expande para as lojas reais da lista)
 export function unidadesPermitidas(unidade, painel) {
