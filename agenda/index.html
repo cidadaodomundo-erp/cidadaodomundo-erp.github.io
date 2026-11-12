@@ -192,7 +192,7 @@ function agDesenhar() {
     const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
-    return `<div class="ag-lin ${x.tipo}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
+    return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"><span class="t">${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''} <span class="f" title="número do item (os chats citam por ele)">#${p.id}</span></span>${acao}${bts}${feito}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
@@ -212,12 +212,14 @@ function agDesenhar() {
   const G = { dep: itens.filter((x) => grp(x) === 'dep'), anda: itens.filter((x) => grp(x) === 'anda'), saber: itens.filter((x) => grp(x) === 'saber') };
   let f = 'dep'; try { f = sessionStorage.getItem('agFiltro') || 'dep'; } catch (e) {}
   if (!G[f]) f = 'dep';
+  const alvoIt = agItemAlvo(); if (alvoIt) { const k = ['dep', 'anda', 'saber'].find((g) => G[g].some((x) => x.id === alvoIt)); if (k) f = k; }
   const ROT = { dep: ['Depende de você', 'pede uma ação sua'], anda: ['Em andamento', 'respondido ou feito, esperando aplicar ou conferir'], saber: ['Para saber', 'sem ação sua'] };
   const corC = { dep: G.dep.length ? 'neg' : 'pos', anda: 'blue', saber: 'neutral' };
   h += `<div class="cards cards-3 ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
       <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${G[k].length}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}</div>`;
   h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
   alvo.innerHTML = h;
+  agRolarAteItem();
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
   agEquipeMontar().then(agGuia);
@@ -404,7 +406,7 @@ function agPessoaHtml(L, soLeitura) {
       const fio = Array.isArray(x.fio) ? x.fio : [];
       const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
         `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
-      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" style="flex-wrap:wrap;"><span class="t">${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
+      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" id="agItem_${id}" style="flex-wrap:wrap;"><span class="t"><span class="f" style="float:right;" title="número do item">#${id}</span>${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
         ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}</div>`;
       if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
     });
@@ -412,10 +414,25 @@ function agPessoaHtml(L, soLeitura) {
   return h;
 }
 function agSoLeitura() { avisoAcao('atencao', 'Você está vendo a agenda de outra pessoa: os botões são dela e não gravam daqui.'); }
+// 12/11/2026 02:08 (dono): ?item=131 no endereço abre a agenda rolada até o item (uma vez) e o destaca
+let AG_ITEM_FEITO = false;
+function agItemAlvo() {
+  if (AG_ITEM_FEITO) return null;
+  let q = ''; try { q = (window.parent !== window ? parent.location.search : '') || location.search; } catch (e) { q = location.search; }
+  const n = Number(new URLSearchParams(q).get('item')); return n > 0 ? n : null;
+}
+function agRolarAteItem() {
+  const n = agItemAlvo(); if (!n) return;
+  const el = document.getElementById('agItem_' + n); if (!el) return;
+  AG_ITEM_FEITO = true;
+  el.style.outline = '2px solid var(--info)'; el.style.borderRadius = '8px';
+  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
+}
 function agPessoaRedesenhar() {
   const v = document.getElementById('view-agenda');
   v.innerHTML = '<h2>Minha agenda</h2>' + (AGP.linhas.length ? agOrdemHtml(false) + agPessoaHtml(AGP.linhas, false)
     : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nada na sua agenda nos próximos 7 dias</span></div>');
+  agRolarAteItem();
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AGP.linhas.filter((x) => ['Atrasada', 'Travada', 'Falta', 'Voltou'].includes(x.estado) || (x.estado === 'A fazer' && x.dia <= agHoje())).length });
 }
 function agPessoaForm(id, tipo) { AGP.form = AGP.form && AGP.form.id === id && AGP.form.tipo === tipo ? null : { id, tipo }; agPessoaRedesenhar(); }
