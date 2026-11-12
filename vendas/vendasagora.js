@@ -18,7 +18,10 @@ const vaDdmm = (d) => d.slice(8, 10) + '/' + d.slice(5, 7);
 const vaSemana = (d) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' });
 const vaPassado = (d) => { const s = vaSemana(d); return s + (s.endsWith('feira') ? ' passada' : ' passado'); };
 const vaCanal = (c) => ({ IFOOD: 'iFood', 'VNDX TECNOLOGIA': 'VNDX' })[c] || c;
-const vaSoma = (ls, campo) => ls.reduce((s, l) => s + (Number(l[campo]) || 0), 0);
+// 12/11/2026 (regra nova: venda de R$ 0 não é pedido): o motor agrupa por tipo, canal, marca, turno e cancelada, e a venda de
+// R$ 0 do balcão/salão vem quase sempre sem marca, num grupo só dela (valor 0). Esse grupo não conta em "pedidos". Grupo que
+// misture R$ 0 com venda paga ainda conta a de R$ 0 — só o motor (script/vendas_agora.py) separa de vez.
+const vaSoma = (ls, campo) => ls.reduce((s, l) => s + (campo === 'pedidos' && !(Number(l.valor) > 0) ? 0 : (Number(l[campo]) || 0)), 0);
 
 function vaHoraSP() {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());

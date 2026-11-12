@@ -14,12 +14,22 @@ window.CASCA_MODULOS_CFG = {
     cardapio: 'Desempenho do cardápio',
     logfin: 'Motoboys · Financeiro da logística',
     macertos: 'Motoboys · Acertos',
+    contestacoes: 'Cancelamentos · Contestações',
     reembolsos: 'Pedir reembolso',
     plano: 'Em desenvolvimento',   // dono 07/11 03:59: o plano, com a evolução em cima (o Fabio acompanha)
   },
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
-    notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' } },   // 12/11: onde a Rita resolve as tarefas 30 e 82   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
+    notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' },   // 12/11: onde a Rita resolve as tarefas 30 e 82
+    motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
+  // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
+  // um item só no menu; ao abrir, a casca mostra as abas logo abaixo do título. Cada aba é a tela que já existia (mesma
+  // chave, mesma página, mesmo cálculo). Quem vê o item: quem pode abrir qualquer uma das abas (painel_acesso das chaves
+  // antigas continua valendo, sem SQL). Os endereços antigos (#contestacoes, #logfin, #macertos) abrem a aba deles.
+  juncoes: {
+    cancelamentos: { abas: [['cancelamentos', 'Cancelamentos'], ['contestacoes', 'Contestações']] },
+    motoboys: { abas: [['logfin', 'Financeiro da logística'], ['macertos', 'Acertos']] },
+  },
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
@@ -30,7 +40,7 @@ window.CASCA_MODULOS = [
   { id: 'resultado', nome: 'Resultado', icone: '📊',
     lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
-    lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'contestacoes', 'cardapio', 'clientes', 'site', 'frete', 'logfin', 'macertos'] },
+    lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete', 'motoboys'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
   { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notasfaltam'], acompanhar: ['comprateto'] },

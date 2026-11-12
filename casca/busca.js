@@ -22,7 +22,9 @@ window.CASCA_BUSCA = {
   vendasagora: ['vendas hoje', 'pedidos agora', 'tempo real', 'quanto vendeu hoje'],
   resumo: ['ifood', 'resumo do ifood', 'canal ifood'],
   promocoes: ['promocao', 'hits', 'campanha', 'cupom', 'frete gratis', 'anuncio'],
-  cancelamentos: ['cancelado', 'pedido cancelado', 'cancelamento'],
+  // 12/11/2026: Contestações virou aba de Cancelamentos e Motoboys junta Financeiro da logística + Acertos — as palavras
+  // das telas antigas vieram para o item novo (as chaves antigas não aparecem mais sozinhas na busca)
+  cancelamentos: ['cancelado', 'pedido cancelado', 'cancelamento', 'contestacoes', 'contestar', 'contestacao', 'reembolso do ifood'],
   contestacoes: ['contestar', 'contestacao', 'reembolso do ifood'],
   atendimento: ['reclamacao', 'cliente reclamou', 'respostas ao cliente', 'chat do cliente'],
   negociacoes: ['negociacao', 'acordo com ifood'],
@@ -35,6 +37,7 @@ window.CASCA_BUSCA = {
   frete: ['taxa de entrega', 'distancia', 'raio de entrega', 'frete'],
   logfin: ['motoboy', 'entregadores', 'logistica', 'corridas'],
   macertos: ['pagar motoboy', 'acerto do motoboy', 'entregador', 'pagamento dos motoboys'],
+  motoboys: ['motoboy', 'entregadores', 'logistica', 'corridas', 'financeiro da logistica', 'pagar motoboy', 'acerto do motoboy', 'acertos', 'entregador', 'pagamento dos motoboys'],
   concbanco: ['conciliar', 'conciliacao', 'extrato', 'banco', 'ofx', 'bateu o saldo'],
   caixa: ['fechamento de caixa', 'quebra de caixa', 'sangria', 'diferenca de caixa', 'maquininha', 'caixa do dia'],
   contaspagar: ['quanto devo', 'contas', 'boletos', 'vencidas', 'pagar', 'fornecedor', 'vencimento', 'a pagar'],

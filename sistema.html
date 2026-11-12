@@ -140,6 +140,10 @@
   .home-loja-op { display:flex; flex-wrap:wrap; gap:6px; }
   .faixa-loja { padding:7px 16px; font-size:12.5px; color:var(--tx-2); background:var(--surface-2); border-bottom:1px solid var(--line); }
   .faixa-loja[hidden] { display:none; }
+  /* 12/11/2026: abas de uma junção (Cancelamentos | Contestações; Motoboys: Financeiro | Acertos) */
+  .abas-juncao { display:flex; flex-wrap:wrap; gap:6px; padding:8px 16px; border-bottom:1px solid var(--line); }
+  .abas-juncao[hidden] { display:none; }
+  .abas-juncao .aba { padding:5px 14px; font-size:12.5px; }
   .vista { flex:1; position:relative; min-height:0; }
   .vista > * { position:absolute; inset:0; }
   .vista iframe { width:100%; height:100%; border:0; background:var(--bg); }
@@ -239,6 +243,7 @@
       <button class="btn" type="button" id="btnTema" title="Mudar para o visual claro">☀️</button>
       <div class="acoes" id="acoes"></div>
     </div>
+    <div class="abas-juncao" id="abasJuncao" hidden></div>
     <div class="faixa-loja" id="faixaLoja" hidden></div>
     <div class="vista" id="vista"></div>
   </div>
@@ -246,8 +251,8 @@
 
 <script src="casca/menu.js?v=20261107a"></script>
 <script src="casca/paginas.js?v=20261112a"></script>
-<script src="casca/modulos.js?v=20261112a"></script>
-<script src="casca/busca.js?v=20261112a"></script>
+<script src="casca/modulos.js?v=20261112b"></script>
+<script src="casca/busca.js?v=20261112b"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -276,6 +281,14 @@ ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliaçõe
 const MOD_CFG = window.CASCA_MODULOS_CFG || {};
 Object.entries(MOD_CFG.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
 Object.entries(MOD_CFG.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
+// JUNÇÕES (dono 12/11/2026 00:32): um item no menu, as telas antigas viram abas dele (casca/modulos.js, juncoes). A aba que
+// não é o próprio item sai do menu e da busca (FORA_DO_MENU), mas o endereço dela continua abrindo a aba.
+const JUNCOES = MOD_CFG.juncoes || {};
+function abasJuncao(k) { return ((JUNCOES[k] || {}).abas || []).map((a) => a[0]); }
+Object.keys(JUNCOES).forEach((j) => abasJuncao(j).forEach((k) => { if (k !== j) FORA_DO_MENU.add(k); }));
+function juncaoDe(k) { return Object.keys(JUNCOES).find((j) => abasJuncao(j).includes(k)) || null; }
+// o que o item do menu abre: ele mesmo (se for tela e o login puder) ou a primeira aba que o login pode abrir
+function alvoMenu(k) { const ab = abasJuncao(k); if (!ab.length) return visivel(k) ? k : null; return ab.find((x) => visivel(x)) || null; }
 
 // FORMATO A (22/10/2026): os módulos de casca/modulos.js. Tela do menu que não está em nenhum módulo cai em "Outras
 // telas" — nada some por esquecimento.
@@ -286,7 +299,7 @@ const MODULOS = (Array.isArray(window.CASCA_MODULOS) ? window.CASCA_MODULOS : []
   if (sobra.length) MODULOS.push({ id: 'outras', nome: 'Outras telas', icone: '📁', lancar: [], acompanhar: sobra });
 })();
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';
-function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && visivel(k)); }
+function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && alvoMenu(k)); }
 let PODE = null;                        // null = vê tudo (regra do painel_acesso)
 let DESC = {};                          // chave -> painel_telas.responde
 let ATUAL = null;                       // chave aberta (null = Início)
@@ -430,6 +443,8 @@ let VE_GESTAO = null;
 function visivel(chave) {
   const it = ITENS[chave];
   if (!it) return false;
+  // item de junção que não é tela (Motoboys): visível se o login abre alguma das abas
+  if (JUNCOES[chave] && !abasJuncao(chave).includes(chave)) return abasJuncao(chave).some((k) => visivel(k));
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
   if (SO_DONO.has(chave) && !ehDono() && !(chave === 'agenda' && VE_EQUIPE === true)) return false;
@@ -456,15 +471,28 @@ function desenharMenu() {
   MODULOS.forEach((g) => {
     const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => MOD_CFG.hojeNoModulo || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
     if (!itens.length) return;
-    const tem = itens.some((i) => i.chave === ATUAL);
+    const tem = itens.some((i) => emItem(i.chave));
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
     h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}${aberto ? '' : sinalHtml(itens.reduce((a, i) => a + (SINAIS[i.chave] || 0), 0))}<span class="seta">▶</span></button>`;
     h += '<div class="itens">' + itens.map((i) =>
-      `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`
+      `<button class="mi${emItem(i.chave) ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`
     ).join('') + '</div>';
   });
   $('menu').innerHTML = h;
   $('miInicio').classList.toggle('on', ATUAL === null);
+  desenharAbasJuncao();
+}
+// o item do menu fica aceso também quando a tela aberta é uma aba dele (junção)
+function emItem(k) { return k === ATUAL || (ATUAL !== null && abasJuncao(k).includes(ATUAL)); }
+// 12/11/2026: as abas da junção logo abaixo do título (só as que o login pode abrir; com uma só, não aparece)
+function desenharAbasJuncao() {
+  const box = $('abasJuncao');
+  if (!box) return;
+  const j = ATUAL ? juncaoDe(ATUAL) : null;
+  const abas = j ? JUNCOES[j].abas.filter((a) => visivel(a[0])) : [];
+  if (abas.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+  box.innerHTML = abas.map(([k, r]) => `<button class="aba${k === ATUAL ? ' on' : ''}" type="button" data-aba-juncao="${esc(k)}">${esc(r)}</button>`).join('');
+  box.hidden = false;
 }
 
 $('menu').addEventListener('click', (e) => {
@@ -480,6 +508,7 @@ $('menu').addEventListener('click', (e) => {
   if (b) abrir(b.dataset.chave);
 });
 $('miInicio').addEventListener('click', () => inicio());
+$('abasJuncao').addEventListener('click', (e) => { const b = e.target.closest('[data-aba-juncao]'); if (b && b.dataset.abaJuncao !== ATUAL) abrir(b.dataset.abaJuncao); });
 
 // -------------------------------------------------------------- busca de telas (07/11/2026, dono 03:44 pelo Organizador)
 // Acha TELA pelo nome, pelo grupo, pelas palavras de casca/busca.js e pela descrição da tela (painel_telas.responde, em DESC).
@@ -508,7 +537,7 @@ function buscaProcurar(texto) {
   const q = buscaNorm(texto);
   if (!q) return [];
   const palavras = q.split(' ').filter((w) => w.length >= 2 && !BUSCA_PARADAS.has(w));
-  return Object.keys(ITENS).filter((k) => visivel(k) && !FORA_DO_MENU.has(k))
+  return Object.keys(ITENS).filter((k) => alvoMenu(k) && !FORA_DO_MENU.has(k))
     .map((k) => ({ k, p: buscaPontos(k, q, palavras) })).filter((x) => x.p > 0)
     .sort((a, b) => b.p - a.p || String(ITENS[a.k].rotulo).localeCompare(String(ITENS[b.k].rotulo), 'pt-BR')).slice(0, 8).map((x) => x.k);
 }
@@ -589,6 +618,8 @@ function mostrarSo(el) {
 }
 
 function abrir(chave, deDentro) {
+  // item de junção: abre a primeira aba que o login pode abrir (Motoboys → Financeiro da logística ou Acertos)
+  if (JUNCOES[chave]) { const a = alvoMenu(chave); if (a && a !== chave) { abrir(a, deDentro); return; } }
   const it = ITENS[chave];
   if (!it || !visivel(chave)) { inicio(); return; }
   if (it.link) { window.open(it.link, '_blank', 'noopener'); return; }
@@ -840,7 +871,7 @@ async function montar() {
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').split('/');
   const minhas = Object.keys(ITENS).filter((k) => visivel(k) && !ITENS[k].link);
-  if (pedido && visivel(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
+  if (pedido && alvoMenu(pedido)) { ABA_PEDIDA = abaPedida || null; abrir(pedido); ABA_PEDIDA = null; }
   else if (PODE && minhas.length) abrir(minhas[0]);     // acesso restrito abre direto no que é dele, como o painel
   // 07/11/2026 (dono, pelo Organizador: "a tela inicial poderia abrir já na tela da agenda"): por ora só o dono;
   // os outros logins quando a agenda deles for ao ar
