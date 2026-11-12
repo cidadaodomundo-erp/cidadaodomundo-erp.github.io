@@ -66,17 +66,15 @@
       <div id="conteudo"><div class="dl-vazio">Carregando…</div></div>
     </div>
     <div id="operacao" style="display:none;"></div>
-    <!-- 12/11/2026 (Fabio, etapa 1 da migração do Delivery): o que esta página já lê e o que continua no portal antigo.
-         Só texto: nenhum link para o portal antigo aqui (os atalhos ficam no menu da casca, que aplica a permissão de
-         cada login), nenhuma leitura nova, nenhum timer. Mapa completo em docs/delivery-migracao.md. -->
+    <!-- 12/11/2026 (Fabio): o que esta página já lê e o que está em migração. Só texto: nenhum botão, link ou moldura
+         para o portal antigo, nenhuma leitura nova, nenhum timer. Mapa em docs/delivery-migracao.md. -->
     <section class="dl-migracao" aria-labelledby="dlMigT">
-      <h2 id="dlMigT">O que já está aqui e o que ainda está no portal antigo</h2>
+      <h2 id="dlMigT">O que já está aqui e o que está em migração</h2>
       <ul>
         <li><strong>Já consultam dados neste portal:</strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia (leitura do dia no banco do ERP, por loja autorizada).</li>
         <li><strong>Leitura parcial, em construção:</strong> Chegada do dia (mostra só a atividade registrada nas entregas, que não é chegada nem saída do motoboy) e Escala do Delivery (só consulta da escala prevista).</li>
-        <li><strong>Ainda não migrado, continua no portal antigo:</strong> Motoboys rodando no dia (entrada combinada, chegada, saída registrada, tempo registrado, garantido e refeição), Mapa de Pedidos (fila) e a edição da Escala do Delivery. Garantido e refeição <strong>não</strong> são calculados nem mostrados nesta página.</li>
+        <li><strong>Em migração, ainda sem tela neste portal:</strong> Chegada completa dos motoboys (entrada combinada, chegada, saída registrada, tempo registrado, garantido e refeição), Fila de pedidos e a edição da Escala do Delivery. A fonte de dados correta ainda está sendo verificada. Garantido e refeição <strong>não</strong> são calculados nem mostrados nesta página.</li>
       </ul>
-      <p class="dl-nota">Os atalhos para essas telas antigas ficam no menu, em Sistema operacional do Fábio › Delivery, para quem tem acesso. Eles abrem o portal antigo em outra aba, com o login de lá; nada desta página é levado junto.</p>
     </section>
   </div>
 </div>

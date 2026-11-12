@@ -94,6 +94,7 @@
   /* 12/11/2026: setores dentro do "Sistema operacional do Fábio" (casca/setores-fabio.js); tela com integração pendente fica sem botão ativo */
   .sub-setor { color:var(--tx-6); font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; padding:8px 12px 2px; }
   .mi[disabled] { opacity:.5; cursor:default; }
+  .setor-aviso { grid-column:1 / -1; color:var(--tx-6); font-size:12px; padding:2px 2px 6px; }
   .mi[disabled]:hover { background:none; color:var(--tx-2); }
   .mi .obs { margin-left:auto; font-size:10.5px; font-weight:600; color:var(--tx-5); }
   .sinal { margin-left:auto; min-width:18px; padding:0 6px; border-radius:9px; background:var(--farol-fora); color:var(--bg); font-size:11px; font-weight:700; line-height:18px; text-align:center; flex-shrink:0; }
@@ -257,7 +258,7 @@
 <script src="casca/menu.js?v=20261107a"></script>
 <script src="casca/paginas.js?v=20261112-reservas-goomer1"></script>
 <script src="casca/modulos.js?v=20261112b"></script>
-<script src="casca/setores-fabio.js?v=20261112a"></script>
+<script src="casca/setores-fabio.js?v=20261112b"></script>
 <script src="casca/busca.js?v=20261112b"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -287,10 +288,9 @@ ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliaçõe
 const MOD_CFG = window.CASCA_MODULOS_CFG || {};
 Object.entries(MOD_CFG.extras || {}).forEach(([k, v]) => { if (!ITENS[k]) ITENS[k] = Object.assign({ grupo: null }, v); });
 Object.entries(MOD_CFG.rotulos || {}).forEach(([k, r]) => { if (ITENS[k]) ITENS[k] = Object.assign({}, ITENS[k], { rotulo: r }); });
-// 12/11/2026 (Fabio): setores e atalhos do portal antigo do agrupamento "Sistema operacional do Fábio" (casca/setores-fabio.js).
-// Atalho = link externo https, sem tela nem dado aqui; entra na sobra (não está em módulo nenhum) e cai no setor dele.
+// 12/11/2026 (Fabio): setores do agrupamento "Sistema operacional do Fábio" (casca/setores-fabio.js). Só arrumam telas
+// deste portal; nenhum atalho para o portal antigo.
 const SETORES_CFG = window.CASCA_SETORES_FABIO || {};
-Object.entries(SETORES_CFG.atalhos || {}).forEach(([k, v]) => { if (!ITENS[k] && /^https:\/\//.test(String(v.link || ''))) ITENS[k] = Object.assign({ grupo: null }, v); });
 // JUNÇÕES (dono 12/11/2026 00:32): um item no menu, as telas antigas viram abas dele (casca/modulos.js, juncoes). A aba que
 // não é o próprio item sai do menu e da busca (FORA_DO_MENU), mas o endereço dela continua abrindo a aba.
 const JUNCOES = MOD_CFG.juncoes || {};
@@ -315,7 +315,7 @@ function setoresDe(sobra) {
   const lista = (SETORES_CFG.setores || []).map((s) => {
     const chaves = (s.chaves || []).filter((k) => sobra.includes(k) && !ja.has(k));
     chaves.forEach((k) => ja.add(k));
-    return { id: s.id, nome: s.nome, icone: s.icone, chaves };
+    return { id: s.id, nome: s.nome, icone: s.icone, chaves, aviso: s.aviso || '' };
   }).filter((s) => s.chaves.length);
   const resto = sobra.filter((k) => !ja.has(k));
   const d = SETORES_CFG.demais || { id: 'demais', nome: 'Demais telas', icone: '📁' };
@@ -482,9 +482,8 @@ function visivel(chave) {
   // devolve o que é da própria pessoa, então ela não depende da lista de telas do painel_acesso (nenhum login restrito a tinha)
   if (chave === 'agenda') return true;
   if (!PODE) return true;
-  // atalhos também somem para acesso restrito (igual ao painel). 12/11/2026: atalho do portal antigo (casca/setores-fabio.js)
-  // só aparece se a PRÓPRIA chave dele estiver na lista do login — nunca por ter outra chave (ex.: 'delivery')
-  if (it.link) return !!it.autorizavelPorChave && PODE.includes(chave);
+  // atalhos também somem para acesso restrito (igual ao painel)
+  if (it.link) return false;
   return PODE.includes(chave);
 }
 let GRUPOS_ABERTOS = {};
@@ -792,14 +791,16 @@ function abrirModulo(id, aba) {
   const cartao = (k) => { const i = ITENS[k];
     // 12/11/2026: tela do agrupamento do Fábio com acesso ainda não conectado (sem rota) = cartão sem botão ativo, com o aviso
     if (semPagina(k)) return `<div class="card vazio" aria-disabled="true"><span class="t"><span>${esc(i.icone)}</span>${esc(i.rotulo)}</span><span class="n">integração pendente · acesso ainda não conectado</span></div>`;
-    const d = DESC[k] || i.nota;
+    const d = DESC[k];
     return `<button class="card" type="button" data-chave="${esc(k)}"><span class="t"><span>${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}</span>` +
       (d ? `<span class="d">${esc(d)}</span>` : '') + '</button>'; };
   // 12/11/2026 (Fabio): o agrupamento do Fábio separa as telas por setor (as mesmas telas da lista, nenhuma a mais)
   const porSetor = m.setores && lista.length
     ? m.setores.map((s) => { const ks = s.chaves.filter((k) => lista.includes(k)); if (!ks.length) return '';
         const ativo = ks.some((k) => !semPagina(k));
-        return `<div class="gh">${esc(s.icone)} ${esc(s.nome)}${ativo ? '' : ' · em construção'}</div>` + ks.map(cartao).join(''); }).join('')
+        // aviso do setor: só texto, sem botão nem link (ex.: telas do Delivery ainda em migração)
+        const aviso = s.aviso ? `<div class="setor-aviso">${esc(s.aviso)}</div>` : '';
+        return `<div class="gh">${esc(s.icone)} ${esc(s.nome)}${ativo ? '' : ' · em construção'}</div>` + ks.map(cartao).join('') + aviso; }).join('')
     : null;
   h += porSetor !== null ? porSetor : lista.length ? lista.map(cartao).join('')
     : `<div class="gh" style="text-transform:none; letter-spacing:0;">${semAbas ? 'Nenhuma tela neste módulo.' : ABA_ATUAL === 'lancar' ? 'Nada para lançar neste módulo.' : 'Nada para acompanhar neste módulo.'}</div>`;

@@ -1,20 +1,16 @@
 /* Setores do agrupamento "Sistema operacional do Fábio" + Delivery na casca (etapa 1, 12/11/2026).
  * Roda o script REAL do sistema.html com casca/*.js e nucleo/loja.js; DOM, rede, sessão e loja são ficções (só e-mail fake).
- * Node stdlib: node --test casca/ . Sem rede. O último teste usa git (só leitura) para conferir que nenhum robô mudou. */
+ * Node stdlib: node --test casca/ . Sem rede, sem git (o diff da revisão é auditado manualmente pelo coordenador). */
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { execFileSync } = require('node:child_process');
 
 const RAIZ = path.join(__dirname, '..');
-const ANTIGO = path.join(RAIZ, '..', 'antigo-atual');   // referência local, só leitura (pode não existir na máquina)
-const BASE = '96e003ff53250a4076356736671ae24e11b30b6d';   // HEAD clonado em 12/11/2026, antes desta etapa
 const ler = (...p) => fs.readFileSync(path.join(RAIZ, ...p), 'utf8');
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r)); };
-function git(args) { try { return execFileSync('git', args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { return null; } }
 
 const SISTEMA = ler('sistema.html');
 const SCRIPTS_SRC = [...SISTEMA.matchAll(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g)].map((m) => m[1]).filter((s) => !/ajuda\.js$/.test(s));
@@ -81,7 +77,7 @@ function abrirCasca({ pode = null, hash = '' } = {}) {
 
 const C = abrirCasca().ctx;   // só para ler as constantes dos arquivos da casca
 const fabioNoMenu = C.CASCA_MENU.flatMap((g) => g.itens).filter((i) => i.origem === 'fabio').map((i) => i.chave);
-const ATALHOS = Object.keys(C.CASCA_SETORES_FABIO.atalhos);
+const ANTIGO_RE = /cidadaodomundo\.github\.io|portal antigo/i;
 
 // --------------------------------------------------------------------------------------------------------- testes
 test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; nenhum grupo paralelo; módulos do Neto intocados', async () => {
@@ -93,7 +89,10 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   const o = mods.find((m) => m.id === 'outras');
   assert.equal(o.nome, 'Sistema operacional do Fábio');
   fabioNoMenu.forEach((k) => assert.ok(o.acompanhar.includes(k), 'tela do Fábio saiu do agrupamento: ' + k));
-  ATALHOS.forEach((k) => assert.ok(o.acompanhar.includes(k), k));
+  // nenhum atalho externo no agrupamento: nenhuma chave antigo:*, nenhum item com link
+  assert.ok(!o.acompanhar.some((k) => /^antigo:/.test(k)), 'chave antigo:* no agrupamento');
+  o.acompanhar.forEach((k) => assert.equal(t.ev(`!!(ITENS[${JSON.stringify(k)}] || {}).link`), false, 'link externo no agrupamento: ' + k));
+  assert.equal(t.ev("Object.keys(ITENS).filter((k) => /^antigo:/.test(k)).length"), 0, 'nenhum item antigo:* ativo');
   // cada tela da sobra em exatamente um setor; setores não acrescentam nada
   const nosSetores = o.setores.flatMap((s) => s.chaves);
   assert.deepEqual([...nosSetores].sort(), [...o.acompanhar].sort());
@@ -101,30 +100,25 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
   assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento do Fábio');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
-  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', ...ATALHOS]);
+  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery'], 'Delivery: só o Delivery do dia nativo');
+  assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados'], 'Reservas e Pausados no Salão');
 });
 
-test('rotas: delivery e salao ligados; rotas, telas por loja e junções anteriores preservadas', () => {
+test('rotas: delivery, salao, reservas e pausados ligados; telas por loja e junções preservadas', () => {
   assert.equal(C.CASCA_PAGINAS.delivery, 'delivery/index.html');
   assert.equal(C.CASCA_PAGINAS.salao, 'salao/index.html');
+  assert.equal(C.CASCA_PAGINAS.reservas, 'reservas/index.html');
+  assert.equal(C.CASCA_PAGINAS.pausados, 'pausados/index.html');
   assert.ok(fs.existsSync(path.join(RAIZ, 'delivery', 'index.html')) && fs.existsSync(path.join(RAIZ, 'salao', 'index.html')));
   assert.equal(C.CASCA_PAGINAS.pao, 'pessoas/index.html#pao');
-  assert.ok(C.CASCA_TELAS_POR_LOJA.includes('delivery') && C.CASCA_TELAS_POR_LOJA.includes('pao'));
-  const antes = git(['show', BASE + ':casca/paginas.js']);
-  if (antes) {
-    const c0 = { window: {} }; c0.window = c0; vm.createContext(c0); vm.runInContext(antes, c0);
-    Object.entries(c0.CASCA_PAGINAS).forEach(([k, v]) => assert.equal(C.CASCA_PAGINAS[k], v, 'rota mudou: ' + k));
-    assert.deepEqual([...C.CASCA_TELAS_POR_LOJA].filter((k) => k !== 'delivery'), [...c0.CASCA_TELAS_POR_LOJA]);
-    assert.deepEqual([...C.CASCA_TELAS_SEM_LOJA], [...c0.CASCA_TELAS_SEM_LOJA]);
-    ['casca/menu.js', 'casca/modulos.js', 'casca/busca.js', 'casca/modulos-proposta.js'].forEach((f) =>
-      assert.equal(ler(f).replace(/\r\n/g, '\n'), git(['show', BASE + ':' + f]).replace(/\r\n/g, '\n'), f + ' não podia mudar'));
-  }
+  ['delivery', 'pao', 'reservas', 'pausados'].forEach((k) => assert.ok(C.CASCA_TELAS_POR_LOJA.includes(k), 'tela por loja: ' + k));
+  Object.entries(C.CASCA_PAGINAS).forEach(([k, v]) => assert.doesNotMatch(String(v), ANTIGO_RE, 'rota para o portal antigo: ' + k));
   assert.deepEqual(JSON.parse(JSON.stringify(C.CASCA_MODULOS_CFG.juncoes)), {
     cancelamentos: { abas: [['cancelamentos', 'Cancelamentos'], ['contestacoes', 'Contestações']] },
     motoboys: { abas: [['logfin', 'Financeiro da logística'], ['macertos', 'Acertos']] } });
 });
 
-test('navegação sem restrição: #delivery abre a página própria; tela sem página não abre o painel antigo; atalho abre outra aba sem referência', async () => {
+test('navegação sem restrição: #delivery abre a página própria; tela sem página não abre o painel antigo; nenhum botão para o portal antigo', async () => {
   const t = abrirCasca({ hash: '#delivery' }); await settle();
   const molduras = () => t.$('vista').children.filter((c) => c.tagName === 'iframe').map((f) => f.src);
   assert.deepEqual(molduras(), ['delivery/index.html']);
@@ -140,31 +134,36 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   assert.doesNotMatch(casa, /data-chave="pcartao"/, 'sem página = sem botão ativo');
   assert.match(casa, /integração pendente · acesso ainda não conectado/);
   assert.doesNotMatch(casa + t.$('menu').innerHTML, /sem página/);
-  // atalho do portal antigo
-  t.ev("abrir('antigo:chegada')");
-  assert.deepEqual(t.abertas, [{ u: 'https://cidadaodomundo.github.io/chegada/', alvo: '_blank', extra: 'noopener,noreferrer' }]);
-  assert.ok(!molduras().some((u) => /github\.io/.test(u)), 'portal antigo nunca vai para moldura');
+  // setor Delivery: só o Delivery do dia; Chegada completa/Fila/Escala só como aviso em texto, sem botão nem link
+  const setorDl = casa.slice(casa.indexOf('Delivery<'), casa.indexOf('Salão<'));
+  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery']);
+  assert.match(setorDl, /class="setor-aviso">Em migração para este portal: Chegada completa dos motoboys, Fila de pedidos e edição da Escala\.</);
+  assert.doesNotMatch(casa, /antigo:|github\.io|portal antigo|href=|<iframe|↗/i, 'agrupamento outras sem link para o portal antigo');
+  assert.doesNotMatch(t.$('menu').innerHTML, /antigo:|portal antigo/i);
+  ['antigo:chegada', 'antigo:fila', 'antigo:escala'].forEach((k) => t.ev(`abrir(${JSON.stringify(k)})`));
+  assert.equal(t.abertas.length, 0, 'nada abre outra aba');
+  assert.ok(!molduras().some((u) => ANTIGO_RE.test(u)), 'portal antigo nunca vai para moldura');
   // #pao continua abrindo a página do Ponto ao Vivo
   const t2 = abrirCasca({ hash: '#pao' }); await settle();
   assert.deepEqual(t2.$('vista').children.filter((c) => c.tagName === 'iframe').map((f) => f.src), ['pessoas/index.html#pao']);
 });
 
-test('conta restrita: atalho só com a própria chave na lista; delivery não libera atalho; nada aparece por inferência', async () => {
+test('conta restrita: só a chave da lista; nenhuma chave antigo:* libera nada; links somem (regra de antes)', async () => {
   const t = abrirCasca({ pode: ['delivery'] }); await settle();
   assert.equal(t.ev("visivel('delivery')"), true);
-  ATALHOS.forEach((k) => assert.equal(t.ev(`visivel(${JSON.stringify(k)})`), false, k));
-  ['pao', 'salao', 'freelas', 'macertos', 'logfin'].forEach((k) => assert.equal(t.ev(`visivel('${k}')`), false, k));
+  ['pao', 'salao', 'reservas', 'pausados', 'freelas', 'macertos', 'logfin'].forEach((k) => assert.equal(t.ev(`visivel('${k}')`), false, k));
   const menu = t.$('menu').innerHTML;
   assert.match(menu, /data-chave="delivery"/);
   assert.doesNotMatch(menu, /antigo:|github\.io|data-chave="pao"/);
-  t.ev("abrir('antigo:chegada')");
-  assert.equal(t.abertas.length, 0, 'abrir não fura a permissão');
 
-  const t2 = abrirCasca({ pode: ['pao', 'antigo:fila'] }); await settle();
-  assert.equal(t2.ev("visivel('antigo:fila')"), true);
-  assert.equal(t2.ev("visivel('antigo:chegada')"), false);
-  assert.equal(t2.ev("visivel('delivery')"), false);
-  // atalhos antigos do Neto continuam sumindo para acesso restrito, mesmo com a chave na lista (regra de antes)
+  // chave antigo:* na lista (sobra de configuração antiga) não cria item nem abre nada
+  const t2 = abrirCasca({ pode: ['pao', 'antigo:fila', 'antigo:chegada', 'antigo:escala'] }); await settle();
+  ['antigo:fila', 'antigo:chegada', 'antigo:escala', 'delivery'].forEach((k) => assert.equal(t2.ev(`visivel(${JSON.stringify(k)})`), false, k));
+  assert.equal(t2.ev("visivel('pao')"), true);
+  t2.ev("abrir('antigo:fila')");
+  assert.equal(t2.abertas.length, 0);
+  assert.doesNotMatch(t2.$('menu').innerHTML, /antigo:|github\.io/);
+  // links do Neto continuam sumindo para acesso restrito, mesmo com a chave na lista (regra de antes)
   const t3 = abrirCasca({ pode: ['link:portal-qualidade', 'link:promos.html', 'delivery'] }); await settle();
   assert.equal(t3.ev("visivel('link:portal-qualidade')"), false);
   assert.equal(t3.ev("visivel('link:promos.html')"), false);
@@ -172,50 +171,39 @@ test('conta restrita: atalho só com a própria chave na lista; delivery não li
 
 test('sem rede nova: a casca só chama as leituras que já chamava (nenhuma RPC nova, nenhuma escrita nova)', async () => {
   const t = abrirCasca({ hash: '#delivery' }); await settle();
-  t.ev("abrir('antigo:fila')"); t.ev("abrir('salao')"); await settle();
+  t.ev("abrir('salao')"); t.ev("abrir('reservas')"); t.ev("abrir('pausados')"); await settle();
+  assert.equal(t.abertas.length, 0, 'nada abre outra aba');
   const rpcs = new Set(t.chamadas.map((c) => (/\/rpc\/(\w+)/.exec(c.url) || [])[1]).filter(Boolean));
   const conhecidas = ['meus_modulos', 'painel_minhas_lojas', 'pode_ver_pessoal', 'tr_meu_papel', 'agenda_ve_equipe', 'painel_meu_tema', 'painel_registrar_uso', 'painel_tema_gravar'];
   [...rpcs].forEach((r) => assert.ok(conhecidas.includes(r), 'rpc nova: ' + r));
   assert.ok(!t.chamadas.some((c) => /github\.io/.test(c.url)), 'nenhuma leitura do portal antigo');
 });
 
-test('setores-fabio.js: só configuração (sem rede, timer, sessão ou token); atalhos https do portal antigo que existem na referência', () => {
+test('setores-fabio.js: só configuração (sem rede, timer, sessão ou token); nenhum atalho, link ou chave antigo:*', () => {
   const src = ler('casca', 'setores-fabio.js').replace(/^\s*\/\/.*$/gm, '');
-  [/fetch\s*\(/, /XMLHttpRequest/, /setInterval|setTimeout/, /localStorage|sessionStorage/, /token|apikey|Authorization|eyJ/i, /rpc/i, /<iframe/i]
+  [/fetch\s*\(/, /XMLHttpRequest/, /setInterval|setTimeout/, /localStorage|sessionStorage/, /token|apikey|Authorization|eyJ/i, /rpc/i, /<iframe/i,
+    /antigo:/, /https?:\/\//, /github\.io/, /autorizavelPorChave/, /atalhos/]
     .forEach((re) => assert.doesNotMatch(src, re));
-  const at = C.CASCA_SETORES_FABIO.atalhos;
-  const caminho = { 'antigo:chegada': 'chegada/index.html', 'antigo:fila': 'fila/index.html', 'antigo:escala': 'delivery/escala.html' };
-  Object.entries(at).forEach(([k, v]) => {
-    assert.match(v.link, /^https:\/\/cidadaodomundo\.github\.io\//, k);
-    assert.doesNotMatch(v.link, /[?#]/, k + ': nenhum parâmetro (nada de token na URL)');
-    assert.equal(v.autorizavelPorChave, true);
-    assert.match(v.rotulo, /portal antigo/);
-    if (fs.existsSync(ANTIGO)) assert.ok(fs.existsSync(path.join(ANTIGO, caminho[k])), 'tela antiga não existe: ' + caminho[k]);
-  });
-  assert.match(SISTEMA, /window\.open\(it\.link, '_blank', 'noopener,noreferrer'\)/);
+  const cfg = C.CASCA_SETORES_FABIO;
+  assert.equal(cfg.atalhos, undefined);
+  assert.ok(!Object.keys(cfg.busca).some((k) => /^antigo:/.test(k)));
+  assert.doesNotMatch(SISTEMA, /autorizavelPorChave|SETORES_CFG\.atalhos|i\.nota/);
+  assert.match(SISTEMA, /if \(it\.link\) return false;/, 'regra anterior de links em acesso restrito');
   assert.equal((SISTEMA.match(/casca\/setores-fabio\.js\?v=\d{8}[a-z]"/g) || []).length, 1);
   assert.ok(SISTEMA.indexOf('casca/setores-fabio.js') < SISTEMA.indexOf('const MENU = '), 'carregado antes do script da casca');
 });
 
-test('delivery/index.html: diz o que consulta e o que não migrou; não liga ao portal antigo; nada de garantido/refeição calculado; um timer só', () => {
+test('delivery/index.html: diz o que consulta e o que está em migração; não manda ao portal antigo; nada de garantido/refeição calculado; um timer só', () => {
   const html = ler('delivery', 'index.html');
   assert.match(html, /Já consultam dados neste portal:<\/strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia/);
-  assert.match(html, /Ainda não migrado, continua no portal antigo/);
+  assert.match(html, /Em migração, ainda sem tela neste portal:<\/strong> Chegada completa dos motoboys/);
+  const bloco = (/<section class="dl-migracao"[\s\S]*?<\/section>/.exec(html) || [''])[0];
+  assert.ok(bloco, 'bloco de migração presente');
+  assert.doesNotMatch(bloco, /portal antigo|atalho|href=|<a\b|<button/i, 'só texto, sem mandar ao portal antigo');
   assert.match(html, /Garantido e refeição <strong>não<\/strong> são calculados/);
   const semLink = html.replace(/<link[^>]*>/g, '');
   assert.doesNotMatch(semLink, /github\.io|target=|<iframe|<embed|<object/i, 'sem link, moldura ou embed do portal antigo');
   assert.equal((html.match(/data-aba=/g) || []).length, 7, 'abas do Delivery do dia iguais');
   assert.equal((html.match(/setInterval\(/g) || []).length, 1, 'nenhum polling novo');
   assert.doesNotMatch(html, /garantido_|refeicao_|direito_/i);
-});
-
-test('nenhum robô, workflow, banco ou credencial alterado: só arquivos de frontend desta etapa mudaram desde a base', (t) => {
-  const diff = git(['diff', '--name-only', BASE]);
-  const novos = git(['ls-files', '--others', '--exclude-standard']);
-  if (diff === null || novos === null) { t.skip('git indisponível'); return; }
-  const mudados = [...diff.split('\n'), ...novos.split('\n')].map((s) => s.trim().replace(/\\/g, '/')).filter(Boolean);
-  const permitidos = new Set(['sistema.html', 'casca/paginas.js', 'casca/setores-fabio.js', 'casca/setores-fabio.test.js',
-    'delivery/index.html', 'docs/delivery-migracao.md']);
-  mudados.forEach((f) => assert.ok(permitidos.has(f), 'arquivo fora do escopo mudou: ' + f));
-  assert.ok(!mudados.some((f) => /^\.github\/|supabase|\.sql$|robo|coletor|rotina|cron/i.test(f)));
 });
