@@ -51,7 +51,7 @@ async function entrarContagem() {
       const papel = rp.ok ? await rp.json() : null;
       if (!papel) {
         alvo.innerHTML = `<div class="contexto">Você está logado como <b>${sessao.email}</b>, mas este login ainda
-          não tem papel na operação. Quem cadastra é o Neto, em <b>tr_usuarios</b>.</div>`;
+          não tem papel na operação. Fale com o Neto para liberar.</div>`;
         return;
       }
       CTG = { papel, unidade: null };
@@ -159,23 +159,23 @@ function ctgNfDepoisHtml(soMarcadas) {
   const linha = (n) => `<tr>
       <td style="white-space:nowrap;">${dm(n.data_da_nota)}</td><td style="white-space:nowrap;">${trEscH(String(n.nf || '').replace(/^NF:\s*/, ''))}</td>
       <td style="white-space:normal; font-size:12px;">${trEscH(n.o_que_veio || '')}</td>
-      <td style="text-align:right; white-space:nowrap;">R$ ${fmt(Number(n.valor || 0))}</td>
+      <td style="white-space:nowrap;">R$ ${fmt(Number(n.valor || 0))}</td>
       <td style="white-space:nowrap;">${n.decisao
         ? `<span style="color:${n.decisao === 'ESTAVA_NA_CONTAGEM' ? 'var(--info)' : 'var(--farol-ok)'}; font-weight:700;">${n.decisao === 'ESTAVA_NA_CONTAGEM' ? 'já estava' : 'chegou depois'}</span>
            <span style="font-size:11px; color:var(--tx-4);">${trEscH(estNome(n.decidido_por) || '')}</span>
            <a href="javascript:void(0)" style="font-size:11px; color:var(--tx-4); margin-left:4px;" onclick="ctgNfMarcar(${arg(n)}, null)">desfazer</a>`
-        : `<button class="preset-btn est-ciclo" onclick="ctgNfMarcar(${arg(n)}, 'ESTAVA_NA_CONTAGEM')" title="a mercadoria já estava na prateleira na hora da contagem: a nota não entra de novo no saldo">Já estava</button>
-           <button class="preset-btn est-ciclo" onclick="ctgNfMarcar(${arg(n)}, 'CHEGOU_DEPOIS')" title="a mercadoria chegou depois da contagem: a nota entra no saldo">Chegou depois</button>`}</td></tr>`;
+        : `<button class="preset-btn est-ciclo" onclick="ctgNfMarcar(${arg(n)}, 'ESTAVA_NA_CONTAGEM')" title="a mercadoria já estava na prateleira na hora da contagem: a nota não entra de novo no saldo">Já estava na prateleira</button>
+           <button class="preset-btn est-ciclo" onclick="ctgNfMarcar(${arg(n)}, 'CHEGOU_DEPOIS')" title="a mercadoria chegou depois da contagem: a nota entra no saldo">Chegou depois da contagem</button>`}</td></tr>`;
   if (soMarcadas) return `<details style="margin-top:18px;"><summary style="cursor:pointer; font-size:13px; color:var(--tx-3);">Notas lançadas depois da contagem de ${dm(L[0].contagem_de)}: <b>${feitas.length} ${feitas.length === 1 ? 'marcada' : 'marcadas'}</b> (ver)</summary>
       <span id="ctgNfMsg" style="font-size:12px;"></span>
-      <div id="tabelaNfDepois" style="overflow-x:auto; margin-top:8px;"><table><thead><tr><th>Data</th><th>Nota</th><th>O que veio</th><th style="text-align:right;">Valor</th><th></th></tr></thead>
+      <div id="tabelaNfDepois" style="overflow-x:auto; margin-top:8px;"><table><thead><tr><th>Data</th><th>Nota</th><th>O que veio</th><th>Valor</th><th></th></tr></thead>
         <tbody>${feitas.map(linha).join('')}</tbody></table></div></details>`;
   return `<div class="section-label">Notas lançadas depois da contagem de ${dm(L[0].contagem_de)}</div>
     <div class="contexto" style="text-align:left; border-color:${pend.length ? 'var(--farol-perto)' : 'var(--line)'};">
       ${pend.length ? `<b>${pend.length} nota(s) para marcar</b> (R$ ${fmt(soma(pend))}).` : '<b>Todas marcadas.</b>'}
-      A nota é de antes da contagem, mas foi lançada no Saipos depois dela: a mercadoria já estava na prateleira na hora da contagem?
+      Esta nota já estava na prateleira na hora da contagem?
       <span id="ctgNfMsg" style="font-size:12px;"></span>
-      <div id="tabelaNfDepois" style="overflow-x:auto; margin-top:8px;"><table><thead><tr><th>Data</th><th>Nota</th><th>O que veio</th><th style="text-align:right;">Valor</th><th></th></tr></thead>
+      <div id="tabelaNfDepois" style="overflow-x:auto; margin-top:8px;"><table><thead><tr><th>Data</th><th>Nota</th><th>O que veio</th><th>Valor</th><th></th></tr></thead>
         <tbody>${pend.map(linha).join('')}</tbody></table></div></div>`;
 }
 async function ctgNfMarcar(nf, decisao) {
@@ -183,7 +183,8 @@ async function ctgNfMarcar(nf, decisao) {
   const msg = document.getElementById('ctgNfMsg');
   try {
     const r = await trRpc('est_nf_contagem_marcar', { p_unidade: CTG.unidade, p_nf: nf, p_decisao: decisao });
-    if (!r.ok) { if (msg) { msg.textContent = ' ' + await trErroDe(r); msg.style.color = 'var(--farol-fora)'; } return; }
+    if (!r.ok) { avisoAcao('erro', `✗ A nota NÃO foi marcada: ${await trErroDe(r)}. Tente de novo.`); return; }
+    avisoAcao('ok', `✓ Nota ${decisao ? 'marcada' : 'desmarcada'} — às ${avisoHora()}.`);
     const antes = (CTG.nfDepois || []).filter((n) => !n.decisao).length;
     CTG.nfDepois = await consultarTudo(`vw_est_nf_apos_contagem?select=*&unidade=eq.${encodeURIComponent(CTG.unidade)}&order=data_da_nota,nf`).catch(() => CTG.nfDepois);
     CTG.nfTodasAgora = antes > 0 && !(CTG.nfDepois || []).some((n) => !n.decisao);
@@ -197,8 +198,7 @@ function ctgRender() {
   const hoje = ctgHoje();
   const dia = new Date(hoje + 'T12:00:00').getDay();   // 3 = quarta
 
-  let h = `<h2>Contagem de estoque</h2>
-    <div class="caption-label">O que a prateleira tem contra o que o sistema diz — a diferença é a única perda medida da casa.</div>`;
+  let h = `<h2>Contagem de estoque</h2>`;
   h += ctgNfDepoisHtml();
 
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -612,13 +612,13 @@ function ctgHtmlFotos() {
     if (!linhas.length) return;
     h += `<div class="section-label">Confira o que eu li na foto de ${f.grupo || 'toda a folha'}</div>
       <div class="caption-label">O que está em âmbar é onde eu fiquei em dúvida. Corrija o que precisar e grave.</div>
-      <div id="tabelaConfereFoto"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th style="text-align:right;">Li na foto</th><th>Unidade</th><th>Corrigir unidade</th><th></th></tr></thead><tbody>`;
+      <div id="tabelaConfereFoto"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th>Li na foto</th><th>Unidade</th><th>Corrigir unidade</th><th></th></tr></thead><tbody>`;
     linhas.forEach((l) => {
       h += `<tr${l.duvida ? ' style="background:var(--surface-2);"' : ''}>
         <td style="color:var(--tx-5);">${l.linha == null ? '' : l.linha}</td>
         <td>${ctgNomeHtml(l.nome_saipos)}${l.nota ? `<div class="caption-label" style="color:var(--farol-perto);">${l.nota}</div>` : ''}</td>
-        <td style="text-align:right;"><input type="number" step="0.001" id="fl_${l.id}" value="${l.qtd_lida == null ? '' : l.qtd_lida}"
-             style="width:110px; text-align:right; background:var(--surface-2); border:1px solid ${l.duvida ? 'var(--farol-perto)' : 'var(--line)'}; border-radius:8px; color:var(--tx-1); padding:6px 8px;"></td>
+        <td><input type="number" step="0.001" id="fl_${l.id}" value="${l.qtd_lida == null ? '' : l.qtd_lida}"
+             style="width:110px; background:var(--surface-2); border:1px solid ${l.duvida ? 'var(--farol-perto)' : 'var(--line)'}; border-radius:8px; color:var(--tx-1); padding:6px 8px;"></td>
         ${ctgUnidadeCelulas(l.nome_saipos)}
         <td style="color:${l.duvida ? 'var(--farol-perto)' : 'var(--tx-5)'};">${l.duvida ? 'confira' : ''}</td></tr>`;
     });
@@ -804,7 +804,7 @@ async function ctgProporUnidade(sel, nomeSaipos) {
     });
     const x = CTG.unConf && CTG.unConf.get(nomeSaipos);
     if (x) { x.proposta_id = -1; x.un_proposta = v; x.proposta_quem = (rmbSessao() || {}).email || ''; x.proposta_em = new Date().toISOString(); }
-    sel.insertAdjacentHTML('afterend', `<div class="caption-label" style="color:var(--farol-ok);">✓ proposta ${trEscH(v)} enviada ao Estoque</div>`);
+    sel.insertAdjacentHTML('afterend', `<div class="caption-label" style="color:var(--farol-ok);">✓ proposta ${trEscH(v)} enviada</div>`);
   } catch (e) { avisoAcao('erro', `✗ A proposta NÃO foi enviada: ${e.message}. Escolha de novo.`); sel.value = ''; }
 }
 // o que da folha não bate com a base (vw_est_contagem_fora_da_base): só aparece quando há linha
@@ -812,7 +812,7 @@ function ctgFaixaForaBase() {
   const L = CTG.foraBase || [];
   if (!L.length) return '';
   return `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${L.length} ${L.length === 1 ? 'item da folha não bate' : 'itens da folha não batem'} com a base</b>${
-    L.map((r) => `<div style="font-size:12.5px; margin-top:4px;">${ctgNomeHtml(r.nome_saipos)}<span style="color:var(--tx-3);">${r.o_que_fazer ? ' — ' + r.o_que_fazer : ''}${r.quem === 'DONO' ? ' (decisão do Neto)' : ' (com o chat do Estoque; não muda a contagem)'}</span></div>`).join('')}</div>`;
+    L.map((r) => `<div style="font-size:12.5px; margin-top:4px;">${ctgNomeHtml(r.nome_saipos)}<span style="color:var(--tx-3);">${r.o_que_fazer ? ' — ' + r.o_que_fazer : ''}${r.quem === 'DONO' ? ' (decisão do Neto)' : ' (o Neto acerta; não muda a contagem)'}</span></div>`).join('')}</div>`;
 }
 
 function ctgListaDoPapel(f) {
@@ -847,10 +847,7 @@ function ctgHtmlContar(f) {
       <div class="card ${n >= papel.length && papel.length ? 'pos' : 'neutral'}"><div class="card-lbl">Contados</div>
         <div class="card-val">${n} de ${papel.length}</div>
         <div class="card-pct">${CTG.itens.filter((x) => x.conferido_em).length} conferidos · ${grupos.length} ${grupos.length === 1 ? 'grupo' : 'grupos'} na folha</div></div>
-      <div class="card neutral"><div class="card-lbl">Fotos a transcrever</div>
-        <div class="card-val">${(CTG.fotos || []).filter((x) => x.status === 'AGUARDANDO').length}</div>
-        <div class="card-pct">a leitura vira número só depois de conferida</div></div>
-    </div>`;
+    </div>`;   // 12/11/2026 (auditoria 07/11): o card "Fotos a transcrever" saiu — o Próximo passo e o quadro das páginas já dizem
 
   // ---------------- QUADRO 1: imprimir as listas ----------------
   // 21/10/2026 (dono): "mantemos somente a impressão de todas as listas de uma só vez" — saem os botões por grupo
@@ -869,12 +866,13 @@ function ctgHtmlContar(f) {
     <div id="ctgConferir">${ctgHtmlConferir()}</div>`;
 
   // ---------------- QUADRO 4: fechar (29/10/2026: o passo que faltava na tela) ----------------
+  // 12/11/2026 (auditoria 07/11): um botão Fechar só na tela — com tudo contado e conferido ele está no Próximo passo, no alto
   const conf = CTG.itens.filter((x) => x.conferido_em).length;
+  const pronto = n && conf >= n && n >= papel.length;
   h += `<div class="section-label">4 · Fechar a contagem</div>
-    <div class="contexto" style="text-align:left;">Fechar trava os números: eles viram o ponto de partida do saldo e aparece o esperado contra o contado.
-      <b>Sem fechar, a contagem não vale.</b>
-      <div style="margin-top:10px;"><button class="preset-btn" onclick="ctgFechar()" style="font-size:14px; padding:11px 18px;${n && conf >= n && n >= papel.length ? ' border-color:var(--marca-amarelo);' : ''}">🔒 Fechar a contagem</button>
-        <span style="font-size:12px; color:var(--tx-4); margin-left:6px;">${n} de ${papel.length} contados · ${conf} conferidos</span></div></div>`;
+    <div class="contexto" style="text-align:left;"><b>Sem fechar, a contagem não vale.</b> Fechada, aparece o esperado contra o contado.
+      <div style="margin-top:10px;">${pronto ? '<span style="color:var(--tx-3);">Tudo contado e conferido: o botão 🔒 Fechar a contagem está no Próximo passo, no alto.</span>'
+        : `<button class="preset-btn" onclick="ctgFechar()" style="font-size:14px; padding:11px 18px;">🔒 Fechar a contagem</button>`}</div></div>`;
   return h;
 }
 // 29/10/2026 (dono 17:02): quando a contagem começou e terminou — dois cliques, o topo mostra "Contagem: HH:MM → HH:MM"
@@ -944,19 +942,22 @@ function ctgHtmlConferencia(f) {
   h += `<div class="section-label">Item a item</div>
     <div class="caption-label">Diferença acima de R$ 500 precisa de motivo escrito; o resto aparece para você ver.</div>
     <div id="tabelaConferencia"><table><thead><tr>
-      <th>Item</th><th style="text-align:right;">Contado</th><th style="text-align:right;">Esperado</th>
-      <th style="text-align:right;">Diferença</th><th style="text-align:right;">R$</th><th>Situação</th><th></th></tr></thead><tbody>`;
+      <th>Item</th><th>Contado</th><th>Esperado</th>
+      <th>Diferença</th><th>Diferença em R$</th><th>Situação</th><th></th></tr></thead><tbody>`;
+  // 12/11/2026 (auditoria 07/11): números à esquerda, a unidade junto e a situação na palavra do operador
+  const SIT_CTG = { FALTA: 'falta', SOBRA: 'sobra', BATEU: 'bateu', 'PONTO DE PARTIDA': 'primeira contagem' };
   c.forEach((x) => {
     const cor = x.situacao === 'FALTA' ? 'var(--farol-fora)'
               : x.situacao === 'SOBRA' ? 'var(--amber-2)'
               : x.situacao === 'BATEU' ? 'var(--farol-ok)' : 'var(--tx-5)';
     const temNome = Number(x.explicado_reais || 0) !== 0;
+    const un = x.un ? ` <span style="color:var(--tx-4); font-size:11px;">${trEscH(x.un)}</span>` : '';
     h += `<tr><td>${ctgNomeHtml(x.nome_saipos)}</td>
-      <td style="text-align:right;">${fmt(Number(x.qtd_contada))}</td>
-      <td style="text-align:right;">${x.esperado === null ? '—' : fmt(Number(x.esperado))}</td>
-      <td style="text-align:right; color:${cor};">${x.diferenca === null ? '—' : fmt(Number(x.diferenca))}</td>
-      <td style="text-align:right; color:${cor};">${x.diferenca_reais === null ? '—' : fmt(Number(x.diferenca_reais))}</td>
-      <td style="color:${cor};">${x.situacao}</td>
+      <td style="white-space:nowrap;">${fmt(Number(x.qtd_contada))}${un}</td>
+      <td style="white-space:nowrap;">${x.esperado === null ? '—' : fmt(Number(x.esperado)) + un}</td>
+      <td style="white-space:nowrap; color:${cor};">${x.diferenca === null ? '—' : fmt(Number(x.diferenca)) + un}</td>
+      <td style="white-space:nowrap; color:${cor};">${x.diferenca_reais === null ? '—' : 'R$ ' + fmt(Number(x.diferenca_reais))}</td>
+      <td style="color:${cor};">${trEscH(SIT_CTG[x.situacao] || String(x.situacao || '').toLowerCase())}</td>
       <td>${x.precisa_explicar && !temNome ? `<button class="preset-btn" onclick="ctgExplicar(${x.id}, ${x.diferenca}, ${x.diferenca_reais})">explicar</button>`
             : temNome ? '<span style="color:var(--farol-ok);">explicado</span>' : ''}</td></tr>`;
   });
@@ -1127,7 +1128,7 @@ function ctgHtmlBrancos() {
     <div style="font-size:12.5px; margin-top:2px;">${nLidas === L.length ? 'A foto leu, mas o número não foi gravado.'
       : nLidas ? 'Ficaram em branco no papel, ou a foto leu e o número não foi gravado.' : 'Ficaram em branco no papel.'}
       Se não tinha, digite <b>0</b>; se tinha, digite o que foi contado. Grava ao sair do campo.</div>
-    <div id="tabelaBrancos" style="margin-top:6px;"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th>Página</th><th style="text-align:right;">Contado</th></tr></thead><tbody>`;
+    <div id="tabelaBrancos" style="margin-top:6px;"><table><thead><tr><th style="width:1%;">#</th><th>Item</th><th>Página</th><th>Contado</th></tr></thead><tbody>`;
   L.forEach((b) => {
     const nome = JSON.stringify(b.nome).replace(/"/g, '&quot;');
     const e = ctgEscopoDe(b.nome) || (CTG.escopo || []).find((x) => x.nome_saipos === b.nome_saipos_conta) || {};
@@ -1135,16 +1136,28 @@ function ctgHtmlBrancos() {
       <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}${
         b.qtd_lida != null ? `<div class="caption-label" style="color:var(--farol-perto);">a foto leu ${fmt(Number(b.qtd_lida))} ${trEscH(b.un || '')} — confira e digite</div>` : ''}</td>
       <td style="color:var(--tx-4);">${trEscH(b.grupo || '')}</td>
-      <td style="text-align:right; white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
+      <td style="white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
            onchange="ctgSalvar(this, ${nome}, ${JSON.stringify(b.un || '').replace(/"/g, '&quot;')}, ${e.custo || 'null'}, ${JSON.stringify(e.custo_fonte || '').replace(/"/g, '&quot;')})"
-           style="width:120px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;">
+           style="width:120px; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;">
         <span style="color:var(--tx-5); font-size:11.5px;"> ${trEscH(b.un || '')}</span></td></tr>`;
   });
   return h + `</tbody></table></div></div>`;
 }
 
 function ctgHtmlConferir() {
-  const feitos = CTG.itens.slice().sort((a, b) => (b.contado_em || '').localeCompare(a.contado_em || ''));
+  // 12/11/2026 (auditoria 07/11): na ORDEM DA FOLHA impressa (a mesma numeração de ctgImprimir), com o # e a página —
+  // quem confere segue o papel na mão. O que não está na folha vai para o fim, pela hora.
+  const lin = new Map();
+  if (CTG.folha) {
+    const { porGrupo, grupos } = ctgPorGrupo(ctgListaDoPapel(CTG.folha));
+    let k = 0;
+    grupos.forEach((g) => porGrupo[g].forEach((i) => { k++; const v = { linha: k, grupo: g };
+      if (i.nome_saipos && !lin.has(i.nome_saipos)) lin.set(i.nome_saipos, v);
+      if (i.nome_base && !lin.has(i.nome_base)) lin.set(i.nome_base, v); }));
+  }
+  const L = (j) => lin.get(j.nome_saipos) || null;
+  const feitos = CTG.itens.slice().sort((a, b) => ((L(a) || {}).linha || 1e9) - ((L(b) || {}).linha || 1e9)
+                                               || (b.contado_em || '').localeCompare(a.contado_em || ''));
   const brancos = ctgHtmlGradeAviso() + ctgHtmlBrancos();
   if (!feitos.length) {
     return brancos || `<div class="caption-label">Nada ainda — o que vier da foto aparece aqui para conferir e corrigir.</div>`;
@@ -1154,8 +1167,8 @@ function ctgHtmlConferir() {
   const jaConferidos = feitos.filter((j) => j.conferido_em).length;
   const faltam = feitos.length - jaConferidos;
 
-  let h = brancos + `<div class="caption-label">O mais recente em cima. Corrija o número aqui mesmo, marque o que estiver certo
-      e dê um OK no fim. ${jaConferidos ? `<b>${jaConferidos} de ${feitos.length} já conferidos.</b>` : ''}</div>`;
+  let h = brancos + `<div class="caption-label">Na ordem da folha. Corrija o número aqui, marque o que está certo e dê o OK.
+      ${jaConferidos ? `<b>${jaConferidos} de ${feitos.length} já conferidos.</b>` : ''}</div>`;
   // 28/10/2026 (dono, 19:08): o OK fica no INÍCIO da tabela, junto do "marcar os que faltam" — um botão só
   if (faltam || CTG.okMsg) {
     h += `<div style="margin:8px 0 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -1168,21 +1181,24 @@ function ctgHtmlConferir() {
       ${ctgOkMsgHtml()}</div>`;
   }
   h += `<div id="tabelaConferir"><table><thead><tr>
-      <th style="width:34px;">✓</th><th>Item</th><th style="text-align:right;">Contado</th><th>Hora</th><th></th></tr></thead><tbody>`;
+      <th style="width:34px;">✓</th><th style="width:1%;">#</th><th>Item</th><th>Página</th><th>Contado</th><th>Hora</th><th></th></tr></thead><tbody>`;
   feitos.forEach((j) => {
     const i = porNome.get(j.nome_saipos) || ctgEscopoDe(j.nome_saipos) || {};   // linha pelo nome da base: custo traduzido
     const id = btoa(unescape(encodeURIComponent(j.nome_saipos))).replace(/[^A-Za-z0-9]/g, '');
+    const lf = L(j) || {};
     h += `<tr${j.conferido_em ? ' style="opacity:.72;"' : ''}>
       <td>${j.conferido_em
             ? `<span style="color:var(--farol-ok); font-weight:700;" title="Conferido por ${estNome(j.conferido_por)} às ${ctgHora(j.conferido_em)}">✓</span>`
             : `<input type="checkbox" id="ctgc_${id}" ${CTG.marcados.has(j.nome_saipos) ? 'checked' : ''}
                  onchange="ctgMarcar(${JSON.stringify(j.nome_saipos).replace(/"/g, '&quot;')}, this.checked)"
                  style="width:20px; height:20px;">`}</td>
+      <td style="color:var(--tx-5);">${lf.linha || ''}</td>
       <td>${ctgNomeHtml(j.nome_saipos)}</td>
-      <td style="text-align:right;"><input type="number" step="0.001" inputmode="decimal"
+      <td style="color:var(--tx-4); font-size:12px;">${trEscH(lf.grupo || 'fora da folha')}</td>
+      <td style="white-space:nowrap;"><input type="number" step="0.001" inputmode="decimal"
            id="ctgr_${id}" value="${j.qtd_contada}"
            onchange="ctgSalvar(this, ${JSON.stringify(j.nome_saipos).replace(/"/g, '&quot;')}, ${JSON.stringify(j.un || i.un || '').replace(/"/g, '&quot;')}, ${i.custo || 'null'}, ${JSON.stringify(i.custo_fonte || '').replace(/"/g, '&quot;')})"
-           style="width:104px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:8px;">
+           style="width:104px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:8px;">
         <span style="color:var(--tx-5); font-size:11.5px;"> ${j.un || i.un || ''}</span></td>
       <td style="color:var(--tx-4); font-size:12px;">${ctgHora(j.contado_em)}</td>
       <td><button class="preset-btn" onclick="ctgApagar(${JSON.stringify(j.nome_saipos).replace(/"/g, '&quot;')})"
@@ -1338,7 +1354,7 @@ async function estLojaDaTela(alvo, reentrar) {
   if (u && u !== LOJA_REDE_EST) { estContagemAbertaAviso(u); return u; }
   alvo.innerHTML = u === LOJA_REDE_EST
     ? `<div class="contexto" style="text-align:left;"><b>Estoque e produção são por loja.</b> Na Rede não há um número só para lançar,
-        apontar ou conferir o kardex. Escolha a loja:
+        apontar ou conferir o estoque. Escolha a loja:
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${(LOJA_INFO.lojas || []).filter((l) => l !== LOJA_REDE_EST)
           .map((l) => `<button class="preset-btn active" onclick="estEscolherLoja('${trEscH(l)}')">${trEscH(lojaNome(l))}</button>`).join('')}</div></div>`
     : `<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>`;
@@ -1528,7 +1544,7 @@ async function estRecarregar() {
   if (EST_TELA === 'prodhist') return histCarregar();
   if (EST_TELA === 'separacao') return sepCarregar();
   if (EST_TELA === 'ordens' || EST_TELA === 'producao') return prdCarregar();
-  return plpCarregar();
+  return PLP && PLP.manual ? plpManCarregar() : plpCarregar();
 }
 const EST_LEIT_COR = (l) => /esperando|falta|sem apontar|a separar|a conferir|aberto/i.test(l || '') ? 'var(--farol-perto)'
   : /cancel/i.test(l || '') ? 'var(--tx-5)' : 'var(--tx-3)';
@@ -1934,9 +1950,12 @@ async function entrarPlprod() {
   try {
     const uT = await estLojaDaTela(alvo, entrarPlprod); if (!uT) return;
     if (!PLP || PLP.unidade !== uT) PLP = { unidade: uT, filtro: null, busca: '' };
-    await plpCarregar();
+    // 12/11/2026 (dono, 11/11 23:42): o plano manual não passa pelo motor do saldo
+    if (PLP.manual) await plpManCarregar(); else await plpCarregar();
   } catch (e) {
-    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui abrir a tela: ${e.message}</div>`;
+    // a sugestão pesa (motor do saldo); se ela cair, o plano manual continua a um clique
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui abrir a tela: ${trEscH(e.message)}
+      ${PLP && !PLP.manual ? `<button class="preset-btn active" onclick="plpManual(true)">Montar o plano à mão</button>` : ''}</div>`;
   }
 }
 
@@ -2017,14 +2036,17 @@ function plpRender() {
                          || (p.nome_base || '').toLowerCase().includes(b));
   }
 
-  let h = `<h2>Planejar produção</h2>` + estFilaHtml();
+  let h = `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"><h2>Planejar produção</h2>
+      <button class="preset-btn active" onclick="plpManual(true)" title="Escolher as receitas e digitar a quantidade, sem a sugestão">✎ Plano manual</button></div>` + estFilaHtml();
 
   // aviso CONDICIONAL: retrato velho faz a tela mentir sem avisar
   if (PLP.idade && PLP.idade.retrato_atrasado) {
-    h += `<div class="contexto" style="border-color:var(--farol-fora);">O consumo foi calculado até
-      <b>${PLP.idade.retrato_ate}</b> e o banco já tem venda até <b>${PLP.idade.venda_ate}</b>.
-      O que falta pode estar subestimado — rode <code>python script/recalcular_mv_estoque.py</code>.</div>`;
+    // 12/11/2026 (auditoria 07/11, operacao-27): sem comando de programador na tela da cozinha
+    h += `<div class="contexto" style="border-color:var(--farol-fora);">Consumo calculado até <b>${plpDm(PLP.idade.retrato_ate).slice(0, 5)}</b>
+      (já há venda até ${plpDm(PLP.idade.venda_ate).slice(0, 5)}): o que falta pode estar baixo. Avise o Neto.</div>`;
   }
+  // 12/11/2026 (auditoria 07/11): a decisão (o plano de amanhã e o botão Fechar) vem logo abaixo do título
+  h += plpBlocoPlano();
 
   const cartao = (f) => `style="cursor:pointer; ${PLP.filtro === f ? 'outline:2px solid var(--info); outline-offset:2px;' : ''}"
       onclick="plpFiltro('${f}')" title="${PLP.filtro === f ? 'clique de novo para ver tudo' : 'clique para ver só estas na grade'}"`;
@@ -2046,7 +2068,7 @@ function plpRender() {
     </div>
   </div>`;
 
-  h += `<div class="caption-label" style="text-align:left;">A conta vai até ${plpDm(quarta).slice(0, 5)} (quarta, dia da contagem${dias ? ` — falta${dias === 1 ? '' : 'm'} ${dias} ${dias === 1 ? 'dia' : 'dias'}` : ''}). Clique num quadro ou numa praça para filtrar a grade.</div>`;
+  h += `<div class="caption-label" style="text-align:left;">Conta até quarta ${plpDm(quarta).slice(0, 5)}${dias ? ` (${dias} ${dias === 1 ? 'dia' : 'dias'})` : ''} · "Sai por dia" = balcão + filiais, média de 28 dias · clique num quadro ou numa praça para filtrar.</div>`;
 
   h += `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 10px;">`;
   if (PLP.grade) {
@@ -2086,12 +2108,12 @@ function plpRender() {
   const famOrd = (m) => [...m.keys()].sort((a, b) => (/^SEM FAM/.test(a) ? 1 : 0) - (/^SEM FAM/.test(b) ? 1 : 0) || a.localeCompare(b, 'pt-BR'));
   const nomePracaT = (p) => p === 'PRODUÇÃO' ? 'Produção' : p === 'LANCHES' ? 'Lanches' : p === 'PRATOS' ? 'Pratos' : p.charAt(0) + p.slice(1).toLowerCase();
 
-  h += plpBlocoPlano();
+  // 12/11/2026 (auditoria 07/11): a coluna da decisão logo depois da Receita, cabeçalho curto, datas sem o ano
   h += `<div id="tabelaPlanoProducao"><table><thead><tr>
-      <th>Receita</th><th>Tem hoje</th>
+      <th>Receita</th>${PLP.dia ? `<th title="o que a cozinha decidiu produzir; vazio = ainda não decidido">Amanhã (${plpDm(plpAmanha()).slice(0, 5)})</th>` : ''}<th>Tem hoje</th>
       <th title="A venda do balcão (descendo a nossa ficha) MAIS o que sai em lista para o Ahú e o São Braz. Média dos últimos 28 dias.">Sai por dia</th>
       <th>Dura até</th><th title="o que o estoque de hoje não cobre até a próxima quarta: é a sugestão">Falta (sugerido)</th>
-      <th>R$ a produzir</th>${PLP.dia ? `<th title="o que a cozinha decidiu produzir; vazio = ainda não decidido">Planejar p/ ${plpDm(plpAmanha())}</th>` : ''}<th>Situação</th></tr></thead><tbody>`;
+      <th>R$ a produzir</th><th>Situação</th></tr></thead><tbody>`;
   const nCol = PLP.dia ? 8 : 7;
   if (!vis.length) {
     h += `<tr><td colspan="${nCol}">Nada nesta situação.</td></tr>`;
@@ -2101,16 +2123,18 @@ function plpRender() {
     const b = blocos.get(praca);
     const todos = [...b.fams.values()].flat();
     const rsP = somaR(todos);
-    h += `<tr class="grp"><td colspan="5" style="font-weight:800; font-size:15px; letter-spacing:.6px; padding-top:14px; border-bottom:2px solid var(--line-2);">${trEscH(nomePracaT(praca).toUpperCase())}
+    const bd = 'border-bottom:2px solid var(--line-2);';
+    h += `<tr class="grp"><td style="font-weight:800; font-size:15px; letter-spacing:.6px; padding-top:14px; white-space:nowrap; ${bd}">${trEscH(nomePracaT(praca).toUpperCase())}
         <span style="color:var(--tx-4); font-weight:400; font-size:12.5px;">· ${todos.length} ${todos.length === 1 ? 'receita' : 'receitas'}</span></td>
-      <td style="font-weight:800; padding-top:14px; border-bottom:2px solid var(--line-2);">${rsP ? 'R$ ' + fmt(rsP) : ''}</td>${PLP.dia ? '<td style="border-bottom:2px solid var(--line-2);"></td>' : ''}<td style="border-bottom:2px solid var(--line-2);"></td></tr>`;
+      ${PLP.dia ? `<td style="${bd}"></td>` : ''}<td colspan="4" style="${bd}"></td>
+      <td style="font-weight:800; padding-top:14px; ${bd}">${rsP ? 'R$ ' + fmt(rsP) : ''}</td><td style="${bd}"></td></tr>`;
    famOrd(b.fams).forEach((fam) => {
     const itens = b.fams.get(fam);
     if (fam) {
       const rs = somaR(itens);
-      h += `<tr class="sub"><td colspan="5" style="font-weight:700; letter-spacing:.4px; padding-left:14px;">${trEscH(fam.length <= 3 ? fam : fam.charAt(0) + fam.slice(1).toLowerCase())}
+      h += `<tr class="sub"><td style="font-weight:700; letter-spacing:.4px; padding-left:14px; white-space:nowrap;">${trEscH(fam.length <= 3 ? fam : fam.charAt(0) + fam.slice(1).toLowerCase())}
           <span style="color:var(--tx-4); font-weight:400;">· ${itens.length}</span></td>
-        <td style="font-weight:700;">${rs ? 'R$ ' + fmt(rs) : ''}</td>${PLP.dia ? '<td></td>' : ''}<td></td></tr>`;
+        ${PLP.dia ? '<td></td>' : ''}<td colspan="4"></td><td style="font-weight:700;">${rs ? 'R$ ' + fmt(rs) : ''}</td><td></td></tr>`;
     }
     itens.forEach((p) => {
       const cor = p.situacao === 'DA ATE A QUARTA' ? 'var(--farol-ok)'
@@ -2121,18 +2145,21 @@ function plpRender() {
       h += `<tr${PLP.grade && plpFaixa(p.nome_base).f === 'OUTRO' ? ' style="opacity:.5;"' : ''}>
         <td>${p.nome_base || p.nome_saipos}${p.de_onde_vem_o_custo ? ` <span style="color:var(--tx-5);font-size:11px;">(${p.de_onde_vem_o_custo})</span>` : ''}${
           (gInfo(p) || {}).tem_dia_na_grade === false && !/^SEM GRADE/.test((gInfo(p) || {}).leitura || '') ? ` <span style="font-size:11px; color:var(--amber-2);" title="é desta praça, mas a grade ainda não diz o dia em que se faz">· sem dia definido</span>` : ''}</td>
+        ${PLP.dia ? plpCelulaPlano(p) : ''}
         <td style="${Number(p.saldo) <= 0 ? 'color:var(--farol-fora);font-weight:700;' : ''}">${fmt(Number(p.saldo))} ${p.un || ''}${
           p.saldo_negativo ? ` <span style="display:block;color:var(--tx-5);font-size:11px;" title="O sistema está negativo porque ninguém apontou a produção. A conta do que falta parte de zero, não deste número.">falta apontar</span>` : ''}</td>
         <td>${p.por_dia_28 == null ? '—' : fmt(Number(p.por_dia_28))}${
           Number(p.por_dia_28_transf) > 0 ? `<span style="display:block;color:var(--tx-5);font-size:11px;white-space:normal;">${fmt(Number(p.por_dia_28_venda))} balcão + ${fmt(Number(p.por_dia_28_transf))} filiais</span>` : ''}</td>
-        <td style="white-space:nowrap;">${p.dura_ate ? plpDm(p.dura_ate) : '—'}</td>
+        <td style="white-space:nowrap;">${p.dura_ate ? plpDm(p.dura_ate).slice(0, 5) : '—'}</td>
         <td style="font-weight:700;">${p.falta == null ? '—' : fmt(Number(p.falta)) + ' ' + (p.un || '')}</td>
         <td>${p.falta_em_reais == null ? '—' : 'R$ ' + fmt(Number(p.falta_em_reais))}</td>
-        ${PLP.dia ? plpCelulaPlano(p) : ''}
         <td style="color:${cor};font-size:12px;white-space:normal;min-width:80px;">${rot}</td></tr>`;
     });
    });
   });
+  // 12/11/2026 (auditoria 07/11): o total do que está na tela (segue o filtro)
+  if (vis.length) h += `<tr class="liq"><td><b>Total · ${vis.length} ${vis.length === 1 ? 'receita' : 'receitas'}</b></td>${PLP.dia ? '<td></td>' : ''}<td colspan="4"></td>
+      <td><b>R$ ${fmt(somaR(vis))}</b></td><td></td></tr>`;
   h += `</tbody></table></div>`;
 
   // 27/10/2026 (dono): o histórico dos planos
@@ -2248,7 +2275,8 @@ function plpPintarSalvar() {
   if (b) { b.disabled = !n; b.textContent = n ? `Salvar o plano (${n} ${n === 1 ? 'mudança' : 'mudanças'})` : 'Salvar o plano'; }
 }
 function plpBlocoPlano() {
-  if (!PLP.dia) return `<div class="contexto" style="border-color:var(--amber-2);">Não consegui ler o plano de amanhã agora; a sugestão abaixo continua valendo.</div>`;
+  if (!PLP.dia) return `<div class="contexto" style="border-color:var(--amber-2);">Não consegui ler o plano de amanhã agora; a sugestão abaixo continua valendo.
+      <button class="preset-btn" onclick="plpManual(true)">✎ Montar o plano à mão</button></div>`;
   const linhas = [...PLP.dia.values()];
   const dec = linhas.filter((d) => d.planejado != null);
   const fech = plpFechado();
@@ -2265,8 +2293,10 @@ function plpBlocoPlano() {
       <button class="preset-btn active" onclick="mostrarModulo('separacao')">Abrir a Separação ›</button></div>`;
     return h;
   }
-  h += plpQuadroGrade();
-  h += `<div class="caption-label" style="text-align:left;">Decididas: <b>${dec.length} de ${linhas.length}</b> · digite na coluna Planejar p/ ${plpDm(amanha).slice(0, 5)} (grava sozinho; cinza = sugestão; 0 tira do plano).</div>
+  // 12/11/2026 (auditoria 07/11): o quadro da grade repete as etiquetas da coluna Amanhã — fica recolhido, a um clique
+  const qg = plpQuadroGrade();
+  if (qg) h += `<details style="margin:4px 0 8px;"><summary style="cursor:pointer; font-size:13px; color:var(--tx-3);">Ver o que a grade de dias manda fazer amanhã</summary>${qg}</details>`;
+  h += `<div class="caption-label" style="text-align:left;"><b>${dec.length} de ${linhas.length}</b> decididas · digite na coluna Amanhã (grava sozinho; cinza = sugestão; 0 tira do plano).</div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 12px;">
       <button class="preset-btn" onclick="plpUsarSugerido()" title="Põe e grava a sugestão no que é do dia, no que não tem dia na grade e no que é de outro dia mas acaba antes dele">Preencher os vazios com o sugerido</button>
       <button class="preset-btn active est-ciclo" onclick="plpFecharEGerar()" ${dec.length || plpMudancas().length ? '' : 'disabled title="Decida ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
@@ -2317,19 +2347,26 @@ async function plpFecharEGerar() {
     const um = [...PLP.dia.values()].find((d) => d.id_plano);
     if (!um) { avisoAcao('atencao', '! Decida ao menos uma receita antes de fechar.'); return; }
     const dec = [...PLP.dia.values()].filter((d) => Number(d.planejado) > 0);
-    if (!confirm(`Fechar o plano de ${plpDm(plpAmanha())} com ${dec.length} ${dec.length === 1 ? 'receita' : 'receitas'} e gerar as listas de separação (uma por família)?\n\nPara mudar depois, é preciso reabrir o plano.`)) return;
+    await plpFecharGerar(um.id_plano, plpAmanha(), dec.length);
+  } catch (e) { estTravar(false); diz(e.message, 'var(--farol-fora)'); }
+}
+// 12/11/2026: o mesmo fechar + gerar as listas serve à sugestão (amanhã) e ao plano manual (a data escolhida)
+async function plpFecharGerar(idPlano, data, nRec) {
+  const diz = (t, cor) => avisoAcao(cor ? 'erro' : 'enviando', cor ? `✗ ${t}. Tente de novo.` : t);
+  if (!confirm(`Fechar o plano de ${plpDm(data)} com ${nRec} ${nRec === 1 ? 'receita' : 'receitas'} e gerar as listas de separação (uma por família)?\n\nPara mudar depois, é preciso reabrir o plano.`)) return;
+  try {
     diz('Fechando…');
     estTravar(true);
-    let r = await trRpc('est_plano_fechar', { p_id: um.id_plano });
+    let r = await trRpc('est_plano_fechar', { p_id: idPlano });
     if (!r.ok) throw new Error(await trErroDe(r));
     diz('Gerando as listas…');
-    r = await trRpc('est_separacao_gerar', { p_id_plano: um.id_plano, p_quem: ((rmbSessao() || {}).email || '') });
+    r = await trRpc('est_separacao_gerar', { p_id_plano: idPlano, p_quem: ((rmbSessao() || {}).email || '') });
     if (!r.ok) throw new Error(await trErroDe(r));
     estTravar(false);
-    avisoAcao('ok', `✓ Plano de ${plpDm(plpAmanha())} fechado e listas de separação geradas — às ${avisoHora()}.`);
+    avisoAcao('ok', `✓ Plano de ${plpDm(data)} fechado e listas de separação geradas — às ${avisoHora()}.`);
     // 27/10/2026: próximo passo é separar — abre a Separação
     mostrarModulo('separacao');
-    await plpCarregar();
+    await (PLP.manual ? plpManCarregar() : plpCarregar());
   } catch (e) { estTravar(false); diz(e.message, 'var(--farol-fora)'); }
 }
 // as listas de separação do plano fechado (vw_est_separacao_lista + o saldo depois, vw_est_separacao_saldo): separar → conferir → gerar a ordem
@@ -2501,7 +2538,188 @@ async function plpReabrir(id) {
   const r = await trRpcSeguro('est_plano_reabrir', { p_id: id, p_motivo: motivo });
   if (!r.ok) return avisoAcao('erro', `✗ O plano NÃO reabriu: ${await trErroDe(r)}. Tente de novo.`);
   avisoAcao('ok', `✓ Plano reaberto — já dá para mudar. Às ${avisoHora()}.`);
-  await plpCarregar();
+  await (PLP && PLP.manual ? plpManCarregar() : plpCarregar());
+}
+
+// PLANO MANUAL (dono, qua 11/11/2026 23:42, para o teste de qui 12/11; livro chat-frente-estoque/respostas/teste-producao-12-11-decisoes).
+// A sugestão ainda não serve (o saldo de partida não bate): a cozinha escolhe as receitas e digita a quantidade.
+// Catálogo = vw_est_plano_receitas (leve, sem o motor do saldo); o que já está no plano da data = vw_est_plano_itens;
+// grava por est_plano_salvar (uma receita por chamada, em fila); fecha e gera as listas como a sugestão (plpFecharGerar).
+// A data escolhida manda (hoje ou amanhã) — a sugestão segue só em amanhã (vw_est_plano_do_dia).
+async function plpManual(on) {
+  if (!PLP) return;
+  PLP.manual = !!on;
+  const alvo = document.getElementById('view-plprod');
+  try { await (on ? plpManCarregar() : plpCarregar()); }
+  catch (e) {
+    if (alvo) alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui abrir: ${trEscH(e.message)}
+      <button class="preset-btn" onclick="plpManual(${on ? 'false' : 'true'})">${on ? 'Voltar à sugestão' : 'Montar o plano à mão'}</button></div>`;
+  }
+}
+async function plpManCarregar() {
+  const alvo = document.getElementById('view-plprod');
+  if (!alvo || !PLP) return;
+  const M = PLP.man || (PLP.man = { data: prdHoje(), grupo: null, fam: null, busca: '', soPlano: false, dig: {} });
+  if (M.data < prdHoje()) M.data = prdHoje();
+  if (!M.cat) alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
+  const u = encodeURIComponent(PLP.unidade);
+  const [cat, itens] = await Promise.all([
+    M.cat ? Promise.resolve(M.cat) : consultarTudo(`vw_est_plano_receitas?select=nome_base,grupo_receita,familia,un&order=nome_base`),
+    consultarTudo(`vw_est_plano_itens?select=id_plano,situacao_plano,nome_base,planejado,un&unidade=eq.${u}&data_para=eq.${M.data}`),
+    estFilaCarregar(PLP.unidade),
+  ]);
+  M.cat = cat || [];
+  M.itens = new Map((itens || []).map((i) => [i.nome_base, i]));
+  const um = (itens || []).find((i) => i.id_plano);
+  M.idPlano = um ? um.id_plano : null;
+  M.sit = um ? um.situacao_plano : null;
+  plpManRender();
+}
+function plpManData(d) { const M = PLP.man; if (!M || M.data === d) return; M.data = d; M.dig = {}; plpManual(true); }
+function plpManChip(campo, v) { const M = PLP.man; M[campo] = M[campo] === v ? null : v; if (campo === 'grupo') M.fam = null; plpManRender(); }
+function plpManBusca(v) { PLP.man.busca = v; plpManRender(); }
+const PLP_MAN_GRUPO = { LANCHES: 'Lanches', PRATOS: 'Pratos', PRODUCAO: 'Produção', 'PRE PREPARO': 'Pré-preparo' };
+function plpManNomeG(g) { return !g ? 'Sem categoria' : PLP_MAN_GRUPO[g] || g.charAt(0) + g.slice(1).toLowerCase(); }
+function plpManNomeF(f) { return !f ? 'Sem família' : f.length <= 3 ? f : f.charAt(0) + f.slice(1).toLowerCase(); }
+function plpManNoPlano() { return [...(PLP.man.itens || new Map()).values()].filter((i) => Number(i.planejado) > 0); }
+function plpManResumoHtml() {
+  const n = plpManNoPlano().length;
+  return n ? `<b>${n} ${n === 1 ? 'receita' : 'receitas'}</b> no plano de ${plpDm(PLP.man.data).slice(0, 5)}` : `Nenhuma receita no plano de ${plpDm(PLP.man.data).slice(0, 5)} ainda`;
+}
+function plpManPintar() {
+  const r = document.getElementById('plpManResumo'); if (r) r.innerHTML = plpManResumoHtml();
+  const b = document.getElementById('plpManFecharBtn'); if (b && !EST_OCUPADO) b.disabled = !plpManNoPlano().length && !Object.keys(PLP.man.dig).length;
+}
+function plpManRender() {
+  const alvo = document.getElementById('view-plprod');
+  const M = PLP && PLP.man;
+  if (!alvo || !M) return;
+  const foco = document.activeElement && document.activeElement.id === 'plpManBusca';
+  const hoje = prdHoje(), amanha = plpAmanha();
+  const fechado = /FECHAD/i.test(M.sit || '');
+  // o catálogo da base + o que já está no plano e saiu da base (não some da tela)
+  const todas = M.cat.slice();
+  M.itens.forEach((i, k) => { if (!todas.some((r) => r.nome_base === k)) todas.push({ nome_base: k, grupo_receita: null, familia: null, un: i.un }); });
+  const noPl = (r) => M.itens.has(r.nome_base) || M.dig[r.nome_base] !== undefined;
+  let vis = todas;
+  if (M.soPlano) vis = vis.filter(noPl);
+  if (M.grupo !== null) vis = vis.filter((r) => (r.grupo_receita || '') === M.grupo);
+  const antesFam = vis;
+  const fams = [...new Set(antesFam.map((r) => r.familia || ''))].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b, 'pt-BR'));
+  if (M.fam !== null) vis = vis.filter((r) => (r.familia || '') === M.fam);
+  if (M.busca) { const b = M.busca.toLowerCase(); vis = vis.filter((r) => String(r.nome_base).toLowerCase().includes(b)); }
+  const grupos = [...new Set(todas.map((r) => r.grupo_receita || ''))].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b, 'pt-BR'));
+  const chip = (ativo, onclick, rot, titulo) => `<button class="preset-btn${ativo ? ' active' : ''}" onclick="${onclick}"${titulo ? ` title="${titulo}"` : ''}>${rot}</button>`;
+  const js = (v) => trEscH(JSON.stringify(v));
+
+  let h = `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"><h2>Planejar produção — plano manual</h2>
+      <button class="preset-btn" onclick="plpManual(false)" title="A tela com a sugestão do que falta até a quarta">‹ Voltar à sugestão</button></div>` + estFilaHtml();
+  h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0 10px;">
+      <span style="color:var(--tx-3); font-weight:700;">Plano para</span>
+      ${chip(M.data === hoje, `plpManData('${hoje}')`, `Hoje · ${plpDm(hoje).slice(0, 5)}`)}
+      ${chip(M.data === amanha, `plpManData('${amanha}')`, `Amanhã · ${plpDm(amanha).slice(0, 5)}`)}
+      <span id="plpManResumo" style="margin-left:8px;">${plpManResumoHtml()}</span></div>`;
+  if (fechado) {
+    const f = EST_FILA || {};
+    const nL = (Number(f.listas_a_separar) || 0) + (Number(f.listas_a_conferir) || 0) + (Number(f.listas_a_virar_ordem) || 0);
+    h += `<div class="contexto" style="border-color:var(--farol-ok); text-align:left;"><b>Plano de ${plpDm(M.data)} fechado.</b>
+      ${nL ? `${nL} ${nL === 1 ? 'lista espera' : 'listas esperam'} na Separação.` : 'As listas dele estão na Separação e nas Ordens.'}
+      <button class="preset-btn active" onclick="mostrarModulo('separacao')">Abrir a Separação ›</button>
+      <button class="preset-btn" onclick="plpReabrir(${M.idPlano})" title="Volta o plano para edição. Se já existe lista separada ou ordem dele, desfaça antes.">Reabrir o plano</button></div>`;
+  } else {
+    h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;">
+      <button id="plpManFecharBtn" class="preset-btn active est-ciclo" onclick="plpManFechar()" ${plpManNoPlano().length || Object.keys(M.dig).length ? '' : 'disabled title="Digite a quantidade de ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
+      <span class="caption-label" style="text-align:left;">Digite a quantidade: grava ao sair do campo · 0 tira do plano.</span></div>`;
+  }
+  // filtros: categoria, família (da categoria escolhida), só o que está no plano, busca
+  h += `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0;">
+      ${chip(M.grupo === null && !M.soPlano, `PLP.man.grupo=null; PLP.man.fam=null; PLP.man.soPlano=false; plpManRender();`, `Todas · ${todas.length}`)}
+      ${grupos.map((g) => chip(M.grupo === g, `plpManChip('grupo', ${js(g)})`, `${trEscH(plpManNomeG(g))} · ${todas.filter((r) => (r.grupo_receita || '') === g).length}`)).join('')}
+      ${chip(M.soPlano, `PLP.man.soPlano=!PLP.man.soPlano; plpManRender();`, `Só o que está no plano · ${todas.filter(noPl).length}`)}
+      <input id="plpManBusca" value="${trEscH(M.busca || '')}" oninput="plpManBusca(this.value)" placeholder="procurar receita"
+        style="flex:1; min-width:160px; background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); color:var(--p-ink, var(--tx-1)); border-radius:6px; padding:7px 10px; font-size:13px;"></div>`;
+  if (fams.length > 1) {
+    h += `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0 10px;"><span style="color:var(--tx-4); font-size:12.5px;">Família:</span>
+      ${fams.map((f) => chip(M.fam === f, `plpManChip('fam', ${js(f)})`, `${trEscH(plpManNomeF(f))} · ${antesFam.filter((r) => (r.familia || '') === f).length}`)).join('')}</div>`;
+  }
+  const campo = 'width:84px; background:var(--p-paper, var(--surface-2)); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:5px 8px; font-weight:700;';
+  h += `<div id="tabelaPlanoManual" style="overflow-x:auto;"><table><thead><tr><th>Receita</th><th>Família</th><th>Quantidade</th></tr></thead><tbody>`;
+  if (!vis.length) h += `<tr><td colspan="3">Nenhuma receita neste filtro.</td></tr>`;
+  const porG = new Map();
+  vis.slice().sort((a, b) => (a.familia ? 0 : 1) - (b.familia ? 0 : 1) || String(a.familia || '').localeCompare(String(b.familia || ''), 'pt-BR')
+                           || String(a.nome_base).localeCompare(String(b.nome_base), 'pt-BR'))
+     .forEach((r) => { const g = r.grupo_receita || ''; if (!porG.has(g)) porG.set(g, []); porG.get(g).push(r); });
+  grupos.filter((g) => porG.has(g)).forEach((g) => {
+    const arr = porG.get(g);
+    h += `<tr class="grp"><td colspan="3" style="font-weight:800; letter-spacing:.6px; padding-top:12px; border-bottom:2px solid var(--line-2);">${trEscH(plpManNomeG(g).toUpperCase())}
+        <span style="color:var(--tx-4); font-weight:400; font-size:12.5px;">· ${arr.length}</span></td></tr>`;
+    arr.forEach((r) => {
+      const k = r.nome_base, it = M.itens.get(k);
+      const salvo = it && it.planejado != null ? plpQtd(it.planejado) : '';
+      const v = M.dig[k] !== undefined ? M.dig[k] : salvo;
+      const un = (it && it.un) || r.un || '';
+      h += `<tr><td>${trEscH(k)}</td><td style="color:var(--tx-3);">${trEscH(plpManNomeF(r.familia))}</td>
+        <td style="white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" value="${trEscH(v)}" ${fechado ? 'disabled' : ''}
+            oninput="PLP.man.dig[${js(k)}]=this.value; plpManPintar();" onchange="plpManSalvarUm(${js(k)})"
+            style="${campo} border:1px solid ${salvo ? 'var(--farol-ok)' : 'var(--info)'};">
+          <span style="color:var(--tx-4); font-size:11px;">${trEscH(un)}</span>
+          <span id="${plpIdK('m' + k)}" style="font-size:11px; color:${salvo ? 'var(--farol-ok)' : 'var(--tx-5)'};">${salvo ? 'no plano' : ''}</span></td></tr>`;
+    });
+  });
+  h += `</tbody></table></div>`;
+  alvo.innerHTML = h;
+  if (foco) { const i = document.getElementById('plpManBusca'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+}
+// uma receita por chamada e em FILA (a função lê a view do plano por receita; várias juntas passavam do teto de 8 s)
+function plpManSalvarUm(k) {
+  const M = PLP.man;
+  M.fila = (M.fila || Promise.resolve()).then(() => plpManGravar(k)).catch(() => {});
+  return M.fila;
+}
+async function plpManGravar(k) {
+  const M = PLP.man;
+  if (M.dig[k] === undefined) return;
+  const v = String(M.dig[k]).trim();
+  const it = M.itens.get(k);
+  const salvo = it && it.planejado != null ? plpQtd(it.planejado) : '';
+  const st = document.getElementById(plpIdK('m' + k));
+  const diz = (t, cor) => { if (st) { st.style.color = cor; st.textContent = t; } };
+  if (v === salvo || (v === '' && !it)) { delete M.dig[k]; diz(salvo ? 'no plano' : '', salvo ? 'var(--farol-ok)' : 'var(--tx-5)'); plpManPintar(); return; }
+  if (v === '') { diz('para tirar, digite 0', 'var(--farol-perto)'); return; }
+  const qtd = Number(v.replace(',', '.'));
+  if (!isFinite(qtd) || qtd < 0) { diz('não é número', 'var(--farol-fora)'); avisoAcao('atencao', `! ${k}: a quantidade não é número. Corrija.`); return; }
+  const r0 = M.cat.find((r) => r.nome_base === k) || {};
+  const un = (it && it.un) || r0.un || null;
+  diz('salvando…', 'var(--tx-4)');
+  avisoAcao('enviando', `Gravando ${k}…`);
+  const r = await trRpcSeguro('est_plano_salvar', { p_unidade: PLP.unidade, p_data_para: M.data, p_itens: [{ nome_base: k, qtd, un }],
+                                                    p_quem: ((rmbSessao() || {}).email || '') });
+  if (!r.ok) {
+    const erro = await trErroDe(r);
+    diz('não salvou', 'var(--farol-fora)');
+    avisoAcao('erro', `✗ ${k} NÃO foi para o plano: ${erro}. O número continua na tela — tente de novo.`, () => plpManSalvarUm(k));
+    return;
+  }
+  const idp = await r.json().catch(() => null);
+  if (idp) M.idPlano = idp;
+  if (!M.sit) M.sit = 'ABERTO';
+  if (qtd > 0) M.itens.set(k, { id_plano: M.idPlano, situacao_plano: M.sit, nome_base: k, planejado: qtd, un });
+  else M.itens.delete(k);
+  delete M.dig[k];
+  diz(qtd > 0 ? '✓ salvo' : '✓ tirado', 'var(--farol-ok)');
+  avisoAcao('ok', `✓ ${k}: ${qtd > 0 ? plpQtd(qtd) + ' ' + (un || '') + ' no' : 'tirado do'} plano de ${plpDm(M.data).slice(0, 5)} — às ${avisoHora()}.`);
+  plpManPintar();
+}
+async function plpManFechar() {
+  if (EST_OCUPADO) return;
+  const M = PLP.man;
+  // o que ficou digitado sem sair do campo grava antes
+  Object.keys(M.dig).forEach((k) => plpManSalvarUm(k));
+  await M.fila;
+  if (Object.keys(M.dig).length) { avisoAcao('atencao', '! Há quantidade que não gravou (veja a linha marcada). Corrija antes de fechar.'); return; }
+  const n = plpManNoPlano().length;
+  if (!M.idPlano || !n) { avisoAcao('atencao', '! Digite a quantidade de ao menos uma receita antes de fechar.'); return; }
+  await plpFecharGerar(M.idPlano, M.data, n);
 }
 
 // A folha impressa segue o molde da folha de contagem: grupo por grupo, na ordem em que se
@@ -2709,7 +2927,7 @@ function ctlRender() {
   const negativos = daBase.filter((i) => Number(i.saldo_hoje) < 0).length;
 
   let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Controle de estoque — ${trEscH(estNomeLoja(CTL.unidade))}</div>
-    <div class="caption-label" style="text-align:left;">Cada item desde a implantação (contagem de 21/10, 19:00): o que entrou (nota, produção, lista recebida) e o que saiu (venda pela ficha, produção, lista enviada). Clique no item para ver o kardex, com o saldo linha a linha.</div>
+    <div class="caption-label" style="text-align:left;">Clique no item para ver o kardex, com o saldo linha a linha.</div>
     ${ctlIdadeHtml()}
     <div class="cards cards-3">
       <div class="card neutral"><div class="card-lbl">Itens no estoque</div><div class="card-val">${daBase.length}</div><div class="card-pct">nomes da base nesta loja</div></div>
@@ -2871,20 +3089,20 @@ function posRender() {
   const grupos = [...new Set((POS.itens || []).map((i) => i.grupo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const comValor = Number(D.itens || 0) - Number(D.itens_sem_valor || 0);
   const semCustoN = Number(D.itens_sem_custo_com_saldo != null ? D.itens_sem_custo_com_saldo : D.itens_sem_valor || 0);
-  let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Posição de estoque — ${trEscH(estNomeLoja(POS.unidade))} · ${dm(POS.dia)}</div>
-    <div class="caption-label" style="text-align:left;">Quanto dinheiro está parado em cada item: o saldo do sistema × o custo da nossa base, numa foto por dia. As quantidades, item a item, ficam no Controle de estoque.</div>
+  // 12/11/2026 (auditoria 07/11, operacao-25): as legendas viraram dica (title) ou saíram; fica a das cores, numa linha
+  let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;" title="saldo do sistema × custo da nossa base, numa foto por dia">Posição de estoque — ${trEscH(estNomeLoja(POS.unidade))} · ${dm(POS.dia)}</div>
     <div class="cards${Number(D.valor_negativo) < 0 ? '' : ' cards-3'}">
       <div class="card neutral"><div class="card-lbl">Valor parado</div><div class="card-val">R$ ${fmt(Number(D.valor || 0))}</div><div class="card-pct">em ${comValor} itens · ${varTxt}</div></div>
       <div class="card neutral"><div class="card-lbl">Curva A</div><div class="card-val">R$ ${fmt(Number(D.valor_curva_a || 0))}</div><div class="card-pct">${D.valor ? Math.round(100 * Number(D.valor_curva_a) / Number(D.valor)) : 0}% do valor parado</div></div>
       <div class="card ${semCustoN ? 'highlight' : 'pos'}" style="cursor:pointer;" onclick="POS.semCusto=true; POS.ord='valor'; POS.desc=true; posRender();" title="ver a lista">
         <div class="card-lbl">Sem custo na base</div><div class="card-val">${semCustoN}</div>
-        <div class="card-pct">itens com mercadoria e sem custo: ficam fora da conta, o valor é um piso · ver a lista</div></div>
+        <div class="card-pct">com mercadoria, fora do total · ver a lista</div></div>
       ${Number(D.valor_negativo) < 0 ? `<div class="card neg" style="cursor:pointer;" onclick="POS.soNeg=true; POS.ord='valor'; POS.desc=false; posRender();" title="ver a lista">
         <div class="card-lbl">Saldo negativo</div><div class="card-val">−R$ ${fmt(Math.abs(Number(D.valor_negativo)))}</div>
         <div class="card-pct">em ${Number(D.itens_negativos || 0)} ${Number(D.itens_negativos) === 1 ? 'item' : 'itens'} · entrada ou produção a lançar · ver a lista</div></div>` : ''}
     </div>`;
   // histórico: uma linha por dia
-  h += `<div id="tabelaPosicaoDias"><table><thead><tr><th>Dia</th><th>Foto</th><th style="text-align:right;">Valor parado</th><th style="text-align:right;">Curva A</th><th style="text-align:right;">Sem custo, com mercadoria</th><th>Saldo negativo</th></tr></thead><tbody>`;
+  h += `<div id="tabelaPosicaoDias"><table><thead><tr><th title="o histórico começa em 21/10, o primeiro dia com a contagem como ponto de partida">Dia</th><th title="remontada: dia refeito com o custo de hoje, então a diferença é só de quantidade">Foto</th><th style="text-align:right;">Valor parado</th><th style="text-align:right;">Curva A</th><th style="text-align:right;">Sem custo, com mercadoria</th><th>Saldo negativo</th></tr></thead><tbody>`;
   (POS.dias || []).slice().reverse().forEach((d) => {
     h += `<tr style="cursor:pointer;${d.dia === POS.dia ? ' background:var(--surface-2);' : ''}" onclick="POS.dia='${d.dia}'; posCarregarItens();" title="ver a foto deste dia">
       <td><b>${dm(d.dia)}</b></td>
@@ -2893,8 +3111,7 @@ function posRender() {
       <td style="text-align:right;">${Number(d.itens_sem_custo_com_saldo != null ? d.itens_sem_custo_com_saldo : d.itens_sem_valor)}</td>
       <td style="${Number(d.valor_negativo) < 0 ? 'color:var(--farol-fora);' : 'color:var(--tx-5);'}">${Number(d.valor_negativo) < 0 ? `−R$ ${fmt(Math.abs(Number(d.valor_negativo)))} · ${Number(d.itens_negativos || 0)}` : '—'}</td></tr>`;
   });
-  h += `</tbody></table></div>
-    <div class="caption-label" style="text-align:left;">O histórico começa em 21/10, o primeiro dia com a contagem como ponto de partida. "remontada": dia refeito com o custo de hoje, então a diferença é só de quantidade.</div>`;
+  h += `</tbody></table></div>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <span>Loja <b>${trEscH(estNomeLoja(POS.unidade))}</b></span>
       <input id="posBusca" placeholder="Procurar item…" value="${trEscH(POS.busca || '')}" oninput="POS.busca=this.value; posRender(); const c=document.getElementById('posBusca'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); }" style="flex:1 1 200px; ${sel}">
@@ -2905,17 +3122,17 @@ function posRender() {
       <span class="caption-label">${itens.length} de ${(POS.itens || []).length}</span>
     </div>`;
   const th = (col, rot, dir) => `<th style="cursor:pointer;${dir ? ' text-align:right;' : ''}" onclick="posOrdenarPor('${col}')" title="ordenar">${rot}${POS.ord === col ? (POS.desc ? ' ▼' : ' ▲') : ''}</th>`;
-  h += `<div id="tabelaPosicaoItens"><table><thead><tr>${th('nome_base', 'Item')}${th('curva', 'Curva')}${th('grupo', 'Grupo')}${th('saldo', 'Saldo', 1)}<th>Un</th>${th('custo_unitario', 'Custo', 1)}${th('valor', 'Valor parado', 1)}</tr></thead><tbody>`;
+  h += `<div id="tabelaPosicaoItens"><table><thead><tr>${th('nome_base', 'Item')}${th('curva', 'Curva')}${th('grupo', 'Grupo')}${th('saldo', 'Saldo', 1)}${th('custo_unitario', 'Custo', 1)}${th('valor', 'Valor parado', 1)}</tr></thead><tbody>`;
   itens.forEach((i) => {
     const neg = Number(i.valor) < 0;
     const cor = i.valor == null ? '' : neg ? ' color:var(--farol-fora);' : i.custo_confiavel === false ? ' color:var(--farol-perto);' : '';
     h += `<tr><td><b>${trEscH(i.nome_base)}</b></td><td>${trEscH(i.curva || '')}</td><td style="color:var(--tx-4);">${i.grupo ? trEscH(i.grupo) : '<i>fora da folha</i>'}</td>
-      <td style="text-align:right;${Number(i.saldo) < 0 ? ' color:var(--farol-fora);' : ''}">${ctlNum(i.saldo, i.un)}</td><td style="color:var(--tx-4);">${trEscH(i.un || '')}</td>
+      <td style="text-align:right; white-space:nowrap;${Number(i.saldo) < 0 ? ' color:var(--farol-fora);' : ''}">${ctlNum(i.saldo, i.un)} <span style="color:var(--tx-4); font-size:11px;">${trEscH(i.un || '')}</span></td>
       <td style="text-align:right;">${i.custo_unitario == null ? '' : 'R$ ' + fmt(Number(i.custo_unitario))}</td>
       <td style="text-align:right;${cor}"${i.valor == null ? ' title="sem custo na nossa base — fora do total"' : i.custo_confiavel === false ? ' title="custo ainda não confiável em alguma etiqueta"' : ''}>${i.valor == null ? '<span style="color:var(--tx-5);">sem custo</span>' : '<b>R$ ' + fmt(Number(i.valor)) + '</b>'}</td></tr>`;
   });
   h += `</tbody></table></div>
-    <div class="caption-label" style="text-align:left;">"sem custo": item sem custo na nossa base, fora do total. Em âmbar, custo ainda não confiável; em vermelho, saldo negativo (em geral produção não apontada).</div>`;
+    <div class="caption-label" style="text-align:left;">Âmbar: custo ainda não confiável · vermelho: saldo negativo (em geral, produção não apontada).</div>`;
   alvo.innerHTML = h;
 }
 
@@ -3000,16 +3217,14 @@ function prdRender() {
   const hoje = prdHoje();
   const email = ((rmbSessao() || {}).email || '').toLowerCase();
 
-  let h = `<h2>Apontar produção</h2>` + estFilaHtml() + `
-    <div class="caption-label">O que a cozinha produziu entra no estoque; os ingredientes da ficha saem.</div>`;
+  // 12/11/2026 (auditoria 07/11): saem a legenda do topo e o card "Receitas da casa" (inventário, não ação; a contagem
+  // continua no botão "todas N" da grade)
+  let h = `<h2>Apontar produção</h2>` + estFilaHtml();
 
-  h += `<div class="cards cards-3">
+  h += `<div class="cards">
       <div class="card ${PRD.lancamentos.length ? 'pos' : 'neutral'}"><div class="card-lbl">Apontado no dia</div>
         <div class="card-val">${PRD.lancamentos.length}</div>
         <div class="card-pct">${PRD.data === hoje ? 'hoje' : PRD.data.split('-').reverse().join('/')}</div></div>
-      <div class="card neutral"><div class="card-lbl">Receitas da casa</div>
-        <div class="card-val">${PRD.receitas.length}</div>
-        <div class="card-pct">da base de receitas, em uso nesta loja</div></div>
       <div class="card ${parciais.length ? 'highlight' : 'pos'}"><div class="card-lbl">Baixam só em parte</div>
         <div class="card-val">${parciais.length}</div>
         <div class="card-pct">receita com ingrediente fora do estoque</div></div>
@@ -3090,20 +3305,19 @@ function prdRender() {
   const qtd = (v) => { const n = Number(v); return Number.isInteger(n) ? String(n) : fmt(n); };
   const campo = 'background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:5px 8px;';
   h += `<div class="section-label">O que a cozinha produziu — sem precisar de ordem</div>
-    <div class="caption-label">Para o que foi feito fora do plano. O que nasceu de uma ordem, registre na própria ordem, acima.
-      Digite quanto saiu pronto; toque na receita para ver o que sai do estoque; clique no título da coluna para ordenar.</div>
+    <div class="caption-label">Fora de ordem: digite quanto saiu e toque em Apontar (o que nasceu de ordem se aponta na tela Ordens) · toque na receita para ver a ficha e o custo.</div>
     <div style="text-align:center; margin:8px 0 10px;">
       <button class="preset-btn ${PRD.grupo ? '' : 'active'}" onclick="PRD.grupo=null; prdRender();">todas ${PRD.receitas.length}</button>
       ${gruposTodos.map((g) => `<button class="preset-btn ${PRD.grupo === g ? 'active' : ''}" onclick="PRD.grupo='${g}'; prdRender();">${nomeGrp(g)} ${nGrp(g)}</button>`).join(' ')}
     </div>
     <div id="tabelaPrdGrade" style="overflow-x:auto;"><table><thead><tr>${th('receita', 'Receita')}${th('rende', 'Rende')}
-      ${th('ingredientes', 'Ingred.')}${th('custo', 'Custo/un')}${th('ultima', 'Última vez')}
+      ${th('ultima', 'Última vez')}
       <th style="white-space:nowrap;" title="o que veio do plano (ou o lote da ficha); troque se o plano do dia for outro">Planejado</th>
       <th style="white-space:nowrap;">Produziu</th><th style="white-space:nowrap;" title="só se houve perda: quanto e o motivo">Perdeu</th><th></th></tr></thead><tbody>`;
   (PRD.grupo ? [PRD.grupo] : gruposTodos).forEach((g) => {
     const doGrupo = lista.filter((r) => r.grupo === g).sort(cmp);
     if (!doGrupo.length) return;
-    h += `<tr class="grp"><td colspan="9" style="font-weight:800; letter-spacing:.5px;">${nomeGrp(g).toUpperCase()}
+    h += `<tr class="grp"><td colspan="7" style="font-weight:800; letter-spacing:.5px;">${nomeGrp(g).toUpperCase()}
         <span style="color:var(--tx-4); font-weight:400;">· ${doGrupo.length} ${doGrupo.length === 1 ? 'receita' : 'receitas'}</span></td></tr>`;
   doGrupo.forEach((r) => {
     const id = prdId(r.receita);
@@ -3116,8 +3330,6 @@ function prdRender() {
               r.ingredientes_fora_do_estoque} ${Number(r.ingredientes_fora_do_estoque) === 1 ? 'ingrediente' : 'ingredientes'} sem estoque</div>` : ''}
         ${r.move === false ? `<div style="color:var(--farol-perto); font-size:11px;" title="Apontar esta receita fica registrado, mas não mexe no saldo: nem entra a receita nem saem os ingredientes.">não mexe no saldo · ${trEscH(r.move_motivo || '')}</div>` : ''}</td>
       <td style="white-space:nowrap;">${r.rendimento ? qtd(r.rendimento) : '—'} <span style="color:var(--tx-4); font-size:11px;">${r.un || ''}</span></td>
-      <td>${r.ingredientes == null ? '—' : r.ingredientes}</td>
-      <td style="white-space:nowrap;">${r.custo_un == null ? '—' : 'R$ ' + fmt(Number(r.custo_un))}</td>
       <td style="color:var(--tx-5); font-size:12px; line-height:1.2;${dias === null ? ' opacity:.6;' : ' white-space:nowrap;'}">${dias === null ? 'nunca apontada' : dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : `há ${dias} dias`}</td>
       <td><input type="number" step="0.001" min="0" inputmode="decimal" id="${id}_pl" value="${r.rendimento ? Math.round(Number(r.rendimento) * 100) / 100 : ''}"
            title="o que veio do plano (ou o lote da ficha); troque se o plano do dia for outro"
@@ -3130,7 +3342,10 @@ function prdRender() {
       <td><button class="preset-btn" onclick="prdApontar(${prdTxt(r.receita)}, ${prdTxt(r.un)})">Apontar</button></td></tr>`;
     if (PRD.aberta === r.receita) {
       const ing = PRD.ingredientes[r.receita];
-      h += `<tr><td colspan="9" style="background:var(--p-paper, var(--surface-2));">`;
+      h += `<tr><td colspan="7" style="background:var(--p-paper, var(--surface-2));">`;
+      // 12/11/2026 (auditoria 07/11): custo e nº de ingredientes saíram da grade e moram aqui, a um toque
+      h += `<div class="caption-label" style="text-align:left;">Custo por ${trEscH(r.un || 'unidade')}: <b>${r.custo_un == null ? '—' : 'R$ ' + fmt(Number(r.custo_un))}</b>
+        · ${r.ingredientes == null ? '—' : r.ingredientes} ${Number(r.ingredientes) === 1 ? 'ingrediente' : 'ingredientes'} na ficha</div>`;
       if (!ing) h += `<span style="color:var(--tx-5);">carregando a ficha…</span>`;
       else if (!ing.length) h += `<span style="color:var(--tx-5);">esta receita não tem ingrediente na ficha — nada sai do estoque.</span>`;
       else {
