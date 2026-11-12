@@ -361,8 +361,10 @@ async function agPlanoMontar(reler) {
   const P = Array.isArray(AGPL.pend) ? AGPL.pend : [], D = Array.isArray(AGPL.dev) ? AGPL.dev : [];
   let box = document.getElementById('agPlano');
   if (!P.length && !D.length) { if (box) box.remove(); return; }
-  if (!box) { box = document.createElement('div'); box.id = 'agPlano'; const h2 = alvo.querySelector('h2'); if (h2 && h2.nextSibling) alvo.insertBefore(box, h2.nextSibling); else alvo.appendChild(box); }
   const dono = souODono(), hoje = agHoje();
+  // para o Fabio, no topo (é a agenda dele); para o dono, depois da agenda dele e antes da equipe
+  if (!box) { box = document.createElement('div'); box.id = 'agPlano'; const h2 = alvo.querySelector('h2'), eq = document.getElementById('agEquipe');
+    if (dono) { if (eq) alvo.insertBefore(box, eq); else alvo.appendChild(box); } else if (h2 && h2.nextSibling) alvo.insertBefore(box, h2.nextSibling); else alvo.appendChild(box); }
   const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
   const linhaA = (p) => {
     const fio = Array.isArray(p.fio) ? p.fio : [];
