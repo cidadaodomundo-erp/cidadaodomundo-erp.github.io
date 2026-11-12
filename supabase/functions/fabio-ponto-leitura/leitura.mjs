@@ -310,18 +310,25 @@ function tipoDe(produto) {
 function produtoExibido(produto) {
   return textoSeguro(produto, 80).replace(/^(SEGUNDA|TER[CÇ]A|QUARTA|QUINTA|SEXTA|S[AÁ]BADO|DOMINGO)\s*-\s*/i, '').replace(/\s*FUNCION[AÁ]RIOS?\s*$/i, '').toLowerCase().slice(0, 60);
 }
+export const TIPOS_VINCULO = Object.freeze(['CARTAO', 'APELIDO', 'CATEGORIA_CARTAO', 'CATEGORIA_CLIENTE', 'PESSOA_VENDA', 'CATEGORIA_VENDA']);
+const TIPOS_CATEGORIA = ['CATEGORIA_CARTAO', 'CATEGORIA_CLIENTE', 'CATEGORIA_VENDA'];
 export function validarVinculos(rows, dia) {
   const ok = []; let invalidos = 0;
   for (const v of Array.isArray(rows) ? rows : []) {
     const un = ehObj(v) ? unidadeCanonica(v.unidade) : null;
-    const tipo = ehObj(v) ? (v.tipo === 'CARTAO' || v.tipo === 'APELIDO' ? v.tipo : null) : null;
+    const tipo = ehObj(v) ? (TIPOS_VINCULO.includes(v.tipo) ? v.tipo : null) : null;
     const chaveTxt = ehObj(v) && (typeof v.chave === 'string' || Number.isSafeInteger(v.chave)) ? String(v.chave).trim() : '';
-    const chave = tipo === 'APELIDO' ? tokens(chaveTxt) : chaveTxt;
+    // APELIDO: frase por tokens inteiros (mínimo 2 caracteres); CATEGORIA_CLIENTE: nome do cliente EXATO normalizado (sem substring); cartões: texto da comanda
+    const chave = tipo === 'APELIDO' ? tokens(chaveTxt) : (tipo === 'CATEGORIA_CLIENTE' ? normalizar(chaveTxt) : chaveTxt);
+    const categoria = TIPOS_CATEGORIA.includes(tipo);
+    const porVenda = tipo === 'PESSOA_VENDA' || tipo === 'CATEGORIA_VENDA';   // lançamento avulso: chave = id_sale textual, vale SÓ na data exata
+    const nome = ehObj(v) && typeof v.nome === 'string' ? (categoria ? textoSeguro(v.nome, 30).trim() : v.nome) : '';   // categoria: rótulo sanitizado, até 30 caracteres
     // valido_desde NULL = sem limite inicial explícito (vigente desde sempre); data inválida (não nula) = vínculo inválido
     const semInicio = v && (v.valido_desde === null || v.valido_desde === undefined);
-    if (!un || un === 'REDE' || !tipo || !chave || (tipo === 'APELIDO' && chave.length < 3) || typeof v.nome !== 'string' || !normalizar(v.nome) || (!semInicio && !dataValida(v.valido_desde))) { invalidos++; continue; }
+    if (!un || un === 'REDE' || !tipo || !chave || (tipo === 'APELIDO' && chave.length < 2) || !normalizar(nome) || (!semInicio && !dataValida(v.valido_desde)) || (porVenda && semInicio)) { invalidos++; continue; }
+    if (porVenda && v.valido_desde !== dia) continue;   // por venda: só vale quando a data do lançamento === dia pedido; outro dia é ignorado (não é inválido)
     if (!semInicio && v.valido_desde > dia) continue;   // ainda não vigente nesse dia
-    ok.push({ un, tipo, chave, nome: v.nome, desde: semInicio ? '' : v.valido_desde });   // '' ordena antes de qualquer data: NULL nunca vence uma data explícita
+    ok.push({ un, tipo, chave, nome, desde: semInicio ? '' : v.valido_desde });   // '' ordena antes de qualquer data: NULL nunca vence uma data explícita
   }
   return { vinculos: ok, invalidos };
 }
@@ -331,59 +338,100 @@ export function construirRefeicoes({ vendas, itens, vinculos, pessoas, dia }) {
   const nomes = new Map();
   for (const p of pessoas) { const un = unidadeCanonica(p.unidade); if (!un || un === 'REDE') continue; const k = normalizar(p.nome) + '|' + un; nomes.set(k, (nomes.get(k) || []).concat(p.id)); }
   const v = validarVinculos(vinculos, dia);
-  let semPessoa = 0, homonimo = 0, conflitoVinc = 0;
+  let homonimo = 0, conflitoVinc = 0, conflitoCat = 0;
+  const pendentes = [];   // vínculo de pessoa sem pessoa única ativa: só vira aviso se for USADO por item elegível do dia
   const grupos = new Map();
   for (const x of v.vinculos) {
-    const ids = nomes.get(normalizar(x.nome) + '|' + x.un) || [];
-    if (ids.length === 0) { semPessoa++; continue; }
-    if (ids.length > 1) { homonimo++; continue; }
-    const k = x.tipo + '|' + x.un + '|' + x.chave;
+    const ehCat = TIPOS_CATEGORIA.includes(x.tipo);
+    let quem;   // pessoa: id único do cadastro; categoria: o próprio rótulo (conjunto, nunca pessoa)
+    if (ehCat) quem = x.nome;
+    else {
+      const ids = nomes.get(normalizar(x.nome) + '|' + x.un) || [];
+      if (ids.length === 0) { pendentes.push({ tipo: x.tipo, un: x.un, chave: x.chave }); continue; }
+      if (ids.length > 1) { homonimo++; continue; }
+      quem = ids[0];
+    }
+    const k = x.tipo + '|' + x.un + '|' + x.chave;   // mapas separados por tipo + unidade + chave
     const g = grupos.get(k) || { tipo: x.tipo, un: x.un, chave: x.chave, linhas: [] };
-    g.linhas.push({ id: ids[0], desde: x.desde }); grupos.set(k, g);
+    g.linhas.push({ id: quem, desde: x.desde }); grupos.set(k, g);
   }
-  const cartao = new Map(), aliases = new Map(), identificados = new Set();
+  const cartao = new Map(), aliases = new Map(), catCartao = new Map(), catCliente = new Map(), catVenda = new Map(), pessoaVenda = new Map(), identificados = new Set();
   for (const g of grupos.values()) {
     const max = g.linhas.reduce((a, l) => (l.desde > a ? l.desde : a), '');
-    const ids = [...new Set(g.linhas.filter((l) => l.desde === max).map((l) => l.id))];
+    const noMax = g.linhas.filter((l) => l.desde === max);
+    if (TIPOS_CATEGORIA.includes(g.tipo)) {
+      const porNorm = new Map(); for (const l of noMax) if (!porNorm.has(normalizar(l.id))) porNorm.set(normalizar(l.id), l.id);
+      const rot = porNorm.size === 1 ? [...porNorm.values()][0] : CONFLITO;
+      if (rot === CONFLITO) conflitoCat++;
+      (g.tipo === 'CATEGORIA_CARTAO' ? catCartao : g.tipo === 'CATEGORIA_VENDA' ? catVenda : catCliente).set(g.un + '|' + g.chave, rot);
+      continue;
+    }
+    const ids = [...new Set(noMax.map((l) => l.id))];
     const dono = ids.length === 1 ? ids[0] : CONFLITO;
     if (dono === CONFLITO) conflitoVinc++; else identificados.add(dono);
     if (g.tipo === 'CARTAO') cartao.set(g.un + '|' + g.chave, dono);
+    else if (g.tipo === 'PESSOA_VENDA') pessoaVenda.set(g.un + '|' + g.chave, dono);
     else aliases.set(g.un, (aliases.get(g.un) || []).concat([{ alias: g.chave, dono }]));
   }
+  const temCategoria = catCartao.size + catCliente.size + catVenda.size > 0;
   if (v.invalidos) avisos.push(v.invalidos + ' vínculo(s) de refeição inválido(s) ignorado(s).');
-  if (semPessoa) avisos.push(semPessoa + ' vínculo(s) de refeição sem pessoa única no cadastro foram ignorados.');
   if (homonimo) avisos.push(homonimo + ' vínculo(s) de refeição com nome repetido no cadastro foram ignorados (sem vínculo).');
   if (conflitoVinc) avisos.push(conflitoVinc + ' chave(s) de vínculo de refeição em conflito: ninguém recebe refeição por elas.');
+  if (conflitoCat) avisos.push(conflitoCat + ' chave(s) de categoria de refeição em conflito: nenhuma categoria recebe refeição por elas.');
 
   const vendaPor = new Map();
   for (const x of Array.isArray(vendas) ? vendas : []) {
     const un = ehObj(x) ? unidadeCanonica(x.unidade) : null;
     if (!un || x.cancelada === true || x.id_sale === null || x.id_sale === undefined) continue;
     const cm = x.comanda_id === null || x.comanda_id === undefined ? '' : String(x.comanda_id).trim();
-    vendaPor.set(un + '|' + String(x.id_sale), { un, cancelada: false, comanda: cm && cm !== '0' ? cm : '', texto: tokens((x.nome_venda || '') + ' ' + (x.cliente_nome || '')), hora: horaDe(x.hora_venda) });
+    vendaPor.set(un + '|' + String(x.id_sale), { un, idSale: String(x.id_sale), cancelada: false, comanda: cm && cm !== '0' ? cm : '', texto: tokens((x.nome_venda || '') + ' ' + (x.cliente_nome || '')), cliente: normalizar(x.cliente_nome), hora: horaDe(x.hora_venda) });
   }
-  const porPessoa = {}; let semDono = 0, conflitoItem = 0;
+  const porPessoa = {}, porCategoria = new Map(); let semDono = 0, conflitoItem = 0;
+  const usados = new Set();   // índices de `pendentes` realmente usados por item elegível do dia
   for (const it of Array.isArray(itens) ? itens : []) {
     const un = ehObj(it) ? unidadeCanonica(it.unidade) : null;
     const venda = un ? vendaPor.get(un + '|' + String(it.id_sale)) : null;
     if (!venda || !ehItemRefeicao(it, venda)) continue;
     const texto = ' ' + venda.texto + ' ' + tokens(it.observacao) + ' ';
+    pendentes.forEach((p, i) => {
+      if (p.un !== un) return;
+      if ((p.tipo === 'CARTAO' && venda.comanda && p.chave === venda.comanda) || (p.tipo === 'PESSOA_VENDA' && p.chave === venda.idSale) || (p.tipo === 'APELIDO' && texto.includes(' ' + p.chave + ' '))) usados.add(i);
+    });
+    // categoria (conjunto, não pessoa) vence o alias da observação; com cartão de pessoa explícita na mesma venda = conflito
+    const cats = new Set(); let confCat = false;
+    for (const k of [venda.comanda ? catCartao.get(un + '|' + venda.comanda) : undefined, venda.cliente ? catCliente.get(un + '|' + venda.cliente) : undefined, catVenda.get(un + '|' + venda.idSale)]) {
+      if (k === CONFLITO) confCat = true; else if (k !== undefined) cats.add(k);
+    }
+    const pv = pessoaVenda.get(un + '|' + venda.idSale);   // pessoa atribuída a esta venda (lançamento avulso do dia)
+    if (pv !== undefined && (confCat || cats.size > 0)) { conflitoItem++; continue; }   // qualquer categoria × PESSOA_VENDA = conflito
+    if (confCat || cats.size > 1) { conflitoItem++; continue; }
+    if (cats.size === 1) {
+      if (venda.comanda && cartao.get(un + '|' + venda.comanda) !== undefined) { conflitoItem++; continue; }
+      const q = Number(it.quantidade), rot = [...cats][0];
+      (porCategoria.get(rot) || porCategoria.set(rot, []).get(rot)).push({ tipo: tipoDe(it.produto), produto: produtoExibido(it.produto), quantidade: Number.isFinite(q) && q >= 1 ? Math.min(99, Math.round(q)) : 1, hora: venda.hora });
+      continue;
+    }
     const achados = new Set(); let confAlias = false;
     for (const a of aliases.get(un) || []) if (texto.includes(' ' + a.alias + ' ')) { if (a.dono === CONFLITO) confAlias = true; else achados.add(a.dono); }
     const c = venda.comanda ? cartao.get(un + '|' + venda.comanda) : undefined;
-    let dono = null;
-    if (c === CONFLITO || confAlias) { conflitoItem++; continue; }
-    if (c !== undefined) { if ([...achados].some((id) => id !== c)) { conflitoItem++; continue; } dono = c; }
-    else if (achados.size === 1) dono = [...achados][0];
-    else if (achados.size > 1) { conflitoItem++; continue; }
+    if (c === CONFLITO || confAlias || pv === CONFLITO) { conflitoItem++; continue; }
+    // PESSOA_VENDA pode atribuir órfão, mas contra qualquer cartão/alias pessoal de OUTRA pessoa é conflito (nada silencia regra)
+    const ids = new Set(achados); if (c !== undefined) ids.add(c); if (pv !== undefined) ids.add(pv);
+    if (ids.size > 1) { conflitoItem++; continue; }
+    const dono = ids.size === 1 ? [...ids][0] : null;
     if (dono === null) { semDono++; continue; }
     const q = Number(it.quantidade);
     (porPessoa[dono] = porPessoa[dono] || []).push({ tipo: tipoDe(it.produto), produto: produtoExibido(it.produto), quantidade: Number.isFinite(q) && q >= 1 ? Math.min(99, Math.round(q)) : 1, hora: venda.hora });
   }
   for (const k of Object.keys(porPessoa)) porPessoa[k].sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
+  const categorias = [...porCategoria].map(([rotulo, its]) => ({ rotulo, total: its.reduce((a, i) => a + i.quantidade, 0), itens: its.sort((a, b) => String(a.hora).localeCompare(String(b.hora))) }))
+    .sort((a, b) => (a.rotulo < b.rotulo ? -1 : a.rotulo > b.rotulo ? 1 : 0));
+  // órfãos reais (sem categoria e sem pessoa) seguem avisados à parte; só contagens e rótulos de categoria, nunca chave/cliente/observação
+  if (categorias.length) avisos.push('Refeição em categoria (não é pessoa): ' + categorias.map((c) => c.rotulo + ' (' + c.itens.length + ')').join(', ') + '.');
+  if (usados.size) avisos.push(usados.size + ' vínculo(s) de refeição sem pessoa ativa nesse dia (vínculo inativo ou cadastro a conferir) foram ignorados.');   // só vínculo usado; o não usado não é pendência atual
   if (semDono) avisos.push(semDono + ' item(ns) de refeição sem dono identificado (não atribuídos a ninguém).');
   if (conflitoItem) avisos.push(conflitoItem + ' item(ns) de refeição com identificação em conflito (não atribuídos a ninguém).');
-  return { porPessoa, identificados: [...identificados].sort((a, b) => a - b), avisos, semVinculos: identificados.size === 0 };
+  return { porPessoa, categorias, identificados: [...identificados].sort((a, b) => a - b), avisos, semVinculos: identificados.size === 0 && !temCategoria };
 }
 
 // ---------- orquestração ----------
@@ -455,7 +503,7 @@ async function executar(c) {
     };
     const r = await lerDia(dia);
     if (r.semVinculos) avisos.push('Refeição: nenhum vínculo confirmado no cadastro; ninguém pode ser identificado.');
-    else refeicoes = { disponivel: true, porPessoa: r.porPessoa, identificados: r.identificados };
+    else refeicoes = { disponivel: true, porPessoa: r.porPessoa, identificados: r.identificados, categorias: r.categorias };
     avisos.push(...r.avisos);
   } catch (e) {
     if (e instanceof ErroLeitura && e.status === 401) throw e;

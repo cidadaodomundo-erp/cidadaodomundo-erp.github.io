@@ -337,7 +337,7 @@ test('refeição: mesma chave de cartão para duas pessoas na mesma vigência = 
 });
 test('refeição: vínculo futuro, nome sem pessoa única e homônimos são ignorados com aviso', () => {
   assert.deepEqual(cr({ vinculos: [VC({ valido_desde: '2026-12-01' })] }).porPessoa, {});
-  const sem = cr({ vinculos: [VC({ nome: 'Fulano Inexistente' })] }); assert.deepEqual(sem.porPessoa, {}); assert.ok(sem.avisos.some((a) => /sem pessoa única/.test(a)));
+  const sem = cr({ vinculos: [VC({ nome: 'Fulano Inexistente' })] }); assert.deepEqual(sem.porPessoa, {}); assert.ok(sem.avisos.some((a) => /sem pessoa ativa nesse dia \(vínculo inativo ou cadastro a conferir\)/.test(a)));
   const hom = cr({ pessoas: PE.concat([{ id: 9, nome: 'ANA  TESTE', unidade: 'AGUA VERDE' }]) }); assert.deepEqual(hom.porPessoa, {}); assert.ok(hom.avisos.some((a) => /nome repetido/.test(a)));
 });
 test('refeição: nome igual em OUTRA unidade não se mistura (nome completo + unidade)', () => {
@@ -369,6 +369,69 @@ test('refeição: item que começa com dia da semana e hífen conta; "FUNCION" e
 test('refeição: unidade sem acento, comanda 0/vazia nunca casa cartão', () => {
   assert.deepEqual(cr({ vendas: [V({ comanda_id: 0 })], vinculos: [VC({ chave: '0' })] }).porPessoa, {});
   assert.deepEqual(cr({ vendas: [V({ comanda_id: null })] }).porPessoa, {});
+});
+
+// ---------- categorias (conjunto, não pessoa) e apelidos curtos ----------
+const CC = (o) => Object.assign({ unidade: 'AGUA VERDE', tipo: 'CATEGORIA_CLIENTE', chave: 'Mesa da Equipe', nome: 'Equipe Teste', valido_desde: '2026-01-01' }, o);
+const CK = (o) => CC(Object.assign({ tipo: 'CATEGORIA_CARTAO', chave: '200' }, o));
+const crc = (o) => cr(Object.assign({ vendas: [V({ comanda_id: 999, cliente_nome: 'mesa da equipe' })], vinculos: [CC()] }, o));
+const rotulos = (r) => r.categorias.map((c) => c.rotulo + ':' + c.itens.length);
+test('categoria: cliente EXATO normalizado (caixa/acento/espaço), nunca substring; cartão da comanda idem', () => {
+  const ok = crc({ vendas: [V({ comanda_id: 999, cliente_nome: '  MESA   DA   ÉQUIPE ' })] });
+  assert.deepEqual(rotulos(ok), ['Equipe Teste:1']); assert.deepEqual(ok.porPessoa, {}); assert.deepEqual(ok.identificados, []);
+  for (const cliente_nome of ['mesa da equipe 2', 'a mesa da equipe', 'mesa da', '']) {
+    const r = crc({ vendas: [V({ comanda_id: 999, cliente_nome })] });
+    assert.deepEqual(r.categorias, [], cliente_nome); assert.ok(r.avisos.some((a) => /^1 item\(ns\) de refeição sem dono/.test(a)), 'órfão segue pendente');
+  }
+  assert.deepEqual(rotulos(cr({ vendas: [V({ comanda_id: 200 })], vinculos: [CK()] })), ['Equipe Teste:1']);
+  assert.deepEqual(cr({ vendas: [V({ comanda_id: 2000 })], vinculos: [CK()] }).categorias, []);
+  assert.deepEqual(cr({ vendas: [V({ comanda_id: 0 })], vinculos: [CK({ chave: '0' })] }).categorias, []);
+});
+test('categoria: unidade, vigência e conflito (mesma chave, rótulos diferentes na vigência mais nova)', () => {
+  assert.deepEqual(crc({ vinculos: [CC({ unidade: 'AHU' })] }).categorias, [], 'outra unidade');
+  assert.deepEqual(crc({ vinculos: [CC({ valido_desde: '2026-12-01' })] }).categorias, [], 'futuro');
+  const dois = crc({ vinculos: [CC(), CC({ nome: 'Outra' })] });
+  assert.deepEqual(dois.categorias, []); assert.ok(dois.avisos.some((a) => /categoria de refeição em conflito/.test(a))); assert.ok(dois.avisos.some((a) => /sem dono/.test(a)) || dois.avisos.some((a) => /conflito/.test(a)));
+  assert.deepEqual(rotulos(crc({ vinculos: [CC(), CC({ nome: 'Outra', valido_desde: '2026-06-01' })] })), ['Outra:1'], 'vigência mais nova resolve');
+  assert.deepEqual(rotulos(crc({ vinculos: [CC(), CC({ nome: 'EQUIPE teste' })] })), ['Equipe Teste:1'], 'mesmo rótulo normalizado não conflita');
+  const cruz = cr({ vendas: [V({ comanda_id: 200, cliente_nome: 'mesa da equipe' })], vinculos: [CC(), CK({ nome: 'Diferente' })] });
+  assert.deepEqual(cruz.categorias, []); assert.ok(cruz.avisos.some((a) => /identificação em conflito/.test(a)));
+  const lista = L.validarVinculos([CC({ nome: ' Rótulo\u0007 muito muito muito longo para caber ' })], DIA).vinculos;
+  assert.equal(lista[0].nome.length, 30); assert.ok(!/[\u0000-\u001f]/.test(lista[0].nome));
+  assert.equal(L.validarVinculos([CC({ nome: '\u0007 ' })], DIA).invalidos, 1);
+});
+test('categoria vence alias da observação (alias bloqueado pelo grupo) e nunca vira pessoa', () => {
+  const r = crc({ itens: [IT({ observacao: 'p/ bia' })], vinculos: [CC(), VC({ tipo: 'APELIDO', chave: 'bia', nome: 'Bia Souza' })] });
+  assert.deepEqual(rotulos(r), ['Equipe Teste:1']); assert.deepEqual(r.porPessoa, {}, 'categoria não entra em porPessoa');
+  assert.ok(!r.identificados.includes('Equipe Teste'), 'categoria não entra em identificados');
+  const conf = crc({ itens: [IT({ observacao: 'pretinho' })], vinculos: [CC(), VC({ tipo: 'APELIDO', chave: 'pretinho' }), VC({ tipo: 'APELIDO', chave: 'pretinho', nome: 'Bia Souza' })] });
+  assert.deepEqual(rotulos(conf), ['Equipe Teste:1'], 'alias em conflito também não bloqueia categoria');
+});
+test('categoria × cartão de pessoa explícita na mesma venda = conflito, sem atribuir a ninguém', () => {
+  const r = cr({ vendas: [V({ comanda_id: 100, cliente_nome: 'mesa da equipe' })], vinculos: [VC(), CC()] });
+  assert.deepEqual(r.porPessoa, {}); assert.deepEqual(r.categorias, []); assert.ok(r.avisos.some((a) => /^1 item\(ns\) de refeição com identificação em conflito/.test(a)));
+  const c2 = cr({ vendas: [V({ comanda_id: 100 })], vinculos: [VC(), CK({ chave: '100' })] });
+  assert.deepEqual(c2.porPessoa, {}); assert.deepEqual(c2.categorias, []);
+});
+test('apelido: 2 letras valem como token inteiro; 1 letra é rejeitada; pedaço de palavra não casa', () => {
+  const ok = cr({ vendas: [V({ comanda_id: 999, nome_venda: 'refeição ZÉ' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'Zé' })] });
+  assert.deepEqual(Object.keys(ok.porPessoa), ['1']);
+  assert.deepEqual(cr({ vendas: [V({ comanda_id: 999, nome_venda: 'zeca' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'ze' })] }).porPessoa, {});
+  const um = L.validarVinculos([VC({ tipo: 'APELIDO', chave: 'z' })], DIA); assert.equal(um.vinculos.length, 0); assert.equal(um.invalidos, 1);
+  assert.equal(L.validarVinculos([VC({ tipo: 'APELIDO', chave: 'ze' })], DIA).vinculos.length, 1);
+});
+test('categoria ponta a ponta: só contagens e rótulo nos avisos (nunca chave, cliente, observação); órfão real segue pendente; refeição disponível só com categoria', async () => {
+  const vendas = [V({ id_sale: 1, comanda_id: 999, cliente_nome: 'CLIENTE SECRETO XYZ' }), V({ id_sale: 2, comanda_id: 888, nome_venda: 'mesa 9', cliente_nome: 'OUTRO SIGILO' })]
+    .map((x) => Object.assign(x, { shift_date: DIA }));
+  const itens = [IT({ id_sale: 1, id_sale_item: 1, observacao: 'OBS SIGILOSA' }), IT({ id_sale: 2, id_sale_item: 2, observacao: 'OBS ORFA' })];
+  const vinc = [CC({ chave: 'cliente secreto xyz' }), CK({ chave: '4242' })];
+  const r = await rodar({ vendas, itens, ctx: { obterVinculos: async () => vinc } });
+  const rf = r.corpo.refeicoes;
+  assert.equal(rf.disponivel, true); assert.deepEqual(rf.porPessoa, {}); assert.deepEqual(rf.identificados, []);
+  assert.deepEqual(rf.categorias.map((c) => [c.rotulo, c.itens.length]), [['Equipe Teste', 1]]);
+  assert.ok(r.corpo.avisos.some((a) => /^1 item\(ns\) de refeição sem dono/.test(a)), 'órfão real continua avisado');
+  const texto = JSON.stringify(r.corpo);
+  for (const proibido of ['CLIENTE SECRETO', 'cliente secreto', 'OUTRO SIGILO', 'OBS SIGILOSA', 'OBS ORFA', '4242', 'cliente_nome', 'comanda']) assert.ok(!texto.includes(proibido), 'vazou: ' + proibido);
 });
 
 // ---------- utilitários ----------
@@ -438,6 +501,81 @@ test('refeição com valido_desde NULL: atribui; NULL não vence data explícita
   assert.deepEqual(Object.keys(cr({ vinculos: [VC({ valido_desde: null }), VC({ nome: 'Bia Souza', valido_desde: '2026-06-01' })] }).porPessoa), ['2']);
   const c = cr({ vinculos: [VC({ valido_desde: null }), VC({ nome: 'Bia Souza', valido_desde: null })] }); assert.deepEqual(c.porPessoa, {}); assert.ok(c.avisos.some((a) => /em conflito/.test(a)));
   assert.deepEqual(cr({ vinculos: [VC({ valido_desde: null, tipo: 'APELIDO', chave: 'ninja' })], vendas: [V({ comanda_id: 9, nome_venda: 'ninja' })] }).identificados, [1]);
+});
+// ---------- aviso "sem pessoa ativa": só vínculo USADO no dia ----------
+const AVISO_SEM = /sem pessoa ativa nesse dia/;
+test('aviso sem pessoa ativa: vínculo usado (cartão exato / alias de fronteira) avisa; não usado (desligado antigo) não avisa', () => {
+  const naoUsado = cr({ vinculos: [VC({ nome: 'Fulano Desligado', chave: '999' })] });
+  assert.ok(!naoUsado.avisos.some((a) => AVISO_SEM.test(a)), 'cartão que nenhum item elegível usou'); assert.deepEqual(naoUsado.porPessoa, {});
+  const usado = cr({ vinculos: [VC({ nome: 'Fulano Desligado', chave: '100' })] });
+  assert.ok(usado.avisos.some((a) => /^1 vínculo\(s\) de refeição sem pessoa ativa/.test(a))); assert.ok(usado.avisos.some((a) => /^1 item\(ns\) de refeição sem dono/.test(a)), 'segue órfão, não some');
+  assert.equal(usado.identificados.length, 0);
+  const apNao = cr({ vinculos: [VC({ tipo: 'APELIDO', chave: 'zeca', nome: 'Fulano Desligado' })] });
+  assert.ok(!apNao.avisos.some((a) => AVISO_SEM.test(a)));
+  const apSim = cr({ vendas: [V({ comanda_id: 999, nome_venda: 'refeição Zeca' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'zeca', nome: 'Fulano Desligado' })] });
+  assert.ok(apSim.avisos.some((a) => AVISO_SEM.test(a))); assert.deepEqual(apSim.porPessoa, {}, 'nunca mapeia por primeiro nome');
+  const apFron = cr({ vendas: [V({ comanda_id: 999, nome_venda: 'zecao' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'zeca', nome: 'Fulano Desligado' })] });
+  assert.ok(!apFron.avisos.some((a) => AVISO_SEM.test(a)), 'pedaço de palavra não é uso');
+  const cancel = cr({ vendas: [V({ cancelada: true })], vinculos: [VC({ nome: 'Fulano Desligado', chave: '100' })] });
+  assert.ok(!cancel.avisos.some((a) => AVISO_SEM.test(a)), 'venda não elegível não usa o vínculo');
+  const outraUn = cr({ vinculos: [VC({ nome: 'Fulano Desligado', chave: '100', unidade: 'AHU' })] });
+  assert.ok(!outraUn.avisos.some((a) => AVISO_SEM.test(a)), 'outra unidade não usa');
+});
+
+// ---------- PESSOA_VENDA / CATEGORIA_VENDA (lançamento avulso; chave = id_sale; só na data exata) ----------
+const PV = (o) => VC(Object.assign({ tipo: 'PESSOA_VENDA', chave: '1', valido_desde: DIA }, o));
+const CV = (o) => CC(Object.assign({ tipo: 'CATEGORIA_VENDA', chave: '1', valido_desde: DIA }, o));
+test('PESSOA_VENDA: atribui órfão só com data EXATA, id_sale, unidade e nome completo único; outro dia ignora; NULL/inválida rejeita', () => {
+  assert.deepEqual(Object.keys(cr({ vinculos: [PV()] }).porPessoa), ['1'], 'órfão atribuído');
+  assert.deepEqual(Object.keys(cr({ vinculos: [PV({ nome: 'Bia Souza' })] }).porPessoa), ['2']);
+  for (const d of ['2026-11-11', '2026-11-13', '2026-01-01']) {
+    const x = L.validarVinculos([PV({ valido_desde: d })], DIA); assert.equal(x.vinculos.length, 0, d); assert.equal(x.invalidos, 0, 'outro dia é ignorado, não inválido');
+    assert.deepEqual(cr({ vinculos: [PV({ valido_desde: d })] }).porPessoa, {}, d);
+  }
+  for (const d of [null, undefined, '', 'ontem', '2026-02-30', 20261112]) { const x = L.validarVinculos([PV({ valido_desde: d })], DIA); assert.equal(x.vinculos.length, 0); assert.equal(x.invalidos, 1, String(d)); }
+  assert.equal(L.validarVinculos([CV({ valido_desde: null })], DIA).invalidos, 1); assert.equal(L.validarVinculos([CV({ valido_desde: '2026-11-11' })], DIA).vinculos.length, 0);
+  assert.deepEqual(cr({ vinculos: [PV({ chave: '2' })] }).porPessoa, {}, 'outro id_sale'); assert.deepEqual(cr({ vinculos: [PV({ unidade: 'AHU' })] }).porPessoa, {}, 'outra unidade');
+  assert.deepEqual(cr({ vinculos: [PV({ nome: 'Ana' })] }).porPessoa, {}, 'primeiro nome não resolve');
+  assert.ok(cr({ vinculos: [PV({ nome: 'Ana' })] }).avisos.some((a) => AVISO_SEM.test(a)), 'sem pessoa e usado: avisa e segue órfão');
+  assert.deepEqual(cr({ vinculos: [PV({ nome: 'Ana Teste', unidade: 'AHU' })], vendas: [V({ unidade: 'AHU' })], itens: [IT({ unidade: 'AHU', observacao: '' })] }).porPessoa[3].length, 1, 'mesmo nome, unidade certa');
+  const hom = cr({ vinculos: [PV()], pessoas: PE.concat([{ id: 9, nome: 'ANA TESTE', unidade: 'AGUA VERDE' }]) }); assert.deepEqual(hom.porPessoa, {}); assert.ok(hom.avisos.some((a) => /nome repetido/.test(a)));
+  assert.deepEqual(Object.keys(cr({ vinculos: [PV({ chave: ' 1 ' })] }).porPessoa), ['1'], 'chave textual aparada');
+});
+test('PESSOA_VENDA × cartão/alias pessoal: mesma pessoa ok; outra pessoa = conflito (nada silencia a regra)', () => {
+  assert.deepEqual(Object.keys(cr({ vinculos: [VC(), PV()] }).porPessoa), ['1'], 'mesma pessoa do cartão');
+  const c = cr({ vinculos: [VC({ nome: 'Bia Souza' }), PV()] });
+  assert.deepEqual(c.porPessoa, {}); assert.ok(c.avisos.some((a) => /^1 item\(ns\) de refeição com identificação em conflito/.test(a)));
+  const apNome = (o) => cr({ vendas: [V({ comanda_id: 999, nome_venda: 'pretinho' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'pretinho', nome: 'Bia Souza' }), PV(o)] });
+  assert.deepEqual(apNome().porPessoa, {}); assert.ok(apNome().avisos.some((a) => /identificação em conflito/.test(a)));
+  assert.deepEqual(Object.keys(apNome({ nome: 'Bia Souza' }).porPessoa), ['2']);
+  const cartaoEmConflito = cr({ vinculos: [VC(), VC({ nome: 'Bia Souza' }), PV()] }); assert.deepEqual(cartaoEmConflito.porPessoa, {});
+  const aliasEmConflito = cr({ vendas: [V({ comanda_id: 999, nome_venda: 'pretinho' })], vinculos: [VC({ tipo: 'APELIDO', chave: 'pretinho' }), VC({ tipo: 'APELIDO', chave: 'pretinho', nome: 'Bia Souza' }), PV()] }); assert.deepEqual(aliasEmConflito.porPessoa, {});
+  const dois = cr({ vinculos: [PV(), PV({ nome: 'Bia Souza' })] }); assert.deepEqual(dois.porPessoa, {}); assert.ok(dois.avisos.some((a) => /em conflito/.test(a)));
+  assert.deepEqual(Object.keys(cr({ vinculos: [PV(), PV()] }).porPessoa), ['1'], 'mesma pessoa duas vezes não conflita');
+});
+test('CATEGORIA_VENDA: conjunto por id_sale/dia/unidade; vence só alias; × cartão pessoal, × PESSOA_VENDA e × outra categoria = conflito', () => {
+  const ok = cr({ vinculos: [CV()] }); assert.deepEqual(rotulos(ok), ['Equipe Teste:1']); assert.deepEqual(ok.porPessoa, {}); assert.deepEqual(ok.identificados, []);
+  assert.deepEqual(cr({ vinculos: [CV({ valido_desde: '2026-11-11' })] }).categorias, []); assert.deepEqual(cr({ vinculos: [CV({ chave: '2' })] }).categorias, []); assert.deepEqual(cr({ vinculos: [CV({ unidade: 'AHU' })] }).categorias, []);
+  const alias = cr({ itens: [IT({ observacao: 'p/ bia' })], vinculos: [CV(), VC({ tipo: 'APELIDO', chave: 'bia', nome: 'Bia Souza' })] });
+  assert.deepEqual(rotulos(alias), ['Equipe Teste:1']); assert.deepEqual(alias.porPessoa, {});
+  const cartao = cr({ vinculos: [CV(), VC()] }); assert.deepEqual(cartao.categorias, []); assert.deepEqual(cartao.porPessoa, {}); assert.ok(cartao.avisos.some((a) => /identificação em conflito/.test(a)));
+  const pv = cr({ vinculos: [CV(), PV()] }); assert.deepEqual(pv.categorias, []); assert.deepEqual(pv.porPessoa, {}); assert.ok(pv.avisos.some((a) => /identificação em conflito/.test(a)));
+  const pvCliente = cr({ vendas: [V({ comanda_id: 999, cliente_nome: 'mesa da equipe' })], vinculos: [CC(), PV()] }); assert.deepEqual(pvCliente.categorias, []); assert.deepEqual(pvCliente.porPessoa, {});
+  const pvCartaoCat = cr({ vinculos: [CK({ chave: '100' }), PV()] }); assert.deepEqual(pvCartaoCat.categorias, []); assert.deepEqual(pvCartaoCat.porPessoa, {});
+  const pvConf = cr({ vinculos: [CV(), PV({ nome: 'Fulano Sem Cadastro' })] }); assert.deepEqual(rotulos(pvConf), ['Equipe Teste:1'], 'PESSOA_VENDA sem pessoa resolvida não entra em jogo');
+  const dois = cr({ vinculos: [CV(), CV({ nome: 'Outra' })] }); assert.deepEqual(dois.categorias, []); assert.ok(dois.avisos.some((a) => /categoria de refeição em conflito/.test(a)));
+  const duasFontes = cr({ vendas: [V({ cliente_nome: 'mesa da equipe' })], vinculos: [CV({ nome: 'Outra' }), CC()] }); assert.deepEqual(duasFontes.categorias, []); assert.ok(duasFontes.avisos.some((a) => /identificação em conflito/.test(a)));
+  assert.deepEqual(rotulos(cr({ vinculos: [CV(), CV({ nome: 'EQUIPE teste' })] })), ['Equipe Teste:1']);
+});
+test('venda avulsa ponta a ponta: só Pessoa/categoria mínimas na resposta; id_sale, cliente e observação nunca vazam', async () => {
+  const vendas = [V({ id_sale: 'SEGREDOVENDA77', comanda_id: 5, cliente_nome: 'CLIENTE SIGILOSO' }), V({ id_sale: 'SEGREDOVENDA88', comanda_id: 6, cliente_nome: 'OUTRO SIGILO' })].map((x) => Object.assign(x, { shift_date: DIA }));
+  const itens = [IT({ id_sale: 'SEGREDOVENDA77', id_sale_item: 1, observacao: 'OBS SIGILOSA' }), IT({ id_sale: 'SEGREDOVENDA88', id_sale_item: 2, observacao: 'OBS DOIS' })];
+  const vinc = [PV({ chave: 'SEGREDOVENDA77' }), CV({ chave: 'SEGREDOVENDA88' }), PV({ chave: 'SEGREDOVENDA55', valido_desde: '2026-11-10' })];
+  const r = await rodar({ vendas, itens, ctx: { obterVinculos: async () => vinc } });
+  const rf = r.corpo.refeicoes; assert.equal(rf.disponivel, true);
+  assert.deepEqual(Object.keys(rf.porPessoa), ['1']); assert.deepEqual(rf.identificados, [1]); assert.deepEqual(rf.categorias.map((c) => [c.rotulo, c.itens.length]), [['Equipe Teste', 1]]);
+  const texto = JSON.stringify(r.corpo);
+  for (const proibido of ['SEGREDOVENDA', 'CLIENTE SIGILOSO', 'OUTRO SIGILO', 'OBS SIGILOSA', 'OBS DOIS', 'id_sale', 'cliente_nome', 'valido_desde']) assert.ok(!texto.includes(proibido), 'vazou: ' + proibido);
 });
 test('ponta a ponta: vínculos NULL chegam à resposta (refeição disponível)', async () => {
   const r = await rodar({ ctx: { obterVinculos: async () => VINC.map((x) => Object.assign({}, x, { valido_desde: null })) } });
