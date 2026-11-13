@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Estudo "Saída da antecipação" (Financeiro, 13/11/2026; dono 13:24 via Organizador: página fácil de ler para o Fabio).
+     Fora do menu. Sem saldo de conta, limite do banco ou valor da aplicação (o Pages é aberto). Fonte: contexto/propostas-telas/2026-11-13-sair-antecipacao.html -->
+<title>Saída da antecipação</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: três números grandes, um gráfico de barras mês a mês, cartões de passos, duas decisões e a última linha. */
+:root {
+  --bg: #f4f6f4; --card: #ffffff; --fg: #18201c; --muted: #5f6b65; --line: #dde3df;
+  --accent: #1f6f5c; --accent-soft: #e2efe9; --warn: #b4531c; --warn-soft: #f7e9df; --bar: #9fb8ad;
+  --f-text: "IBM Plex Sans", system-ui, sans-serif;
+  --f-head: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111513; --card: #19201c; --fg: #e6ece9; --muted: #9eaba4; --line: #2b3430;
+  --accent: #5cc0a4; --accent-soft: #1d2b25; --warn: #e3935f; --warn-soft: #2e231c; --bar: #4f6b60; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111513; --card: #19201c; --fg: #e6ece9; --muted: #9eaba4; --line: #2b3430;
+  --accent: #5cc0a4; --accent-soft: #1d2b25; --warn: #e3935f; --warn-soft: #2e231c; --bar: #4f6b60; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 var(--f-text); }
+.wrap { max-width: 820px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 36px; }
+h1 { font: 700 2rem/1.1 var(--f-head); margin: 0; text-wrap: balance; }
+h2 { font: 600 .85rem/1 var(--f-head); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+.sub { color: var(--muted); margin: 6px 0 0; font-size: .95rem; }
+section { display: grid; gap: 14px; }
+.big { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.n { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 6px; min-width: 0; }
+.n b { font: 700 2.3rem/1 var(--f-head); color: var(--accent); }
+.n.w b { color: var(--warn); }
+.n span { color: var(--muted); font-size: .95rem; }
+.chart { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 12px 8px; overflow-x: auto; }
+.chart svg { width: 100%; min-width: 480px; height: auto; display: block; }
+.bar { fill: var(--bar); } .bar.hi { fill: var(--accent); } .bar.zero { fill: var(--accent); }
+.vl { font: 500 13px var(--f-num); fill: var(--fg); } .ml { font: 13px var(--f-text); fill: var(--muted); }
+.cx { font: 12px var(--f-text); fill: var(--warn); } .base { stroke: var(--line); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.c { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 4px; align-content: start; }
+.c .d { font: 600 1.05rem var(--f-head); color: var(--accent); }
+.c .q { font-weight: 600; }
+.c .s { font-size: .88rem; color: var(--muted); }
+.c.later { border-style: dashed; } .c.later .d { color: var(--warn); }
+.dec { display: grid; gap: 10px; }
+.dc { background: var(--warn-soft); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; }
+.dc b { font-family: var(--f-head); font-size: 1.05rem; }
+.dc span { color: var(--muted); font-size: .92rem; }
+.last { background: var(--accent-soft); border-radius: 10px; padding: 18px; font-size: 1.1rem; font-weight: 600; }
+.foot { color: var(--muted); font-size: .8rem; }
+@media (max-width: 480px) { h1 { font-size: 1.6rem; } .n b { font-size: 2rem; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Saída da antecipação da Rede e do iFood</h1>
+    <p class="sub">Estudo do Financeiro · 13/11/2026</p>
+  </header>
+
+  <section class="big">
+    <div class="n w"><b>R$ 10,5 mil</b><span>por mês é o custo de antecipar hoje</span></div>
+    <div class="n"><b>R$ 510 mil</b><span>de caixa, uma vez só, para deixar de antecipar</span></div>
+    <div class="n"><b>5 passos</b><span>de 16/11 a 27/01, um de cada vez</span></div>
+  </section>
+
+  <section>
+    <h2>Quanto custa</h2>
+    <div class="cards">
+      <div class="c"><span class="q">iFood</span><span class="d">R$ 8,6 mil/mês</span><span class="s">recebe 21 dias antes, paga 1,59% por semana</span></div>
+      <div class="c"><span class="q">Rede (crédito)</span><span class="d">R$ 2,0 mil/mês</span><span class="s">recebe em 1 dia em vez de 30, paga 1,42%</span></div>
+      <div class="c"><span class="q">Rede (débito)</span><span class="d">R$ 0</span><span class="s">já cai em 1 dia, sem custo extra</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Custo da antecipação, mês a mês</h2>
+    <div class="chart">
+      <svg viewBox="0 0 560 230" role="img" aria-label="Custo mensal da antecipação caindo de 10,5 mil para zero">
+        <line x1="20" x2="540" y1="180" y2="180" class="base"/>
+        <rect class="bar" x="40" y="40" width="64" height="140"/><text class="vl" x="72" y="32" text-anchor="middle">10,5</text><text class="ml" x="72" y="198" text-anchor="middle">nov</text>
+        <rect class="bar" x="140" y="40" width="64" height="140"/><text class="vl" x="172" y="32" text-anchor="middle">10,5</text><text class="ml" x="172" y="198" text-anchor="middle">dez</text>
+        <rect class="bar hi" x="240" y="67" width="64" height="113"/><text class="vl" x="272" y="59" text-anchor="middle">8,5</text><text class="ml" x="272" y="198" text-anchor="middle">jan</text>
+        <rect class="bar hi" x="340" y="98" width="64" height="82"/><text class="vl" x="372" y="90" text-anchor="middle">6,2</text><text class="ml" x="372" y="198" text-anchor="middle">fev</text>
+        <rect class="bar zero" x="440" y="177" width="64" height="3"/><text class="vl" x="472" y="168" text-anchor="middle">0</text><text class="ml" x="472" y="198" text-anchor="middle">depois</text>
+        <text class="cx" x="272" y="218" text-anchor="middle">4 passos</text>
+        <text class="cx" x="472" y="218" text-anchor="middle">iFood AV</text>
+      </svg>
+    </div>
+    <p class="sub">Em mil reais por mês. Cada passo feito deixa de pagar a taxa daquela loja.</p>
+  </section>
+
+  <section>
+    <h2>Os passos</h2>
+    <div class="cards">
+      <div class="c"><span class="d">16/11</span><span class="q">Rede Ahú</span><span class="s">caixa R$ 2 mil</span></div>
+      <div class="c"><span class="d">06/01</span><span class="q">Rede São Braz</span><span class="s">caixa R$ 40 mil</span></div>
+      <div class="c"><span class="d">13/01</span><span class="q">Rede Água Verde</span><span class="s">caixa R$ 92 mil</span></div>
+      <div class="c"><span class="d">20/01</span><span class="q">iFood Ahú</span><span class="s">caixa R$ 51 mil</span></div>
+      <div class="c"><span class="d">27/01</span><span class="q">iFood São Braz</span><span class="s">caixa R$ 53 mil</span></div>
+      <div class="c later"><span class="d">depois</span><span class="q">iFood Água Verde</span><span class="s">caixa R$ 270 mil · data a medir</span></div>
+    </div>
+    <p class="sub">Com os 5 primeiros, o pior dia do caixa fica igual ao de hoje. Antes de cada passo, o caixa é medido de novo.</p>
+  </section>
+
+  <section class="dec">
+    <h2>Falta decidir (Neto)</h2>
+    <div class="dc"><b>#557 · Ritmo</b><span>devagar como acima, tudo de uma vez, ou devagar com o iFood da Água Verde antes</span></div>
+    <div class="dc"><b>#558 · Pedir taxa menor antes de sair</b><span>cada 0,5 ponto a menos: ≈ R$ 700/mês na Rede, ≈ R$ 2.700/mês no iFood</span></div>
+  </section>
+
+  <div class="last">Custa ≈ R$ 10,5 mil por mês. Sair custa ≈ R$ 510 mil de caixa. Caminho em 5 passos, de 16/11 a 27/01.</div>
+  <p class="foot">Fontes: vendas da Rede (agosto a outubro) e antecipações do iFood (últimas 3 semanas), pelas APIs; fluxo de caixa projetado de 13/11.</p>
+</div>
+</body>
+</html>
