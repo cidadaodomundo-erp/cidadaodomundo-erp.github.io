@@ -265,37 +265,62 @@ function agAvisosHtml() {
       : '<span style="color:var(--farol-perto);font-weight:700;">esperando você</span>';
     // 13/11/2026 12:37 (dono: "coloca a observação dos avisos da agenda na frente, quero usar agora"): o campo de observação
     // fica à vista em todo aviso que espera você; vale para os três botões (no Manda vira a observação do aviso)
-    const bts = !a.botoes ? '' : `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota_${Number(a.ref)}" oninput="AG_AV_NOTAS[${Number(a.ref)}]=this.value" rows="2" placeholder="observação (opcional no Manda e no Não manda; obrigatória no Muda o texto)" style="${campo}">${agE(AG_AV_NOTAS[a.ref] || '')}</textarea>
+    const bts = !a.botoes ? '' : `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota_${Number(a.ref)}" oninput="AG_AV_NOTAS[${Number(a.ref)}]=this.value" rows="2" placeholder="observação (opcional no Manda e no Não manda; obrigatória no Muda o texto)" style="${campo}">${agE(AG_AV_NOTAS[a.ref] != null ? AG_AV_NOTAS[a.ref] : (a.obs_dono || ''))}</textarea>
+        ${a.obs_situacao ? `<div class="ag-ctx" style="color:var(--tx-4);">${agE(a.obs_situacao)}</div>` : ''}
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, 'MANDA')">Manda</button>
           <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'MUDA')">Muda o texto</button>
-          <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'NAO')">Não manda</button></div></div>`;
+          <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'NAO')">Não manda</button>
+          ${a.alvo ? `<button type="button" class="preset-btn" title="só grava a observação, sem decidir" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, 'agAvNota_${Number(a.ref)}')">Salvar observação</button>` : ''}</div></div>`;
     return `<div class="ag-lin ${a.estado === 'ESPERA' ? 'alerta' : ''}" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} <span class="f">${a.frente ? '· ' + agE(a.frente) : ''}</span> · ${est}
         <div style="white-space:pre-wrap;margin:6px 0 2px;padding:8px 10px;background:var(--surface-2);border-radius:8px;color:var(--tx-1);">${agE(a.texto || '')}</div>
-        ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}</span>${bts}</div>`;
+        ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}</span>${bts || agAvObsHtml(a)}</div>`;
   }).join('') : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nenhum aviso esperando você</span></div>';
   // 2) automáticos validados
   const G2 = g(2);
   h += `<div class="ag-bloco">Automáticos validados <span class="f">· saem sozinhos; números da semana</span></div>`;
-  h += G2.length ? `<div id="tabelaAgAvAuto"><table><thead><tr><th>Assunto</th><th>Para quem</th><th>Quando sai</th><th>Enviados</th><th>Feitos</th><th>Travados</th><th>Abertos</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+  h += G2.length ? `<div id="tabelaAgAvAuto"><table><thead><tr><th>Assunto</th><th>Para quem</th><th>Quando sai</th><th>Enviados</th><th>Feitos</th><th>Travados</th><th>Abertos</th><th>Situação</th><th>Ação</th><th>Observação</th></tr></thead><tbody>
     ${G2.map((a) => { const lig = a.estado !== 'DESLIGADO';
       return `<tr><td style="white-space:normal;"><b>${agE(a.assunto || '')}</b>${a.texto ? `<div style="font-size:11.5px;color:var(--tx-4);">${agE(a.texto)}</div>` : ''}</td><td>${agE(a.para_quem || '')}</td>
         <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td><td>${Number(a.enviados_7d) || 0}</td><td style="color:var(--farol-ok);">${Number(a.feitos_7d) || 0}</td>
         <td style="color:${Number(a.travados_7d) ? 'var(--farol-fora)' : 'var(--tx-4)'};">${Number(a.travados_7d) || 0}</td><td>${Number(a.abertos) || 0}</td>
         <td style="color:${lig ? 'var(--farol-ok)' : 'var(--tx-4)'};font-weight:700;">${lig ? 'ligado' : 'desligado'}</td>
-        <td>${lig ? (a.pode_parar ? `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, false)">Parar</button>` : '') : `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, true)">Ligar</button>`}</td></tr>`; }).join('')}
+        <td>${lig ? (a.pode_parar ? `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, false)">Parar</button>` : '') : `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, true)">Ligar</button>`}</td><td style="min-width:200px;">${agAvObsHtml(a, true)}</td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="caption-label" style="text-align:left;">Nenhum aviso automático ainda: o primeiro "Manda" de um tipo liga o automático dele.</div>';
   // 3) enviados e travados (7 dias): Travada primeiro
   const ordem = { Travada: 0, Esperando: 1, Respondeu: 2, Feita: 3, Cancelada: 4 };
   const G3 = g(3).slice().sort((x, y) => (ordem[x.estado] ?? 9) - (ordem[y.estado] ?? 9) || String(y.quando || '').localeCompare(String(x.quando || '')));
   const cor3 = { Travada: 'var(--farol-fora)', Esperando: 'var(--farol-perto)', Respondeu: 'var(--info)', Feita: 'var(--farol-ok)', Cancelada: 'var(--tx-5)' };
   h += `<div class="ag-bloco">Enviados e travados <span class="f">· últimos 7 dias · ${G3.length}</span></div>`;
-  h += G3.length ? `<div id="tabelaAgAvEnviados"><table><thead><tr><th>Quando</th><th>Para quem</th><th>Assunto</th><th>Situação</th><th>Como saiu</th><th>Resposta</th></tr></thead><tbody>
+  h += G3.length ? `<div id="tabelaAgAvEnviados"><table><thead><tr><th>Quando</th><th>Para quem</th><th>Assunto</th><th>Situação</th><th>Como saiu</th><th>Resposta</th><th>Observação</th></tr></thead><tbody>
     ${G3.map((a) => `<tr><td style="white-space:nowrap;">${a.quando ? agDm(new Date(a.quando).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })) + ' ' + agHm(a.quando) : '–'}</td>
       <td>${agE(a.para_quem || '')}</td><td style="white-space:normal;">${agE(a.assunto || '')}</td>
       <td style="color:${cor3[a.estado] || 'var(--tx-3)'};font-weight:700;">${agE(String(a.estado || '').toLowerCase())}</td><td style="font-size:12px;">${agE(a.tipo || '')}</td>
-      <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td></tr>`).join('')}</tbody></table></div>`
+      <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td><td style="min-width:200px;">${agAvObsHtml(a, true)}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="caption-label" style="text-align:left;">Nada enviado nos últimos 7 dias.</div>';
   return h;
+}
+// 13/11/2026 12:40 (chat Avisos; dono 12:33 "coloca um campo de observação nos avisos da agenda"): em todo cartão e linha,
+// observação pré-preenchida (obs_dono) + Salvar (wa_aviso_obs_gravar, p_alvo = alvo; vazio apaga) + a situação em cinza
+let AG_AV_OBS_N = 0;
+function agAvObsHtml(a, compacto) {
+  if (!a.alvo) return '';
+  const id = 'agAvObs_' + (++AG_AV_OBS_N), v = AG_AV_NOTAS[a.alvo] != null ? AG_AV_NOTAS[a.alvo] : (a.obs_dono || '');
+  const st = 'background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:6px 8px;font:inherit;font-size:12.5px;';
+  return `<div style="${compacto ? '' : 'flex-basis:100%;margin-top:6px;'}display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;">
+      <textarea id="${id}" rows="1" placeholder="observação" oninput="AG_AV_NOTAS[${agE(JSON.stringify(a.alvo))}]=this.value" style="flex:1 1 160px;min-width:0;${st}">${agE(v)}</textarea>
+      <button type="button" class="preset-btn" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, '${id}')">Salvar</button>
+      ${a.obs_situacao ? `<div style="flex-basis:100%;font-size:11.5px;color:var(--tx-4);">${agE(a.obs_situacao)}</div>` : ''}</div>`;
+}
+async function agAvObsSalvar(alvo, campoId) {
+  const txt = ((document.getElementById(campoId) || {}).value || '').trim();
+  avisoAcao('enviando', txt ? 'Salvando a observação…' : 'Apagando a observação…');
+  const r = await trRpcSeguro('wa_aviso_obs_gravar', { p_alvo: alvo, p_texto: txt });
+  if (!r.ok) return avisoAcao('erro', '✗ A observação NÃO foi salva: ' + (await trErroDe(r)), () => agAvObsSalvar(alvo, campoId));
+  const fr = await agAvFrase(r);
+  delete AG_AV_NOTAS[alvo];
+  avisoAcao('ok', `✓ ${fr || (txt ? 'Observação salva.' : 'Observação apagada.')} — às ${avisoHora()}.`);
+  try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
+  await entrarAgenda(true);
 }
 async function agAvFrase(r) { try { const j = await r.json(); return typeof j === 'string' ? j : (j && (j.frase || j.mensagem || j.msg)) || ''; } catch (e) { return ''; } }
 async function agAvDecidir(ref, dec) {
