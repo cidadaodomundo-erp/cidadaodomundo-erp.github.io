@@ -23,7 +23,7 @@ export const MAX_LINHAS = 500;
 
 // ---------- texto / unidades ----------
 export function normalizar(s) {
-  return typeof s === 'string' ? s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim() : '';
+  return typeof s === 'string' ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim() : '';
 }
 export function textoSeguro(s, max) {
   return typeof s === 'string' ? s.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '';
@@ -162,6 +162,8 @@ const campo = (ctx, v, f) => { if (v === null || v === undefined) return null; c
 export const DIREITOS = Object.freeze(['ok', 'perdeu', 'rango_excecao', 'sem_prova', 'no_prazo', 'nao_chegou', 'fora']);
 export const MOTIVOS_SEM_PROVA = Object.freeze(['nome', 'gps', 'robo', 'balcao']);
 export const FONTES_CHEGADA = Object.freeze(['fila', 'patio_gps']);   // única chegada real; 1ª entrega fica em campo próprio
+export const FONTES_FILA = Object.freeze(['site', 'api']);   // 13/11: de onde veio a hora da fila do TrackEat
+const sinalMinDe = (v) => (Number.isInteger(v) && v >= 0 ? v : null);   // minutos desde o último sinal (histórico passa de 1 dia)
 const FORMATO_DB = () => new ErroLeitura('consulta_formato', 502);
 
 export function projetarLinha(x, un, ctx) {
@@ -198,7 +200,13 @@ export function projetarLinha(x, un, ctx) {
     chegou_txt: fonte ? chegouBruto : null,
     chegou_fonte: fonte && chegouBruto ? fonte : null,
     primeira_entrega_txt: campo(ctx, x.primeira_entrega_txt, hmDe),   // evidência separada; NÃO é chegada
+    chegada_fila_fonte: campo(ctx, x.chegada_fila_fonte, enumDe(FONTES_FILA)),   // 13/11: site do TrackEat (principal) ou API
     saida_registrada_txt: saida,
+    // 13/11/2026 (Fabio #6729): evidências do fim do turno, SEPARADAS da saída registrada; nunca viram saída
+    ultima_entrega_txt: campo(ctx, x.ultima_entrega_txt, hmDe),
+    ultimo_patio_txt: campo(ctx, x.ultimo_patio_txt, hmDe),
+    ultimo_sinal_txt: campo(ctx, x.ultimo_sinal_txt, hmDe),
+    sinal_min: campo(ctx, x.sinal_min, sinalMinDe),
     tempo_registrado_min: tempoOk ? tempo : null,
     tempo_fonte: tempoOk ? tempoFonte : null,
     // regra herdada de public.chegada_direito: validada, nunca recalculada

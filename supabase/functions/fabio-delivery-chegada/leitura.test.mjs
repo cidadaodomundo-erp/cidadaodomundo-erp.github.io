@@ -273,6 +273,31 @@ test('resposta malformada ou de outra loja: indisponível', async () => {
   }
 });
 
+test('13/11: fim do turno e fonte da fila passam validados; formato errado vira null e conta inválido', async () => {
+  const boa = linha({ chegada_fila_fonte: 'site', ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:01', sinal_min: 2950 });
+  let x = await chamar({ lerConsulta: db({ 'AGUA VERDE': consulta([boa]) }) });
+  let l = x.r.corpo.por_unidade[0].linhas[0];
+  assert.equal(l.chegada_fila_fonte, 'site');
+  assert.equal(l.ultima_entrega_txt, '22:40');
+  assert.equal(l.ultimo_patio_txt, '22:58');
+  assert.equal(l.ultimo_sinal_txt, '23:01');
+  assert.equal(l.sinal_min, 2950, 'histórico pode passar de 1 dia sem virar inválido');
+  assert.equal(l.saida_registrada_txt, '18:10:42', 'saída registrada continua só a batida');
+  assert.equal(x.r.corpo.por_unidade[0].campos_invalidos, 0);
+  const ruim = linha({ chegada_fila_fonte: 'whatsapp', ultima_entrega_txt: 'ontem', ultimo_patio_txt: 25, sinal_min: -3 });
+  x = await chamar({ lerConsulta: db({ 'AGUA VERDE': consulta([ruim]) }) });
+  l = x.r.corpo.por_unidade[0].linhas[0];
+  assert.equal(l.chegada_fila_fonte, null);
+  assert.equal(l.ultima_entrega_txt, null);
+  assert.equal(l.ultimo_patio_txt, null);
+  assert.equal(l.sinal_min, null);
+  assert.equal(x.r.corpo.por_unidade[0].campos_invalidos, 4);
+  x = await chamar({ lerConsulta: db({ 'AGUA VERDE': consulta([linha()]) }) });
+  l = x.r.corpo.por_unidade[0].linhas[0];
+  assert.equal(l.ultima_entrega_txt, null, 'sem o campo = null, sem inventar');
+  assert.equal(x.r.corpo.por_unidade[0].campos_invalidos, 0);
+});
+
 test('projeção allowlist: nada de quem, contato ou payload', async () => {
   const extra = linha({ quem: 'fulano@x', telefone: '41999999999', cpf: '123', payload: { a: 1 }, user_metadata: { b: 2 }, token: 't', motoboy: 'Moto\u0000 B' });
   const x = await chamar({ lerConsulta: db({ 'AGUA VERDE': consulta([extra], { quem: 'z', indicadores: { total: 9 }, robo: { atualizado_em: '2026-11-12T17:59:00Z', ok: true, log: 'segredo' } }) }) });
@@ -280,10 +305,10 @@ test('projeção allowlist: nada de quem, contato ou payload', async () => {
   const u = x.r.corpo.por_unidade[0];
   assert.deepEqual(Object.keys(u).sort(), ['ao_vivo', 'campos_invalidos', 'consultado_em', 'hoje', 'linhas', 'robo', 'status', 'unidade']);
   assert.deepEqual(Object.keys(u.robo).sort(), ['atualizado_em', 'ok']);
-  assert.deepEqual(Object.keys(u.linhas[0]).sort(), ['anotado_txt', 'atraso_min', 'chegada_fila_em', 'chegada_fila_txt', 'chegou_fonte', 'chegou_txt', 'direito',
+  assert.deepEqual(Object.keys(u.linhas[0]).sort(), ['anotado_txt', 'atraso_min', 'chegada_fila_em', 'chegada_fila_fonte', 'chegada_fila_txt', 'chegou_fonte', 'chegou_txt', 'direito',
     'escala_saida_txt', 'escala_txt', 'garantido_manual', 'garantido_motivo', 'garantido_perdido', 'limite_txt', 'motivo_sem_prova', 'motoboy', 'n_turno',
-    'na_escala', 'patio_gps_txt', 'primeira_entrega_txt', 'rango_manual', 'rango_motivo', 'saida_registrada_txt', 'tempo_fonte', 'tempo_registrado_min',
-    'unidade', 'vivo_rodando']);
+    'na_escala', 'patio_gps_txt', 'primeira_entrega_txt', 'rango_manual', 'rango_motivo', 'saida_registrada_txt', 'sinal_min', 'tempo_fonte', 'tempo_registrado_min',
+    'ultima_entrega_txt', 'ultimo_patio_txt', 'ultimo_sinal_txt', 'unidade', 'vivo_rodando']);
   const txt = JSON.stringify(x.r.corpo);
   for (const s of ['fulano', '4199', 'cpf', 'payload', 'metadata', 'segredo', 'indicadores', '"quem"', 'token', 'override', 'motivos']) assert.ok(!txt.includes(s), s);
   assert.equal(u.linhas[0].motoboy, 'Moto B');

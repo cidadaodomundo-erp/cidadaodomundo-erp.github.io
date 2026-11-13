@@ -27,11 +27,14 @@
     const esc1 = M.hora(l.escala_txt), esc2 = M.hora(l.escala_saida_txt);
     return '<details class="cg-ficha"><summary>Ficha e fontes</summary><dl>' +
       item('Chegada usada', ch ? ch.hora + ' · ' + ch.rotulo : 'nenhuma fonte de chegada') +
-      item(M.ROTULO_FONTE.fila, fila ? fila + (filaEm ? ' (registro às ' + filaEm + ')' : '') : null) +
+      item(M.ROTULO_FONTE.fila, fila ? fila + (filaEm ? ' (registro às ' + filaEm + ')' : '') + (M.filaFonte(l) ? ' · ' + M.filaFonte(l) : '') : null) +
       item('Pátio (GPS)', M.hora(l.patio_gps_txt)) +
       item('Anotado à mão pela loja', M.hora(l.anotado_txt)) +
       item('Primeira entrega (não conta como chegada)', M.hora(l.primeira_entrega_txt)) +
       item('Saída registrada', M.saidaRegistrada(l)) +
+      item('Última entrega', M.hora(l.ultima_entrega_txt)) +
+      item('Última vez no pátio (GPS)', M.hora(l.ultimo_patio_txt)) +
+      item('Último sinal do aplicativo', M.hora(l.ultimo_sinal_txt)) +
       item('Entrada combinada', esc1 ? esc1 + (esc2 ? ' até ' + esc2 : '') : null) +
       item('Limite de tolerância', M.hora(l.limite_txt)) +
       item('Atraso desde a entrada combinada', Number.isFinite(l.atraso_min) ? l.atraso_min + ' min' : null) +
@@ -42,7 +45,15 @@
       item('Situação informada pela fonte', M.txt(l.direito)) +
       '</dl><p class="cg-nota">O intervalo registrado vai da chegada (Fila do TrackEat ou pátio GPS) à saída registrada e pode conter pausas: não é hora líquida trabalhada.</p></details>';
   }
-  function linhaHtml(M, l) {
+  // 13/11/2026 (Fabio): embaixo da saída registrada, última entrega e última vez no pátio, separadas e rotuladas;
+  // "Foi embora por volta de" só como estimativa. Sem dado = pendência visível, nunca hora inventada.
+  function fimHtml(M, l, aoVivo) {
+    const f = M.fimDoTurno(l, aoVivo);
+    const lin = (rot, v) => '<small class="cg-motivo cg-fim">' + M.esc(rot) + ' ' + (v ? '<strong>' + M.esc(v) + '</strong>' : '<span class="cg-fraco">sem dado</span>') + '</small>';
+    return lin('Última entrega', f.entrega) + lin('Última vez no pátio', f.patio) +
+      (f.foiEmbora ? '<small class="cg-motivo cg-estimativa">Foi embora por volta de <strong>' + M.esc(f.foiEmbora) + '</strong> · estimativa, não é saída registrada</small>' : '');
+  }
+  function linhaHtml(M, l, aoVivo) {
     const ch = M.chegadaObservada(l), sai = M.saidaRegistrada(l), iv = M.intervaloRegistrado(l), d = M.direitos(l), marca = M.marcaEscala(l);
     const ent = M.hora(l.escala_txt), entSai = M.hora(l.escala_saida_txt);
     const sub = [];
@@ -56,7 +67,7 @@
         : '<span class="cg-fraco">Sem escala</span>') + '</td>' +
       '<td data-rot="Chegada observada">' + (ch ? '<span class="cg-hora">' + M.esc(ch.hora) + '</span><small class="cg-motivo cg-f-' + ch.fonte + '">' + M.esc(ch.rotulo) + '</small>'
         : '<span class="cg-fraco">Sem chegada registrada</span><small class="cg-motivo">não é falta confirmada</small>') + '</td>' +
-      '<td data-rot="Saída registrada">' + (sai ? '<span class="cg-hora">' + M.esc(sai) + '</span>' : '<span class="cg-fraco">Sem saída registrada</span>') + '</td>' +
+      '<td data-rot="Saída registrada">' + (sai ? '<span class="cg-hora">' + M.esc(sai) + '</span>' : '<span class="cg-fraco">Sem saída registrada</span>') + fimHtml(M, l, aoVivo) + '</td>' +
       '<td data-rot="Intervalo registrado">' + (iv ? '<span class="cg-hora">' + M.esc(iv.texto) + '</span><small class="cg-motivo">desde ' + M.esc(iv.rotulo) +
         ' · pode conter pausas</small>' : '<span class="cg-fraco">—</span>') + '</td>' +
       celDireito(M, 'Garantido', d.garantido) + celDireito(M, 'Refeição', d.refeicao) + '</tr>';
@@ -79,7 +90,7 @@
       corpo = '<div class="cg-vazio">A fonte foi lida e não trouxe nenhum turno de motoboy para este dia nesta loja.</div>';
     } else {
       corpo = '<div class="cg-tab-wrap"><table class="cg-tab"><thead><tr>' + CAB.map((c) => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' +
-        u.linhas.filter((l) => l && typeof l === 'object').map((l) => linhaHtml(M, l)).join('') + '</tbody></table></div>';
+        u.linhas.filter((l) => l && typeof l === 'object').map((l) => linhaHtml(M, l, u.ao_vivo === true)).join('') + '</tbody></table></div>';
     }
     return '<section class="cg-loja"><header class="cg-loja-topo"><h2>' + M.esc(nome) + '</h2><div class="cg-meta">' + meta.join('') + '</div></header>' + inval + corpo + '</section>';
   }

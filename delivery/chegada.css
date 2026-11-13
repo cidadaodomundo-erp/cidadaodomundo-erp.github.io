@@ -21,6 +21,7 @@
 .cg-hora { font-variant-numeric:tabular-nums; font-weight:600; }
 .cg-motivo, .cg-sub { display:block; font-size:11.5px; opacity:.8; line-height:1.35; margin-top:2px; }
 .cg-fraco { opacity:.7; }
+.cg-estimativa { font-style:italic; color:var(--farol-atencao, #d29922); opacity:1; }
 .cg-marca { color:var(--farol-atencao, #d29922); font-weight:700; }
 .cg-vivo { color:var(--farol-ok); font-weight:700; }
 .cg-alerta { color:var(--farol-atencao, #d29922); }

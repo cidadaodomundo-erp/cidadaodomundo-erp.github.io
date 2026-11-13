@@ -71,6 +71,27 @@
     if (!saidaRegistrada(l)) return null;
     return { min: m, texto: Math.floor(m / 60) + 'h ' + pad(m % 60) + 'min', fonte: l.tempo_fonte, rotulo: ROTULO_FONTE[l.tempo_fonte] };
   }
+  // 13/11/2026 (Fabio, caderneta #6729): embaixo da saída registrada, duas linhas separadas — última entrega e última
+  // vez no pátio. "Foi embora por volta de" é ESTIMATIVA e só aparece quando a última vez no pátio é DEPOIS da última
+  // entrega e o aplicativo não deu mais sinal (último sinal até 10 min depois do pátio; ao vivo, sem sinal há 30 min).
+  // Nunca é saída registrada e não muda garantido, refeição, pagamento nem lacres. Sem dado = null (a tela mostra pendência).
+  const SINAL_PERTO_MIN = 10, SEM_SINAL_AO_VIVO_MIN = 30;
+  // minutos do dia operacional (vira às 05h): 00:10 vem depois de 23:50
+  function minOp(h) { if (!h) return null; const p = h.split(':'); const m = (+p[0]) * 60 + (+p[1]); return m < VIRADA_HORA * 60 ? m + 1440 : m; }
+  function fimDoTurno(l, aoVivo) {
+    l = l || {};
+    const entrega = hora(l.ultima_entrega_txt), patio = hora(l.ultimo_patio_txt), sinal = hora(l.ultimo_sinal_txt);
+    let foiEmbora = null;
+    if (entrega && patio && sinal) {
+      const e = minOp(entrega), p = minOp(patio), s = minOp(sinal);
+      const calado = aoVivo === true ? (Number.isInteger(l.sinal_min) && l.sinal_min >= SEM_SINAL_AO_VIVO_MIN) : true;
+      if (p > e && s >= p && s - p <= SINAL_PERTO_MIN && calado) foiEmbora = patio.slice(0, 5);
+    }
+    return { entrega: entrega ? entrega.slice(0, 5) : null, patio: patio ? patio.slice(0, 5) : null, foiEmbora };
+  }
+  // de onde veio a hora da fila: o site do TrackEat lido pelo nosso robô (principal, Fabio 12/11) ou a API (segunda fonte)
+  const ROTULO_FILA_FONTE = { site: 'site do TrackEat (robô)', api: 'API do TrackEat' };
+  function filaFonte(l) { const f = (l || {}).chegada_fila_fonte; return Object.prototype.hasOwnProperty.call(ROTULO_FILA_FONTE, f) ? ROTULO_FILA_FONTE[f] : null; }
   function marcaEscala(l) {
     const v = (l || {}).na_escala;
     if (v === true) return null;
@@ -175,6 +196,6 @@
   }
 
   return { ENDPOINT, VIRADA_HORA, ROTULO_FONTE, FONTES_TEMPO, esc, txt, diaOperacional, diaValido, diaBR, montarUrl, hora, horaISO, dataHoraISO,
-           chegadaObservada, saidaRegistrada, intervaloRegistrado, marcaEscala, direitos, camposInvalidos, situacaoRobo, ehHistorico,
+           chegadaObservada, saidaRegistrada, intervaloRegistrado, fimDoTurno, filaFonte, marcaEscala, direitos, camposInvalidos, situacaoRobo, ehHistorico,
            unidadesVisiveis, validarResposta, normUnidade, lojasReais };
 });
