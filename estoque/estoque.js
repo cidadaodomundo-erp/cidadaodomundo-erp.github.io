@@ -2235,7 +2235,8 @@ function plpRender() {
         <td>${p.nome_base || p.nome_saipos}${p.de_onde_vem_o_custo ? ` <span style="color:var(--tx-5);font-size:11px;">(${p.de_onde_vem_o_custo})</span>` : ''}${
           (gInfo(p) || {}).tem_dia_na_grade === false && !/^SEM GRADE/.test((gInfo(p) || {}).leitura || '') ? ` <span style="font-size:11px; color:var(--amber-2);" title="é desta praça, mas a grade ainda não diz o dia em que se faz">· sem dia definido</span>` : ''}${
           // 13/11/2026 (Estoque, ff7fe5a): por que o corte/defumado aparece mesmo sem venda própria — as receitas-mãe que o pedem
-          p.pedido_pelas_receitas ? `<div style="font-size:11.5px; color:var(--tx-4); white-space:normal;">pedido por: ${trEscH(String(p.pedido_pelas_receitas))}${Number(p.demanda_das_receitas) ? ` (${fmt(Number(p.demanda_das_receitas))} ${trEscH(p.un || '')} até quarta)` : ''}</div>` : ''}</td>
+          p.pedido_pelas_receitas ? `<div style="font-size:11.5px; color:var(--tx-4); white-space:normal;">pedido por: ${(() => { const L = String(p.pedido_pelas_receitas).split(/\s*,\s*/).map((x) => x.replace(/\s+RECEITA$/i, '').toLowerCase());
+            return `<span title="${trEscH(String(p.pedido_pelas_receitas))}">${trEscH(L.slice(0, 3).join(', '))}${L.length > 3 ? ` e mais ${L.length - 3}` : ''}</span>`; })()}${Number(p.demanda_das_receitas) ? ` (${fmt(Number(p.demanda_das_receitas))} ${trEscH(p.un || '')} até quarta)` : ''}</div>` : ''}</td>
         ${PLP.dia ? plpCelulaPlano(p) : ''}
         <td style="${Number(p.saldo) <= 0 ? 'color:var(--farol-fora);font-weight:700;' : ''}">${fmt(Number(p.saldo))} ${p.un || ''}${
           p.saldo_negativo ? ` <span style="display:block;color:var(--tx-5);font-size:11px;" title="O sistema está negativo porque ninguém apontou a produção. A conta do que falta parte de zero, não deste número.">falta apontar</span>` : ''}</td>
