@@ -1020,7 +1020,7 @@ function cgAdmTemIdentidade() { return cgAdmTiposAnexados().some((t) => /\b(RG|C
 // 06/11/2026 (dono 16:23: "quais são os campos obrigatórios ... e ve quais pode aplicar lista suspensa"; proposta 2026-11-06-rh-admissao-campos-e-listas)
 const CG_UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 const CG_ADM_BLOCOS = [
-  ['Pessoais', [['cpf', 'CPF *'], ['nascimento', 'Nascimento *', 'date'], ['nome_mae', 'Nome da mãe *'], ['nome_pai', 'Nome do pai'], ['municipio_nascimento', 'Município de nascimento'],
+  ['Pessoais', [['cpf', 'CPF *'], ['nascimento', 'Nascimento *', 'date'], ['nome_mae', 'Nome da mãe *'],
     ['sexo', 'Sexo', ['', 'MASCULINO', 'FEMININO']], ['estado_civil', 'Estado civil', ['', 'SOLTEIRO', 'CASADO', 'DIVORCIADO', 'SEPARADO', 'VIÚVO']],
     ['raca_cor', 'Raça/cor (a pessoa declara)', ['', 'BRANCA', 'PRETA', 'PARDA', 'AMARELA', 'INDÍGENA', 'NÃO INFORMADO']],
     ['grau_instrucao', 'Grau de instrução', ['', 'ANALFABETO', 'ATÉ O 5º ANO INCOMPLETO', '5º ANO COMPLETO', '6º AO 9º ANO INCOMPLETO', 'ENSINO FUNDAMENTAL COMPLETO', 'ENSINO MÉDIO INCOMPLETO',
@@ -1029,9 +1029,11 @@ const CG_ADM_BLOCOS = [
   ['Contrato', [['experiencia_dias', 'Experiência (dias)', ['30', '45', '60', '90']], ['prorrogavel_dias', 'Prorrogável (dias)', 'number'], ['tipo_salario', 'Salário por', ['MENSAL', 'HORA']],
     ['entrada', 'Entrada', 'time'], ['intervalo', 'Intervalo', ['', '15 MIN', '1H', '1H30', '2H']], ['saida', 'Saída', 'time'],
     ['folga', 'Folga', ['', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'ESCALA/VARIÁVEL']]]],
-  ['Documentos', [['pis', 'PIS'], ['ctps', 'CTPS (digital = CPF)'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF', ['', ...CG_UFS]], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'],
+  // 13/11/2026 (dono #443 "443 pode", proposta do RH): os números dos documentos saem da digitação — a leitura preenche e a
+  // contabilidade copia do PDF. Ficam num bloco recolhido (3º elemento = true), só para corrigir; continuam indo no salvar.
+  ['Vem dos documentos (só corrigir se a leitura errou)', [['nome_pai', 'Nome do pai'], ['municipio_nascimento', 'Município de nascimento'], ['pis', 'PIS'], ['ctps', 'CTPS (digital = CPF)'], ['ctps_serie', 'Série'], ['ctps_uf', 'UF', ['', ...CG_UFS]], ['ctps_data', 'Data da CTPS', 'date'], ['rg', 'RG'],
     ['rg_orgao', 'Órgão', ['', 'SESP', 'SSP', 'DETRAN', 'II', 'PC', 'OUTRO']], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'],
-    ['cnh_categoria', 'Categoria', ['', 'A', 'B', 'AB', 'C', 'D', 'E', 'AC', 'AD', 'AE']]]],
+    ['cnh_categoria', 'Categoria', ['', 'A', 'B', 'AB', 'C', 'D', 'E', 'AC', 'AD', 'AE']]], true],
   ['Benefícios', [['vt_itinerario', 'Itinerário do VT'], ['vt_valor_passagem', 'Valor da passagem', 'number'], ['va_valor_dia', 'VA por mês', 'number']]],
   // 13/11/2026 (dono 01:23: "O campo de dados bancários pode ser o PIX somente"): banco/agência/conta ficam só na tabela (legado)
   ['PIX', [['chave_pix', 'Chave PIX (CPF, celular, e-mail ou aleatória)']]],
@@ -1082,7 +1084,8 @@ function cgFormAdmissao(a, id, parte) {   // parte: 'docs' (anexos, vão no topo
   if (parte === 'docs') return docs;
   // 12/11/2026 (usabilidade, padm): o bloco com campo obrigatório fica aberto; o resto recolhe (abre sozinho se o robô já leu algo dele)
   const bloco = ([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1].replace(/^(Nascimento|Nome da mãe) \*$/, '$1 * (ou anexe RG/CNH)'), ctl(c) + selo(c[0]))).join('')}</div>`;
-  const obrig = CG_ADM_BLOCOS.filter(([, cs]) => cs.some((c) => /\*/.test(c[1]))), resto = CG_ADM_BLOCOS.filter((b) => !obrig.includes(b));
+  const recolhidos = CG_ADM_BLOCOS.filter((b) => b[2] === true);
+  const obrig = CG_ADM_BLOCOS.filter((b) => !b[2] && b[1].some((c) => /\*/.test(c[1]))), resto = CG_ADM_BLOCOS.filter((b) => !b[2] && !obrig.includes(b));
   const abreResto = resto.some(([, cs]) => cs.some((c) => lido[c[0]] && lido[c[0]].doc || (a.id && a[c[0]] != null && a[c[0]] !== ''))) || (a.dependentes || []).length || !!a.obs;
   const ficha = `${obrig.map(bloco).join('')}
     <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')}, dependentes)</span></summary>
@@ -1090,6 +1093,8 @@ function cgFormAdmissao(a, id, parte) {   // parte: 'docs' (anexos, vão no topo
     <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
     ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
     </details>
+    ${recolhidos.map(([t, cs]) => `<details style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">${t} <span style="font-weight:400;color:var(--tx-4);">(${cs.filter((c) => a[c[0]] != null && a[c[0]] !== '').length} de ${cs.length} preenchidos)</span></summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:6px;">${cs.map((c) => campo(c[1], ctl(c) + selo(c[0]))).join('')}</div></details>`).join('')}
     ${campo('<span style="margin-top:12px;">Observação para a contabilidade</span>', `<input id="cgA_obs" value="${cgEsc(a.obs || '')}" style="width:100%">`)}`;
   return parte === 'ficha' ? ficha : `${docs}${ficha}`;
 }
