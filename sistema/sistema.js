@@ -43,6 +43,36 @@ let ROT_SO_PROBLEMAS = false;
 
 let ROTINAS_TIMER = null;
 
+// ---- PLACAR DAS ROTINAS (7 dias) ----
+let ROT_PLACAR = null, ROT_PLACAR_DIA = null;
+const ROT_LETRA = { R: ['rodou', 'var(--farol-ok)', true], E: ['errou ou ficou presa', 'var(--farol-fora)', true], T: ['errou ou ficou presa', 'var(--farol-fora)', true],
+  N: ['não rodou', 'var(--tx-4)', true], P: ['pulou', 'var(--farol-perto)', true], A: ['aguardando', 'var(--tx-3)', false] };
+function rotPlacarHtml() {
+  const P = ROT_PLACAR, D = ROT_PLACAR_DIA;
+  if (!Array.isArray(P) || !P.length) return '';
+  const hojeIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const diaDe = (i) => { const d = new Date(hojeIso + 'T12:00:00'); d.setDate(d.getDate() - (6 - i)); return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }).replace('.', ''); };
+  const resumo = (x, rot) => x ? `${rot}: <b style="color:var(--farol-ok);">${Number(x.rodou) || 0} rodaram</b> · <b style="color:${Number(x.errou) ? 'var(--farol-fora)' : 'var(--tx-4)'};">${Number(x.errou) || 0} errou</b> · <b style="color:${Number(x.nao_rodou) ? 'var(--farol-fora)' : 'var(--tx-4)'};">${Number(x.nao_rodou) || 0} não rodou</b>${Number(x.pulou) ? ` · ${Number(x.pulou)} pulou` : ''}${Number(x.aguardando) ? ` · ${Number(x.aguardando)} aguardando` : ''}` : '';
+  const hoje = (D || []).find((x) => String(x.dia).slice(0, 10) === hojeIso), ontem = (D || []).find((x) => String(x.dia).slice(0, 10) < hojeIso);
+  const L = P.slice().sort((a, b) => ((Number(b.errou) || 0) + (Number(b.nao_rodou) || 0)) - ((Number(a.errou) || 0) + (Number(a.nao_rodou) || 0)) || rotNome(a.rotina).localeCompare(rotNome(b.rotina), 'pt-BR'));
+  const quad = (ch, i, r) => {
+    const t = ROT_LETRA[ch];
+    if (!t) return `<span title="${diaDe(i)}: sem horário" style="display:inline-block;width:14px;height:14px;margin-right:3px;border-radius:3px;border:1px dashed var(--line);"></span>`;
+    return `<span title="${diaDe(i)}: ${t[0]}${r.previsto ? ' · previsto ' + trEscH(String(r.previsto)) : ''}" style="display:inline-block;width:14px;height:14px;margin-right:3px;border-radius:3px;${t[2] ? 'background:' + t[1] + ';' : 'border:2px solid ' + t[1] + ';box-sizing:border-box;'}"></span>`;
+  };
+  const conf = P.map((r) => r.conferido_em).filter(Boolean).sort().pop();
+  const parado = !conf || Date.now() - Date.parse(conf) > 3600 * 1000;
+  return `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Placar dos últimos 7 dias</div>
+    <div class="caption-label" style="text-align:left;">${[resumo(hoje, 'Hoje'), resumo(ontem, 'Ontem')].filter(Boolean).join('<br>')}</div>
+    <div id="tabelaRotPlacar"><table><thead><tr><th>Rotina</th><th>7 dias (hoje à direita)</th><th>Rodou</th><th>Errou</th><th>Não rodou</th><th>Última</th></tr></thead><tbody>
+    ${L.map((r) => `<tr><td>${trEscH(rotNome(r.rotina))}${r.origem === 'windows' ? ' <span style="font-size:11px;color:var(--tx-4);">· Windows</span>' : ''}</td>
+      <td style="white-space:nowrap;">${String(r.dias || '').padStart(7, '·').slice(-7).split('').map((ch, i) => quad(ch, i, r)).join('')}${r.tem_reconstruido ? ' <span title="06 a 12/11: dias refeitos pela agenda de hoje" style="color:var(--tx-4);">≈</span>' : ''}</td>
+      <td style="color:var(--farol-ok);">${Number(r.rodou) || 0}</td><td style="color:${Number(r.errou) ? 'var(--farol-fora)' : 'var(--tx-4)'};font-weight:${Number(r.errou) ? 700 : 400};">${Number(r.errou) || 0}</td>
+      <td style="color:${Number(r.nao_rodou) ? 'var(--farol-fora)' : 'var(--tx-4)'};font-weight:${Number(r.nao_rodou) ? 700 : 400};">${Number(r.nao_rodou) || 0}</td>
+      <td style="font-size:12px;">${trEscH(String(r.situacao_ultima || '').toLowerCase().replace('nao', 'não'))}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="caption-label" style="text-align:left;${parado ? 'color:var(--farol-fora);font-weight:700;' : ''}">${conf ? `conferido pelo vigia às ${new Date(conf).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}${parado ? ' — o vigia parou há mais de 1 h' : ''}` : 'o vigia ainda não conferiu'} · verde rodou · vermelho errou · cinza não rodou · amarelo pulou · contorno aguardando</div>`;
+}
 async function entrarRotinas() {
   const alvo = document.getElementById('view-rotinas');
   if (!alvo.innerHTML) alvo.innerHTML = '<div class="contexto">Carregando rotinas...</div>';
@@ -65,6 +95,11 @@ async function carregarRotinas() {
     // idênticos na tela — e foi assim que um dia inteiro se perdeu sem ninguém ver.
     consultarTudo('vw_rotinas_batimento?select=rotina,situacao,motivo,acordou_em,ha_seg'),
   ]);
+  // 13/11/2026 (dono 03:03: "eu ainda não confio 100% nas rotinas"; proposta 2026-11-13-placar-rotinas.md): o placar de 7 dias
+  // do vigia (script/vigia_rotinas.py, sem IA). Leitura que nunca derruba a tela.
+  [ROT_PLACAR, ROT_PLACAR_DIA] = await Promise.all([
+    consultarTudo('vw_rotinas_placar_7d?select=rotina,origem,previsto,rodou,errou,pulou,nao_rodou,dias,situacao_ultima,conferido_em,tem_reconstruido&order=rotina').catch(() => null),
+    consultarTudo('vw_rotinas_placar_dia?select=dia,rodou,errou,pulou,nao_rodou,aguardando,reconstruido&order=dia.desc&limit=2').catch(() => null)]);
   renderModuloRotinas(status, historico, batimento || []);
 }
 
@@ -139,7 +174,7 @@ function renderModuloRotinas(status, historico, batimento = []) {
   const batAntes = document.getElementById('batDetalhe');
   const batAberto = !batOk || (batAntes ? batAntes.open : false);
 
-  alvo.innerHTML = `
+  alvo.innerHTML = rotPlacarHtml() + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Rotinas automáticas</div>
   <div class="caption-label" style="text-align:center;">atualiza a cada 30 s · as ${lista.length} que rodaram nos últimos ${ROTINAS_JANELA_DIAS} dias</div>
 
