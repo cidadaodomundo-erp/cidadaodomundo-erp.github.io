@@ -3246,7 +3246,13 @@ function renderHoje() {
   // por pessoa, so com o que esta ABERTO; cada linha leva para a tela onde se resolve. Os avisos de
   // fonte parada (avaliacoes, negociacoes) que nao sao fila de ninguem continuam embaixo, curtos.
   let b1;
-  if (HOJE_ERROS.filas || !HOJE_FILAS || !HOJE_DONOS) {
+  // 13/11/2026 13:29 (dono: "agora isso fica na agenda"): o quadro por pessoa saiu. Os 7 tipos de fila foram conferidos e
+  // estão na agenda de cada um (Avisos, wa_fila_agenda_sincronizar, commit b05fde2). Ficam só os avisos de fonte parada.
+  if (true) {
+    const extras = (alertasAgora() || []).filter(a => !['rotinas', 'contestacoes'].includes(a.link));
+    b1 = extras.map(a => '<div class="contexto" style="border-color:' + a.cor + '; margin-top:8px;' + (a.link ? ' cursor:pointer;' : '') + '"' +
+      (a.link ? ' onclick="mostrarModulo(\'' + a.link + '\')"' : '') + '>' + a.txt + '</div>').join('');
+  } else if (HOJE_ERROS.filas || !HOJE_FILAS || !HOJE_DONOS) {
     b1 = '<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Quem precisa fazer o quê</div>' +
       aviso('Não consegui ler as filas de trabalho' + (HOJE_ERROS.filas ? ': ' + HOJE_ERROS.filas : '.'));
   } else {
