@@ -230,10 +230,10 @@ function agDesenhar() {
   const ROT = { dep: ['Depende de você', 'pede uma ação sua'], anda: ['Em andamento', 'respondido ou feito, esperando aplicar ou conferir'], saber: ['Para saber', 'sem ação sua'] };
   const corC = { dep: G.dep.length ? 'neg' : 'pos', anda: 'blue', saber: 'neutral' };
   const nCard = (k) => k === 'dep' ? G.dep.length + Math.max(0, (AG.avEsp || 0) - 1) : G[k].length;   // os avisos contam um a um (eram cartões da agenda)
-  h += `<div class="cards ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
-      <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${nCard(k)}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}
+  h += `<div class="cards ag-filtros">
     <div class="card ${AG.avEsp ? 'highlight' : 'neutral'}" style="cursor:pointer;${f === 'avisos' ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('avisos')">
-      <div class="card-lbl">Avisos à equipe</div><div class="card-val">${AG.avEsp || 0}</div><div class="card-pct">esperando o seu "manda"</div></div></div>`;
+      <div class="card-lbl">Avisos à equipe</div><div class="card-val">${AG.avEsp || 0}</div><div class="card-pct">esperando o seu "manda"</div></div>${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
+      <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${nCard(k)}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}</div>`;
   // 12/11/2026 (dono 15:43): "● N respostas novas" — a frente respondeu e o dono ainda não abriu o cartão; clicar filtra
   const novos = itens.filter((x) => x.pend && agRetNovo(x.pend));
   if (!novos.length) AG.soNovos = false;
@@ -251,7 +251,8 @@ function agDesenhar() {
 // ---- ABA AVISOS (dono 13/11/2026 10:07: "um resumo dos avisos na agenda, uma aba só pra isso, talvez assim eu consiga autorizar
 // mais facilmente o que depende de mim, e vamos automatizando os que estiverem corretos"; proposta 2026-11-13-aba-avisos-agenda.md)
 let AG_AVISOS_IR = (() => { try { return new URLSearchParams(location.search).get('aba') === 'avisos'; } catch (e) { return false; } })();
-let AG_AV_FORM = null;   // { ref, dec: 'MUDA' | 'NAO' }
+let AG_AV_FORM = null;   // (antigo) — 13/11 12:37 a observação ficou sempre à vista
+const AG_AV_NOTAS = {};   // o que o dono digitou na observação sobrevive à releitura da agenda
 function agAvisosHtml() {
   const A = AG.avisos;
   if (!A || A.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler os avisos${A && A.erro ? ': ' + agE(A.erro) : ''}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
@@ -262,14 +263,12 @@ function agAvisosHtml() {
     const est = a.estado === 'MUDAR' ? `<span style="color:var(--info);font-weight:700;">o chat Avisos está reescrevendo</span>${a.nota_dono ? ' · você pediu: ' + agE(a.nota_dono) : ''}`
       : a.estado === 'APROVADO' ? `<span style="color:var(--farol-ok);font-weight:700;">aprovado</span>${a.espera_por ? ' · <b style="color:var(--farol-perto);">sai quando: ' + agE(a.espera_por) + '</b>' : ''}`
       : '<span style="color:var(--farol-perto);font-weight:700;">esperando você</span>';
-    const fm = AG_AV_FORM && AG_AV_FORM.ref === a.ref ? AG_AV_FORM : null;
-    const bts = !a.botoes ? '' : fm
-      ? `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota" rows="2" placeholder="${fm.dec === 'MUDA' ? 'o que mudar no texto (obrigatório)' : 'por quê (opcional)'}" style="${campo}"></textarea>
-          <div style="margin-top:4px;display:flex;gap:6px;"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, '${fm.dec}')">${fm.dec === 'MUDA' ? 'Pedir a mudança' : 'Confirmar: não manda'}</button>
-          <button type="button" class="preset-btn" onclick="AG_AV_FORM=null;agDesenhar()">Voltar</button></div></div>`
-      : `<span class="bts"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, 'MANDA')">Manda</button>
-          <button type="button" class="preset-btn" onclick="AG_AV_FORM={ref:${Number(a.ref)},dec:'MUDA'};agDesenhar()">Muda o texto</button>
-          <button type="button" class="preset-btn" onclick="AG_AV_FORM={ref:${Number(a.ref)},dec:'NAO'};agDesenhar()">Não manda</button></span>`;
+    // 13/11/2026 12:37 (dono: "coloca a observação dos avisos da agenda na frente, quero usar agora"): o campo de observação
+    // fica à vista em todo aviso que espera você; vale para os três botões (no Manda vira a observação do aviso)
+    const bts = !a.botoes ? '' : `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota_${Number(a.ref)}" oninput="AG_AV_NOTAS[${Number(a.ref)}]=this.value" rows="2" placeholder="observação (opcional no Manda e no Não manda; obrigatória no Muda o texto)" style="${campo}">${agE(AG_AV_NOTAS[a.ref] || '')}</textarea>
+        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, 'MANDA')">Manda</button>
+          <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'MUDA')">Muda o texto</button>
+          <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'NAO')">Não manda</button></div></div>`;
     return `<div class="ag-lin ${a.estado === 'ESPERA' ? 'alerta' : ''}" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} <span class="f">${a.frente ? '· ' + agE(a.frente) : ''}</span> · ${est}
         <div style="white-space:pre-wrap;margin:6px 0 2px;padding:8px 10px;background:var(--surface-2);border-radius:8px;color:var(--tx-1);">${agE(a.texto || '')}</div>
         ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}</span>${bts}</div>`;
@@ -300,13 +299,14 @@ function agAvisosHtml() {
 }
 async function agAvFrase(r) { try { const j = await r.json(); return typeof j === 'string' ? j : (j && (j.frase || j.mensagem || j.msg)) || ''; } catch (e) { return ''; } }
 async function agAvDecidir(ref, dec) {
-  const nota = ((document.getElementById('agAvNota') || {}).value || '').trim();
+  const nota = ((document.getElementById('agAvNota_' + ref) || {}).value || '').trim();
+  AG_AV_NOTAS[ref] = nota;
   if (dec === 'MUDA' && !nota) return avisoAcao('atencao', '! Escreva o que mudar no texto.');
   avisoAcao('enviando', dec === 'MANDA' ? 'Aprovando o aviso…' : dec === 'MUDA' ? 'Pedindo a mudança…' : 'Registrando que não vai…');
   const r = await trRpcSeguro('wa_rascunho_decidir', { p_id: ref, p_decisao: dec, p_nota: nota || null });
   if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => agAvDecidir(ref, dec));
   const fr = await agAvFrase(r);
-  AG_AV_FORM = null;
+  AG_AV_FORM = null; delete AG_AV_NOTAS[ref];
   avisoAcao('ok', `✓ ${fr || (dec === 'MANDA' ? 'Aprovado.' : dec === 'MUDA' ? 'O chat Avisos vai reescrever.' : 'Não vai.')} — às ${avisoHora()}.`);
   try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
   await entrarAgenda(true);
