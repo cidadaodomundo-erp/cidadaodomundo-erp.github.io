@@ -98,6 +98,48 @@ test('modelo: REDE sem lojas autorizadas falha fechado; REDE mostra só as autor
   assert.deepEqual(M.unidadesVisiveis(r, 'AHU', ['AHU']).map((u) => u.unidade), ['AHU']);
 });
 
+test('modelo 13/11: fim do turno — última entrega, último pátio e "foi embora" só como estimativa', () => {
+  const fim = (o, vivo) => M.fimDoTurno(linha(o), vivo);
+  // pátio depois da entrega, sinal parou no pátio, histórico → estimativa
+  assert.deepEqual(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:01' }, false),
+    { entrega: '22:40', patio: '22:58', foiEmbora: '22:58' });
+  // sinal continuou longe do pátio (> 10 min) → não afirma que foi embora
+  assert.equal(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:30' }, false).foiEmbora, null);
+  // pátio ANTES da última entrega → não é fim no pátio
+  assert.equal(fim({ ultima_entrega_txt: '23:10', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:12' }, false).foiEmbora, null);
+  // ao vivo: só com o aplicativo calado há 30 min ou mais
+  assert.equal(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:01', sinal_min: 12 }, true).foiEmbora, null);
+  assert.equal(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:01', sinal_min: 45 }, true).foiEmbora, '22:58');
+  assert.equal(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58', ultimo_sinal_txt: '23:01' }, true).foiEmbora, null, 'ao vivo sem sinal_min: não afirma');
+  // virada da meia-noite: 00:10 vem depois de 23:50
+  assert.equal(fim({ ultima_entrega_txt: '23:50', ultimo_patio_txt: '00:10', ultimo_sinal_txt: '00:12' }, false).foiEmbora, '00:10');
+  // sem dado: nada inventado
+  assert.deepEqual(fim({}, false), { entrega: null, patio: null, foiEmbora: null });
+  assert.equal(fim({ ultima_entrega_txt: '22:40', ultimo_patio_txt: '22:58' }, false).foiEmbora, null, 'sem último sinal não estima');
+  // fonte da fila
+  assert.equal(M.filaFonte(linha({ chegada_fila_fonte: 'site' })), 'site do TrackEat (robô)');
+  assert.equal(M.filaFonte(linha({ chegada_fila_fonte: 'api' })), 'API do TrackEat');
+  assert.equal(M.filaFonte(linha({ chegada_fila_fonte: 'outra' })), null);
+});
+
+test('render 13/11: saída registrada intacta, duas linhas rotuladas embaixo, estimativa marcada, pendência sem dado', () => {
+  const l1 = linha({ saida_registrada_txt: null, ultima_entrega_txt: '14:40', ultimo_patio_txt: '14:55', ultimo_sinal_txt: '14:58', chegada_fila_fonte: 'site' });
+  const h = T.renderizar({ fase: 'ok', resp: resposta('2026-11-10', [unidade('AHU', { ao_vivo: false, linhas: [l1] })]) }, { M, loja: 'AHU', lojas: ['AHU'], lojaNome: (l) => l });
+  const cel = (/<td data-rot="Saída registrada">([\s\S]*?)<\/td>/.exec(h) || [])[1];
+  assert.match(cel, /Sem saída registrada/, 'saída continua só a batida');
+  assert.match(cel, /Última entrega <strong>14:40<\/strong>/);
+  assert.match(cel, /Última vez no pátio <strong>14:55<\/strong>/);
+  assert.match(cel, /Foi embora por volta de <strong>14:55<\/strong> · estimativa, não é saída registrada/);
+  assert.doesNotMatch(cel, /<span class="cg-hora">14:55/, 'estimativa nunca aparece como hora de saída');
+  assert.match(h, /site do TrackEat \(robô\)/);
+  const h2 = T.renderizar({ fase: 'ok', resp: resposta(HOJE, [unidade('AHU', { linhas: [linha()] })]) }, { M, loja: 'AHU', lojas: ['AHU'], lojaNome: (l) => l });
+  const cel2 = (/<td data-rot="Saída registrada">([\s\S]*?)<\/td>/.exec(h2) || [])[1];
+  assert.match(cel2, /<span class="cg-hora">15:02:00<\/span>/);
+  assert.match(cel2, /Última entrega <span class="cg-fraco">sem dado<\/span>/);
+  assert.match(cel2, /Última vez no pátio <span class="cg-fraco">sem dado<\/span>/);
+  assert.doesNotMatch(cel2, /Foi embora/);
+});
+
 test('render: seis campos por linha além do nome (celular), direitos separados, robô desatualizado não é falha, histórico, campos inválidos', () => {
   const r = resposta('2026-11-10', [unidade('AHU', { ao_vivo: false, campos_invalidos: 2, robo: { atualizado_em: '2026-11-10T20:00:00Z', ok: false } })]);
   const h = T.renderizar({ fase: 'ok', resp: r }, { M, loja: 'AHU', lojas: ['AHU'], lojaNome: (l) => l });
