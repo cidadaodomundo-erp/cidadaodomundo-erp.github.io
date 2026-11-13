@@ -1403,6 +1403,17 @@ function estQuando(ts) {
 }
 // histórico: as últimas linhas, com "ver mais"
 const EST_HIST = {};
+let EST_HIST_BUSCA = '';
+// a busca procura no que a linha mostra (nome, número, pessoa, data dd/mm)
+function estHistBate(r) {
+  const b = String(EST_HIST_BUSCA || '').trim().toLowerCase();
+  if (!b || EST_TELA !== 'prodhist') return true;
+  const txt = Object.keys(r).map((k) => { const v = r[k]; if (v == null) return '';
+    if (/(^quem|_por$|quem_)/.test(k)) return estNome(v) + ' ' + v;
+    if (/^\d{4}-\d{2}-\d{2}/.test(String(v))) return estQuando(v) + ' ' + ffDdmm(String(v).slice(0, 10));
+    return String(v); }).join(' ').toLowerCase();
+  return txt.includes(b);
+}
 async function estHistCarregar(chave, view, unidade, ordem) {
   const lim = (EST_HIST[chave] && EST_HIST[chave].lim) || 30;
   try {
@@ -1415,18 +1426,19 @@ async function estHistCarregar(chave, view, unidade, ordem) {
 function estHistHtml(chave, titulo, legenda, cols, linhaFn) {
   const H = EST_HIST[chave];
   if (!H) return '';
-  const aberto = !!H.aberto;
-  const n = (H.rows || []).length;
+  const rows = (H.rows || []).filter(estHistBate);
+  const aberto = !!H.aberto || (!!EST_HIST_BUSCA && rows.length > 0);
+  const n = rows.length;
   let h = `<div class="contexto" style="text-align:left; padding:8px 12px;">
     <a href="javascript:void(0)" onclick="estHistToggle('${chave}')" style="text-decoration:none; color:var(--tx-1); font-weight:700;">
       ${aberto ? '▾' : '▸'} ${titulo} <span style="color:var(--tx-4); font-weight:400;">· ${n}${H.mais ? '+' : ''} ${n === 1 ? 'registro' : 'registros'}</span></a>`;
   if (!aberto) return h + `</div>`;
   h += `<div class="caption-label" style="text-align:left;">${legenda}${EST_HIST_DET[chave] ? ' Clique numa linha para ver o detalhe.' : ''}</div>`;
   if (H.erro) return h + `<div style="color:var(--amber-2);">Não consegui ler o histórico agora: ${trEscH(H.erro)}</div></div>`;
-  if (!n) return h + `<div style="color:var(--tx-4);">Nada registrado ainda.</div></div>`;
+  if (!n) return h + `<div style="color:var(--tx-4);">${EST_HIST_BUSCA ? 'Nada com essa busca nos registros carregados.' : 'Nada registrado ainda.'}</div></div>`;
   const clicavel = !!EST_HIST_DET[chave];
   h += `<div id="tabelaHist_${chave}"><table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>
-    ${H.rows.map((r) => {
+    ${rows.map((r) => {
       let tr = linhaFn(r);
       if (clicavel) {
         const sel = H.det === r.id;
@@ -1503,9 +1515,10 @@ async function estHistAbrir(chave, id) {
   }
 }
 // o detalhe de cada histórico (só leitura)
-const estMini = (cols, linhas) => `<table style="width:100%; border-collapse:collapse; font-size:12.5px;"><thead><tr>${cols.map((c) =>
-  `<th style="text-align:left; padding:3px 8px; color:var(--tx-4); font-size:11px; text-transform:uppercase; border-bottom:1px solid var(--line);">${c}</th>`).join('')}</tr></thead>
-  <tbody>${linhas.map((l) => `<tr>${l.map((c) => `<td style="padding:3px 8px; border-bottom:1px solid var(--line);">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+// 13/11/2026 (auditoria G1): o detalhe é grade padrão (div id="tabela…" herda borda, zebra e cabeçalho)
+let EST_MINI_N = 0;
+const estMini = (cols, linhas) => `<div id="tabelaHistDet${++EST_MINI_N}"><table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>
+  <tbody>${linhas.map((l) => `<tr>${l.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 const EST_HIST_DET = {
   plano: async (id) => {
     const [itens, seps, ords] = await Promise.all([
@@ -1621,7 +1634,8 @@ async function entrarProcessos() {
   try {
     const uT = await estLojaDaTela(alvo, entrarProcessos); if (!uT) return;
     if (!PLP || PLP.unidade !== uT) PLP = { unidade: uT, filtro: null, busca: '' };
-    PRC = PRC || { aberta: null, filtro: null, praca: null, busca: '' };
+    // 13/11/2026 (auditoria): abre no que falta (sem nada definido ou com dúvida); "ver todas" tira o filtro
+    PRC = PRC || { aberta: null, filtro: undefined, praca: null, busca: '' };
     await prcCarregar();
   } catch (e) {
     alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui abrir a tela: ${e.message}</div>`;
@@ -1644,11 +1658,11 @@ function prcRender() {
   const foco = document.activeElement && document.activeElement.id === 'prcBusca';
   // 28/10/2026 (dono): a receita que sai dentro de outra não é processo próprio — não aparece (nem em nota, 14:24)
   const L = PRC.linhas.filter((r) => r.leitura !== 'DENTRO DE OUTRA RECEITA');
+  if (PRC.filtro === undefined) PRC.filtro = ['SEM NADA DEFINIDO', 'TEM DUVIDA'].find((k) => L.some((r) => r.leitura === k)) || null;
   let vis = L.filter((r) => (!PRC.filtro || r.leitura === PRC.filtro) && (!PRC.praca || (r.praca || 'SEM PRAÇA') === PRC.praca));
   if (PRC.busca) { const b = PRC.busca.toLowerCase(); vis = vis.filter((r) => r.nome_base.toLowerCase().includes(b)); }
   let h = `<h2>Processos da produção</h2>` + estFilaHtml()
-    + `<div class="caption-label" style="text-align:left;">Por receita: em que dia se faz, o processo e a hora. O Planejar lê daqui. Clique na receita para mudar.</div>`;
-  if (PRC.msg) h += `<div class="contexto" style="text-align:left; border-color:${PRC.msg.cor};">${trEscH(PRC.msg.txt)}</div>`;
+    + `<div class="caption-label" style="text-align:left;">Clique na receita para definir dia e hora.</div>`;
   // filtros: situação e praça
   h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0;">`;
   Object.keys(PRC_LEIT).forEach((k) => {
@@ -1656,6 +1670,7 @@ function prcRender() {
     if (n) h += `<button class="preset-btn${PRC.filtro === k ? ' active' : ''}" onclick="PRC.filtro=PRC.filtro==='${k}'?null:'${k}'; prcRender();"
       style="${PRC.filtro === k ? '' : `color:${PRC_LEIT[k][1]};`}">${PRC_LEIT[k][0]} · ${n}</button>`;
   });
+  if (PRC.filtro || PRC.praca) h += `<button class="preset-btn" onclick="PRC.filtro=null; PRC.praca=null; prcRender();">ver todas · ${L.length}</button>`;
   ['PRODUÇÃO', 'LANCHES', 'PRATOS'].forEach((p) => {
     const n = L.filter((r) => r.praca === p).length;
     if (n) h += `<button class="preset-btn${PRC.praca === p ? ' active' : ''}" onclick="PRC.praca=PRC.praca==='${p}'?null:'${p}'; prcRender();">${prcPraca(p)} · ${n}</button>`;
@@ -1664,19 +1679,19 @@ function prcRender() {
       style="flex:1; min-width:160px; background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); color:var(--p-ink, var(--tx-1)); border-radius:6px; padding:7px 10px; font-size:13px;"></div>`;
   // por praça
   // as automáticas (descem pela ficha, sem apontar) num bloco à parte, no fim
-  const ordem = { 'PRODUÇÃO': 1, 'LANCHES': 2, 'PRATOS': 3, 'AUTOMÁTICAS — DESCEM PELA FICHA, SEM APONTAR': 99 };
+  const ordem = { 'PRODUÇÃO': 1, 'LANCHES': 2, 'PRATOS': 3, 'Automáticas (sem apontar)': 99 };
   const porPraca = new Map();
-  vis.forEach((r) => { const p = r.leitura === 'AUTOMATICA' ? 'AUTOMÁTICAS — DESCEM PELA FICHA, SEM APONTAR' : (r.praca || 'SEM PRAÇA');
+  vis.forEach((r) => { const p = r.leitura === 'AUTOMATICA' ? 'Automáticas (sem apontar)' : (r.praca || 'SEM PRAÇA');
     if (!porPraca.has(p)) porPraca.set(p, []); porPraca.get(p).push(r); });
   // a moldura da receita aberta: linha dela + edição, nas células (a borda da linha não vence a grade padrão)
   h += `<style>#tabelaProcessos tr.prc-sel > td { border-top:2px solid var(--p-ink, var(--line-2)) !important; }
     #tabelaProcessos tr.prc-sel > td:first-child { border-left:2px solid var(--p-ink, var(--line-2)) !important; }
     #tabelaProcessos tr.prc-sel > td:last-child { border-right:2px solid var(--p-ink, var(--line-2)) !important; }</style>`;
-  h += `<div id="tabelaProcessos"><table><thead><tr><th>Receita</th><th>Ritmo</th><th>Dias e processos</th><th>Pré-preparos (da ficha)</th><th>Situação</th></tr></thead><tbody>`;
-  if (!vis.length) h += `<tr><td colspan="5">Nenhuma receita neste filtro.</td></tr>`;
+  h += `<div id="tabelaProcessos"><table><thead><tr><th>Receita</th><th>Ritmo</th><th>Dias e processos</th><th>Situação</th></tr></thead><tbody>`;
+  if (!vis.length) h += `<tr><td colspan="4">Nenhuma receita neste filtro.</td></tr>`;
   [...porPraca.keys()].sort((a, b) => (ordem[a] || 9) - (ordem[b] || 9)).forEach((p) => {
     const rs = porPraca.get(p);
-    h += `<tr class="grp"><td colspan="5" style="font-weight:800; letter-spacing:.6px;">${trEscH(prcPraca(p).toUpperCase())}
+    h += `<tr class="grp"><td colspan="4" style="font-weight:800; letter-spacing:.6px;">${trEscH(prcPraca(p).toUpperCase())}
       <span style="color:var(--tx-4); font-weight:400;">· ${rs.length}</span></td></tr>`;
     rs.forEach((r) => {
       const dias = r.dias || [];
@@ -1687,16 +1702,15 @@ function prcRender() {
         <td><b>${trEscH(r.nome_base)}</b>${r.familia && r.familia !== 'NENHUMA' ? ` <span style="color:var(--tx-5); font-size:11px;">${trEscH(String(r.familia).toLowerCase())}</span>` : ''}</td>
         <td>${trEscH(r.ritmo_em_palavras || '—')}</td>
         <td style="white-space:normal; font-size:12.5px;">${dias.length ? dias.map((d) => `<span style="white-space:nowrap;">${d.dia ? `<b>${trEscH(d.dia.slice(0, 3))}</b> ` : ''}${trEscH(d.etapa || '')}${d.hora_desde || d.hora_ate ? ` <span style="color:var(--tx-4);">${prcHora(d.hora_desde)}${d.hora_ate ? '–' + prcHora(d.hora_ate) : ''}</span>` : ''}${d.duvida ? ' <span style="color:var(--amber-2);">(?)</span>' : ''}</span>`).join(' · ') : '<span style="color:var(--tx-5);">—</span>'}</td>
-        <td style="white-space:normal; font-size:12px; color:var(--tx-3);">${(r.pre_preparos || []).map((x) => trEscH(x.nome_base)).join(', ') || '—'}</td>
         <td style="font-size:12px; color:${lc}; font-weight:700;">${lt}</td></tr>`;
-      if (ab) h += `<tr><td colspan="5" style="white-space:normal; padding:12px 16px 16px; border:2px solid var(--p-ink, var(--line-2)); border-top:1px solid var(--p-line, var(--line));">${prcEditorHtml(r)}</td></tr>`;
+      if (ab) h += `<tr><td colspan="4" style="white-space:normal; padding:12px 16px 16px; border:2px solid var(--p-ink, var(--line-2)); border-top:1px solid var(--p-line, var(--line));">${prcEditorHtml(r)}</td></tr>`;
     });
   });
   h += `</tbody></table></div>`;
   alvo.innerHTML = h;
   if (foco) { const i = document.getElementById('prcBusca'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 }
-function prcAbrir(nome) { PRC.aberta = PRC.aberta === nome ? null : nome; PRC.msg = null; prcRender(); }
+function prcAbrir(nome) { PRC.aberta = PRC.aberta === nome ? null : nome; PRC.tirar = null; PRC.duv = null; prcRender(); }
 function prcEditorHtml(r) {
   // 27/10/2026 (dono): tema claro "papel" e grade com linhas — campo branco, linha fina, tinta escura
   const campo = 'background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); border-radius:6px; color:var(--p-ink, var(--tx-1)); padding:5px 8px;';
@@ -1712,10 +1726,15 @@ function prcEditorHtml(r) {
     h += `<div id="tabelaPrcDias" style="margin-top:4px;"><table><thead><tr><th>Dia</th><th>Processo</th><th>Hora</th><th></th></tr></thead><tbody>${dias.map((d) => `<tr>
         <td style="width:90px;"><b>${trEscH(d.dia || 'sem dia fixo')}</b></td>
         <td>${trEscH(d.etapa || '')}</td>
-        <td style="white-space:nowrap;">de <input type="time" value="${prcHora(d.hora_desde)}" style="${campo}" onchange="prcHoraGravar(${k}, ${d.dia_semana == null ? 'null' : Number(d.dia_semana)}, ${trEscH(JSON.stringify(d.etapa || ''))}, this.value, null, ${trEscH(JSON.stringify(d.frequencia || ritmoAt))}, ${trEscH(JSON.stringify(d.praca || r.praca || ''))}, ${trEscH(JSON.stringify(prcHora(d.hora_ate)))})">
-          até <input type="time" value="${prcHora(d.hora_ate)}" style="${campo}" onchange="prcHoraGravar(${k}, ${d.dia_semana == null ? 'null' : Number(d.dia_semana)}, ${trEscH(JSON.stringify(d.etapa || ''))}, ${trEscH(JSON.stringify(prcHora(d.hora_desde)))}, this.value, ${trEscH(JSON.stringify(d.frequencia || ritmoAt))}, ${trEscH(JSON.stringify(d.praca || r.praca || ''))}, null)"></td>
-        <td style="white-space:nowrap;"><label style="font-size:12px; color:${d.duvida ? 'var(--amber-2)' : 'var(--tx-4)'};" title="${trEscH(d.duvida_qual || '')}"><input type="checkbox"${d.duvida ? ' checked' : ''} onchange="prcDuvida(${Number(d.id)}, this.checked)"> dúvida</label>
-          <button class="preset-btn est-ciclo" onclick="event.stopPropagation(); prcTirar(${Number(d.id)}, ${trEscH(JSON.stringify((d.dia || 'sem dia fixo') + ' · ' + (d.etapa || '')))})">Tirar</button></td></tr>`).join('')}</tbody></table></div>`;
+        <td style="white-space:nowrap;">de <input id="prcDe${Number(d.id)}" type="time" value="${prcHora(d.hora_desde)}" style="${campo}">
+          até <input id="prcAte${Number(d.id)}" type="time" value="${prcHora(d.hora_ate)}" style="${campo}">
+          <button class="preset-btn est-ciclo" onclick="event.stopPropagation(); prcHoraGravar(${k}, ${Number(d.id)}, ${d.dia_semana == null ? 'null' : Number(d.dia_semana)}, ${trEscH(JSON.stringify(d.etapa || ''))}, ${trEscH(JSON.stringify(d.frequencia || ritmoAt))}, ${trEscH(JSON.stringify(d.praca || r.praca || ''))})">Gravar hora</button></td>
+        <td style="white-space:nowrap;">${PRC.duv === Number(d.id)
+          ? `<input id="prcDuvQual" placeholder="qual é a dúvida?" style="${campo} width:180px;"> <button class="preset-btn active est-ciclo" onclick="event.stopPropagation(); prcDuvida(${Number(d.id)}, true)">Marcar dúvida</button> <button class="preset-btn" onclick="event.stopPropagation(); PRC.duv=null; prcRender();">Cancelar</button>`
+          : `<label style="font-size:12px; color:${d.duvida ? 'var(--amber-2)' : 'var(--tx-4)'};" title="${trEscH(d.duvida_qual || '')}"><input type="checkbox"${d.duvida ? ' checked' : ''} onchange="if (this.checked) { PRC.duv=${Number(d.id)}; prcRender(); } else prcDuvida(${Number(d.id)}, false);"> dúvida${d.duvida && d.duvida_qual ? ': ' + trEscH(d.duvida_qual) : ''}</label>`}
+          ${PRC.tirar === Number(d.id)
+          ? `<button class="preset-btn active est-ciclo" onclick="event.stopPropagation(); prcTirar(${Number(d.id)}, ${trEscH(JSON.stringify((d.dia || 'sem dia fixo') + ' · ' + (d.etapa || '')))})">Confirmar: tirar</button> <button class="preset-btn" onclick="event.stopPropagation(); PRC.tirar=null; prcRender();">Cancelar</button>`
+          : `<button class="preset-btn est-ciclo" onclick="event.stopPropagation(); PRC.tirar=${Number(d.id)}; prcRender();">Tirar</button>`}</td></tr>`).join('')}</tbody></table></div>`;
   } else h += `<div style="color:var(--tx-4);">Nenhum dia definido ainda.</div>`;
   h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--p-line, var(--line));">
       <b>Pôr um dia</b>
@@ -1729,16 +1748,20 @@ function prcEditorHtml(r) {
         style="color:var(--brand); font-size:12.5px;">${trEscH(x.nome_base)} <span style="color:var(--tx-5);">${fmt(Number(x.qtd_ft))} ${trEscH(x.un || '')}</span></a>`).join(' · ')}</div>` : `<div style="color:var(--tx-4);">nenhum</div>`);
   return `<div onclick="event.stopPropagation()">${h}</div>`;
 }
-function prcIrPara(nome) { PRC.aberta = nome; PRC.filtro = null; PRC.praca = null; PRC.busca = ''; PRC.msg = null; prcRender();
+function prcIrPara(nome) { PRC.aberta = nome; PRC.filtro = null; PRC.praca = null; PRC.busca = ''; prcRender();
   setTimeout(() => { const el = [...document.querySelectorAll('#tabelaProcessos tr')].find((t) => t.textContent.trim().startsWith(nome)); if (el) el.scrollIntoView({ block: 'center' }); }, 50); }
+// 13/11/2026 (auditoria T9): o retorno de gravar vai na barra padrão (enviando → ✓ hora / ✗ motivo + Tentar de novo)
 async function prcGravar(fn, args, ok) {
   if (!estTravar(true)) return;
+  const refazer = () => prcGravar(fn, args, ok);
+  avisoAcao('enviando', 'Gravando…');
   let r;
   try { r = await trRpc(fn, Object.assign(args, { p_quem: ((rmbSessao() || {}).email || '') })); }
-  catch (e) { estTravar(false); PRC.msg = { txt: 'Não consegui gravar: ' + e.message, cor: 'var(--farol-fora)' }; return prcRender(); }
+  catch (e) { estTravar(false); return avisoAcao('erro', `✗ NÃO gravou: ${e.message}. Tente de novo.`, refazer); }
   estTravar(false);
-  if (!r.ok) { PRC.msg = { txt: await trErroDe(r), cor: 'var(--farol-fora)' }; return prcRender(); }
-  PRC.msg = { txt: ok, cor: 'var(--farol-ok)' };
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO gravou: ${await trErroDe(r)}. Tente de novo.`, refazer);
+  PRC.tirar = null; PRC.duv = null;
+  avisoAcao('ok', `${ok} Às ${avisoHora()}.`);
   await prcCarregar();
 }
 function prcDefinir(nome) {
@@ -1750,25 +1773,23 @@ function prcPorDia(nome, praca, ritmo) {
   const dv = (document.getElementById('prcNovoDia') || {}).value;
   const etapa = ((document.getElementById('prcNovaEtapa') || {}).value || '').trim();
   const de = (document.getElementById('prcNovaDe') || {}).value || null, ate = (document.getElementById('prcNovaAte') || {}).value || null;
-  if (!etapa) { PRC.msg = { txt: 'Escreva o processo (o que se faz nesse dia).', cor: 'var(--farol-perto)' }; return prcRender(); }
+  if (!etapa) return avisoAcao('atencao', '! Escreva o processo (o que se faz nesse dia).');
   const dia = dv === '' ? null : Number(dv);
   const freq = dia == null ? (['MENSAL', 'QUINZENAL', 'SE_NECESSARIO'].includes(ritmo) ? ritmo : 'SE_NECESSARIO') : (ritmo === 'DIARIA' ? 'DIARIA' : 'SEMANAL');
   return prcGravar('est_processo_dia_por', { p_nome_base: nome, p_dia_semana: dia, p_etapa: etapa, p_hora_desde: de, p_hora_ate: ate,
     p_frequencia: freq, p_praca: praca || null }, `✓ ${nome}: ${dia == null ? 'sem dia fixo' : PRC_DIAS[dia - 1][1]} · ${etapa}.`);
 }
-function prcHoraGravar(nome, dia, etapa, de, ate, freq, praca, outra) {
-  // mesmo dia + mesmo processo: a função atualiza a hora
-  const deF = de === null ? (outra || null) : (de || null), ateF = ate === null ? (outra || null) : (ate || null);
+function prcHoraGravar(nome, id, dia, etapa, freq, praca) {
+  // mesmo dia + mesmo processo: a função atualiza a hora (13/11: grava pelo botão, nunca a meia hora digitada)
+  const deF = (document.getElementById('prcDe' + id) || {}).value || null, ateF = (document.getElementById('prcAte' + id) || {}).value || null;
   return prcGravar('est_processo_dia_por', { p_nome_base: nome, p_dia_semana: dia, p_etapa: etapa, p_hora_desde: deF, p_hora_ate: ateF,
     p_frequencia: freq, p_praca: praca || null }, `✓ ${nome}: hora gravada.`);
 }
 function prcTirar(id, rot) {
-  if (!confirm(`Tirar ${rot} da grade? Fica registrado no histórico.`)) return;
   return prcGravar('est_processo_dia_tirar', { p_id: id }, `✓ ${rot} saiu da grade.`);
 }
 function prcDuvida(id, marcada) {
-  let qual = null;
-  if (marcada) { qual = prompt('Qual é a dúvida? (fica registrada)'); if (qual === null) return prcRender(); qual = qual.trim() || null; }
+  const qual = marcada ? (((document.getElementById('prcDuvQual') || {}).value || '').trim() || null) : null;
   return prcGravar('est_processo_duvida', { p_id: id, p_duvida: marcada, p_qual: qual }, marcada ? '✓ dúvida marcada.' : '✓ dúvida tirada.');
 }
 
@@ -1796,16 +1817,23 @@ async function histCarregar() {
     estHistCarregar('ordem', 'vw_est_historico_ordem', PLP.unidade, 'criado_em.desc'),
     estHistCarregar('apont', 'vw_est_historico_apontamento', PLP.unidade, 'criado_em.desc'),
     estHistCarregar('grade', 'est_processo_historico', null, 'quando.desc'),
+    estFilaCarregar(PLP.unidade),
   ]);
   histRender();
 }
 function histRender() {
   const alvo = document.getElementById('view-prodhist');
   if (!alvo) return;
-  let h = `<h2>Históricos da produção</h2>
-    <div class="caption-label" style="text-align:left;">Tudo o que já foi feito, do plano ao apontamento. Clique no título para abrir; clique numa linha para ver o detalhe.</div>`;
+  // 13/11/2026 (auditoria): as abas do ciclo também aqui, e UMA busca que vale para os 5 históricos
+  const foco = document.activeElement && document.activeElement.id === 'histBusca';
+  let h = `<h2>Históricos da produção</h2>` + estFilaHtml()
+    + `<div style="display:flex; gap:8px; align-items:center; margin:8px 0;"><input id="histBusca" value="${trEscH(EST_HIST_BUSCA)}" oninput="EST_HIST_BUSCA=this.value; histRender();"
+        placeholder="procurar receita, lista, ordem, pessoa ou data (dd/mm)" style="flex:1; min-width:200px; background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); border-radius:6px; padding:7px 10px; font-size:13px;">
+        ${EST_HIST_BUSCA ? `<button class="preset-btn" onclick="EST_HIST_BUSCA=''; histRender();">✕ limpar</button>` : ''}</div>
+    <div class="caption-label" style="text-align:left;">Clique no título para abrir; na linha, o detalhe.</div>`;
   ['plano', 'sep', 'ordem', 'apont', 'grade'].forEach((ch) => { h += estHistHtml(...EST_HIST_DEF[ch]); });
   alvo.innerHTML = h;
+  if (foco) { const i = document.getElementById('histBusca'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 }
 
 // ---- ORDENS (tela própria, 27/10/2026): as ordens com o relógio e o apontar na linha + o histórico ----
