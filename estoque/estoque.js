@@ -105,8 +105,7 @@ async function ctgCarregar() {
   // 13/11/2026 (dono 01:48, "regra simples"; Estoque): onde contar cada item (vale para folha a partir de 19/11) e o aviso
   // de ordem/separação aberta antes de abrir a folha. Leitura que nunca derruba a tela.
   const [ondeC, ordAb] = await Promise.all([
-    CTG.ondeContarDe === CTG.unidade ? Promise.resolve(null)
-      : consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde&unidade=eq.${u}&order=nome_base`).catch(() => []),
+    consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde&unidade=eq.${u}&order=nome_base`).catch(() => []),
     consultarTudo(`vw_est_contagem_ordem_aberta?select=tipo,numero,data_para,situacao,texto&unidade=eq.${u}&order=data_para,numero`).catch(() => [])]);
   if (ondeC) { CTG.ondeContar = new Map(ondeC.map((x) => [x.nome_base, x])); CTG.ondeContarDe = CTG.unidade; }
   CTG.ordemAberta = ordAb || [];
@@ -210,8 +209,8 @@ function ctgRender() {
   h += ctgNfDepoisHtml();
 
   // 13/11/2026: ordem ou separação aberta → avisa antes de abrir a folha (não bloqueia)
-  if (!aberta && (CTG.ordemAberta || []).length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); color:var(--farol-perto);">
-      <b>Aponte antes de contar:</b> ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
+  if ((CTG.ordemAberta || []).length) h += `<div class="contexto" style="text-align:left; border-color:var(--info);">
+      <b>Em produção agora</b> (os itens dela saem marcados "EM PRODUÇÃO — não contar"; o resto conta normal): ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <b>${CTG.unidade}</b>
       ${f ? `<span>folha de <b>${f.data.split('-').reverse().join('/')}</b> · ${f.escopo === 'CURVA_A' ? 'só os de maior valor' : 'tudo'} · ${aberta ? 'aberta' : 'fechada'}</span>` : '<span>nenhuma folha ainda</span>'}
@@ -486,7 +485,8 @@ async function ctgDescartarFoto(id) {
 
 // Grava na contagem o que a transcricao leu, DEPOIS da conferencia na tela.
 async function ctgAplicarFoto(id, semPergunta) {
-  const linhas = (CTG.fotoLinhas || []).filter((l) => l.id_foto === id);
+  // 13/11/2026 (dono #436): item EM PRODUÇÃO não se grava
+  const linhas = (CTG.fotoLinhas || []).filter((l) => l.id_foto === id && !ctgEmProducao(ctgBaseDe(l.nome_saipos)));
   if (!linhas.length) { avisoAcao('atencao', '! Esta foto ainda não tem leitura.'); return; }
   const campos = linhas.map((l) => {
     const el = document.getElementById('fl_' + l.id);
@@ -627,9 +627,9 @@ function ctgHtmlFotos() {
     linhas.forEach((l) => {
       h += `<tr${l.duvida ? ' style="background:var(--surface-2);"' : ''}>
         <td style="color:var(--tx-5);">${l.linha == null ? '' : l.linha}</td>
-        <td>${ctgNomeHtml(l.nome_saipos)}${l.nota ? `<div class="caption-label" style="color:var(--farol-perto);">${l.nota}</div>` : ''}</td>
-        <td><input type="number" step="0.001" id="fl_${l.id}" value="${l.qtd_lida == null ? '' : l.qtd_lida}"
-             style="width:110px; background:var(--surface-2); border:1px solid ${l.duvida ? 'var(--farol-perto)' : 'var(--line)'}; border-radius:8px; color:var(--tx-1); padding:6px 8px;"></td>
+        <td>${ctgNomeHtml(l.nome_saipos)}${ctgOndeTag(CTG.folha, ctgBaseDe(l.nome_saipos))}${l.nota ? `<div class="caption-label" style="color:var(--farol-perto);">${l.nota}</div>` : ''}</td>
+        <td>${ctgEmProducao(ctgBaseDe(l.nome_saipos)) ? '<span style="color:var(--farol-fora); font-weight:700;">não contar</span>' : `<input type="number" step="0.001" id="fl_${l.id}" value="${l.qtd_lida == null ? '' : l.qtd_lida}"
+             style="width:110px; background:var(--surface-2); border:1px solid ${l.duvida ? 'var(--farol-perto)' : 'var(--line)'}; border-radius:8px; color:var(--tx-1); padding:6px 8px;">`}</td>
         ${ctgUnidadeCelulas(l.nome_saipos)}
         <td style="color:${l.duvida ? 'var(--farol-perto)' : 'var(--tx-5)'};">${l.duvida ? 'confira' : ''}</td></tr>`;
     });
@@ -679,6 +679,24 @@ function ctgGrupoDe(i) {
 // "linha 14" significaria um item em cada folha. Por isso a contagem corre sobre todos os grupos
 // e só a impressão é filtrada.
 // 13/11/2026 (dono 01:48): "só estoque" vale só para folha com data a partir de vale_para_contagem_desde (19/11); a de 18/11 conta tudo
+// 13/11/2026 02:03 (dono #436): "não dá pra desconsiderar ingredientes que estejam com ordem de produção aberta na hora da
+// contagem? na lista de contagem sinalizar o que eles têm que contar de cada praça de forma mais clara". Cada item diz onde
+// contar: SÓ ESTOQUE / ESTOQUE + COZINHA (folhas a partir de vale_para_contagem_desde) ou EM PRODUÇÃO — não contar (sempre;
+// vem do banco, vw_est_contagem_onde_contar). Item em produção não se conta e não se grava.
+function ctgOnde(f, nomeBase) {
+  const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
+  if (!x) return null;
+  if (/^EM PRODU/i.test(x.onde_contar || '')) return 'EM PRODUÇÃO — não contar';
+  return f && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde) ? x.onde_contar : null;
+}
+function ctgEmProducao(nomeBase) { const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null; return !!(x && /^EM PRODU/i.test(x.onde_contar || '')); }
+function ctgBaseDe(nomeSaipos) { ctgNomeHtml(nomeSaipos); return (CTG._nomeBase && CTG._nomeBase.get(nomeSaipos)) || null; }
+function ctgOndeTag(f, nomeBase) {
+  const o = ctgOnde(f, nomeBase);
+  if (!o) return '';
+  const cor = /^EM PRODU/.test(o) ? 'var(--farol-fora)' : /COZINHA/.test(o) ? 'var(--info)' : 'var(--farol-perto)';
+  return ` <span style="display:inline-block; font-size:11px; font-weight:800; letter-spacing:.3px; color:${cor}; border:1px solid ${cor}; border-radius:6px; padding:0 6px;">${trEscH(o)}</span>`;
+}
 function ctgSoEstoque(f, nomeBase) {
   const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
   return !!(x && f && x.onde_contar === 'SÓ ESTOQUE' && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde));
@@ -734,7 +752,8 @@ async function ctgImprimir(soEsteGrupo) {
     .n { width:30px; color:#45443f; font-size:11px; }
     .un { width:46px; }
     .box { width:120px; border:1px solid #000 !important; height:26px; }
-    .so { font-size:11px; font-weight:bold; }
+    .so { font-size:10.5px; font-weight:bold; border:1px solid #000; border-radius:4px; padding:0 4px; white-space:nowrap; }
+    .so.prod { background:#000; color:#fff; } .risc { background:#e8e6dc; text-align:center; font-size:10px; font-weight:bold; }
     @media print { .naoimprime { display:none; } body { margin:10px 14px; } }
   </style></head><body>
     <button class="naoimprime" onclick="window.print()" style="float:right; padding:8px 14px;">Imprimir / salvar PDF</button>
@@ -750,8 +769,8 @@ async function ctgImprimir(soEsteGrupo) {
     ${grupos.map((g, iG) => `<div class="grupo${iG ? ' quebra' : ''}"><h2>${g} — ${porGrupo[g].length} itens · linhas ${comeca[g] + 1} a ${comeca[g] + porGrupo[g].length}</h2><table>
       <tr><th class="n">#</th><th>Item</th><th class="un">Un</th><th class="box">Contado</th></tr>
       ${porGrupo[g].map((i, k) => { n = comeca[g] + k + 1; return `<tr><td class="n">${n}</td>
-        <td>${i.nome_base || i.nome_saipos}${ctgSoEstoque(f, i.nome_base) ? ' <span class="so">· só estoque</span>' : ''}</td>
-        <td class="un">${(i.un_saipos || '').toLowerCase()}</td><td class="box"></td></tr>`; }).join('')}
+        <td>${i.nome_base || i.nome_saipos}${ctgOnde(f, i.nome_base) ? ` <span class="so${ctgEmProducao(i.nome_base) ? ' prod' : ''}">${ctgOnde(f, i.nome_base)}</span>` : ''}</td>
+        <td class="un">${(i.un_saipos || '').toLowerCase()}</td><td class="box${ctgEmProducao(i.nome_base) ? ' risc' : ''}">${ctgEmProducao(i.nome_base) ? 'NÃO CONTAR' : ''}</td></tr>`; }).join('')}
     </table></div>`).join('')}
   </body></html>`);
   w.document.close();
