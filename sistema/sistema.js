@@ -69,7 +69,7 @@ function rotPlacarHtml() {
       <td style="white-space:nowrap;">${String(r.dias || '').padStart(7, '·').slice(-7).split('').map((ch, i) => quad(ch, i, r)).join('')}${r.tem_reconstruido ? ' <span title="06 a 12/11: dias refeitos pela agenda de hoje" style="color:var(--tx-4);">≈</span>' : ''}</td>
       <td style="color:var(--farol-ok);">${Number(r.rodou) || 0}</td><td style="color:${Number(r.errou) ? 'var(--farol-fora)' : 'var(--tx-4)'};font-weight:${Number(r.errou) ? 700 : 400};">${Number(r.errou) || 0}</td>
       <td style="color:${Number(r.nao_rodou) ? 'var(--farol-fora)' : 'var(--tx-4)'};font-weight:${Number(r.nao_rodou) ? 700 : 400};">${Number(r.nao_rodou) || 0}</td>
-      <td style="font-size:12px;">${trEscH(String(r.situacao_ultima || '').toLowerCase().replace('nao', 'não'))}</td></tr>`).join('')}
+      <td style="font-size:12px;">${trEscH(String(r.situacao_ultima || '').toLowerCase().replace(/_/g, ' ').replace('nao', 'não'))}</td></tr>`).join('')}
     </tbody></table></div>
     <div class="caption-label" style="text-align:left;${parado ? 'color:var(--farol-fora);font-weight:700;' : ''}">${conf ? `conferido pelo vigia às ${new Date(conf).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}${parado ? ' — o vigia parou há mais de 1 h' : ''}` : 'o vigia ainda não conferiu'} · verde rodou · vermelho errou · cinza não rodou · amarelo pulou · contorno aguardando</div>`;
 }
