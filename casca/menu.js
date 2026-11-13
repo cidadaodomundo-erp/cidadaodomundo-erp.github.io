@@ -336,6 +336,11 @@ window.CASCA_MENU = [
     "icone": "🪪"
    },
    {
+    "chave": "pseguro",
+    "rotulo": "Seguro de vida",
+    "icone": "🛡️"
+   },
+   {
     "chave": "freelas",
     "rotulo": "Taxas e Freelas",
     "icone": "🤝",

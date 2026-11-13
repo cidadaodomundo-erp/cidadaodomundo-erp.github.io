@@ -255,11 +255,11 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261112f"></script>
-<script src="casca/paginas.js?v=20261112-ativ1"></script>
-<script src="casca/modulos.js?v=20261112d"></script>
+<script src="casca/menu.js?v=20261113seg"></script>
+<script src="casca/paginas.js?v=20261113seg"></script>
+<script src="casca/modulos.js?v=20261113seg"></script>
 <script src="casca/setores-fabio.js?v=20261112c"></script>
-<script src="casca/busca.js?v=20261112d"></script>
+<script src="casca/busca.js?v=20261113seg"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -475,6 +475,8 @@ function visivel(chave) {
   if (!it) return false;
   // 12/11/2026 (Fabio): a Chegada dos motoboys usa a MESMA permissão do Delivery do dia (sem chave nova no painel_acesso)
   if (chave === 'chegada') return visivel('delivery');
+  // 13/11/2026: o Seguro de vida (RH) abre para quem vê Cargos e salários e vê pessoal (sem chave nova no painel_acesso)
+  if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');
   // item de junção que não é tela (Motoboys): visível se o login abre alguma das abas
   if (JUNCOES[chave] && !abasJuncao(chave).includes(chave)) return abasJuncao(chave).some((k) => visivel(k));
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;

@@ -49,6 +49,7 @@ window.CASCA_BUSCA = {
   pcalc: ['calculos da folha', 'adiantamento', 'vale transporte', 'vt', 'va', 'vale alimentacao', 'gratificacao', 'bonificacao', '10%', 'dez por cento', 'por fora'],
   rh: ['desconto em folha', 'emprestimo', 'vale', 'divida', 'desconto'],
   penvio: ['enviar a contabilidade', 'contabilidade', 'envio da folha'],
+  pseguro: ['seguro de vida', 'seguro', 'capemisa', 'apolice', 'corretor', 'segurado'],
   pconf: ['conferencia da folha', 'conferir folha', 'validar folha', 'holerite', 'pagamento da folha', 'folha de pagamento'],
   padm: ['admissao', 'contratar', 'contratacao', 'funcionario novo', 'registro'],
   pferias: ['ferias', 'ferias vencidas', 'programacao de ferias'],

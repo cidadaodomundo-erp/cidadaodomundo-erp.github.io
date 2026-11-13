@@ -3845,3 +3845,72 @@ async function mbCancelar(id) {
   avisoAcao('ok', `✓ Acerto cancelado — às ${avisoHora()}.`);
   MB.cancelando = null; await mbLerLista(); mbRender();
 }
+
+// ---------- SEGURO DE VIDA (RH, 13/11/2026; proposta 2026-11-13-rh-seguro-vida.md) ----------
+// Pedido do dono (12/11 13:31): todo mês, quem está na Capemisa × funcionários ativos e motoboys com contrato rodando.
+// Só leitura: o envio ao corretor é do dono, pela agenda (item rh:seguro-movimentacao-AAAA-MM). RLS pode_ver_pessoal().
+let SEG = null, SEG_F = { apolice: null, acao: 'acao' };
+const SEG_PASTA = 'https://drive.google.com/drive/folders/1ZBQgb48DbVTb7we-vJwpAfDsw1gJEGg5';
+const SEG_COR = { 'Certo': 'var(--farol-ok)', 'Incluir no seguro': 'var(--farol-perto)', 'Tirar do seguro': 'var(--farol-fora)',
+  'Conferir': 'var(--amber-2)', 'Rodando sem contrato': 'var(--farol-fora)' };
+async function entrarPesSeguro() {
+  const alvo = document.getElementById('view-pseguro');
+  if (!alvo) return;
+  alvo.innerHTML = '<div class="contexto">Carregando o seguro de vida...</div>';
+  try {
+    const [res, lin] = await Promise.all([
+      consultarTudo('vw_rh_seguro_resumo?select=*&order=apolice_nome'),
+      consultarTudo('vw_rh_seguro_conferencia?select=competencia,apolice_nome,nome,tipo,acao_texto,motivo,data_mov,certificado,desde,entregas_30d,falta_dado,gerado_em&order=apolice_nome,nome,certificado')]);
+    SEG = { res, lin };
+  } catch (e) {
+    alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui carregar o seguro de vida: ${cgEsc(e.message)}</div>`;
+    return;
+  }
+  segRender();
+}
+function segFiltrar(campo, v) { SEG_F[campo] = SEG_F[campo] === v ? (campo === 'acao' ? 'todos' : null) : v; segRender(); }
+function segRender() {
+  const alvo = document.getElementById('view-pseguro');
+  if (!alvo || !SEG) return;
+  const n = (v) => Number(v) || 0;
+  const L = SEG.lin || [];
+  const r0 = (SEG.res || [])[0] || (L[0] || {});
+  const comp = r0.competencia ? `${String(r0.competencia).slice(5, 7)}/${String(r0.competencia).slice(0, 4)}` : '—';
+  const quando = r0.gerado_em ? new Date(r0.gerado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '—';
+  let h = `<h2>Seguro de vida</h2>
+    <div class="caption-label" style="text-align:left;">Relação da Capemisa de ${comp}, conferida em ${quando} · <a href="${SEG_PASTA}" target="_blank" rel="noopener">planilha do mês ›</a></div>`;
+  if (!L.length) { alvo.innerHTML = h + `<div class="contexto">Nenhuma relação conferida ainda.</div>`; return; }
+  // cartões: um por apólice (número = incluir + tirar) e o dos motoboys rodando sem contrato; clicar filtra a lista
+  const cartao = (chave, lbl, num, pct) => {
+    const sel = SEG_F.apolice === chave;
+    return `<div class="card ${num ? 'neg' : 'pos'}" style="cursor:pointer;${sel ? ' outline:2px solid var(--brand); background:var(--surface-2);' : ''}"
+      onclick="segFiltrar('apolice', ${cgEsc(JSON.stringify(chave))})" title="${sel ? 'clique para ver todas' : 'clique para filtrar'}">
+      <div class="card-lbl">${cgEsc(lbl)}${sel ? ' ✕' : ''}</div><div class="card-val">${num}</div><div class="card-pct">${pct}</div></div>`;
+  };
+  h += `<div class="cards">` + (SEG.res || []).map((r) => r.apolice
+    ? cartao(r.apolice_nome, r.apolice_nome, n(r.incluir) + n(r.tirar) + n(r.conferir), `a mexer · ${n(r.segurados)} segurados · ${n(r.certos)} certos`)
+    : cartao(r.apolice_nome, 'Rodando sem contrato', n(r.sem_contrato), 'motoboys fora do seguro')).join('') + `</div>`;
+  // filtro por ação (padrão: o que precisa de ação)
+  const daApolice = L.filter((x) => !SEG_F.apolice || x.apolice_nome === SEG_F.apolice);
+  const conta = (f) => daApolice.filter(f).length;
+  const FILTROS = [['acao', 'Precisa de ação', (x) => x.acao_texto !== 'Certo'], ['Incluir no seguro', 'Incluir', (x) => x.acao_texto === 'Incluir no seguro'],
+    ['Tirar do seguro', 'Tirar', (x) => x.acao_texto === 'Tirar do seguro'], ['Conferir', 'Conferir', (x) => x.acao_texto === 'Conferir'],
+    ['Rodando sem contrato', 'Rodando sem contrato', (x) => x.acao_texto === 'Rodando sem contrato'], ['Certo', 'Certos', (x) => x.acao_texto === 'Certo'],
+    ['todos', 'Todos', () => true]];
+  h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0;">`
+    + FILTROS.map(([k, rot, f]) => { const q = conta(f); return (q || k === 'acao' || k === 'todos') ? `<button class="preset-btn${SEG_F.acao === k ? ' active' : ''}" onclick="SEG_F.acao='${k}'; segRender();">${rot} · ${q}</button>` : ''; }).join('')
+    + (SEG_F.apolice ? `<button class="preset-btn" onclick="segFiltrar('apolice', null)">${cgEsc(SEG_F.apolice)} ✕</button>` : '') + `</div>`;
+  const fAt = (FILTROS.find(([k]) => k === SEG_F.acao) || FILTROS[0])[2];
+  const vis = daApolice.filter(fAt);
+  h += `<div id="tabelaSeguro"><table><thead><tr><th>Pessoa</th><th>Apólice</th><th>Ação</th><th>Motivo</th><th>Falta</th></tr></thead><tbody>`
+    + (vis.length ? vis.map((x) => `<tr>
+        <td style="font-weight:600;">${cgEsc(x.nome || "")}</td>
+        <td>${cgEsc(x.apolice_nome || '')}</td>
+        <td style="font-weight:700; color:${SEG_COR[x.acao_texto] || 'var(--tx-3)'};">${cgEsc(String(x.acao_texto || '').toLowerCase())}</td>
+        <td style="white-space:normal; font-size:12.5px;">${cgEsc(x.motivo || '')}</td>
+        <td>${x.falta_dado ? `<span style="display:inline-block; border:1px solid var(--farol-perto); color:var(--farol-perto); border-radius:10px; padding:1px 8px; font-size:12px; white-space:normal;">${cgEsc(x.falta_dado)}</span>` : '<span style="color:var(--tx-5);">—</span>'}</td></tr>`).join('')
+      : `<tr><td colspan="5">Ninguém neste filtro.</td></tr>`)
+    + `</tbody></table></div>`;
+  h += `<div class="caption-label" style="text-align:left; margin-top:6px;">Sem botão de envio: o envio ao corretor é do dono, pela agenda.</div>`;
+  alvo.innerHTML = h;
+}
