@@ -102,6 +102,14 @@ async function ctgCarregar() {
     CTG.base = (await consultarTudo(`vw_est_folha_contagem?select=nome_base,nome_saipos_conta,nomes_saipos,etiquetas,qtd,un,tipo,situacao,grupo,ordem_grupo&unidade=eq.${u}&order=ordem_grupo,grupo,nome_base`)).map(ctgDaFolha);
     CTG._grupoDe = null;   // o grupo de cada item sai daqui; base nova, mapa novo
   }
+  // 13/11/2026 (dono 01:48, "regra simples"; Estoque): onde contar cada item (vale para folha a partir de 19/11) e o aviso
+  // de ordem/separação aberta antes de abrir a folha. Leitura que nunca derruba a tela.
+  const [ondeC, ordAb] = await Promise.all([
+    CTG.ondeContarDe === CTG.unidade ? Promise.resolve(null)
+      : consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde&unidade=eq.${u}&order=nome_base`).catch(() => []),
+    consultarTudo(`vw_est_contagem_ordem_aberta?select=tipo,numero,data_para,situacao,texto&unidade=eq.${u}&order=data_para,numero`).catch(() => [])]);
+  if (ondeC) { CTG.ondeContar = new Map(ondeC.map((x) => [x.nome_base, x])); CTG.ondeContarDe = CTG.unidade; }
+  CTG.ordemAberta = ordAb || [];
   CTG.foraBase = CTG.folha ? await consultarTudo(`vw_est_contagem_fora_da_base?select=nome_saipos,nome_base,problema,quem,o_que_fazer&id_inventario=eq.${CTG.folha.id}`).catch(() => []) : [];
   CTG.fotos = [];
   CTG.fotoLinhas = [];
@@ -201,6 +209,9 @@ function ctgRender() {
   let h = `<h2>Contagem de estoque</h2>`;
   h += ctgNfDepoisHtml();
 
+  // 13/11/2026: ordem ou separação aberta → avisa antes de abrir a folha (não bloqueia)
+  if (!aberta && (CTG.ordemAberta || []).length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto); color:var(--farol-perto);">
+      <b>Aponte antes de contar:</b> ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <b>${CTG.unidade}</b>
       ${f ? `<span>folha de <b>${f.data.split('-').reverse().join('/')}</b> · ${f.escopo === 'CURVA_A' ? 'só os de maior valor' : 'tudo'} · ${aberta ? 'aberta' : 'fechada'}</span>` : '<span>nenhuma folha ainda</span>'}
@@ -667,6 +678,11 @@ function ctgGrupoDe(i) {
 // transcrição da foto acha o item pelo número da linha, e se cada grupo recomeçasse no 1 a mesma
 // "linha 14" significaria um item em cada folha. Por isso a contagem corre sobre todos os grupos
 // e só a impressão é filtrada.
+// 13/11/2026 (dono 01:48): "só estoque" vale só para folha com data a partir de vale_para_contagem_desde (19/11); a de 18/11 conta tudo
+function ctgSoEstoque(f, nomeBase) {
+  const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
+  return !!(x && f && x.onde_contar === 'SÓ ESTOQUE' && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde));
+}
 async function ctgImprimir(soEsteGrupo) {
   const f = CTG.folha;
   if (!f) { alert('Abra a folha de contagem primeiro.'); return; }
@@ -718,6 +734,7 @@ async function ctgImprimir(soEsteGrupo) {
     .n { width:30px; color:#45443f; font-size:11px; }
     .un { width:46px; }
     .box { width:120px; border:1px solid #000 !important; height:26px; }
+    .so { font-size:11px; font-weight:bold; }
     @media print { .naoimprime { display:none; } body { margin:10px 14px; } }
   </style></head><body>
     <button class="naoimprime" onclick="window.print()" style="float:right; padding:8px 14px;">Imprimir / salvar PDF</button>
@@ -725,7 +742,7 @@ async function ctgImprimir(soEsteGrupo) {
       <div><h1>Contagem de estoque — ${CTG.unidade}</h1>
         <div class="sub">${soEsteGrupo ? `grupo <b>${soEsteGrupo}</b>` : (f.escopo === 'CURVA_A' ? 'curva A' : 'folha inteira')} ·
           ${grupos.reduce((a, g) => a + porGrupo[g].length, 0)} itens · conte e escreva o número na caixa ·
-          item que não existe mais, risque · <b>o número da linha é o que vale na foto</b></div></div>
+          item que não existe mais, risque · <b>o número da linha é o que vale na foto</b>${CTG.ondeContar && [...CTG.ondeContar.values()].some((x) => ctgSoEstoque(f, x.nome_base)) ? ' · <b>"só estoque"</b>: o que está na cozinha já saiu pela requisição, conte só o estoque' : ''}</div></div>
       <div style="text-align:right;"><div class="cod">FOLHA ${f.id}</div>
         <div class="sub">${f.data.split('-').reverse().join('/')}</div></div>
     </div>
@@ -733,7 +750,7 @@ async function ctgImprimir(soEsteGrupo) {
     ${grupos.map((g, iG) => `<div class="grupo${iG ? ' quebra' : ''}"><h2>${g} — ${porGrupo[g].length} itens · linhas ${comeca[g] + 1} a ${comeca[g] + porGrupo[g].length}</h2><table>
       <tr><th class="n">#</th><th>Item</th><th class="un">Un</th><th class="box">Contado</th></tr>
       ${porGrupo[g].map((i, k) => { n = comeca[g] + k + 1; return `<tr><td class="n">${n}</td>
-        <td>${i.nome_base || i.nome_saipos}</td>
+        <td>${i.nome_base || i.nome_saipos}${ctgSoEstoque(f, i.nome_base) ? ' <span class="so">· só estoque</span>' : ''}</td>
         <td class="un">${(i.un_saipos || '').toLowerCase()}</td><td class="box"></td></tr>`; }).join('')}
     </table></div>`).join('')}
   </body></html>`);
