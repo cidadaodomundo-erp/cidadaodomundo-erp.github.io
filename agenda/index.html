@@ -27,6 +27,9 @@
   .ag-lin { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:7px 10px; border:1px solid var(--line); border-radius:8px; margin:4px 0; background:var(--surface); }
   .ag-lin .t { flex:1 1 auto; }
   .ag-lin .f { font-size:11px; color:var(--tx-4); white-space:nowrap; }
+  /* 13/11/2026 (dono 01:23): o número do item é a referência dos chats — grande, no canto, maior que o título */
+  .ag-lin .ag-id { display:inline-block; font-size:17px; font-weight:800; color:var(--tx-1); white-space:nowrap; margin-right:8px;
+    padding:0 6px; border:1px solid var(--line-2); border-radius:6px; background:var(--surface-2); vertical-align:middle; }
   .ag-lin.alerta { border-color:var(--farol-perto); }
   .ag-lin.atraso { border-color:var(--farol-fora); }
   .ag-lin.feito { opacity:.7; }
@@ -196,7 +199,7 @@ function agDesenhar() {
     const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
     const nv = agRetNovo(p);
-    return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t">${nv ? agBolinha(p.id) : ''}${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''} <span class="f" title="número do item (os chats citam por ele)">#${p.id}</span></span>${acao}${bts}${feito}
+    return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t"><span class="ag-id" title="número do item (os chats citam por ele)">#${p.id}</span>${nv ? agBolinha(p.id) : ''}${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
@@ -402,7 +405,7 @@ async function agPlanoMontar(reler) {
       : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
     const nv = !dono && agRetNovo(p);   // no "Com o Fabio" a resposta é para ele: só ele apaga a bolinha
-    return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t">${nv ? agBolinha(p.id) : ''}${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''} <span class="f">#${p.id}</span></span>${bts}
+    return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t"><span class="ag-id" title="número do item (os chats citam por ele)">#${p.id}</span>${nv ? agBolinha(p.id) : ''}${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''}</span>${bts}
       ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   let h = '';
@@ -531,7 +534,7 @@ function agPessoaHtml(L, soLeitura) {
       const fio = Array.isArray(x.fio) ? x.fio : [];
       const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
         `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
-      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" id="agItem_${id}" style="flex-wrap:wrap;"><span class="t"><span class="f" style="float:right;" title="número do item">#${id}</span>${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
+      h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" id="agItem_${id}" style="flex-wrap:wrap;"><span class="t"><span class="ag-id" title="número do item">#${id}</span>${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
         ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}${agAnxLugar('tarefa', id)}</div>`;
       if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
     });
