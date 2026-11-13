@@ -10,7 +10,8 @@
 //  - mínimo legal de intervalo usa o tempo TRABALHADO no dia (mais de 6h = 60 min; mais de 4h = 15 min), não a jornada contratada;
 //  - atraso/saída só aparecem quando o leitor manda a jornada da pessoa (hoje: só no dia em andamento, retrato de até 7 dias);
 //  - hora extra, jornada a menor, falta e folga NÃO são afirmadas: quem não bateu aparece como "sem batida", sem acusar falta;
-//  - dia em andamento não acusa batida incompleta nem refeição (a pessoa ainda pode bater/lançar).
+//  - dia em andamento não acusa batida incompleta nem refeição (a pessoa ainda pode bater/lançar);
+//  - 5 ou mais batidas em número ímpar (dia fechado) = batidas incompletas, sem calcular intervalo (o motor antigo só olhava menos de 4).
 (function (root, factory) {
   'use strict';
   const m = factory();
@@ -72,7 +73,7 @@
   // 4+ batidas: intervalo = soma das saídas do meio (2ª→3ª, 4ª→5ª…); líquido = última − primeira − intervalo
   function medir(mins) {
     const n = mins.length; if (n < 2) return { intervalo: null, liquido: null };
-    if (n < 4) return { intervalo: null, liquido: null };
+    if (n < 4 || n % 2 === 1) return { intervalo: null, liquido: null };   // número ímpar: falta um registro, não dá para medir sem adivinhar
     let interv = 0; for (let i = 1; i + 1 <= n - 1; i += 2) interv += mins[i + 1] - mins[i];
     return { intervalo: interv, liquido: (mins[n - 1] - mins[0]) - interv };
   }
@@ -96,6 +97,7 @@
     const ap = []; const n = mins.length;
     const add = (cat, txt) => ap.push({ categoria: cat, nivel: CATEGORIA[cat].nivel, ordem: CATEGORIA[cat].ordem, rotulo: CATEGORIA[cat].rotulo, texto: txt });
     if (fechado && n > 0 && n < 4) add('BATIDAS_INCOMPLETAS', n + (n === 1 ? ' batida' : ' batidas') + ' no dia (o completo são 4: entrada, saída e volta do intervalo, saída).');
+    else if (fechado && n % 2 === 1) add('BATIDAS_INCOMPLETAS', n + ' batidas no dia (número ímpar: falta um registro; tempo trabalhado e intervalo não calculados).');
     if (n >= 4 && medida.intervalo !== null) {
       const legal = intervaloLegal(medida.liquido);
       if (legal > 0 && medida.intervalo < legal) add('INTERVALO_ABAIXO_LEGAL', 'Intervalo de ' + medida.intervalo + ' min, abaixo do mínimo legal de ' + legal + ' min para ' + fmtDur(medida.liquido) + ' trabalhadas (Art. 71 da CLT).');
@@ -165,7 +167,7 @@
     const conta = (f) => linhas.filter(f).length;
     const kpis = {
       SERIO: conta((l) => l.nivel === 'SERIO'), INFRACAO: conta((l) => l.nivel === 'INFRACAO'), VERBAL: conta((l) => l.nivel === 'VERBAL'),
-      CONFERIR: conta((l) => l.nivel === 'CONFERIR'), SEM: conta((l) => l.nivel === 'SEM'),
+      CONFERIR: conta((l) => l.nivel === 'CONFERIR'), SEM: conta((l) => l.nivel === 'SEM' && !l.refeicaoErro),
       REF_NAO: conta((l) => l.refeicaoErro), REF_OK: conta((l) => l.refeicao.estado === 'lancada'),
       REF_SEM_VINCULO: conta((l) => l.refeicao.estado === 'sem_vinculo'),
       REF_PENDENTE: conta((l) => l.refeicao.estado === 'pendente' || l.refeicao.estado === 'indisponivel'),

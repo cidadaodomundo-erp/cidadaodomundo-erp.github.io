@@ -31,6 +31,7 @@ test('medidas: intervalo é a soma das saídas do meio e o líquido desconta o i
   assert.deepEqual(M.medir([600, 840, 900, 1140]), { intervalo: 60, liquido: 480 });
   assert.deepEqual(M.medir([600, 720, 735, 840, 900, 1140]), { intervalo: 75, liquido: 465 });
   assert.deepEqual(M.medir([600, 840]), { intervalo: null, liquido: null });
+  assert.deepEqual(M.medir([600, 720, 735, 840, 900]), { intervalo: null, liquido: null }, 'número ímpar não mede');
   assert.equal(M.intervaloLegal(361), 60); assert.equal(M.intervaloLegal(360), 15); assert.equal(M.intervaloLegal(240), 0);
 });
 
@@ -58,6 +59,14 @@ test('dia fechado: aponta intervalo abaixo do legal, batidas incompletas e refei
   assert.deepEqual(r.linhas.map((l) => l.id), [2, 3, 1, 6]);   // mais sério primeiro
   assert.equal(r.kpis.SERIO, 1); assert.equal(r.kpis.INFRACAO, 1); assert.equal(r.kpis.REF_NAO, 2); assert.equal(r.kpis.SEM_BATIDA, 1); assert.equal(r.kpis.TOTAL, 4);
   assert.equal(r.atrasoAvaliado, false);
+  // o número de cada cartão é igual ao tamanho da lista que ele abre
+  ['SERIO', 'INFRACAO', 'VERBAL', 'CONFERIR', 'SEM', 'REF_NAO'].forEach((k) => assert.equal(r.kpis[k], M.filtrar(r.linhas, k).length, k));
+  assert.equal(r.kpis.SEM, 1);
+  // 5 batidas (ímpar) em dia fechado: batidas incompletas, sem acusar intervalo; em andamento não aponta
+  const imp = resposta({ batidas: [bat(1, '10:00', '14:00', '14:10', '18:00', '19:00')] });
+  const li = linha(M.apontar(imp, { hojeOperacional: HOJE }), 1);
+  assert.deepEqual(cats(li), ['BATIDAS_INCOMPLETAS']); assert.equal(li.liquido, null); assert.match(li.apontamentos[0].texto, /5 batidas.*ímpar/);
+  assert.deepEqual(cats(linha(M.apontar(imp, { hojeOperacional: DIA }), 1)), []);
   assert.ok(!r.avisos.join(' ').includes('<'));
 });
 
