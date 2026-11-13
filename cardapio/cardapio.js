@@ -611,7 +611,10 @@ async function entrarFichas() {
     composicao.forEach(l => { (porFicha[l.ficha] = porFicha[l.ficha] || []).push(l); });
     const porItem = {};
     origem.forEach(o => { porItem[o.item] = o; });
-    FICHAS = { lista, porFicha, porItem };
+    // 13/11/2026 (dono 02:01 "fichas técnicas = fonte oficial"; Estoque): revisada / quem pode editar (dono e Rita)
+    const est = await consultarTudo('vw_ft_ficha_estado?select=ficha,revisada,revisada_em,revisada_por,obs,ultima_edicao_em,ultima_edicao_por,eu_posso_editar&order=ficha').catch(() => []);
+    const estado = {}; est.forEach(e => { estado[e.ficha] = e; });
+    FICHAS = { lista, porFicha, porItem, estado, pode: est.some(e => e.eu_posso_editar === true) };
   }
   renderModuloFichas();
 }
@@ -683,6 +686,7 @@ async function fichaSalvar() {
   const diz = (txt, cor) => { aviso.style.display = 'block'; aviso.style.borderColor = cor; aviso.innerHTML = txt; };
   const nome = (FICHA_EDIT.nome || '').trim().toUpperCase();
   if (!nome) return diz('Dê um nome à ficha.', 'var(--farol-fora)');
+  if (FICHAS.pode) return fichaGravarOficial(nome, diz);
   if (fichaEhReceita(nome) || (FICHA_EDIT.original && fichaEhReceita(FICHA_EDIT.original))) {
     return diz(`Receita não se muda por aqui: ela vai pela Conferência de receitas. ${fichaBotaoConferencia(FICHA_EDIT.original || nome)}`, 'var(--farol-perto)');
   }
@@ -741,6 +745,49 @@ async function fichaSalvar() {
   } catch (e) {
     diz('Não deu para salvar: ' + e.message, 'var(--farol-fora)');
   }
+}
+
+// ---- FICHA OFICIAL (13/11/2026, dono 02:01; Estoque: script/sql/fichas_tecnicas_fonte_oficial_2026_11_13.sql) ----
+// Quem pode (dono e Rita) grava a ficha INTEIRA por ft_ficha_gravar; antes, mostra o custo novo e quantas fichas usam esta.
+let FICHA_REV = 'todas';
+async function fichaGravarOficial(nome, diz) {
+  const { porItem, porFicha } = FICHAS;
+  const linhas = []; let custo = 0;
+  for (const l of FICHA_EDIT.linhas) {
+    const mp = (l.mp || '').trim(), qtd = Number(String(l.qtd).replace(',', '.'));
+    if (!mp && !l.qtd) continue;
+    const o = porItem[mp];
+    if (!o) return diz(`<b>${mp || '(sem nome)'}</b> não está no cadastro de ingredientes nem é outra ficha. Escolha da lista.`, 'var(--farol-fora)');
+    if (!qtd || qtd <= 0) return diz(`Falta a quantidade de <b>${mp}</b>.`, 'var(--farol-fora)');
+    linhas.push({ materia_prima: mp, qtd_ft: qtd }); custo += qtd * (Number(o.preco_un_uso) || 0);
+  }
+  if (!linhas.length) return diz('Coloque pelo menos um ingrediente.', 'var(--farol-fora)');
+  const alvo = FICHA_EDIT.original || nome;
+  // o rendimento da ficha (lote) continua o mesmo; ficha nova ou produto de venda = 1
+  const rend = Number(((porFicha[alvo] || [])[0] || {}).rendimento) > 0 ? Number(porFicha[alvo][0].rendimento) : 1;
+  const usam = Object.keys(porFicha).filter((f) => f !== alvo && (porFicha[f] || []).some((x) => x.materia_prima === alvo)).length;
+  const antes = Number(((FICHAS.lista.find((f) => f.ficha === alvo) || {}).custo)) || 0;
+  if (!FICHA_EDIT.confirmar) {
+    FICHA_EDIT.confirmar = true;
+    return diz(`Custo novo: <b>R$ ${fmt(custo)}</b>${FICHA_EDIT.original ? ` (antes R$ ${fmt(antes)})` : ''} · ${usam ? `<b>${usam}</b> ${usam === 1 ? 'outra ficha usa' : 'outras fichas usam'} esta e ${usam === 1 ? 'muda' : 'mudam'} junto` : 'nenhuma outra ficha usa esta'}.
+      <button class="preset-btn active" style="margin-left:8px;" onclick="fichaSalvar()">Confirmar e gravar</button>
+      <button class="preset-btn" style="margin-left:6px;" onclick="FICHA_EDIT.confirmar=false; document.getElementById('fichaAviso').style.display='none';">voltar</button>`, 'var(--farol-perto)');
+  }
+  FICHA_EDIT.confirmar = false;
+  diz('Gravando…', 'var(--line)');
+  const r = await trRpcSeguro('ft_ficha_gravar', { p_ficha: alvo, p_linhas: linhas, p_rendimento: rend, p_tipo: null, p_classe: null, p_motivo: 'painel · Fichas técnicas' });
+  if (!r.ok) return diz('✗ Não gravou: ' + (await trErroDe(r)), 'var(--farol-fora)');
+  let j = {}; try { j = await r.json(); if (Array.isArray(j)) j = j[0] || {}; } catch (e) {}
+  FICHA_EDIT = null; FICHAS = null; FICHA_ABERTA = alvo;
+  FICHA_MSG = `✓ <b>${alvo}</b> gravada às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${j.custo_depois != null ? ` · custo R$ ${fmt(Number(j.custo_antes) || 0)} → <b>R$ ${fmt(Number(j.custo_depois))}</b>` : ''}${Number(j.fichas_que_usam) ? ` · ${j.fichas_que_usam} ${Number(j.fichas_que_usam) === 1 ? 'ficha usa' : 'fichas usam'} esta` : ''}.`;
+  await entrarFichas();
+}
+async function fichaMarcarRevisada(nome) {
+  avisoAcao('enviando', 'Marcando como revisada…');
+  const r = await trRpcSeguro('ft_ficha_marcar_revisada', { p_ficha: nome, p_obs: null });
+  if (!r.ok) return avisoAcao('erro', '✗ Não marcou: ' + (await trErroDe(r)), () => fichaMarcarRevisada(nome));
+  avisoAcao('ok', `✓ ${nome} revisada — às ${avisoHora()}.`);
+  FICHAS = null; FICHA_ABERTA = nome; await entrarFichas();
 }
 
 // DESFAZER o ultimo salvamento (12/09/2026). Refaz a troca inteira em vez de remendar
@@ -945,8 +992,10 @@ function renderModuloFichas() {
 
   // Com o botao "sem custo" ligado a lista e' exatamente essas fichas — inclusive as de
   // preparacao, para o numero do botao bater com o que aparece na escolha.
+  const revOk = (f) => FICHA_REV === 'todas' || (FICHA_REV === 'nao' ? !((FICHAS.estado || {})[f.ficha] || {}).revisada : !!((FICHAS.estado || {})[f.ficha] || {}).revisada);
   const visiveis = (FICHA_SO_SEM_CUSTO ? emLinha.filter(f => !nu(f.custo))
                                        : emLinha.filter(f => !(esconderPrep && f.e_preparacao)))
+                   .filter(revOk)
                    .sort((a,b) => a.ficha.localeCompare(b.ficha, 'pt-BR'));
 
   // Lista suspensa em vez de tabela (pedido do dono, 19/08): com 246 fichas a
@@ -993,8 +1042,15 @@ function renderModuloFichas() {
       </tr>`;
     }).join('');
     const origem = FICHA_LINHA_ABERTA ? origemDoCusto(FICHA_LINHA_ABERTA) : '';
+    const est = (FICHAS.estado || {})[nome] || {};
+    const dm = (t) => t ? String(t).slice(0, 10).split('-').reverse().slice(0, 2).join('/') : '';
+    const selo = est.revisada
+      ? `<span style="color:var(--farol-ok);font-weight:700;">✓ Revisada em ${dm(est.revisada_em)}${est.revisada_por ? ' por ' + esc(String(est.revisada_por).split('@')[0]) : ''}</span>${est.obs ? ' <span style="color:var(--tx-4);">· ' + esc(est.obs) + '</span>' : ''}`
+      : '<span style="color:var(--farol-perto);font-weight:700;">Não revisada</span>';
+    const ult = est.ultima_edicao_em ? ` <span style="color:var(--tx-4);">· última mudança ${dm(est.ultima_edicao_em)}${est.ultima_edicao_por ? ' por ' + esc(String(est.ultima_edicao_por).split('@')[0]) : ''}</span>` : '';
     return `
       <div class="section-label">${esc(nome)}</div>
+      <div class="caption-label" style="text-align:center;">${selo}${ult}</div>
       ${avisoFora}
       <div class="caption-label" style="text-align:center;">
         Clique num ingrediente para ver de onde vem o custo dele.
@@ -1008,7 +1064,11 @@ function renderModuloFichas() {
             <td colspan="4"></td><td><b>R$ ${fmt(total)}</b></td></tr>
         </tbody></table></div>
       ${origem}
-      ${fichaEhReceita(nome) ? `<div style="margin-top:10px;">${fichaBotaoConferencia(nome)}</div>`
+      ${FICHAS.pode ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="preset-btn active" onclick="fichaEditar('${esc(nome)}')">Editar esta ficha</button>
+          ${est.revisada ? '' : `<button class="preset-btn" onclick="fichaMarcarRevisada('${esc(nome)}')">Marcar revisada</button>`}</div>`
+      : !FICHAS.pode ? `<div style="margin-top:10px;"><a href="javascript:void(0)" onclick='fichaIrConferencia(${JSON.stringify(nome).replace(/'/g, '&#39;')})' style="color:var(--info);">sugerir mudança nesta ficha ›</a> <span style="color:var(--tx-4);font-size:12px;">(quem muda é a Rita ou o Neto)</span></div>`
+      : fichaEhReceita(nome) ? `<div style="margin-top:10px;">${fichaBotaoConferencia(nome)}</div>`
         : (lista.find(f => f.ficha === nome) || {}).fonte === 'MANUAL' ? `
         <div style="margin-top:10px;">
           <button class="preset-btn" onclick="fichaEditar('${esc(nome)}')">Editar esta ficha</button>
@@ -1073,7 +1133,9 @@ function renderModuloFichas() {
     <div class="ficha-busca-linha">
       <label class="ficha-check"><input type="checkbox" id="fichaSoVendaveis" ${esconderPrep ? 'checked' : ''}
              onchange="renderModuloFichas()"> esconder preparações</label>
-      <button class="preset-btn active" onclick="fichaNova()">＋ Nova ficha</button>
+      <select onchange="FICHA_REV=this.value; renderModuloFichas();" style="background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;">
+        ${[['todas', 'revisadas e não revisadas'], ['nao', 'só as não revisadas (' + lista.filter(f => !((FICHAS.estado || {})[f.ficha] || {}).revisada).length + ')'], ['sim', 'só as revisadas']].map(([v, t]) => `<option value="${v}"${FICHA_REV === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+      ${FICHAS.pode ? '<button class="preset-btn active" onclick="fichaNova()">＋ Nova ficha</button>' : ''}
     </div>
     <div class="ficha-busca-linha">
       <input id="fichaSelect" list="fichaLista" autocomplete="off"
