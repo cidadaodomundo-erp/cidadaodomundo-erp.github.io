@@ -1901,26 +1901,28 @@ function cptDesenhar() {
   const alvo = document.getElementById('view-comprateto');
   if (!alvo) return;
   let h = `<h2>Teto de compra do mês</h2>`;
-  if (!CPT.linhas.length) { alvo.innerHTML = h + `<div class="contexto" style="text-align:left;">Disponível para quem compra.</div>`; return; }
+  if (!CPT.linhas.length) { alvo.innerHTML = h + `<div class="contexto" style="text-align:left;">Sem cálculo do mês para este login: o teto aparece para quem compra.</div>`; return; }
   const umaLoja = CPT.unidade && CPT.unidade !== LOJA_REDE_EST;
   const r$ = (v) => `R$ ${fmt(Number(v) || 0)}`;
   const cor = { 'ACIMA DO TETO': 'var(--farol-fora)', 'ACIMA DO RITMO': 'var(--farol-perto)', DENTRO: 'var(--farol-ok)' };
-  const celulas = (x) => `<td style="text-align:right;">${r$(x.pode_comprar)}</td><td style="text-align:right;">${r$(x.comprado)}</td>
-    <td style="text-align:right; ${Number(x.falta_comprar) < 0 ? 'color:var(--farol-fora); font-weight:700;' : ''}">${r$(x.falta_comprar)}</td>
-    <td style="text-align:right; white-space:nowrap;">${fmt(Number(x.usado_pct) || 0)}% <span style="color:var(--tx-4);">· mês ${fmt(Number(x.mes_corrido_pct) || 0)}%</span></td>
-    <td style="color:${cor[x.situacao] || 'var(--tx-3)'}; font-weight:700;">${trEscH(x.situacao || '')}</td>`;
+  // 13/11/2026 (usabilidade, comprateto): situação em palavra de operador, com a ação ao lado
+  const sitTxt = { 'ACIMA DO TETO': 'acima do teto — pare as compras deste grupo', 'ACIMA DO RITMO': 'acima do ritmo — segure as compras', DENTRO: 'dentro' };
+  const celulas = (x) => `<td>${r$(x.pode_comprar)}</td><td>${r$(x.comprado)}</td>
+    <td style="${Number(x.falta_comprar) < 0 ? 'color:var(--farol-fora); font-weight:700;' : ''}">${r$(x.falta_comprar)}</td>
+    <td>${fmt(Number(x.usado_pct) || 0)}%</td><td style="color:var(--tx-4);">${fmt(Number(x.mes_corrido_pct) || 0)}%</td>
+    <td style="color:${cor[x.situacao] || 'var(--tx-3)'}; font-weight:700; white-space:normal;">${trEscH(sitTxt[x.situacao] || String(x.situacao || '').toLowerCase())}</td>`;
   const totais = CPT.linhas.filter((x) => x.grupo === 'TOTAL' && (umaLoja ? x.unidade === CPT.unidade : true))
     .sort((a, b) => (a.unidade === LOJA_REDE_EST ? -1 : b.unidade === LOJA_REDE_EST ? 1 : 0));
   const m = CPT.linhas[0];
   const quando = new Date(m.calculado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às');
   h += `<div class="caption-label" style="text-align:left; margin-bottom:8px;">${new Date(String(m.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} em andamento, estimativa · calculado em ${quando}</div>
-    <div id="tabelaCompraTeto" style="overflow-x:auto;"><table><thead><tr><th></th><th>Loja</th><th style="text-align:right;">Pode comprar</th><th style="text-align:right;">Comprado</th><th style="text-align:right;">Falta comprar</th><th style="text-align:right;">Usado</th><th>Situação</th><th>Notas lançadas até</th></tr></thead><tbody>
+    <div id="tabelaCompraTeto" style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Pode comprar</th><th>Comprado</th><th>Falta comprar</th><th>Usado</th><th>Mês corrido</th><th>Situação</th><th>Notas lançadas até</th></tr></thead><tbody>
     ${totais.map((t) => {
       const ab = CPT.abertas.has(t.unidade) || umaLoja;
       const gr = CPT.linhas.filter((x) => x.unidade === t.unidade && x.grupo !== 'TOTAL');
-      return `<tr${gr.length ? ` style="cursor:pointer;" onclick="cptAbrir(this.dataset.u)" data-u="${trEscH(t.unidade)}"` : ''}><td style="color:var(--tx-3); font-size:12px; font-weight:600; white-space:nowrap;">${gr.length && !umaLoja ? (ab ? '▾ Fechar grupos' : '▸ Ver grupos') : ''}</td>
-          <td><b>${trEscH(t.unidade === LOJA_REDE_EST ? 'Rede' : estNomeLoja(t.unidade))}</b></td>${celulas(t)}<td>${t.notas_ate ? trEscH(plpDm(t.notas_ate).slice(0, 5)) : 'nenhuma nota no mês'}</td></tr>
-        ${ab ? gr.map((x) => `<tr><td></td><td style="padding-left:16px; color:var(--tx-2);">${trEscH(x.grupo)}</td>${celulas(x)}<td>${x.notas_ate ? trEscH(plpDm(x.notas_ate).slice(0, 5)) : '–'}</td></tr>`).join('') : ''}`;
+      return `<tr${gr.length ? ` style="cursor:pointer;" onclick="cptAbrir(this.dataset.u)" data-u="${trEscH(t.unidade)}"` : ''}>
+          <td><b>${gr.length && !umaLoja ? (ab ? '▾ ' : '▸ ') : ''}${trEscH(t.unidade === LOJA_REDE_EST ? 'Rede' : estNomeLoja(t.unidade))}</b>${gr.length && !umaLoja ? ` <span style="color:var(--tx-4); font-size:12px;">${ab ? 'fechar grupos' : 'ver grupos'}</span>` : ''}</td>${celulas(t)}<td>${t.notas_ate ? trEscH(plpDm(t.notas_ate).slice(0, 5)) : 'nenhuma nota no mês'}</td></tr>
+        ${ab ? gr.map((x) => `<tr><td style="padding-left:16px; color:var(--tx-2);">${trEscH(x.grupo)}</td>${celulas(x)}<td>${x.notas_ate ? trEscH(plpDm(x.notas_ate).slice(0, 5)) : '–'}</td></tr>`).join('') : ''}`;
     }).join('')}</tbody></table></div>`;
   alvo.innerHTML = h;
 }
@@ -3065,37 +3067,36 @@ function ctlRender() {
   const comMov = daBase.filter((i) => Number(i.movimentos) > 0).length;
   const negativos = daBase.filter((i) => Number(i.saldo_hoje) < 0).length;
 
-  let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Controle de estoque — ${trEscH(estNomeLoja(CTL.unidade))}</div>
-    <div class="caption-label" style="text-align:left;">Clique no item para ver o kardex, com o saldo linha a linha.</div>
+  // 13/11/2026 (usabilidade, controle): h2, um cartão só (o que pede ação) e ele filtra a grade; a loja vem do seletor da casca
+  void comMov;
+  let h = `<h2>Controle de estoque</h2>
+    <div class="caption-label" style="text-align:left;">Clique no item para ver o kardex.</div>
     ${ctlIdadeHtml()}
-    <div class="cards cards-3">
-      <div class="card neutral"><div class="card-lbl">Itens no estoque</div><div class="card-val">${daBase.length}</div><div class="card-pct">nomes da base nesta loja</div></div>
-      <div class="card neutral"><div class="card-lbl">Com movimento</div><div class="card-val">${comMov}</div><div class="card-pct">desde a implantação</div></div>
-      <div class="card ${negativos ? 'highlight' : 'pos'}"><div class="card-lbl">Saldo negativo</div><div class="card-val">${negativos}</div><div class="card-pct">saiu mais do que tinha: conferir</div></div>
+    <div class="cards" style="max-width:340px;">
+      <div class="card ${negativos ? 'highlight' : 'pos'}" style="cursor:pointer;${CTL.soNeg ? ' outline:2px solid var(--brand);' : ''}" onclick="CTL.soNeg=!CTL.soNeg; CTL.ord='dinheiro'; CTL.desc=true; ctlRender();" title="${CTL.soNeg ? 'voltar a todos' : 'ver só os negativos'}">
+        <div class="card-lbl">Saldo negativo</div><div class="card-val">${negativos}</div><div class="card-pct">de ${daBase.length} itens · saiu mais do que tinha: conferir · ${CTL.soNeg ? 'mostrando só eles ✕' : 'ver a lista ›'}</div></div>
     </div>
     <div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <span>Loja <b>${trEscH(estNomeLoja(CTL.unidade))}</b></span>
       <datalist id="ctlItensLista">${(CTL.itens || []).filter((x) => !x.fora_da_base).map((x) => `<option value="${trEscH(x.nome_base)}">`).join('')}</datalist>
       <input id="ctlBusca" list="ctlItensLista" placeholder="Procurar item…" value="${trEscH(CTL.busca || '')}" oninput="ctlBuscar(this.value)"
              style="flex:1 1 220px; ${CTL_SEL}">
       ${temCurva ? `<select onchange="CTL.curva=this.value; CTL.ord='dinheiro'; CTL.desc=true; ctlRender();" style="${CTL_SEL}"><option value="">curva: todas</option>${['A', 'B', 'C'].map((c) => `<option${c === CTL.curva ? ' selected' : ''}>${c}</option>`).join('')}</select>` : ''}
       ${temGrupo ? `<select onchange="CTL.grupo=this.value; CTL.ord='dinheiro'; CTL.desc=true; ctlRender();" style="${CTL_SEL}"><option value="">grupo: todos</option>${grupos.map((g) => `<option${g === CTL.grupo ? ' selected' : ''}>${trEscH(g)}</option>`).join('')}${temFora ? `<option value="__fora"${CTL.grupo === '__fora' ? ' selected' : ''}>fora da folha de contagem</option>` : ''}</select>` : ''}
       ${nFora ? `<label style="display:flex; gap:6px; align-items:center;" title="itens sem nome na nossa base: aparecem com o nome do Saipos"><input type="checkbox"${CTL.verFora ? ' checked' : ''} onchange="CTL.verFora=this.checked; CTL.ord='dinheiro'; CTL.desc=true; ctlRender();"> ver os ${nFora} fora da base</label>` : ''}
-      <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox"${CTL.soNeg ? ' checked' : ''} onchange="CTL.soNeg=this.checked; CTL.ord='dinheiro'; CTL.desc=true; ctlRender();"> só negativos</label>
       <span class="caption-label">${itens.length} de ${(CTL.itens || []).length}</span>
     </div>`;
   if (CTL.verFora) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Fora da base: o nome aqui é o do Saipos.</b> São itens que tiveram movimento e ainda não têm nome na nossa base. Cada um que entrar na base sai desta lista sozinho.</div>`;
-  const th = (col, rot, dir) => `<th style="cursor:pointer;${dir ? ' text-align:right;' : ''}" onclick="ctlOrdenarPor('${col}')" title="ordenar">${rot}${CTL.ord === col ? (CTL.desc ? ' ▼' : ' ▲') : ''}</th>`;
-  h += `<div id="tabelaControleItens"><table><thead><tr>${th('nome_base', 'Item')}${temCurva ? th('curva', 'Curva') : ''}${temGrupo ? th('grupo', 'Grupo') : ''}${th('partida_de', 'Saldo inicial em')}${th('qtd_partida', 'Contado', 1)}
+  const th = (col, rot, dir) => `<th style="cursor:pointer;" onclick="ctlOrdenarPor('${col}')" title="ordenar">${rot}${CTL.ord === col ? (CTL.desc ? ' ▼' : ' ▲') : ''}</th>`;
+  h += `<div id="tabelaControleItens"><table><thead><tr>${th('nome_base', 'Item')}${temCurva ? th('curva', 'Curva') : ''}${temGrupo ? th('grupo', 'Grupo') : ''}${th('partida_de', 'Desde')}${th('qtd_partida', 'Saldo inicial', 1)}
       ${th('entrou', 'Entrou', 1)}${th('saiu', 'Saiu', 1)}${th('saldo_hoje', 'Saldo hoje', 1)}<th>Un</th></tr></thead><tbody>`;
   itens.forEach((i) => {
     const neg = Number(i.saldo_hoje) < 0;
     h += `<tr data-nome="${trEscH(i.nome_base)}" style="cursor:pointer;${i.nome_base === CTL.item ? ' background:var(--surface-2);' : ''}" onclick="ctlAbrir(${JSON.stringify(i.nome_base).replace(/"/g, '&quot;')})" title="ver o extrato">
       <td><b>${trEscH(i.nome_base)}</b>${Number(i.movimentos) ? '' : ' <span class="caption-label">sem movimento</span>'}</td>
       ${temCurva ? `<td>${trEscH(i.curva || '')}</td>` : ''}${temGrupo ? `<td style="color:var(--tx-4);">${i.grupo ? trEscH(i.grupo) : '<i>fora da folha</i>'}</td>` : ''}
-      <td>${ctlDm(i.partida_de)}</td><td style="text-align:right;">${ctlNum(i.qtd_partida, i.un)}</td>
-      <td style="text-align:right;">${ctlNum(i.entrou, i.un)}</td><td style="text-align:right;">${ctlNum(i.saiu, i.un)}</td>
-      <td style="text-align:right;${neg ? ' color:var(--farol-fora);' : ''}"><b>${ctlNum(i.saldo_hoje, i.un)}</b></td><td style="color:var(--tx-4);">${trEscH(i.un || '')}</td></tr>`;
+      <td>${ctlDm(i.partida_de)}</td><td>${ctlNum(i.qtd_partida, i.un)}</td>
+      <td>${ctlNum(i.entrou, i.un)}</td><td>${ctlNum(i.saiu, i.un)}</td>
+      <td style="${neg ? ' color:var(--farol-fora);' : ''}"><b>${ctlNum(i.saldo_hoje, i.un)}</b></td><td style="color:var(--tx-4);">${trEscH(i.un || '')}</td></tr>`;
     // 29/10/2026 (dono): o kardex abre logo abaixo do item clicado
     if (i.nome_base === CTL.item) h += `<tr><td colspan="${7 + (temCurva ? 1 : 0) + (temGrupo ? 1 : 0)}" style="white-space:normal; background:var(--bg);">${ctlHtmlExtrato()}</td></tr>`;
   });
@@ -3143,14 +3144,14 @@ function ctlHtmlExtrato() {
         ${CTL.periodo ? `<button class="preset-btn" onclick="ctlPeriodo('', '')">limpar</button>` : ''}
         <button class="preset-btn" onclick="CTL.item=null; ctlRender();">fechar</button></div></div>
     <div id="tabelaControleExtrato"><table><thead><tr><th>Dia</th><th>Movimento</th><th>Documento</th>
-      <th style="text-align:right;">Entrada</th><th style="text-align:right;">Saída</th><th style="text-align:right;">Saldo</th></tr></thead><tbody>`;
+      <th>Entrada</th><th>Saída</th><th>Saldo</th></tr></thead><tbody>`;
   L.forEach((r) => {
     const abre = Number(r.ordem) === 0;
     h += `<tr${abre ? ' style="background:var(--surface-2);"' : ''}>
       <td style="white-space:nowrap;">${ctlDm(r.dia)}</td><td style="white-space:normal;overflow-wrap:anywhere;">${abre ? '<b>' + trEscH(r.movimento) + '</b>' : trEscH(r.movimento)}</td><td style="color:var(--tx-4);white-space:normal;overflow-wrap:anywhere;">${trEscH(r.documento || '')}</td>
-      <td style="text-align:right; color:var(--farol-ok);">${r.entrada != null ? '+' + ctlNum(r.entrada, r.un) : ''}</td>
-      <td style="text-align:right; color:var(--farol-fora);">${r.saida != null ? '−' + ctlNum(r.saida, r.un) : ''}</td>
-      <td style="text-align:right;"><b>${ctlNum(r.saldo, r.un)}</b></td></tr>`;
+      <td style="color:var(--farol-ok);">${r.entrada != null ? '+' + ctlNum(r.entrada, r.un) : ''}</td>
+      <td style="color:var(--farol-fora);">${r.saida != null ? '−' + ctlNum(r.saida, r.un) : ''}</td>
+      <td><b>${ctlNum(r.saldo, r.un)}</b></td></tr>`;
   });
   if (L.length === 1) h += `<tr><td colspan="6" class="caption-label">Nenhum movimento ${CTL.periodo ? 'no período' : 'desde o saldo inicial'}.</td></tr>`;
   return h + `</tbody></table></div>`;
@@ -3229,7 +3230,7 @@ function posRender() {
   const comValor = Number(D.itens || 0) - Number(D.itens_sem_valor || 0);
   const semCustoN = Number(D.itens_sem_custo_com_saldo != null ? D.itens_sem_custo_com_saldo : D.itens_sem_valor || 0);
   // 12/11/2026 (auditoria 07/11, operacao-25): as legendas viraram dica (title) ou saíram; fica a das cores, numa linha
-  let h = `<div class="section-label" style="border-top:none; margin-top:0; padding-top:0;" title="saldo do sistema × custo da nossa base, numa foto por dia">Posição de estoque — ${trEscH(estNomeLoja(POS.unidade))} · ${dm(POS.dia)}</div>
+  let h = `<h2 title="saldo do sistema × custo da nossa base, numa foto por dia">Posição de estoque · ${dm(POS.dia)}</h2>
     <div class="cards${Number(D.valor_negativo) < 0 ? '' : ' cards-3'}">
       <div class="card neutral"><div class="card-lbl">Valor parado</div><div class="card-val">R$ ${fmt(Number(D.valor || 0))}</div><div class="card-pct">em ${comValor} itens · ${varTxt}</div></div>
       <div class="card neutral"><div class="card-lbl">Curva A</div><div class="card-val">R$ ${fmt(Number(D.valor_curva_a || 0))}</div><div class="card-pct">${D.valor ? Math.round(100 * Number(D.valor_curva_a) / Number(D.valor)) : 0}% do valor parado</div></div>
@@ -3240,19 +3241,18 @@ function posRender() {
         <div class="card-lbl">Saldo negativo</div><div class="card-val">−R$ ${fmt(Math.abs(Number(D.valor_negativo)))}</div>
         <div class="card-pct">em ${Number(D.itens_negativos || 0)} ${Number(D.itens_negativos) === 1 ? 'item' : 'itens'} · entrada ou produção a lançar · ver a lista</div></div>` : ''}
     </div>`;
-  // histórico: uma linha por dia
-  h += `<div id="tabelaPosicaoDias"><table><thead><tr><th title="o histórico começa em 21/10, o primeiro dia com a contagem como ponto de partida">Dia</th><th title="remontada: dia refeito com o custo de hoje, então a diferença é só de quantidade">Foto</th><th style="text-align:right;">Valor parado</th><th style="text-align:right;">Curva A</th><th style="text-align:right;">Sem custo, com mercadoria</th><th>Saldo negativo</th></tr></thead><tbody>`;
+  // histórico: uma linha por dia (13/11/2026, usabilidade: recolhido, abaixo da grade de itens)
+  let hDias = `<details style="margin-top:12px;"><summary style="cursor:pointer; font-weight:700;">Histórico por dia (${(POS.dias || []).length} dias) — clique num dia para ver a foto dele</summary><div id="tabelaPosicaoDias"><table><thead><tr><th title="o histórico começa em 21/10, o primeiro dia com a contagem como ponto de partida">Dia</th><th title="remontada: dia refeito com o custo de hoje, então a diferença é só de quantidade">Foto</th><th>Valor parado</th><th>Curva A</th><th>Sem custo, com mercadoria</th><th>Saldo negativo</th></tr></thead><tbody>`;
   (POS.dias || []).slice().reverse().forEach((d) => {
-    h += `<tr style="cursor:pointer;${d.dia === POS.dia ? ' background:var(--surface-2);' : ''}" onclick="POS.dia='${d.dia}'; posCarregarItens();" title="ver a foto deste dia">
+    hDias += `<tr style="cursor:pointer;${d.dia === POS.dia ? ' background:var(--surface-2);' : ''}" onclick="POS.dia='${d.dia}'; posCarregarItens();" title="ver a foto deste dia">
       <td><b>${dm(d.dia)}</b></td>
       <td style="color:var(--tx-4);" title="${d.origem === 'DIA' ? 'foto tirada no próprio dia' : 'remontado do extrato com o custo de hoje: a variação é só de quantidade'}">${d.origem === 'DIA' ? 'do dia' : 'remontada'}</td>
-      <td style="text-align:right;">R$ ${fmt(Number(d.valor))}</td><td style="text-align:right;">R$ ${fmt(Number(d.valor_curva_a))}</td>
-      <td style="text-align:right;">${Number(d.itens_sem_custo_com_saldo != null ? d.itens_sem_custo_com_saldo : d.itens_sem_valor)}</td>
+      <td>R$ ${fmt(Number(d.valor))}</td><td>R$ ${fmt(Number(d.valor_curva_a))}</td>
+      <td>${Number(d.itens_sem_custo_com_saldo != null ? d.itens_sem_custo_com_saldo : d.itens_sem_valor)}</td>
       <td style="${Number(d.valor_negativo) < 0 ? 'color:var(--farol-fora);' : 'color:var(--tx-5);'}">${Number(d.valor_negativo) < 0 ? `−R$ ${fmt(Math.abs(Number(d.valor_negativo)))} · ${Number(d.itens_negativos || 0)}` : '—'}</td></tr>`;
   });
-  h += `</tbody></table></div>`;
+  hDias += `</tbody></table></div></details>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <span>Loja <b>${trEscH(estNomeLoja(POS.unidade))}</b></span>
       <input id="posBusca" placeholder="Procurar item…" value="${trEscH(POS.busca || '')}" oninput="POS.busca=this.value; posRender(); const c=document.getElementById('posBusca'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); }" style="flex:1 1 200px; ${sel}">
       <select onchange="POS.curva=this.value; POS.ord='valor'; POS.desc=true; posRender();" style="${sel}"><option value="">curva: todas</option>${['A', 'B', 'C'].map((c) => `<option${c === POS.curva ? ' selected' : ''}>${c}</option>`).join('')}</select>
       <select onchange="POS.grupo=this.value; POS.ord='valor'; POS.desc=true; posRender();" style="${sel}"><option value="">grupo: todos</option>${grupos.map((g) => `<option${g === POS.grupo ? ' selected' : ''}>${trEscH(g)}</option>`).join('')}<option value="__fora"${POS.grupo === '__fora' ? ' selected' : ''}>fora da folha de contagem</option></select>
@@ -3260,18 +3260,19 @@ function posRender() {
       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox"${POS.semCusto ? ' checked' : ''} onchange="POS.semCusto=this.checked; POS.ord='valor'; POS.desc=true; posRender();"> só sem custo</label>
       <span class="caption-label">${itens.length} de ${(POS.itens || []).length}</span>
     </div>`;
-  const th = (col, rot, dir) => `<th style="cursor:pointer;${dir ? ' text-align:right;' : ''}" onclick="posOrdenarPor('${col}')" title="ordenar">${rot}${POS.ord === col ? (POS.desc ? ' ▼' : ' ▲') : ''}</th>`;
+  const th = (col, rot, dir) => `<th style="cursor:pointer;" onclick="posOrdenarPor('${col}')" title="ordenar">${rot}${POS.ord === col ? (POS.desc ? ' ▼' : ' ▲') : ''}</th>`;
   h += `<div id="tabelaPosicaoItens"><table><thead><tr>${th('nome_base', 'Item')}${th('curva', 'Curva')}${th('grupo', 'Grupo')}${th('saldo', 'Saldo', 1)}${th('custo_unitario', 'Custo', 1)}${th('valor', 'Valor parado', 1)}</tr></thead><tbody>`;
   itens.forEach((i) => {
     const neg = Number(i.valor) < 0;
     const cor = i.valor == null ? '' : neg ? ' color:var(--farol-fora);' : i.custo_confiavel === false ? ' color:var(--farol-perto);' : '';
     h += `<tr><td><b>${trEscH(i.nome_base)}</b></td><td>${trEscH(i.curva || '')}</td><td style="color:var(--tx-4);">${i.grupo ? trEscH(i.grupo) : '<i>fora da folha</i>'}</td>
-      <td style="text-align:right; white-space:nowrap;${Number(i.saldo) < 0 ? ' color:var(--farol-fora);' : ''}">${ctlNum(i.saldo, i.un)} <span style="color:var(--tx-4); font-size:11px;">${trEscH(i.un || '')}</span></td>
-      <td style="text-align:right;">${i.custo_unitario == null ? '' : 'R$ ' + fmt(Number(i.custo_unitario))}</td>
-      <td style="text-align:right;${cor}"${i.valor == null ? ' title="sem custo na nossa base — fora do total"' : i.custo_confiavel === false ? ' title="custo ainda não confiável em alguma etiqueta"' : ''}>${i.valor == null ? '<span style="color:var(--tx-5);">sem custo</span>' : '<b>R$ ' + fmt(Number(i.valor)) + '</b>'}</td></tr>`;
+      <td style="white-space:nowrap;${Number(i.saldo) < 0 ? ' color:var(--farol-fora);' : ''}">${ctlNum(i.saldo, i.un)} <span style="color:var(--tx-4); font-size:11px;">${trEscH(i.un || '')}</span></td>
+      <td>${i.custo_unitario == null ? '' : 'R$ ' + fmt(Number(i.custo_unitario))}</td>
+      <td style="${cor}"${i.valor == null ? ' title="sem custo na nossa base — fora do total"' : i.custo_confiavel === false ? ' title="custo ainda não confiável em alguma etiqueta"' : ''}>${i.valor == null ? '<span style="color:var(--tx-5);">sem custo</span>' : '<b>R$ ' + fmt(Number(i.valor)) + '</b>'}</td></tr>`;
   });
-  h += `</tbody></table></div>
-    <div class="caption-label" style="text-align:left;">Âmbar: custo ainda não confiável · vermelho: saldo negativo (em geral, produção não apontada).</div>`;
+  const totSel = itens.reduce((a, i) => a + (i.valor == null ? 0 : Number(i.valor)), 0);
+  h += `</tbody><tfoot><tr class="liq"><td>Total · ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</td><td></td><td></td><td></td><td></td><td>R$ ${fmt(totSel)}</td></tr></tfoot></table></div>
+    <div class="caption-label" style="text-align:left;">Âmbar: custo ainda não confiável · vermelho: saldo negativo (em geral, produção não apontada).</div>${hDias}`;
   alvo.innerHTML = h;
 }
 
