@@ -4819,13 +4819,13 @@ function reqPedirDesenhar() {
     ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='REQ.praca=${JSON.stringify(p)}; reqPedirDesenhar();'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
     <input id="reqBusca" type="search" placeholder="buscar o item (2 letras ou mais)" value="${trEscH(REQ.busca)}" oninput="reqBuscar(this.value)" style="width:100%; max-width:420px; margin:8px 0; ${campo}">
     <div id="reqLista">${lista.map((x) => linhaItem(x.nome_base, x.un)).join('') || (b.length >= 2 ? `<div class="caption-label">Nenhum item com "${trEscH(REQ.busca)}" na base desta loja. <a href="javascript:void(0)" onclick="reqForaDaBase()">Pedir mesmo assim (vai para o Neto validar)</a></div>` : '')}</div>
-    <div class="section-label" style="margin-top:14px;">No pedido: ${noCarrinho.length} ${noCarrinho.length === 1 ? 'item' : 'itens'}</div>
+    <div class="section-label" id="reqNoPedido" style="margin-top:14px;">No pedido: ${noCarrinho.length} ${noCarrinho.length === 1 ? 'item' : 'itens'}</div>
     ${noCarrinho.map(([nb]) => linhaItem(nb, unDe(nb))).join('')}
     <textarea id="reqObs" placeholder="observação (opcional)" style="width:100%; min-height:44px; margin-top:8px; ${campo}"></textarea>
     <div style="margin:10px 0;"><button class="preset-btn" id="reqBtPedir" ${noCarrinho.length && podePedir ? '' : 'disabled'} style="font-size:15px; padding:10px 18px; border-color:var(--marca-amarelo);" onclick="reqEnviar()">Pedir</button></div>
     <div class="section-label" style="margin-top:18px;">${REQ.manda ? 'Requisições desta loja' : 'Requisições da sua praça'}</div>
     ${REQ.minhas.length ? `<div id="tabelaReqMinhas" style="overflow-x:auto;"><table><thead><tr><th>Número</th><th>Quando</th><th>Praça</th><th style="text-align:right;">Itens</th><th>Situação</th></tr></thead><tbody>
-      ${REQ.minhas.map((r) => `<tr><td>${trEscH(r.numero)}</td><td>${trEscH(reqQuando(r.criado_em))}</td><td>${trEscH(String(r.praca || '').toLowerCase())}</td><td style="text-align:right;">${r.itens}${r.itens_a_menos ? ` <span style="color:var(--farol-perto);">(${r.itens_a_menos} a menos)</span>` : ''}</td><td>${reqSituacao(r)}${r.situacao === 'ABERTA' ? ` <button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button>` : ''}</td></tr>`).join('')}
+      ${REQ.minhas.map((r) => `<tr><td>${trEscH(r.numero)}</td><td>${trEscH(reqQuando(r.criado_em))}</td><td>${trEscH(String(r.praca || '').toLowerCase())}</td><td style="text-align:right;">${r.itens}${r.itens_a_menos ? ` <span style="color:var(--farol-perto);">(${r.itens_a_menos} a menos)</span>` : ''}</td><td>${reqSituacao(r)}${r.situacao === 'ABERTA' ? ' ' + reqCancelarHtml(r) : ''}</td></tr>`).join('')}
     </tbody></table></div>` : '<div class="caption-label">Nenhuma requisição ainda.</div>'}`;
 }
 function reqBuscar(v) {
@@ -4837,6 +4837,7 @@ function reqQtd(nb, v) {
   if (s === '') delete REQ.carrinho[nb]; else REQ.carrinho[nb] = s.replace(',', '.');
   const n = Object.values(REQ.carrinho).filter((q) => Number(q) > 0).length;
   const bt = document.getElementById('reqBtPedir'); if (bt) bt.disabled = !n;
+  const rot = document.getElementById('reqNoPedido'); if (rot) rot.textContent = `No pedido: ${n} ${n === 1 ? 'item' : 'itens'}`;   // 13/11: conta ao digitar
 }
 function reqForaDaBase() {
   const nome = REQ.busca.trim().toUpperCase(); if (!nome) return;
@@ -4863,11 +4864,24 @@ async function reqEnviar() {
   avisoAcao('ok', `✓ Requisição ${x.numero || ''} enviada às ${avisoHora()}, ${x.itens} ${x.itens === 1 ? 'item' : 'itens'}${x.fora_da_base ? ` (${x.fora_da_base} fora da base: o Neto valida)` : ''}.`);
   await reqMinhasCarregar(); reqPedirDesenhar();
 }
-async function reqCancelar(id, numero) {
-  const motivo = prompt(`Cancelar ${numero}? Diga o motivo:`); if (motivo === null) return;
+// 13/11/2026 (padrão T9): cancelar confirma na própria linha, com o motivo num campo (sem caixa do navegador)
+let REQ_CANC = null;
+function reqCancelarHtml(r) {
+  const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
+  if (REQ_CANC !== r.id) return `<button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button>`;
+  return `<span style="display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center;"><span style="color:var(--farol-fora); font-size:12.5px;">Cancelar ${trEscH(r.numero)}?</span>
+    <input id="reqCancMotivo" placeholder="motivo (opcional)" style="width:180px; ${campo}">
+    <button class="preset-btn" style="color:var(--farol-fora);" onclick='reqCancelarConfirmar(${r.id}, ${JSON.stringify(r.numero)})'>Sim, cancelar</button>
+    <button class="preset-btn" onclick="REQ_CANC=null; reqRedesenhar();">Não</button></span>`;
+}
+function reqRedesenhar() { if (EST_TELA === 'reqseparar') reqSepararDesenhar(); else reqPedirDesenhar(); }
+function reqCancelar(id, numero) { REQ_CANC = id; reqRedesenhar(); }
+async function reqCancelarConfirmar(id, numero, motivoDado) {
+  const motivo = motivoDado != null ? motivoDado : ((document.getElementById('reqCancMotivo') || {}).value || '');
   avisoAcao('enviando', `Cancelando ${numero}…`);
   const r = await trRpcSeguro('est_requisicao_cancelar', { p_id: id, p_motivo: motivo.trim() || null });
-  if (!r.ok) return avisoAcao('erro', `✗ ${numero} NÃO foi cancelada: ${await trErroDe(r)}.`, () => reqCancelar(id, numero));
+  if (!r.ok) return avisoAcao('erro', `✗ ${numero} NÃO foi cancelada: ${await trErroDe(r)}.`, () => reqCancelarConfirmar(id, numero, motivo));
+  REQ_CANC = null;
   avisoAcao('ok', `✓ ${numero} cancelada às ${avisoHora()}.`);
   if (EST_TELA === 'reqseparar') entrarReqSeparar(); else { await reqMinhasCarregar(); reqPedirDesenhar(); }
 }
@@ -4918,7 +4932,7 @@ function reqSepararDesenhar() {
         </tbody></table></div>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"><button class="preset-btn" style="border-color:var(--marca-amarelo);" onclick="reqEntregar(${r.id})">Entreguei</button>
           <button class="preset-btn" onclick="reqImprimir(${r.id})">🖨️ Imprimir</button>
-          <button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button></div></div>`;
+          ${reqCancelarHtml(r)}</div></div>`;
     }).join('') || '<div class="contexto">Nenhuma requisição esperando nesta loja.</div>'}
     ${REQS.fora.length ? `<div class="section-label" style="margin-top:18px;">Pedidos fora da base: o Neto valida</div><div id="tabelaReqFora" style="overflow-x:auto;"><table><thead><tr><th>Como pediram</th><th style="text-align:right;">Vezes</th><th>Desde</th><th>Quem pediu</th></tr></thead><tbody>
       ${REQS.fora.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.nome_pedido)}</td><td style="text-align:right;">${x.vezes_pedido}</td><td>${trEscH(reqQuando(x.primeira_vez))}</td><td style="white-space:normal;">${trEscH(String(x.quem_pediu || '').replace(/@[^,\s]+/g, ''))}</td></tr>`).join('')}
