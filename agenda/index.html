@@ -287,7 +287,7 @@ function agDatas(desde, prazo, semFarol) {
 function agOrdemLer() { try { return localStorage.getItem('agOrdem') || 'prazo'; } catch (e) { return 'prazo'; } }
 function agOrdemHtml(comFrente) {
   const o = agOrdemLer(), op = [['prazo', 'por prazo'], ['antigos', 'mais antigos primeiro']].concat(comFrente ? [['frente', 'por frente']] : []);
-  return `<div class="ag-ordem" style="margin:4px 2px 0;font-size:12px;color:var(--tx-3);">ordenar:
+  return agBuscaHtml() + `<div class="ag-ordem" style="margin:4px 2px 0;font-size:12px;color:var(--tx-3);">ordenar:
     <select onchange="agOrdemMudar(this.value)" style="background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:inherit;">${op.map(([v, r]) =>
     `<option value="${v}"${v === o ? ' selected' : ''}>${r}</option>`).join('')}</select></div>`;
 }
@@ -542,6 +542,63 @@ function agPessoaHtml(L, soLeitura) {
   return h;
 }
 function agSoLeitura() { avisoAcao('atencao', 'Você está vendo a agenda de outra pessoa: os botões são dela e não gravam daqui.'); }
+// ---- BUSCA (dono, sex 13/11/2026 10:35: "coloca um campo de busca na agenda pra eu achar a mensagem, o link aqui não direciona
+// pra mensagem certa"). Duas partes: (1) esconde os cartões da tela que não têm o termo; (2) procura no banco (dono_pendencia),
+// inclusive o que já foi resolvido e o que está na agenda de outra pessoa — o que cada login pode ver é o banco que decide (RLS).
+let AG_BUSCA = '', AG_BUSCA_FOCO = null, AG_BUSCA_T = null;
+const agNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function agBuscaHtml() {
+  return `<div style="display:flex;gap:8px;align-items:center;margin:6px 0 4px;"><input id="agBusca" type="search" value="${agE(AG_BUSCA)}" oninput="agBuscar(this.value)"
+      placeholder="buscar: #580, 580, Ultragaz, Hellen, Financeiro…" style="flex:1;min-width:0;max-width:520px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:9px 12px;font:inherit;font-size:14px;">
+    ${AG_BUSCA ? '<button type="button" class="preset-btn" onclick="agBuscar(\'\', true)">✕ limpar</button>' : ''}</div><div id="agBuscaRes"></div>`;
+}
+function agBuscar(v, ja) {
+  AG_BUSCA = String(v || ''); AG_BUSCA_FOCO = null;
+  clearTimeout(AG_BUSCA_T);
+  if (ja) { const i = document.getElementById('agBusca'); if (i) i.value = AG_BUSCA; }
+  AG_BUSCA_T = setTimeout(agBuscaAplicar, ja ? 0 : 300);
+}
+async function agBuscaAplicar() {
+  const t = AG_BUSCA.trim(), res = document.getElementById('agBuscaRes');
+  const num = /^#?\d+$/.test(t) ? Number(t.replace('#', '')) : null;
+  // (1) os cartões já na tela
+  document.querySelectorAll('.ag-lin').forEach((el) => {
+    if (el.closest('#agBuscaRes')) return;
+    el.style.display = !t || (num ? el.id === 'agItem_' + num || agNorm(el.textContent).includes('#' + num) : agNorm(el.textContent).includes(agNorm(t))) ? '' : 'none';
+  });
+  if (!res) return;
+  if (!t || (!num && t.length < 2)) { res.innerHTML = ''; return; }
+  // (2) no banco: tudo o que este login pode ver, aberto ou resolvido
+  res.innerHTML = '<div class="caption-label" style="text-align:left;">procurando…</div>';
+  const w = t.replace(/[,()*%\\"]/g, ' ').trim();
+  const cols = 'select=id,para,frente,o_que,desde,prazo,contexto,resposta,respondido_em,resolvido_em,resolvido_por,feito_em,retorno,retorno_em,fio';
+  const filtro = num ? `id=eq.${num}` : 'or=(' + ['o_que', 'frente', 'para', 'contexto', 'resposta', 'chave'].map((c) => `${c}.ilike.*${encodeURIComponent(w)}*`).join(',') + ')';
+  let L;
+  try { L = await consultarTudo(`dono_pendencia?${cols}&${filtro}&order=id.desc&limit=40`); }
+  catch (e) { res.innerHTML = `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui procurar: ${agE(e.message)} <button type="button" class="preset-btn" onclick="agBuscaAplicar()">Tentar de novo</button></div>`; return; }
+  if (AG_BUSCA.trim() !== t) return;   // digitou de novo enquanto procurava
+  const dmh = (x) => x ? `${agDm(new Date(x).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(x)}` : '';
+  const quem = (e) => e ? String(e).split('@')[0].replace(/^./, (c) => c.toUpperCase()) : '';
+  res.innerHTML = !L.length ? `<div class="caption-label" style="text-align:left;">Nada com "${agE(t)}"${num ? ' (o item não existe ou não é da sua agenda)' : ''}.</div>`
+    : `<div class="caption-label" style="text-align:left;">${L.length} ${L.length === 1 ? 'item encontrado' : 'itens encontrados'} — inclui os resolvidos${souODono() ? ' e os da agenda de outras pessoas' : ''}</div>`
+    + L.map((p) => {
+      const est = p.resolvido_em ? `<span style="color:var(--farol-ok);font-weight:700;">✓ resolvido ${dmh(p.resolvido_em)}${p.resolvido_por ? ' · ' + agE(quem(p.resolvido_por)) : ''}</span>`
+        : p.feito_em ? '<span style="color:var(--farol-ok);">feito — conferindo</span>' : p.resposta ? '<span style="color:var(--info);">respondido — esperando aplicar</span>'
+        : `<span style="color:var(--farol-perto);font-weight:700;">aberto${p.prazo ? ' · prazo ' + agDm(p.prazo) : ''}</span>`;
+      const fio = Array.isArray(p.fio) ? p.fio : [];
+      const naTela = document.getElementById('agItem_' + p.id);
+      return `<div class="ag-lin" id="agBusca_${p.id}" style="flex-wrap:wrap;${AG_BUSCA_FOCO === p.id ? 'outline:2px solid var(--info);' : ''}"><span class="t"><span class="ag-id">#${p.id}</span>${agE(p.o_que)}
+          <span class="f">· ${agE(p.frente || '')}${p.para ? ' · agenda de ' + agE(quem(p.para)) : ''}${p.desde ? ' · desde ' + agDm(String(p.desde).slice(0, 10)) : ''}</span> · ${est}</span>
+        ${naTela && naTela.style.display !== 'none' ? `<button type="button" class="preset-btn" onclick="document.getElementById('agItem_${p.id}').scrollIntoView({block:'center',behavior:'smooth'})">ir ao cartão</button>` : ''}
+        <details class="ag-ctx"${AG_BUSCA_FOCO === p.id || L.length === 1 ? ' open' : ''}><summary style="cursor:pointer;">detalhes</summary>
+          ${p.contexto ? `<div>${agE(p.contexto)}</div>` : ''}
+          ${p.resposta ? `<div style="color:var(--farol-ok);">resposta${p.respondido_em ? ' (' + dmh(p.respondido_em) + ')' : ''}: ${agE(p.resposta)}</div>` : ''}
+          ${p.retorno ? `<div style="color:var(--info);">retorno${p.retorno_em ? ' (' + dmh(p.retorno_em) + ')' : ''}: ${agE(p.retorno)}</div>` : ''}
+          ${fio.length ? fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${dmh(m.em)}: ${agE(m.texto || m.text || '')}</div>`).join('') : ''}
+        </details></div>`;
+    }).join('');
+  if (AG_BUSCA_FOCO) { const el = document.getElementById('agBusca_' + AG_BUSCA_FOCO); if (el) setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150); }
+}
 // 12/11/2026 02:08 (dono): ?item=131 no endereço abre a agenda rolada até o item (uma vez) e o destaca
 let AG_ITEM_FEITO = false;
 function agItemAlvo() {
@@ -550,12 +607,16 @@ function agItemAlvo() {
   const n = Number(new URLSearchParams(q).get('item')); return n > 0 ? n : null;
 }
 function agRolarAteItem() {
-  const n = agItemAlvo(); if (!n) return;
-  const el = document.getElementById('agItem_' + n); if (!el) return;
+  // 13/11/2026 (dono 10:35: "o link aqui não direciona pra mensagem certa"): o ?item vira a busca "#N" — acha o item mesmo
+  // resolvido, fora dos 7 dias ou na agenda de outra pessoa, abre os detalhes e rola até ele
+  const n = agItemAlvo();
+  if (!n) { if (AG_BUSCA.trim()) agBuscaAplicar(); return; }
   AG_ITEM_FEITO = true;
-  if (el.querySelector('.ag-bolinha')) agRetVisto(n);
-  el.style.outline = '2px solid var(--info)'; el.style.borderRadius = '8px';
-  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200);
+  const el = document.getElementById('agItem_' + n);
+  if (el && el.querySelector('.ag-bolinha')) agRetVisto(n);
+  AG_BUSCA = '#' + n; AG_BUSCA_FOCO = n;
+  const i = document.getElementById('agBusca'); if (i) i.value = AG_BUSCA;
+  agBuscaAplicar();
 }
 function agPessoaRedesenhar() {
   const v = document.getElementById('view-agenda');
