@@ -1035,6 +1035,8 @@ async function ctgAbrir(escopo) {
 
 async function ctgSalvar(campo, nome, un, custo, custoFonte) {
   if (campo.value === '') return;
+  // 13/11/2026 (dono #436): item EM PRODUÇÃO não se conta — número aqui viraria contagem e ajustaria o saldo
+  if (ctgEmProducao(nome) || ctgEmProducao(ctgBaseDe(nome))) { campo.value = ''; return avisoAcao('atencao', `! ${nome} está em produção: não contar. O saldo se acerta pelo apontamento.`); }
   const s = rmbSessao();
   campo.style.borderColor = 'var(--line)';
   try {
