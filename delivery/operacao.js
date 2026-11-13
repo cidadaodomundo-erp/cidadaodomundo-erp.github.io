@@ -211,9 +211,9 @@
   }
 
   function banner() {
-    return '<strong>Em construção:</strong> Chegada, Escala e Conferência do Delivery estão sendo incorporadas a esta área. ' +
-      'As abas novas mostram o que vai aparecer; os campos ainda sem fonte ficam em branco. ' +
-      '<a href="#chegada">Ver Chegada do dia</a>';
+    // 13/11/2026 (Fabio): a Chegada saiu das abas desta página (era repetida); fica só no menu, em Chegada dos motoboys.
+    return '<strong>Em construção:</strong> Escala e Conferência do Delivery estão sendo incorporadas a esta área. ' +
+      'As abas novas mostram o que vai aparecer; os campos ainda sem fonte ficam em branco.';
   }
 
   return { ABAS_ANTIGAS, ABAS_NOVAS, abaDoHash, ehNova, diaBR, fmtSP, render, banner, esc };

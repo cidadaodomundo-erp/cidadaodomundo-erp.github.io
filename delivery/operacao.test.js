@@ -322,7 +322,7 @@ test('código novo não consulta nem grava; sintaxe dos scripts ok', () => {
   new vm.Script(OPERACAO_SRC);
   assert.ok(HTML.includes('src="operacao.js'));
   assert.ok(HTML.includes('src="operacao-modelo.js') && HTML.includes('src="operacao-dados.js'));
-  assert.equal((HTML.match(/data-aba=/g) || []).length, 7);
+  assert.equal((HTML.match(/data-aba=/g) || []).length, 6);   // 13/11 (Fabio): a aba Chegada saiu, era repetida
   // a leitura nova só usa o núcleo (GET): nada de sessão, chave, armazenamento, escrita nem rede direta
   new vm.Script(DADOS_SRC); new vm.Script(MODELO_SRC);
   for (const src of [DADOS_SRC, MODELO_SRC]) {
