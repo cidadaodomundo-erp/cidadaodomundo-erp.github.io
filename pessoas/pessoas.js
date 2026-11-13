@@ -1014,7 +1014,7 @@ const CG_ADM_OBRIG = [['RG ou CNH', /\b(RG|CNH|CIN)\b/i], ['CTPS digital', /CTPS
 const CG_ADM_LEIT = { nome_mae: 'RG/CNH/certidão/título', nome_pai: 'RG/CNH/certidão/título', nascimento: 'RG/CNH/certidão/título', municipio_nascimento: 'RG/certidão', sexo: 'RG/certidão',
   estado_civil: 'certidão', rg: 'RG/CNH', rg_orgao: 'RG/CNH', rg_data: 'RG', cnh: 'CNH', cnh_categoria: 'CNH', titulo: 'título', titulo_zona: 'título', titulo_secao: 'título', pis: 'PIS/CTPS',
   ctps: 'CTPS', ctps_serie: 'CTPS', ctps_uf: 'CTPS', ctps_data: 'CTPS', cep: 'comprovante de endereço', rua: 'comprovante de endereço', numero: 'comprovante de endereço',
-  complemento: 'comprovante de endereço', bairro: 'comprovante de endereço', cidade: 'comprovante de endereço', banco: 'dados bancários', agencia: 'dados bancários', conta: 'dados bancários' };
+  complemento: 'comprovante de endereço', bairro: 'comprovante de endereço', cidade: 'comprovante de endereço', chave_pix: 'dados bancários' };
 function cgAdmTiposAnexados() { return CG_ADM ? [...CG_ADM.docs.map((d) => d.tipo), ...CG_ADM.novos.map((n) => n.tipo)] : []; }
 function cgAdmTemIdentidade() { return cgAdmTiposAnexados().some((t) => /\b(RG|CNH|CIN)\b|certid|t[ií]tulo/i.test(t)); }
 // 06/11/2026 (dono 16:23: "quais são os campos obrigatórios ... e ve quais pode aplicar lista suspensa"; proposta 2026-11-06-rh-admissao-campos-e-listas)
@@ -1033,8 +1033,8 @@ const CG_ADM_BLOCOS = [
     ['rg_orgao', 'Órgão', ['', 'SESP', 'SSP', 'DETRAN', 'II', 'PC', 'OUTRO']], ['rg_data', 'Data do RG', 'date'], ['titulo', 'Título'], ['titulo_zona', 'Zona'], ['titulo_secao', 'Seção'], ['cnh', 'CNH'],
     ['cnh_categoria', 'Categoria', ['', 'A', 'B', 'AB', 'C', 'D', 'E', 'AC', 'AD', 'AE']]]],
   ['Benefícios', [['vt_itinerario', 'Itinerário do VT'], ['vt_valor_passagem', 'Valor da passagem', 'number'], ['va_valor_dia', 'VA por mês', 'number']]],
-  ['Banco', [['banco', 'Banco', ['', '001 BANCO DO BRASIL', '104 CAIXA', '237 BRADESCO', '341 ITAÚ', '033 SANTANDER', '260 NUBANK', '077 INTER', '336 C6', '380 PICPAY', '323 MERCADO PAGO', '748 SICREDI', '756 SICOOB', 'OUTRO']],
-    ['agencia', 'Agência'], ['conta', 'Conta']]],
+  // 13/11/2026 (dono 01:23: "O campo de dados bancários pode ser o PIX somente"): banco/agência/conta ficam só na tabela (legado)
+  ['PIX', [['chave_pix', 'Chave PIX (CPF, celular, e-mail ou aleatória)']]],
 ];
 // o que a ficha nova já traz preenchido (sempre editável)
 const CG_ADM_PADRAO = { experiencia_dias: '30', prorrogavel_dias: '60',   // 06/11/2026 (dono): 30 + 60 = 90; alertas aos 30 e aos 90
