@@ -199,14 +199,14 @@ test('delivery/index.html: diz o que consulta e o que está em migração; não 
   assert.match(html, /Já consultam dados neste portal:<\/strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia/);
   assert.match(html, /Em migração, ainda sem tela neste portal:<\/strong> Fila de pedidos/);
   assert.match(html, /Com página própria neste portal:<\/strong> Chegada dos motoboys/);
-  assert.match(html, /<button data-aba="chegada">Chegada do dia<\/button>/, 'aba Chegada sem selo Em construção');
+  assert.doesNotMatch(html, /<button data-aba="chegada"/, '13/11 (Fabio): a Chegada saiu das abas, era repetida; fica só no menu');
   const bloco = (/<section class="dl-migracao"[\s\S]*?<\/section>/.exec(html) || [''])[0];
   assert.ok(bloco, 'bloco de migração presente');
   assert.doesNotMatch(bloco, /portal antigo|atalho|href=|<a\b|<button/i, 'só texto, sem mandar ao portal antigo');
   assert.match(html, /Garantido e refeição <strong>não<\/strong> são calculados/);
   const semLink = html.replace(/<link[^>]*>/g, '');
   assert.doesNotMatch(semLink, /github\.io|target=|<iframe|<embed|<object/i, 'sem link, moldura ou embed do portal antigo');
-  assert.equal((html.match(/data-aba=/g) || []).length, 7, 'abas do Delivery do dia iguais');
+  assert.equal((html.match(/data-aba=/g) || []).length, 6, 'abas do Delivery do dia: 6 desde 13/11 (Chegada saiu, era repetida)');
   assert.equal((html.match(/setInterval\(/g) || []).length, 1, 'nenhum polling novo');
   assert.doesNotMatch(html, /garantido_|refeicao_|direito_/i);
 });
