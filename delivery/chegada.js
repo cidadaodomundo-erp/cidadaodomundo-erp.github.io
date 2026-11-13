@@ -53,6 +53,13 @@
     return lin('Última entrega', f.entrega) + lin('Última vez no pátio', f.patio) +
       (f.foiEmbora ? '<small class="cg-motivo cg-estimativa">Foi embora por volta de <strong>' + M.esc(f.foiEmbora) + '</strong> · estimativa, não é saída registrada</small>' : '');
   }
+  // 13/11/2026 (Fabio): embaixo da chegada observada, a hora em que o GPS viu a pessoa no pátio pela primeira vez,
+  // separada e rotulada. Não repete quando a própria chegada observada já é a do GPS. Sem dado = pendência visível.
+  function patioHtml(M, l, ch) {
+    if (ch && ch.fonte === 'patio_gps') return '';
+    const g = M.hora(l.patio_gps_txt);
+    return '<small class="cg-motivo cg-patio">Primeira vez no pátio (GPS) ' + (g ? '<strong>' + M.esc(g) + '</strong>' : '<span class="cg-fraco">sem dado</span>') + '</small>';
+  }
   function linhaHtml(M, l, aoVivo) {
     const ch = M.chegadaObservada(l), sai = M.saidaRegistrada(l), iv = M.intervaloRegistrado(l), d = M.direitos(l), marca = M.marcaEscala(l);
     const ent = M.hora(l.escala_txt), entSai = M.hora(l.escala_saida_txt);
@@ -66,7 +73,7 @@
       '<td data-rot="Entrada combinada">' + (ent ? '<span class="cg-hora">' + M.esc(ent) + '</span>' + (entSai ? '<small class="cg-motivo">até ' + M.esc(entSai) + '</small>' : '')
         : '<span class="cg-fraco">Sem escala</span>') + '</td>' +
       '<td data-rot="Chegada observada">' + (ch ? '<span class="cg-hora">' + M.esc(ch.hora) + '</span><small class="cg-motivo cg-f-' + ch.fonte + '">' + M.esc(ch.rotulo) + '</small>'
-        : '<span class="cg-fraco">Sem chegada registrada</span><small class="cg-motivo">não é falta confirmada</small>') + '</td>' +
+        : '<span class="cg-fraco">Sem chegada registrada</span><small class="cg-motivo">não é falta confirmada</small>') + patioHtml(M, l, ch) + '</td>' +
       '<td data-rot="Saída registrada">' + (sai ? '<span class="cg-hora">' + M.esc(sai) + '</span>' : '<span class="cg-fraco">Sem saída registrada</span>') + fimHtml(M, l, aoVivo) + '</td>' +
       '<td data-rot="Intervalo registrado">' + (iv ? '<span class="cg-hora">' + M.esc(iv.texto) + '</span><small class="cg-motivo">desde ' + M.esc(iv.rotulo) +
         ' · pode conter pausas</small>' : '<span class="cg-fraco">—</span>') + '</td>' +
