@@ -19,7 +19,8 @@ window.CASCA_MODULOS_CFG = {
   },
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
-    notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' },   // 12/11: onde a Rita resolve as tarefas 30 e 82
+    notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' },
+    cartao: { rotulo: 'Compra no cartão', icone: '💳' },   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
   // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
   // um item só no menu; ao abrir, a casca mostra as abas logo abaixo do título. Cada aba é a tela que já existia (mesma
@@ -34,7 +35,7 @@ window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
     lancar: [], acompanhar: ['hoje', 'agenda', 'vendasagora'] },   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
-    lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'reembolsos'],
+    lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
     lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },

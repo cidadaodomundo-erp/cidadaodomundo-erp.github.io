@@ -79,6 +79,7 @@ window.CASCA_BUSCA = {
   agenda: ['agenda', 'minha agenda', 'o que fazer', 'pendencias', 'depende de mim', 'hoje',
     'plano', 'plano de acao', 'em desenvolvimento', 'desenvolvimentos', 'evolucao do projeto', 'andamento', 'o que esta sendo feito', 'prioridades',
     'atividades da equipe', 'controle das atividades', 'tarefas', 'whatsapp', 'avisos', 'quem fez', 'equipe', 'travada'],   // 12/11 16:55: as atividades entraram na agenda   // 12/11: o Plano entrou na agenda
+  cartao: ['cartao de credito', 'compra no cartao', 'fatura', 'anexar fatura', 'fatura do cartao', 'itau', 'assinatura', 'parcela'],
   notasfaltam: ['notas', 'nota fiscal', 'nf', 'sem conta', 'sem entrada', 'entrada no estoque', 'conta a pagar da nota', 'compras'],
   rotinas: ['rotina', 'robo', 'mini pc', 'automacao'],
   telas: ['telas', 'menu', 'uso do painel'],
