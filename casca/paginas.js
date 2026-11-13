@@ -39,6 +39,7 @@ window.CASCA_PAGINAS = {
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
   pao: 'pessoas/index.html#pao',   // 12/11/2026: Ponto ao Vivo (RH), leitura de rh_flash_batida
+  prh: 'pessoas/index.html#prh',   // 13/11/2026 (Fabio): Gestão do RH — erros do dia (leitor próprio fabio-ponto-leitura, só leitura)
   padm: 'pessoas/index.html#padm',
   pseguro: 'pessoas/index.html#pseguro',   // 13/11/2026: Seguro de vida (RH), só leitura
   // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
@@ -120,7 +121,7 @@ window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'psegu
 window.CASCA_TELAS_POR_LOJA = ['caixa',
   'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao', 'reqpedir', 'reqseparar',
   'listas', 'listasfin',
-  'phoje', 'pao', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
+  'phoje', 'pao', 'prh', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',

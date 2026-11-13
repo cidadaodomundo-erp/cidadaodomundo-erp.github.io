@@ -15,7 +15,7 @@ window.CASCA_SETORES_FABIO = {
     { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada'],
       aviso: 'Em migração para este portal: Fila de pedidos e edição da Escala.' },
     { id: 'salao', nome: 'Salão', icone: '🍽️', chaves: ['salao', 'reservas', 'pausados'] },
-    { id: 'rh', nome: 'RH', icone: '👥', chaves: ['pao', 'pcartao', 'peventos', 'freelas'] },
+    { id: 'rh', nome: 'RH', icone: '👥', chaves: ['prh', 'pao', 'pcartao', 'peventos', 'freelas'] },
     { id: 'cozinha', nome: 'Cozinha e encomendas', icone: '👨‍🍳', chaves: ['cozinha', 'encomendas'] },
     { id: 'manutencao', nome: 'Manutenção e compras', icone: '🔧', chaves: ['manutencao', 'prestadores', 'mercadolivre'] },
     { id: 'gestao', nome: 'Gestão e lojas', icone: '🗓️', chaves: ['reuniao', 'tvs'] },

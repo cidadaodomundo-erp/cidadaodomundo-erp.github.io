@@ -290,6 +290,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "prh",
+    "rotulo": "Gestão do RH",
+    "icone": "🚨",
+    "origem": "fabio"
+   },
+   {
     "chave": "peventos",
     "rotulo": "Eventos e ausências",
     "icone": "🗒️",

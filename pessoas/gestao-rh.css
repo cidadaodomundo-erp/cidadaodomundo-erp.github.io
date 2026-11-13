@@ -1,0 +1,44 @@
+/* Gestão do RH — erros do dia. Estilos isolados (tudo sob #view-prh; prefixo grh-), no molde do Ponto ao Vivo.
+   Cores vêm das variáveis do tema do portal (claro/escuro), com reserva só para o tema claro. Não altera regra compartilhada. */
+#view-prh .grh-sub { color: var(--tx-3, #555); margin: 0 0 8px; }
+#view-prh .grh-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+#view-prh .grh-dia { min-width: 150px; text-align: center; }
+#view-prh .grh-btn[disabled] { opacity: .4; cursor: default; }
+#view-prh .grh-status { margin: 8px 0; }
+#view-prh .grh-erro { color: var(--farol-fora, #a32020); font-weight: 600; }
+#view-prh .grh-fonte { margin: 6px 0; font-size: .88em; color: var(--tx-3, #555); border-left: 3px solid var(--line, #bbb); padding: 2px 8px; }
+#view-prh .grh-kpis { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+#view-prh .grh-kpi { border: 1px solid var(--line, #ddd); border-left: 4px solid var(--line, #bbb); border-radius: 8px; padding: 8px 12px; min-width: 120px;
+  display: flex; flex-direction: column; align-items: flex-start; background: var(--surface, #fff); color: inherit; cursor: pointer; font: inherit; text-align: left; }
+#view-prh .grh-kpi b { font-size: 1.5em; line-height: 1.1; }
+#view-prh .grh-kpi span { color: var(--tx-3, #555); font-size: .88em; }
+#view-prh .grh-kpi.grh-on { outline: 2px solid var(--brand, #b3541e); outline-offset: 1px; }
+#view-prh .grh-k-SERIO, #view-prh .grh-k-REF_NAO { border-left-color: var(--farol-fora, #a32020); }
+#view-prh .grh-k-INFRACAO, #view-prh .grh-k-VERBAL, #view-prh .grh-k-CONFERIR { border-left-color: var(--farol-perto, #8a5a00); }
+#view-prh .grh-k-SEM { border-left-color: var(--farol-ok, #1b6b2f); }
+#view-prh .grh-tab { width: 100%; border-collapse: collapse; font-size: .92em; }
+#view-prh .grh-tab th { color: var(--tx-3, #555); font-weight: 600; }
+#view-prh .grh-tab th, #view-prh .grh-tab td { border-bottom: 1px solid var(--line, #eee); padding: 6px 8px; text-align: left; vertical-align: top; }
+#view-prh .grh-tab tr.grh-n-SERIO td:first-child { box-shadow: inset 3px 0 0 var(--farol-fora, #a32020); }
+#view-prh .grh-tab tr.grh-n-INFRACAO td:first-child, #view-prh .grh-tab tr.grh-n-VERBAL td:first-child, #view-prh .grh-tab tr.grh-n-CONFERIR td:first-child { box-shadow: inset 3px 0 0 var(--farol-perto, #8a5a00); }
+#view-prh .grh-nome { font-weight: 600; }
+#view-prh .grh-loja, #view-prh .grh-jor { color: var(--tx-3, #777); font-size: .85em; }
+#view-prh .grh-h { white-space: nowrap; font-variant-numeric: tabular-nums; }
+#view-prh .grh-ap { margin-bottom: 3px; }
+#view-prh .grh-a-SERIO b { color: var(--farol-fora, #a32020); }
+#view-prh .grh-a-INFRACAO b, #view-prh .grh-a-VERBAL b, #view-prh .grh-a-CONFERIR b { color: var(--farol-perto, #8a5a00); }
+#view-prh .grh-ok, #view-prh .grh-r-lancada { color: var(--farol-ok, #1b6b2f); }
+#view-prh .grh-r-erro { color: var(--farol-fora, #a32020); font-weight: 600; }
+#view-prh .grh-r-pendente, #view-prh .grh-r-indisponivel, #view-prh .grh-r-sem_vinculo { color: var(--farol-perto, #8a5a00); font-style: italic; }
+#view-prh .grh-vazio { color: var(--tx-3, #555); padding: 12px 0; }
+#view-prh .grh-det { margin: 12px 0; }
+#view-prh .grh-det summary { cursor: pointer; color: var(--tx-3, #555); }
+#view-prh .grh-det ul { margin: 6px 0 0 18px; columns: 2; }
+#view-prh .grh-aviso { margin: 2px 0; font-size: .88em; color: var(--farol-perto, #6b4e00); }
+@media (max-width: 700px) {
+  #view-prh .grh-tab thead { display: none; }
+  #view-prh .grh-tab td { display: block; border: 0; padding: 2px 8px; white-space: normal; }
+  #view-prh .grh-tab td::before { content: attr(data-rot) ': '; font-weight: 600; }
+  #view-prh .grh-tab tr { display: block; border-bottom: 1px solid var(--line, #ddd); padding: 6px 0; }
+  #view-prh .grh-det ul { columns: 1; }
+}
