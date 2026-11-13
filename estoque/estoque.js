@@ -4917,11 +4917,43 @@ function reqSepararDesenhar() {
             <td style="text-align:right;">${i.fora_da_base ? '–' : `<input inputmode="decimal" value="${trEscH(REQS.separado[i.id] != null ? REQS.separado[i.id] : reqFmt(i.qtd_pedida))}" oninput="REQS.separado[${i.id}]=this.value" style="width:76px; text-align:right; ${campo}">`}</td></tr>`).join('')}
         </tbody></table></div>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"><button class="preset-btn" style="border-color:var(--marca-amarelo);" onclick="reqEntregar(${r.id})">Entreguei</button>
+          <button class="preset-btn" onclick="reqImprimir(${r.id})">🖨️ Imprimir</button>
           <button class="preset-btn" onclick='reqCancelar(${r.id}, ${JSON.stringify(r.numero)})'>cancelar</button></div></div>`;
     }).join('') || '<div class="contexto">Nenhuma requisição esperando nesta loja.</div>'}
     ${REQS.fora.length ? `<div class="section-label" style="margin-top:18px;">Pedidos fora da base: o Neto valida</div><div id="tabelaReqFora" style="overflow-x:auto;"><table><thead><tr><th>Como pediram</th><th style="text-align:right;">Vezes</th><th>Desde</th><th>Quem pediu</th></tr></thead><tbody>
       ${REQS.fora.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.nome_pedido)}</td><td style="text-align:right;">${x.vezes_pedido}</td><td>${trEscH(reqQuando(x.primeira_vez))}</td><td style="white-space:normal;">${trEscH(String(x.quem_pediu || '').replace(/@[^,\s]+/g, ''))}</td></tr>`).join('')}
     </tbody></table></div>` : ''}`;
+}
+// 13/11/2026 (dono 00:59, teste ponta a ponta das requisições; pedido do Estoque): a folha que o Habrahan leva para separar,
+// no molde da separação da ordem (prdOrdemImprimir). Só imprime: a baixa continua pelo "Entreguei".
+function reqImprimir(id) {
+  const r = REQS.abertas.find((x) => x.id === id) || {};
+  const L = REQS.itens.filter((i) => i.id_requisicao === id);
+  const w = window.open('', '_blank');
+  if (!w) return avisoAcao('erro', '✗ O navegador bloqueou a janela de impressão: libere as janelas (pop-ups) para este site e clique de novo.', () => reqImprimir(id));
+  const e = (t) => trEscH(String(t == null ? '' : t));
+  const quem = r.pedido_por ? estNome(r.pedido_por) : '—';
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(r.numero)} — requisição</title><style>
+    body { font-family:Arial, sans-serif; color:#000; margin:18px 24px; }
+    .cab { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px; }
+    h1 { font-size:18px; margin:0; } .cod { font-size:26px; font-weight:bold; letter-spacing:1px; }
+    .sub { font-size:12px; color:#45443f; margin:3px 0 0; } .assina { font-size:12.5px; margin:16px 0 0; }
+    .assina span { display:inline-block; border-bottom:1px solid #000; width:200px; margin:0 22px 0 4px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; } td, th { border-bottom:1px solid #bbb; padding:6px 6px; font-size:13px; text-align:left; }
+    th { font-size:10px; text-transform:uppercase; color:#45443f; } .q { width:110px; font-weight:bold; white-space:nowrap; }
+    .box { width:110px; border:1px solid #000 !important; height:28px; } .nota { font-size:11px; color:#45443f; }
+    @media print { body { margin:10px 14px; } }
+  </style></head><body>
+    <div class="cab"><div><h1>Requisição — ${e(estNomeLoja(REQS.unidade))} · praça ${e(String(r.praca || '').toLowerCase())}</h1>
+      <p class="sub">Pediu: <b>${e(quem)}</b> em ${e(reqQuando(r.criado_em))} · ${L.length} ${L.length === 1 ? 'item' : 'itens'} · impressa em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+      ${r.observacao ? `<p class="sub"><b>Obs.:</b> ${e(r.observacao)}</p>` : ''}</div><div class="cod">${e(r.numero)}</div></div>
+    <table><thead><tr><th>#</th><th>Item</th><th class="q">Pedido</th><th>Saiu</th></tr></thead><tbody>
+    ${L.map((i, k) => `<tr><td>${k + 1}</td><td>${e(i.nome_base || i.nome_pedido)}${i.fora_da_base ? ' <span class="nota">· fora da base: não sai</span>' : i.sai_por_ficha ? ' <span class="nota">· sai pela ficha</span>' : ''}</td>
+      <td class="q">${reqFmt(i.qtd_pedida)} ${e(String(i.un || '').toLowerCase())}</td><td class="box"></td></tr>`).join('')}
+    </tbody></table>
+    <p class="assina">Separou:<span></span>Recebeu:<span></span></p></body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
 }
 async function reqEntregar(id) {
   const r0 = REQS.abertas.find((r) => r.id === id) || {};
