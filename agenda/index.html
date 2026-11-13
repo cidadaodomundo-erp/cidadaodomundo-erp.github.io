@@ -281,7 +281,7 @@ function agAvisosHtml() {
   h += G2.length ? `<div id="tabelaAgAvAuto"><table><thead><tr><th>Assunto</th><th>Para quem</th><th>Quando sai</th><th>Enviados</th><th>Feitos</th><th>Travados</th><th>Abertos</th><th>Situação</th><th>Ação</th><th>Observação</th></tr></thead><tbody>
     ${G2.map((a) => { const lig = a.estado !== 'DESLIGADO';
       return `<tr><td style="white-space:normal;"><b>${agE(a.assunto || '')}</b>${a.texto ? `<div style="font-size:11.5px;color:var(--tx-4);">${agE(a.texto)}</div>` : ''}</td><td>${agE(a.para_quem || '')}</td>
-        <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td><td>${Number(a.enviados_7d) || 0}</td><td style="color:var(--farol-ok);">${Number(a.feitos_7d) || 0}</td>
+        <td style="white-space:normal;font-size:12.5px;">${agE(agAvDias(a.por_que || ''))}</td><td>${Number(a.enviados_7d) || 0}</td><td style="color:var(--farol-ok);">${Number(a.feitos_7d) || 0}</td>
         <td style="color:${Number(a.travados_7d) ? 'var(--farol-fora)' : 'var(--tx-4)'};">${Number(a.travados_7d) || 0}</td><td>${Number(a.abertos) || 0}</td>
         <td style="color:${lig ? 'var(--farol-ok)' : 'var(--tx-4)'};font-weight:700;">${lig ? 'ligado' : 'desligado'}</td>
         <td>${lig ? (a.pode_parar ? `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, false)">Parar</button>` : '') : `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, true)">Ligar</button>`}</td><td style="min-width:200px;">${agAvObsHtml(a, true)}</td></tr>`; }).join('')}
@@ -321,6 +321,19 @@ async function agAvObsSalvar(alvo, campoId) {
   avisoAcao('ok', `✓ ${fr || (txt ? 'Observação salva.' : 'Observação apagada.')} — às ${avisoHora()}.`);
   try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
   await entrarAgenda(true);
+}
+// 13/11/2026 13:16 (dono não entendeu "1,2,3,4,5,6 às 10:30"): os dias de wa_atividade_repetida.dias_semana (0=dom … 6=sáb)
+// por nome — seguidos "seg a sáb" (inclusive virando a semana, "qua a seg"), soltos "seg, qua, sex", os 7 = "todo dia"
+function agAvDias(txt) {
+  const N = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  return String(txt).replace(/\[?\b([0-6](?:\s*,\s*[0-6])*)\b\]?(?=\s*às\b)/g, (m, lista) => {
+    const S = [...new Set(lista.split(',').map((x) => Number(x.trim())))];
+    if (S.length === 7) return 'todo dia';
+    if (S.length === 1) return N[S[0]];
+    const tem = new Set(S), inicios = S.filter((d) => !tem.has((d + 6) % 7));
+    if (inicios.length === 1) { let f = inicios[0]; while (tem.has((f + 1) % 7)) f = (f + 1) % 7; return `${N[inicios[0]]} a ${N[f]}`; }
+    return [1, 2, 3, 4, 5, 6, 0].filter((d) => tem.has(d)).map((d) => N[d]).join(', ');
+  });
 }
 async function agAvFrase(r) { try { const j = await r.json(); return typeof j === 'string' ? j : (j && (j.frase || j.mensagem || j.msg)) || ''; } catch (e) { return ''; } }
 async function agAvDecidir(ref, dec) {
