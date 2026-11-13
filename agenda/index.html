@@ -331,7 +331,7 @@ function agAvDias(txt) {
     if (S.length === 7) return 'todo dia';
     if (S.length === 1) return N[S[0]];
     const tem = new Set(S), inicios = S.filter((d) => !tem.has((d + 6) % 7));
-    if (inicios.length === 1) { let f = inicios[0]; while (tem.has((f + 1) % 7)) f = (f + 1) % 7; return `${N[inicios[0]]} a ${N[f]}`; }
+    if (inicios.length === 1) { let f = inicios[0]; while (tem.has((f + 1) % 7)) f = (f + 1) % 7; if (f < inicios[0] && S.length === 6) return `todo dia menos ${N[[0, 1, 2, 3, 4, 5, 6].find((d) => !tem.has(d))]}`; return `${N[inicios[0]]} a ${N[f]}`; }
     return [1, 2, 3, 4, 5, 6, 0].filter((d) => tem.has(d)).map((d) => N[d]).join(', ');
   });
 }
