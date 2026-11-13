@@ -4915,6 +4915,7 @@ function reqSepararDesenhar() {
   const diaAberto = REQS.dia.filter((x) => !x.situacao || /ABERT|SEPARAR/i.test(x.situacao));
   alvo.innerHTML = `<h2>Separar requisições</h2>
     <div class="caption-label">${trEscH(estNomeLoja(REQS.unidade))}: ${REQS.abertas.length} ${REQS.abertas.length === 1 ? 'requisição esperando' : 'requisições esperando'}. Separe, ajuste a quantidade que saiu e clique em <b>Entreguei</b>: a baixa no estoque é pelo que saiu.</div>
+    ${REQS.abertas.length ? `<div style="margin:8px 0;"><button class="preset-btn active" style="font-size:15px; padding:10px 18px;" onclick="reqImprimirPracas()">🖨️ Imprimir para separar (uma folha por praça)</button></div>` : ''}
     ${diaAberto.length ? `<div class="section-label">Somado por item</div><div id="tabelaReqDia" style="overflow-x:auto;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Saldo</th><th>Praças</th></tr></thead><tbody>
       ${diaAberto.map((x) => `<tr><td>${trEscH(x.nome_base)}${x.sai_por_ficha ? ' <span style="font-size:11px; color:var(--tx-4);">· sai pela ficha</span>' : ''}</td><td style="text-align:right;">${reqFmt(x.qtd_pedida)} ${trEscH(String(x.un || '').toLowerCase())}</td>
         <td style="text-align:right;${Number(x.saldo) < Number(x.qtd_pedida) ? ' color:var(--farol-fora); font-weight:700;' : ''}">${x.saldo == null ? '–' : reqFmt(x.saldo)}</td><td style="white-space:normal;">${trEscH(String(x.pracas || '').toLowerCase())}</td></tr>`).join('')}
@@ -4966,6 +4967,55 @@ function reqImprimir(id) {
       <td class="q">${reqFmt(i.qtd_pedida)} ${e(String(i.un || '').toLowerCase())}</td><td class="box"></td></tr>`).join('')}
     </tbody></table>
     <p class="assina">Separou:<span></span>Recebeu:<span></span></p></body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
+}
+// 13/11/2026 01:23 (dono: "Dá uma prioridade na impressão, separar pela tela é ruim"): todas as requisições abertas da loja,
+// UMA FOLHA POR PRAÇA (quebra de página entre elas); o mesmo item pedido duas vezes na praça soma numa linha (mesma unidade).
+function reqImprimirPracas() {
+  if (!REQS.abertas.length) return avisoAcao('atencao', '! Nenhuma requisição esperando nesta loja.');
+  const w = window.open('', '_blank');
+  if (!w) return avisoAcao('erro', '✗ O navegador bloqueou a janela de impressão: libere as janelas (pop-ups) para este site e clique de novo.', () => reqImprimirPracas());
+  const e = (t) => trEscH(String(t == null ? '' : t));
+  const pracas = new Map();
+  REQS.abertas.forEach((r) => { const k = String(r.praca || 'sem praça').toLowerCase(); if (!pracas.has(k)) pracas.set(k, []); pracas.get(k).push(r); });
+  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const folhas = [...pracas.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR')).map(([praca, rs]) => {
+    const soma = new Map();
+    rs.forEach((r) => REQS.itens.filter((i) => i.id_requisicao === r.id).forEach((i) => {
+      const nome = i.nome_base || i.nome_pedido, un = String(i.un || '').toLowerCase(), k = nome + '|' + un;
+      const x = soma.get(k) || { nome, un, qtd: 0, ficha: !!i.sai_por_ficha, fora: !!i.fora_da_base, obs: [] };
+      x.qtd += Number(i.qtd_pedida) || 0; if (i.observacao) x.obs.push(i.observacao);
+      soma.set(k, x);
+    }));
+    const L = [...soma.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const quem = [...new Set(rs.map((r) => r.pedido_por ? estNome(r.pedido_por) : '—'))].join(', ');
+    const obs = rs.filter((r) => r.observacao).map((r) => `${r.numero}: ${r.observacao}`);
+    return `<section class="folha">
+      <div class="cab"><div><h1>PRAÇA ${e(praca.toUpperCase())}</h1>
+        <p class="sub">${e(estNomeLoja(REQS.unidade))} · ${rs.length} ${rs.length === 1 ? 'requisição' : 'requisições'} (${e(rs.map((r) => r.numero).join(', '))}) · pediu: ${e(quem)} · pedido em ${e(rs.map((r) => reqQuando(r.criado_em)).join(', '))}</p>
+        ${obs.length ? `<p class="sub"><b>Obs.:</b> ${e(obs.join(' · '))}</p>` : ''}</div>
+        <div class="cod">${e(new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }))}</div></div>
+      <table><thead><tr><th>#</th><th>Item</th><th class="q">Pedido</th><th>Saiu</th><th class="ok">✓</th></tr></thead><tbody>
+      ${L.map((x, k) => `<tr><td>${k + 1}</td><td>${e(x.nome)}${x.fora ? ' <span class="nota">· fora da base: não sai</span>' : x.ficha ? ' <span class="nota">· sai pela ficha</span>' : ''}${x.obs.length ? ` <span class="nota">· ${e(x.obs.join('; '))}</span>` : ''}</td>
+        <td class="q">${reqFmt(x.qtd)} ${e(x.un)}</td><td class="box"></td><td class="ok"><span class="quad"></span></td></tr>`).join('')}
+      </tbody></table>
+      <p class="assina">Separou:<span></span>Recebeu (${e(praca)}):<span></span></p>
+      <p class="sub">impressa em ${e(agora)}</p></section>`;
+  });
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Requisições por praça — ${e(estNomeLoja(REQS.unidade))}</title><style>
+    body { font-family:Arial, sans-serif; color:#000; margin:18px 24px; }
+    .folha { page-break-after:always; break-after:page; margin-bottom:28px; } .folha:last-child { page-break-after:auto; break-after:auto; }
+    .cab { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:6px; }
+    h1 { font-size:24px; margin:0; letter-spacing:1px; } .cod { font-size:20px; font-weight:bold; }
+    .sub { font-size:12px; color:#45443f; margin:3px 0 0; } .assina { font-size:13px; margin:18px 0 0; }
+    .assina span { display:inline-block; border-bottom:1px solid #000; width:200px; margin:0 22px 0 4px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; } td, th { border-bottom:1px solid #bbb; padding:7px 6px; font-size:14px; text-align:left; }
+    th { font-size:10px; text-transform:uppercase; color:#45443f; } .q { width:120px; font-weight:bold; white-space:nowrap; }
+    .box { width:110px; border:1px solid #000 !important; height:30px; } .ok { width:34px; } .quad { display:inline-block; width:18px; height:18px; border:1.5px solid #000; }
+    .nota { font-size:11px; color:#45443f; }
+    @media print { body { margin:10px 14px; } }
+  </style></head><body>${folhas.join('')}</body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 300);
 }
