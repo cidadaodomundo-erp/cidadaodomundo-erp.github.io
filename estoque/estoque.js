@@ -108,6 +108,16 @@ async function ctgCarregar() {
     consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde,em_producao_numero&unidade=eq.${u}&order=nome_base`).catch(() => []),
     consultarTudo(`vw_est_contagem_ordem_aberta?select=tipo,numero,data_para,situacao,texto&unidade=eq.${u}&order=data_para,numero`).catch(() => [])]);
   if (ondeC) { CTG.ondeContar = new Map(ondeC.map((x) => [x.nome_base, x])); CTG.ondeContarDe = CTG.unidade; }
+  // 13/11/2026 (dono #439): CONTAGEM CURTA — a loja com lista em est_contagem_curta_item conta SÓ ela na folha CURVA_A
+  // (a MESMA regra de script/fotos_contagem.py e de est_congelar_folha: a numeração tem de bater com o papel)
+  const [curtaIt, curtaV, cal] = await Promise.all([
+    consultarTudo(`est_contagem_curta_item?select=nome_base,ordem&unidade=eq.${u}&order=ordem,nome_base`).catch(() => []),
+    consultarTudo(`vw_est_contagem_curta?select=nome_base,onde_contar,em_producao_numero&unidade=eq.${u}&order=ordem,nome_base`).catch(() => []),
+    consultarTudo('vw_est_contagem_calendario?select=tipo,escopo,proxima,regra&order=tipo').catch(() => [])]);
+  CTG.curtaSet = new Set((curtaIt || []).map((x) => x.nome_base));
+  CTG.curtaItens = new Set((curtaIt || []).map((x) => x.ordem)).size;   // caixa de marmita: 3 marcas, 1 item
+  CTG.curtaOnde = new Map((curtaV || []).map((x) => [x.nome_base, x]));
+  CTG.calendario = cal || [];
   CTG.ordemAberta = ordAb || [];
   CTG.foraBase = CTG.folha ? await consultarTudo(`vw_est_contagem_fora_da_base?select=nome_saipos,nome_base,problema,quem,o_que_fazer&id_inventario=eq.${CTG.folha.id}`).catch(() => []) : [];
   CTG.fotos = [];
@@ -207,16 +217,20 @@ function ctgRender() {
 
   let h = `<h2>Contagem de estoque</h2>`;
   h += ctgNfDepoisHtml();
+  // 13/11/2026 (#439): a loja com lista curta conta 14 itens seg e qui; a geral é quinzenal (vw_est_contagem_calendario)
+  const curta = !!(CTG.curtaSet && CTG.curtaSet.size), nCurta = CTG.curtaItens || 0;
+  const cal = curta ? (CTG.calendario || []) : [];
 
   // 13/11/2026: ordem ou separação aberta → avisa antes de abrir a folha (não bloqueia)
   if ((CTG.ordemAberta || []).length) h += `<div class="contexto" style="text-align:left; border-color:var(--info);">
       <b>Em produção agora</b> (os itens dela saem marcados "EM PRODUÇÃO — não contar"; o resto conta normal): ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <b>${CTG.unidade}</b>
-      ${f ? `<span>folha de <b>${f.data.split('-').reverse().join('/')}</b> · ${f.escopo === 'CURVA_A' ? 'só os de maior valor' : 'tudo'} · ${aberta ? 'aberta' : 'fechada'}</span>` : '<span>nenhuma folha ainda</span>'}
-      ${aberta ? '' : `<button class="preset-btn" onclick="ctgAbrir('CURVA_A')">Contar só os de maior valor</button>
+      ${f ? `<span>folha de <b>${f.data.split('-').reverse().join('/')}</b> · ${f.escopo === 'CURVA_A' ? (curta ? 'contagem curta' : 'só os de maior valor') : 'tudo'} · ${aberta ? 'aberta' : 'fechada'}</span>` : '<span>nenhuma folha ainda</span>'}
+      ${aberta ? '' : `<button class="preset-btn" onclick="ctgAbrir('CURVA_A')">${curta ? `Contagem curta (${nCurta} itens · seg e qui)` : 'Contar só os de maior valor'}</button>
                        <button class="preset-btn" onclick="ctgAbrir('GERAL')">Contar tudo</button>`}
-      ${dia !== 3 && !aberta ? `<span style="color:var(--tx-4);">hoje não é quarta</span>` : ''}
+      ${!aberta && cal.length ? `<span style="color:var(--tx-4); font-size:12.5px;">${cal.map((c) => `${c.tipo === 'CURTA' ? 'curta' : 'geral'}: próxima <b style="color:var(--tx-2);">${ffDdmm(c.proxima)}</b> (${trEscH(c.regra || '')})`).join(' · ')}</span>`
+        : (dia !== 3 && !aberta ? `<span style="color:var(--tx-4);">hoje não é quarta</span>` : '')}
     </div>`;
 
   if (!f) {
@@ -684,12 +698,17 @@ function ctgGrupoDe(i) {
 // contar: SÓ ESTOQUE / ESTOQUE + COZINHA (folhas a partir de vale_para_contagem_desde) ou EM PRODUÇÃO — não contar (sempre;
 // vem do banco, vw_est_contagem_onde_contar). Item em produção não se conta e não se grava.
 function ctgOnde(f, nomeBase) {
+  const cu = f && f.escopo === 'CURVA_A' && CTG.curtaOnde && nomeBase ? CTG.curtaOnde.get(nomeBase) : null;
+  if (cu && cu.onde_contar) return /^EM PRODU/i.test(cu.onde_contar) ? `EM PRODUÇÃO${cu.em_producao_numero ? ' (' + cu.em_producao_numero + ')' : ''} — não contar` : cu.onde_contar;
   const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
   if (!x) return null;
   if (/^EM PRODU/i.test(x.onde_contar || '')) return `EM PRODUÇÃO${x.em_producao_numero ? ' (' + x.em_producao_numero + ')' : ''} — não contar`;
   return f && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde) ? x.onde_contar : null;
 }
-function ctgEmProducao(nomeBase) { const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null; return !!(x && /^EM PRODU/i.test(x.onde_contar || '')); }
+function ctgEmProducao(nomeBase) {
+  const cu = CTG.folha && CTG.folha.escopo === 'CURVA_A' && CTG.curtaOnde && nomeBase ? CTG.curtaOnde.get(nomeBase) : null;
+  if (cu && /^EM PRODU/i.test(cu.onde_contar || '')) return true;
+  const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null; return !!(x && /^EM PRODU/i.test(x.onde_contar || '')); }
 function ctgBaseDe(nomeSaipos) { ctgNomeHtml(nomeSaipos); return (CTG._nomeBase && CTG._nomeBase.get(nomeSaipos)) || null; }
 function ctgOndeTag(f, nomeBase) {
   const o = ctgOnde(f, nomeBase);
@@ -759,7 +778,7 @@ async function ctgImprimir(soEsteGrupo) {
     <button class="naoimprime" onclick="window.print()" style="float:right; padding:8px 14px;">Imprimir / salvar PDF</button>
     <div class="cab">
       <div><h1>Contagem de estoque — ${CTG.unidade}</h1>
-        <div class="sub">${soEsteGrupo ? `grupo <b>${soEsteGrupo}</b>` : (f.escopo === 'CURVA_A' ? 'curva A' : 'folha inteira')} ·
+        <div class="sub">${soEsteGrupo ? `grupo <b>${soEsteGrupo}</b>` : (f.escopo === 'CURVA_A' ? (CTG.curtaSet && CTG.curtaSet.size ? 'contagem curta' : 'curva A') : 'folha inteira')} ·
           ${grupos.reduce((a, g) => a + porGrupo[g].length, 0)} itens · conte e escreva o número na caixa ·
           item que não existe mais, risque · <b>o número da linha é o que vale na foto</b>${CTG.ondeContar && [...CTG.ondeContar.values()].some((x) => ctgSoEstoque(f, x.nome_base)) ? ' · <b>"só estoque"</b>: o que está na cozinha já saiu pela requisição, conte só o estoque' : ''}</div></div>
       <div style="text-align:right;"><div class="cod">FOLHA ${f.id}</div>
@@ -853,9 +872,11 @@ function ctgFaixaForaBase() {
 
 function ctgListaDoPapel(f) {
   const fora = ['BAIXADO POR ELE', 'FORA DO CONTROLE DE ESTOQUE', 'MARCADO NAO USA'];
+  const base = (CTG.base || []).filter((i) => !fora.includes(i.situacao));
+  if (f.escopo === 'GERAL') return base;
+  if (CTG.curtaSet && CTG.curtaSet.size) return base.filter((i) => CTG.curtaSet.has(i.nome_base));   // contagem curta (#439)
   const curvaA = new Set(CTG.escopo.filter((i) => i.curva === 'A').map((i) => i.nome_saipos));
-  return (CTG.base || []).filter((i) => !fora.includes(i.situacao))
-                         .filter((i) => f.escopo === 'GERAL' || curvaA.has(i.nome_saipos));
+  return base.filter((i) => curvaA.has(i.nome_saipos));
 }
 
 // Os itens agrupados, na ordem da folha impressa e em ordem alfabética dentro do grupo.
