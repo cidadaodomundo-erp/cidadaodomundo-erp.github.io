@@ -3593,7 +3593,14 @@ async function prdOrdensCarregar() {
     const fam = ids.length ? await consultarTudo(`vw_est_ordem_familia?select=id,familia,e_individual,itens_finais,itens_com_fator,precisa_cortar&id=in.(${ids.join(',')})`).catch(() => []) : [];
     // o motivo de cada item final que o apontamento não confere (a ação é diferente para cada motivo)
     if (!PRD.semFator) PRD.semFator = await consultarTudo("vw_est_item_final_sem_fator?select=familia,item_final,situacao&situacao=neq.TEM FATOR&order=familia,item_final").catch(() => []);
-    PRD.ordens = { rel, itens, contas: new Map(contas.map((c) => [c.id, c])), fam: new Map(fam.map((f) => [f.id, f])), sep: (PRD.ordens && PRD.ordens.sep) || {} };
+    // 13/11/2026 (Estoque, proposta 2026-11-12-etapas-em-dias): as etapas de cada ordem e o tempo medido; leitura que nunca derruba a tela
+    const [etapas, etPadrao, etTempo] = ids.length ? await Promise.all([
+      consultarTudo(`est_ordem_etapa?select=*&id_ordem=in.(${ids.join(',')})&order=id_ordem,ordem`).catch(() => []),
+      consultarTudo('est_etapa_padrao?select=familia,ordem,etapa,dia_relativo,prazo_minutos&order=familia,ordem').catch(() => []),
+      consultarTudo(`vw_est_etapa_tempo?select=familia,ordem,etapa,medicoes,minutos_mediana&unidade=eq.${u}&order=familia,ordem`).catch(() => []),
+    ]) : [[], [], []];
+    PRD.ordens = { rel, itens, contas: new Map(contas.map((c) => [c.id, c])), fam: new Map(fam.map((f) => [f.id, f])), sep: (PRD.ordens && PRD.ordens.sep) || {},
+      etapas, etPadrao, etTempo };
   } catch (e) { PRD.ordens = { erro: e.message, rel: [], itens: [], contas: new Map(), sep: {} }; }
 }
 // 27/10/2026 (dono): relógio correndo em hh:mm:ss. O banco manda os segundos e se está correndo; a tela conta sozinha.
@@ -3669,9 +3676,63 @@ function prdOrdensHtml() {
         <button class="preset-btn" onclick="prdOrdemSep(${o.id})">${aberta ? 'Esconder a separação' : 'Ver a separação'}</button>
         <span style="font-size:12px; color:${Number(c.ingredientes_faltando) ? 'var(--farol-perto)' : 'var(--tx-4)'};">${c.ingredientes == null ? '' : `${c.ingredientes} ${Number(c.ingredientes) === 1 ? 'ingrediente' : 'ingredientes'}${Number(c.ingredientes_faltando) ? `, ${c.ingredientes_faltando} sem o suficiente no estoque` : ', todos com saldo'}`}</span></div>
       ${aberta ? prdOrdemSepHtml(o) : ''}
+      ${prdEtapasHtml(o)}
     </div>`;
   });
   return h;
+}
+// ---- ETAPAS EM DIAS (13/11/2026; livro chat-frente-estoque/respostas/tempos-por-etapa-e-dias): pré-preparo num dia, finalização
+// no outro. Uma linha por etapa com Iniciar / Fechar e o dia previsto. Nenhum prazo inventado: só o tempo medido (mediana).
+function prdEtapasHtml(o) {
+  const O = PRD.ordens || {};
+  const fam = ((O.fam && O.fam.get(o.id)) || {}).familia || null;
+  const feitas = (O.etapas || []).filter((e) => e.id_ordem === o.id);
+  const padrao = (O.etPadrao || []).filter((p) => fam && p.familia === fam);
+  const ordens = [...new Set([...padrao.map((p) => Number(p.ordem)), ...feitas.map((e) => Number(e.ordem))])].sort((a, b) => a - b);
+  const hoje = prdHoje();
+  const dia = (d) => !d ? '—' : d === hoje ? 'hoje' : d === fxSomaDias(hoje, 1) ? 'amanhã' : d === fxSomaDias(hoje, -1) ? 'ontem' : ffDdmm(d);
+  const hm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
+  const t0 = Date.now();
+  const campoE = 'background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:5px 8px;';
+  const prox = (ordens.length ? Math.max(...ordens) : 0) + 1;
+  let h = `<div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--p-line, var(--line));"><b>Etapas</b>`;
+  if (ordens.length) {
+    h += `<div id="tabelaPrdEtapa${o.id}" style="margin-top:4px;"><table><thead><tr><th>Etapa</th><th>Dia</th><th>Situação</th><th>Tempo</th><th>Ação</th></tr></thead><tbody>`
+      + ordens.map((n) => {
+        const e = feitas.find((x) => Number(x.ordem) === n) || null;
+        const pd = padrao.find((x) => Number(x.ordem) === n) || null;
+        const nome = (e && e.etapa) || (pd && pd.etapa) || `etapa ${n}`;
+        const prevista = e ? e.data_prevista : (pd ? fxSomaDias(String(o.data_para).slice(0, 10), Number(pd.dia_relativo) || 0) : null);
+        const med = (O.etTempo || []).find((t) => t.familia === fam && Number(t.ordem) === n && Number(t.medicoes) > 0);
+        const correndo = e && e.iniciada_em && !e.fechada_em;
+        const sit = !e || !e.iniciada_em ? '<span style="color:var(--tx-4);">não iniciada</span>'
+          : correndo ? `<span style="color:var(--farol-ok); font-weight:700;">correndo desde ${hm(e.iniciada_em)}</span>`
+          : `<span style="color:var(--farol-ok);">fechada às ${hm(e.fechada_em)}</span>`;
+        const seg = e && e.iniciada_em ? ((e.fechada_em ? new Date(e.fechada_em) : new Date()) - new Date(e.iniciada_em)) / 1000 : null;
+        const tempo = (seg == null ? '—' : prdRelSpan(Math.round(seg), null, !!correndo, t0))
+          + (med ? ` <span style="color:var(--tx-4); font-size:11.5px;">costuma levar ${fmt(Number(med.minutos_mediana))} min</span>` : '');
+        const acao = !e || !e.iniciada_em ? `<button class="preset-btn active est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${trEscH(JSON.stringify(nome))}, 'INICIAR')">Iniciar etapa</button>`
+          : correndo ? `<button class="preset-btn est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${trEscH(JSON.stringify(nome))}, 'FECHAR')">Fechar etapa</button>` : '<span style="color:var(--tx-5);">—</span>';
+        return `<tr><td><b>${n}.</b> ${trEscH(nome)}</td><td>${dia(prevista)}</td><td style="font-size:12.5px;">${sit}</td><td style="white-space:nowrap; font-variant-numeric:tabular-nums;">${tempo}</td><td style="white-space:nowrap;">${acao}</td></tr>`;
+      }).join('') + `</tbody></table></div>`;
+  }
+  // etapa ainda não cadastrada: o nome digitado vira medição (o cadastro da família vem depois)
+  h += `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+      <input id="prdEtNova_${o.id}" placeholder="${ordens.length ? 'outra etapa' : 'nome da etapa'} (ex.: pré-preparo, finalização)" style="flex:1 1 220px; max-width:340px; ${campoE}">
+      <button class="preset-btn est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${prox}, (document.getElementById('prdEtNova_${o.id}') || {}).value, 'INICIAR')">Iniciar etapa</button></div></div>`;
+  return h;
+}
+async function prdEtapaMarcar(idOrdem, n, etapa, passo) {
+  const o = ((PRD.ordens || {}).rel || []).find((x) => x.id === idOrdem) || {};
+  const nome = String(etapa || '').trim();
+  if (!nome) return avisoAcao('atencao', '! Escreva o nome da etapa antes de iniciar.');
+  const refazer = () => prdEtapaMarcar(idOrdem, n, nome, passo);
+  avisoAcao('enviando', `Registrando: ${nome} ${passo === 'FECHAR' ? 'fechada' : 'iniciada'}…`);
+  const r = await trRpcSeguro('est_ordem_etapa_marcar', { p_id_ordem: idOrdem, p_ordem: n, p_etapa: nome, p_passo: passo, p_quem: ((rmbSessao() || {}).email || '') });
+  if (!r.ok) return avisoAcao('erro', `✗ A etapa NÃO foi ${passo === 'FECHAR' ? 'fechada' : 'iniciada'}: ${await trErroDe(r)}`, refazer);
+  avisoAcao('ok', `✓ ${o.numero || 'Ordem'}: ${nome} ${passo === 'FECHAR' ? 'fechada' : 'iniciada'} — às ${avisoHora()}.`);
+  await prdOrdensCarregar();
+  prdRender();
 }
 const PRD_SEP_ORDEM = { 'SALDO NEGATIVO: conferir o registro': 0, 'SEM SALDO NO ESTOQUE': 1, 'ZERADO': 2, 'TEM MENOS DO QUE PRECISA': 3, 'TEM': 4 };
 function prdSepCor(s) {
