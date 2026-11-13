@@ -105,7 +105,7 @@ async function ctgCarregar() {
   // 13/11/2026 (dono 01:48, "regra simples"; Estoque): onde contar cada item (vale para folha a partir de 19/11) e o aviso
   // de ordem/separação aberta antes de abrir a folha. Leitura que nunca derruba a tela.
   const [ondeC, ordAb] = await Promise.all([
-    consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde&unidade=eq.${u}&order=nome_base`).catch(() => []),
+    consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde,em_producao_numero&unidade=eq.${u}&order=nome_base`).catch(() => []),
     consultarTudo(`vw_est_contagem_ordem_aberta?select=tipo,numero,data_para,situacao,texto&unidade=eq.${u}&order=data_para,numero`).catch(() => [])]);
   if (ondeC) { CTG.ondeContar = new Map(ondeC.map((x) => [x.nome_base, x])); CTG.ondeContarDe = CTG.unidade; }
   CTG.ordemAberta = ordAb || [];
@@ -686,7 +686,7 @@ function ctgGrupoDe(i) {
 function ctgOnde(f, nomeBase) {
   const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
   if (!x) return null;
-  if (/^EM PRODU/i.test(x.onde_contar || '')) return 'EM PRODUÇÃO — não contar';
+  if (/^EM PRODU/i.test(x.onde_contar || '')) return `EM PRODUÇÃO${x.em_producao_numero ? ' (' + x.em_producao_numero + ')' : ''} — não contar`;
   return f && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde) ? x.onde_contar : null;
 }
 function ctgEmProducao(nomeBase) { const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null; return !!(x && /^EM PRODU/i.test(x.onde_contar || '')); }
@@ -1172,10 +1172,10 @@ function ctgHtmlBrancos() {
       <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}${
         b.qtd_lida != null ? `<div class="caption-label" style="color:var(--farol-perto);">a foto leu ${fmt(Number(b.qtd_lida))} ${trEscH(b.un || '')} — confira e digite</div>` : ''}</td>
       <td style="color:var(--tx-4);">${trEscH(b.grupo || '')}</td>
-      <td style="white-space:nowrap;"><input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
+      <td style="white-space:nowrap;">${ctgEmProducao(b.nome) ? `${ctgOndeTag(CTG.folha, b.nome)}` : `<input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
            onchange="ctgSalvar(this, ${nome}, ${JSON.stringify(b.un || '').replace(/"/g, '&quot;')}, ${e.custo || 'null'}, ${JSON.stringify(e.custo_fonte || '').replace(/"/g, '&quot;')})"
            style="width:120px; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;">
-        <span style="color:var(--tx-5); font-size:11.5px;"> ${trEscH(b.un || '')}</span></td></tr>`;
+        <span style="color:var(--tx-5); font-size:11.5px;"> ${trEscH(b.un || '')}</span>`}</td></tr>`;
   });
   return h + `</tbody></table></div></div>`;
 }
@@ -1250,7 +1250,7 @@ function ctgHtmlConferir() {
 // fosse gravado aqui, ele seria irrecuperável e toda diferença daria zero.
 async function ctgFechar() {
   // 05/11/2026 (proposta da grade, 22/10): linha em branco sem resposta não deixa fechar — 0 é resposta, vazio não
-  const vazios = ctgBrancosPendentes().length;
+  const vazios = ctgBrancosPendentes().filter((b) => !ctgEmProducao(b.nome)).length;   // 13/11 (#436): em produção não se conta
   if (vazios) return avisoAcao('atencao', `! A folha não fechou: ${vazios} ${vazios === 1 ? 'item ficou' : 'itens ficaram'} em branco no papel. Digite 0 se não tinha, ou o valor contado, no quadro "ainda sem contagem", e feche de novo.`);
   const esperados = ctgListaDoPapel(CTG.folha).length;
   const n = CTG.itens.length;
