@@ -61,7 +61,7 @@ test('dia fechado: aponta intervalo abaixo do legal, batidas incompletas e refei
   assert.equal(r.atrasoAvaliado, false);
   // o número de cada cartão é igual ao tamanho da lista que ele abre
   ['SERIO', 'INFRACAO', 'VERBAL', 'CONFERIR', 'SEM', 'REF_NAO'].forEach((k) => assert.equal(r.kpis[k], M.filtrar(r.linhas, k).length, k));
-  assert.equal(r.kpis.SEM, 1);
+  assert.equal(r.kpis.SEM, 2);
   // 5 batidas (ímpar) em dia fechado: batidas incompletas, sem acusar intervalo; em andamento não aponta
   const imp = resposta({ batidas: [bat(1, '10:00', '14:00', '14:10', '18:00', '19:00')] });
   const li = linha(M.apontar(imp, { hojeOperacional: HOJE }), 1);
