@@ -96,6 +96,8 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
   const hoje = agHoje(), fim = agMais(hoje, 7), ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   // 12/11/2026 (dono 01:09): o que o robô conferiu nas últimas 24 h aparece como "✓ conferido"
   const ontem = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  // 13/11/2026 (dono 10:07; chat Avisos): a aba Avisos — esperando o "manda", automáticos validados e enviados/travados em 7 dias
+  AG.avisos = await consultarTudo('vw_avisos_painel_dono_le?select=*&order=grupo,quando.desc.nullslast,ref').catch((e) => ({ erro: e.message }));
   const [pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf] = await Promise.all([
     ler('dono_pendencia?select=id,chave,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,retorno,retorno_em,retorno_visto_em,fio,feito_em,confere,conferencia_nota&para=is.null&resolvido_em=is.null&order=prazo.nullsfirst,id'),
     ler(`vw_fin_contas_pagar?select=vencimento,dia_pagamento,situacao,descricao,debito,credito,conta,conta_exibida,origem,id_titulo&sentido=eq.PAGAR&situacao=neq.PAGO&dia_pagamento=lte.${fim}&order=dia_pagamento,descricao`).then((L) => (Array.isArray(L) && L.forEach((r) => { if (r.dia_pagamento) r.vencimento = r.dia_pagamento; }), L)),
@@ -134,6 +136,10 @@ function agDesenhar() {
     add({ dep: !espera, grupo: espera ? 'anda' : 'dep', dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
       desde: String(p.desde || '').slice(0, 10), prazo: p.prazo || '' });
   });
+  // 13/11/2026 (chat Avisos): os rascunhos esperando o "manda" saíram da agenda geral e vivem na aba Avisos; contam no número
+  const avEsp = Array.isArray(AG.avisos) ? AG.avisos.filter((a) => Number(a.grupo) === 1 && a.estado === 'ESPERA').length : 0;
+  AG.avEsp = avEsp;
+  if (avEsp) { AG.sinal += avEsp; add({ dep: true, dia: hoje, tipo: 'alerta', txt: `<b>${avEsp}</b> ${avEsp === 1 ? 'aviso à equipe esperando' : 'avisos à equipe esperando'} o seu "manda" — <a href="javascript:void(0)" onclick="agFiltrar('avisos')" style="color:var(--info);">abrir os avisos</a>` }); }
   // 12/11/2026 (dono 01:09): o que o robô conferiu na fonte e fechou (últimas 24 h)
   if (Array.isArray(conf)) conf.forEach((c) => add({ grupo: 'anda', dia: hoje, txt: `<span style="color:var(--farol-ok);">✓ conferido ${agHm(c.resolvido_em)}:</span> ${agE(c.o_que)}`, frente: c.frente }));
   // 2) reembolso que só eu aprovo (o da Hellen)
@@ -218,17 +224,22 @@ function agDesenhar() {
   const grp = (x) => x.grupo || (x.dep ? 'dep' : 'saber');
   const G = { dep: itens.filter((x) => grp(x) === 'dep'), anda: itens.filter((x) => grp(x) === 'anda'), saber: itens.filter((x) => grp(x) === 'saber') };
   let f = 'dep'; try { f = sessionStorage.getItem('agFiltro') || 'dep'; } catch (e) {}
-  if (!G[f]) f = 'dep';
+  if (AG_AVISOS_IR) { f = 'avisos'; AG_AVISOS_IR = false; }
+  if (!G[f] && f !== 'avisos') f = 'dep';
   const alvoIt = agItemAlvo(); if (alvoIt) { const k = ['dep', 'anda', 'saber'].find((g) => G[g].some((x) => x.id === alvoIt)); if (k) f = k; }
   const ROT = { dep: ['Depende de você', 'pede uma ação sua'], anda: ['Em andamento', 'respondido ou feito, esperando aplicar ou conferir'], saber: ['Para saber', 'sem ação sua'] };
   const corC = { dep: G.dep.length ? 'neg' : 'pos', anda: 'blue', saber: 'neutral' };
-  h += `<div class="cards cards-3 ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
-      <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${G[k].length}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}</div>`;
+  const nCard = (k) => k === 'dep' ? G.dep.length + Math.max(0, (AG.avEsp || 0) - 1) : G[k].length;   // os avisos contam um a um (eram cartões da agenda)
+  h += `<div class="cards ag-filtros">${['dep', 'anda', 'saber'].map((k) => `<div class="card ${corC[k]}" style="cursor:pointer;${f === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('${k}')">
+      <div class="card-lbl">${ROT[k][0]}</div><div class="card-val">${nCard(k)}</div><div class="card-pct">${ROT[k][1]}</div></div>`).join('')}
+    <div class="card ${AG.avEsp ? 'highlight' : 'neutral'}" style="cursor:pointer;${f === 'avisos' ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="agFiltrar('avisos')">
+      <div class="card-lbl">Avisos à equipe</div><div class="card-val">${AG.avEsp || 0}</div><div class="card-pct">esperando o seu "manda"</div></div></div>`;
   // 12/11/2026 (dono 15:43): "● N respostas novas" — a frente respondeu e o dono ainda não abriu o cartão; clicar filtra
   const novos = itens.filter((x) => x.pend && agRetNovo(x.pend));
   if (!novos.length) AG.soNovos = false;
   if (novos.length) h += `<div id="agRetCont" style="margin:6px 2px 0;"><a href="javascript:void(0)" onclick="agSoNovos(${AG.soNovos ? 'false' : 'true'})" style="color:var(--farol-fora);font-weight:700;text-decoration:none;">● ${novos.length} ${novos.length === 1 ? 'resposta nova' : 'respostas novas'}</a>${AG.soNovos ? ' <a href="javascript:void(0)" onclick="agSoNovos(false)" class="f">· ver tudo</a>' : ''}</div>`;
-  if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, '');
+  if (f === 'avisos' && !AG.soNovos) h += agAvisosHtml();
+  else if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, '');
   else h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
   alvo.innerHTML = h;
   agRolarAteItem();
@@ -236,6 +247,78 @@ function agDesenhar() {
   avisarCasca({ tipo: 'casca-sinal', nome: 'agenda', n: AG.sinal });
   agEquipeMontar().then(agGuia).then(() => agAtivMontar());
   agPlanoMontar();
+}
+// ---- ABA AVISOS (dono 13/11/2026 10:07: "um resumo dos avisos na agenda, uma aba só pra isso, talvez assim eu consiga autorizar
+// mais facilmente o que depende de mim, e vamos automatizando os que estiverem corretos"; proposta 2026-11-13-aba-avisos-agenda.md)
+let AG_AVISOS_IR = (() => { try { return new URLSearchParams(location.search).get('aba') === 'avisos'; } catch (e) { return false; } })();
+let AG_AV_FORM = null;   // { ref, dec: 'MUDA' | 'NAO' }
+function agAvisosHtml() {
+  const A = AG.avisos;
+  if (!A || A.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler os avisos${A && A.erro ? ': ' + agE(A.erro) : ''}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
+  const g = (n) => A.filter((a) => Number(a.grupo) === n);
+  const campo = 'width:100%;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:8px;font:inherit;';
+  let h = `<div class="ag-bloco">Esperando o seu "manda" <span class="f">· ${g(1).length}</span></div>`;
+  h += g(1).length ? g(1).map((a) => {
+    const est = a.estado === 'MUDAR' ? `<span style="color:var(--info);font-weight:700;">o chat Avisos está reescrevendo</span>${a.nota_dono ? ' · você pediu: ' + agE(a.nota_dono) : ''}`
+      : a.estado === 'APROVADO' ? `<span style="color:var(--farol-ok);font-weight:700;">aprovado</span>${a.espera_por ? ' · <b style="color:var(--farol-perto);">sai quando: ' + agE(a.espera_por) + '</b>' : ''}`
+      : '<span style="color:var(--farol-perto);font-weight:700;">esperando você</span>';
+    const fm = AG_AV_FORM && AG_AV_FORM.ref === a.ref ? AG_AV_FORM : null;
+    const bts = !a.botoes ? '' : fm
+      ? `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota" rows="2" placeholder="${fm.dec === 'MUDA' ? 'o que mudar no texto (obrigatório)' : 'por quê (opcional)'}" style="${campo}"></textarea>
+          <div style="margin-top:4px;display:flex;gap:6px;"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, '${fm.dec}')">${fm.dec === 'MUDA' ? 'Pedir a mudança' : 'Confirmar: não manda'}</button>
+          <button type="button" class="preset-btn" onclick="AG_AV_FORM=null;agDesenhar()">Voltar</button></div></div>`
+      : `<span class="bts"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, 'MANDA')">Manda</button>
+          <button type="button" class="preset-btn" onclick="AG_AV_FORM={ref:${Number(a.ref)},dec:'MUDA'};agDesenhar()">Muda o texto</button>
+          <button type="button" class="preset-btn" onclick="AG_AV_FORM={ref:${Number(a.ref)},dec:'NAO'};agDesenhar()">Não manda</button></span>`;
+    return `<div class="ag-lin ${a.estado === 'ESPERA' ? 'alerta' : ''}" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} <span class="f">${a.frente ? '· ' + agE(a.frente) : ''}</span> · ${est}
+        <div style="white-space:pre-wrap;margin:6px 0 2px;padding:8px 10px;background:var(--surface-2);border-radius:8px;color:var(--tx-1);">${agE(a.texto || '')}</div>
+        ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}</span>${bts}</div>`;
+  }).join('') : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nenhum aviso esperando você</span></div>';
+  // 2) automáticos validados
+  const G2 = g(2);
+  h += `<div class="ag-bloco">Automáticos validados <span class="f">· saem sozinhos; números da semana</span></div>`;
+  h += G2.length ? `<div id="tabelaAgAvAuto"><table><thead><tr><th>Assunto</th><th>Para quem</th><th>Quando sai</th><th>Enviados</th><th>Feitos</th><th>Travados</th><th>Abertos</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+    ${G2.map((a) => { const lig = a.estado !== 'DESLIGADO';
+      return `<tr><td style="white-space:normal;"><b>${agE(a.assunto || '')}</b>${a.texto ? `<div style="font-size:11.5px;color:var(--tx-4);">${agE(a.texto)}</div>` : ''}</td><td>${agE(a.para_quem || '')}</td>
+        <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td><td>${Number(a.enviados_7d) || 0}</td><td style="color:var(--farol-ok);">${Number(a.feitos_7d) || 0}</td>
+        <td style="color:${Number(a.travados_7d) ? 'var(--farol-fora)' : 'var(--tx-4)'};">${Number(a.travados_7d) || 0}</td><td>${Number(a.abertos) || 0}</td>
+        <td style="color:${lig ? 'var(--farol-ok)' : 'var(--tx-4)'};font-weight:700;">${lig ? 'ligado' : 'desligado'}</td>
+        <td>${lig ? (a.pode_parar ? `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, false)">Parar</button>` : '') : `<button type="button" class="preset-btn" onclick="agAvLigar(${agE(JSON.stringify(a.tipo))}, true)">Ligar</button>`}</td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="caption-label" style="text-align:left;">Nenhum aviso automático ainda: o primeiro "Manda" de um tipo liga o automático dele.</div>';
+  // 3) enviados e travados (7 dias): Travada primeiro
+  const ordem = { Travada: 0, Esperando: 1, Respondeu: 2, Feita: 3, Cancelada: 4 };
+  const G3 = g(3).slice().sort((x, y) => (ordem[x.estado] ?? 9) - (ordem[y.estado] ?? 9) || String(y.quando || '').localeCompare(String(x.quando || '')));
+  const cor3 = { Travada: 'var(--farol-fora)', Esperando: 'var(--farol-perto)', Respondeu: 'var(--info)', Feita: 'var(--farol-ok)', Cancelada: 'var(--tx-5)' };
+  h += `<div class="ag-bloco">Enviados e travados <span class="f">· últimos 7 dias · ${G3.length}</span></div>`;
+  h += G3.length ? `<div id="tabelaAgAvEnviados"><table><thead><tr><th>Quando</th><th>Para quem</th><th>Assunto</th><th>Situação</th><th>Como saiu</th><th>Resposta</th></tr></thead><tbody>
+    ${G3.map((a) => `<tr><td style="white-space:nowrap;">${a.quando ? agDm(new Date(a.quando).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })) + ' ' + agHm(a.quando) : '–'}</td>
+      <td>${agE(a.para_quem || '')}</td><td style="white-space:normal;">${agE(a.assunto || '')}</td>
+      <td style="color:${cor3[a.estado] || 'var(--tx-3)'};font-weight:700;">${agE(String(a.estado || '').toLowerCase())}</td><td style="font-size:12px;">${agE(a.tipo || '')}</td>
+      <td style="white-space:normal;font-size:12.5px;">${agE(a.por_que || '')}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="caption-label" style="text-align:left;">Nada enviado nos últimos 7 dias.</div>';
+  return h;
+}
+async function agAvFrase(r) { try { const j = await r.json(); return typeof j === 'string' ? j : (j && (j.frase || j.mensagem || j.msg)) || ''; } catch (e) { return ''; } }
+async function agAvDecidir(ref, dec) {
+  const nota = ((document.getElementById('agAvNota') || {}).value || '').trim();
+  if (dec === 'MUDA' && !nota) return avisoAcao('atencao', '! Escreva o que mudar no texto.');
+  avisoAcao('enviando', dec === 'MANDA' ? 'Aprovando o aviso…' : dec === 'MUDA' ? 'Pedindo a mudança…' : 'Registrando que não vai…');
+  const r = await trRpcSeguro('wa_rascunho_decidir', { p_id: ref, p_decisao: dec, p_nota: nota || null });
+  if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => agAvDecidir(ref, dec));
+  const fr = await agAvFrase(r);
+  AG_AV_FORM = null;
+  avisoAcao('ok', `✓ ${fr || (dec === 'MANDA' ? 'Aprovado.' : dec === 'MUDA' ? 'O chat Avisos vai reescrever.' : 'Não vai.')} — às ${avisoHora()}.`);
+  try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
+  await entrarAgenda(true);
+}
+async function agAvLigar(tipo, ativo) {
+  avisoAcao('enviando', ativo ? 'Ligando o automático…' : 'Parando o automático…');
+  const r = await trRpcSeguro('wa_aviso_tipo_ligar', { p_tipo: tipo, p_ativo: ativo });
+  if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => agAvLigar(tipo, ativo));
+  const fr = await agAvFrase(r);
+  avisoAcao('ok', `✓ ${fr || (ativo ? 'Automático ligado.' : 'Automático parado.')} — às ${avisoHora()}.`);
+  try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
+  await entrarAgenda(true);
 }
 function agFiltrar(k) { AG.soNovos = false; try { sessionStorage.setItem('agFiltro', k); } catch (e) {} agDesenhar(); }
 // 12/11/2026 (dono 15:43, proposta 2026-11-12-agenda-bolinha-retorno): bolinha vermelha quando a frente respondeu o cartão
