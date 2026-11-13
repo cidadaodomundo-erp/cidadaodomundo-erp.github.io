@@ -8470,23 +8470,28 @@ function fxlDiasAte() {
   return n;
 }
 
+let FXL_ERRO = null;
 async function fxlCarregar() {
   // 23/10/2026 (Financeiro): UMA chamada, a mesma foto das tres partes. A leitura paginada de antes (order=dia, nao unico)
   // podia repetir uma linha e perder outra entre as paginas — o quadro somaria errado.
-  try {
-    const r = await trRpc('fin_fluxo_limpo', { p_dias: 90 });
-    if (r.ok) { const j = await r.json(); FXL = fxlMontar(j.partida || [], j.dia0 || [], j.detalhe || []); await fxlMarcas(j.partida); return; }
-    console.warn('fin_fluxo_limpo respondeu', r.status, '— leitura de reserva');
-  } catch (e) { console.warn('fin_fluxo_limpo falhou — leitura de reserva:', e.message); }
-  try {
-    const [par, tit, det] = await Promise.all([
-      consultarTudo('vw_fin_saldo_partida?select=conta,unidade,data_partida,saldo_partida'),
-      consultarTudo('vw_fin_dia0_titulos?select=*'),
-      consultarTudo(`vw_fin_previsto_detalhe?select=*&dia=lte.${fxSomaDias(prdHoje(), 90)}&order=dia,unidade,conta,origem,id_titulo,descricao_tela,valor`),
-    ]);
-    FXL = fxlMontar(par, tit, det);
-    await fxlMarcas();
-  } catch (e) { console.warn('Fluxo limpo sem as views novas:', e.message); FXL = null; }
+  // 13/11/2026 (Financeiro, proposta 2026-11-13-fluxo-sem-leitura-de-reserva): sem a reserva paginada de vw_fin_previsto_detalhe
+  // (6 paginas, cada uma recalculando a projecao inteira = ~90 s). A RPC tenta duas vezes; falhou, a tela diz e oferece tentar de novo.
+  let motivo = '';
+  for (let t = 0; t < 2; t++) {
+    try {
+      const r = await trRpc('fin_fluxo_limpo', { p_dias: 90 });
+      if (r.ok) { const j = await r.json(); FXL = fxlMontar(j.partida || [], j.dia0 || [], j.detalhe || []); FXL_ERRO = null; await fxlMarcas(j.partida); return; }
+      motivo = r.status === 500 || r.status === 503 || r.status === 504 ? 'o banco demorou demais para responder' : 'o banco respondeu ' + r.status;
+    } catch (e) { motivo = 'sem conexão com o banco'; }
+    console.warn('fin_fluxo_limpo falhou (tentativa ' + (t + 1) + '):', motivo);
+  }
+  FXL = null; FXL_ERRO = motivo || 'não sei o motivo';
+}
+async function fxlTentarDeNovo() {
+  const a = document.getElementById('fxlErro');
+  if (a) a.innerHTML = 'Lendo o Fluxo de novo…';
+  await fxlCarregar();
+  renderModuloProjecao();
 }
 
 // 24/10/2026: as contas cujo saldo inicial vem de extrato PARCIAL ou atrasado. Desde a correção do Financeiro (24/10, tarde),
@@ -8933,7 +8938,7 @@ function renderModuloProjecao() {
   alvo.innerHTML = plcCabecalhoQuebra('projecao') + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Fluxo projetado</div>
   <div class="caption-label" style="text-align:center;">Quanto tem, o que sai e o que entra, por loja e na Rede.</div>
-  ${FXL ? `<div id="fxlWrap">${blocoFluxoLimpo()}</div><div id="projDiaWrap" style="display:none;"></div>` : `${blocoCaixaHoje()}
+  ${FXL ? `<div id="fxlWrap">${blocoFluxoLimpo()}</div><div id="projDiaWrap" style="display:none;"></div>` : FXL_ERRO ? `<div class="contexto" id="fxlErro" style="text-align:left; border-color:var(--farol-fora);">✗ O Fluxo não carregou: ${FXL_ERRO}. <button class="preset-btn" onclick="fxlTentarDeNovo()">Tentar de novo</button></div><div id="projDiaWrap" style="display:none;"></div>` : `${blocoCaixaHoje()}
   <div id="projDiaWrap">${blocoSaldoDiaADia()}</div>`}
   <div class="section-label">${FXL ? `Saldo final de cada dia — próximos ${FXL.dias.length - 1} dias` : `Os próximos ${HORIZONTE} dias`}</div>
   <div style="height:260px; margin:6px 0 14px;"><canvas id="chartProjecao"></canvas></div>
