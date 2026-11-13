@@ -122,6 +122,28 @@ test('modelo 13/11: fim do turno — última entrega, último pátio e "foi embo
   assert.equal(M.filaFonte(linha({ chegada_fila_fonte: 'outra' })), null);
 });
 
+test('render 13/11: embaixo da chegada observada, a primeira vez no pátio pelo GPS, rotulada; sem dado vira pendência', () => {
+  const ver = (o) => {
+    const h = T.renderizar({ fase: 'ok', resp: resposta(HOJE, [unidade('AHU', { linhas: [linha(o)] })]) }, { M, loja: 'AHU', lojas: ['AHU'], lojaNome: (l) => l });
+    return (/<td data-rot="Chegada observada">([\s\S]*?)<\/td>/.exec(h) || [])[1];
+  };
+  // fila e GPS: a fila continua sendo a chegada observada; o GPS aparece embaixo, separado
+  let cel = ver({ patio_gps_txt: '10:55:30' });
+  assert.match(cel, /<span class="cg-hora">10:58:12<\/span><small class="cg-motivo cg-f-fila">Fila do TrackEat<\/small>/);
+  assert.match(cel, /Primeira vez no pátio \(GPS\) <strong>10:55:30<\/strong>/);
+  // fila sem GPS: pendência visível, nenhuma hora inventada
+  cel = ver({});
+  assert.match(cel, /Primeira vez no pátio \(GPS\) <span class="cg-fraco">sem dado<\/span>/);
+  // só GPS: ele já é a chegada observada, não repete embaixo
+  cel = ver({ chegada_fila_txt: null, patio_gps_txt: '10:59:00' });
+  assert.match(cel, /<span class="cg-hora">10:59:00<\/span><small class="cg-motivo cg-f-patio_gps">Pátio \(GPS\)<\/small>/);
+  assert.doesNotMatch(cel, /Primeira vez no pátio/);
+  // sem chegada nenhuma: continua "não é falta confirmada" e mostra a pendência do GPS
+  cel = ver({ chegada_fila_txt: null });
+  assert.match(cel, /Sem chegada registrada/);
+  assert.match(cel, /Primeira vez no pátio \(GPS\) <span class="cg-fraco">sem dado<\/span>/);
+});
+
 test('render 13/11: saída registrada intacta, duas linhas rotuladas embaixo, estimativa marcada, pendência sem dado', () => {
   const l1 = linha({ saida_registrada_txt: null, ultima_entrega_txt: '14:40', ultimo_patio_txt: '14:55', ultimo_sinal_txt: '14:58', chegada_fila_fonte: 'site' });
   const h = T.renderizar({ fase: 'ok', resp: resposta('2026-11-10', [unidade('AHU', { ao_vivo: false, linhas: [l1] })]) }, { M, loja: 'AHU', lojas: ['AHU'], lojaNome: (l) => l });
