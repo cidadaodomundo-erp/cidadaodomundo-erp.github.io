@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Temperaturas das câmaras · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- TEMPERATURAS DAS CÂMARAS FRIAS (12/11/2026, ordem do Fábio; frente 183). Só leitura. Mostra o que o coletor da
+     Jaalee (PC da loja, a cada 5 min) gravou no ERP: nome da câmara, loja, temperatura, hora da medição e faixa.
+     Lê pela RPC erp_camaras_ler (mesma regra de acesso de erp_reservas_ler). Nenhuma senha, token ou identificador
+     de sensor passa por esta tela. Dado velho nunca aparece como verde. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .tc-topo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:8px 0 14px; }
+  .tc-topo h1 { font-size:20px; margin:0; }
+  .tc-topo button { font:inherit; padding:7px 14px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; font-weight:700; }
+  .tc-grade { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; }
+  .tc-card { border-radius:16px; padding:18px; border:2px solid #555; background:rgba(127,127,127,.08); display:flex; flex-direction:column; gap:6px; }
+  .tc-nome { font-size:19px; font-weight:800; }
+  .tc-loja { font-size:12px; opacity:.7; text-transform:uppercase; letter-spacing:.5px; }
+  .tc-temp { font-size:46px; font-weight:800; line-height:1.1; margin:6px 0 2px; font-variant-numeric:tabular-nums; }
+  .tc-selo { align-self:flex-start; border-radius:999px; padding:4px 12px; font-weight:800; font-size:13px; background:#555; color:#fff; }
+  .tc-aviso { font-size:13px; opacity:.9; }
+  .tc-linha { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; border-top:1px solid rgba(127,127,127,.25); padding-top:6px; margin-top:2px; }
+  .tc-linha span { opacity:.7; }
+  .tc-ok { border-color:#2e9e5b; } .tc-ok .tc-selo { background:#2e9e5b; }
+  .tc-atencao { border-color:#e0a33a; } .tc-atencao .tc-selo { background:#e0a33a; color:#111; }
+  .tc-fora { border-color:#e5484d; background:rgba(229,72,77,.12); } .tc-fora .tc-selo { background:#e5484d; }
+  .tc-velho { border-color:#e0a33a; border-style:dashed; } .tc-velho .tc-selo { background:#e0a33a; color:#111; } .tc-velho .tc-temp { opacity:.45; }
+  .tc-manut { border-color:#777; border-style:dashed; } .tc-manut .tc-selo { background:#777; } .tc-manut .tc-temp { opacity:.45; font-size:30px; }
+  .tc-banner { border-radius:12px; padding:12px 14px; margin:0 0 14px; font-size:14px; font-weight:600; }
+  .tc-b-ok { background:rgba(46,158,91,.12); border:1px solid #2e9e5b; }
+  .tc-b-velho { background:rgba(224,163,58,.18); border:2px solid #e0a33a; font-weight:800; }
+  .tc-nota { font-size:12px; opacity:.7; margin:14px 0 0; line-height:1.45; }
+  .tc-erro { border:1px solid #e5484d; border-radius:12px; padding:14px; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="tc-topo">
+      <h1>🌡️ Temperaturas das câmaras</h1>
+      <button type="button" id="btnAtualizar">Atualizar</button>
+    </div>
+    <div id="conteudo"><div class="tc-nota">Carregando…</div></div>
+    <p class="tc-nota" id="rodape"></p>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/telas-extra.js?v=20261106a"></script>
+<script>
+const TELA = 'temperaturas';
+const esc = trEscH;
+// ---- desenho dos cartões (igual nos dois portais) ----
+function tfmt(v) { return v == null ? '—' : Number(v).toFixed(1).replace('.', ',') + ' °C'; }
+function nfmt(v) { return String(Number(v)).replace('.', ','); }
+function faixaTexto(c) {
+  if (c.faixa_min == null) return 'sempre abaixo de ' + nfmt(c.teto) + ' °C';
+  return nfmt(c.faixa_min) + ' a ' + nfmt(c.faixa_max) + ' °C (teto ' + nfmt(c.teto) + ' °C)';
+}
+function horaCurtaT(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts), tz = { timeZone: 'America/Sao_Paulo' };
+  const hora = d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, tz));
+  const dia = d.toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, tz));
+  const hoje = new Date().toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, tz));
+  return dia === hoje ? hora : dia + ' às ' + hora;
+}
+function haQuanto(min) {
+  if (min < 1) return 'agora há pouco';
+  if (min < 60) return 'há ' + Math.round(min) + ' min';
+  if (min < 1440) return 'há ' + Math.floor(min / 60) + 'h' + String(Math.round(min % 60)).padStart(2, '0');
+  return 'há ' + Math.floor(min / 1440) + ' dia(s)';
+}
+// Estado de uma câmara. Nunca mostra verde com dado velho ou sem leitura.
+function estadoCamara(c, agoraMs, velhoMin) {
+  if (!c.ativa) return { cls: 'tc-manut', rotulo: c.situacao ? c.situacao.charAt(0).toUpperCase() + c.situacao.slice(1) : 'Desligada', aviso: 'Sem aviso enquanto estiver desligada.' };
+  if (c.temperatura == null || !c.medido_em) return { cls: 'tc-velho', rotulo: 'Sem leitura', aviso: 'O sensor ainda não mandou temperatura.' };
+  const idade = (agoraMs - new Date(c.medido_em).getTime()) / 60000;
+  if (!(idade <= velhoMin)) return { cls: 'tc-velho', rotulo: 'Dado velho', aviso: 'Última medição ' + haQuanto(idade) + '. Não dá para saber como está agora.' };
+  const t = Number(c.temperatura);
+  if (t > Number(c.teto) || (c.faixa_min != null && t < Number(c.faixa_min))) return { cls: 'tc-fora', rotulo: 'Fora da faixa', aviso: '' };
+  if (c.faixa_min != null && t > Number(c.faixa_max)) return { cls: 'tc-atencao', rotulo: 'Atenção', aviso: 'Acima do ideal, mas ainda abaixo do teto.' };
+  return { cls: 'tc-ok', rotulo: 'Dentro da faixa', aviso: '' };
+}
+function desenharCamaras(dados, esc) {
+  const agora = Date.now();
+  const velhoMin = Number(dados.velho_min) || 15;
+  const cams = Array.isArray(dados.camaras) ? dados.camaras : [];
+  const ativas = cams.filter((c) => c.ativa);
+  const maisNova = ativas.reduce((m, c) => (c.medido_em && new Date(c.medido_em).getTime() > m ? new Date(c.medido_em).getTime() : m), 0);
+  let topo = '';
+  if (!cams.length) topo = '<div class="tc-banner tc-b-velho">Nenhuma câmara cadastrada.</div>';
+  else if (!maisNova) topo = '<div class="tc-banner tc-b-velho">⚠️ Ainda não chegou nenhuma medição. O coletor pode estar desligado.</div>';
+  else if ((agora - maisNova) / 60000 > velhoMin) topo = '<div class="tc-banner tc-b-velho">⚠️ DADO VELHO — a última medição foi ' + esc(haQuanto((agora - maisNova) / 60000)) + ' (' + esc(horaCurtaT(maisNova)) + '). O coletor parou de mandar. As temperaturas abaixo NÃO são as de agora.</div>';
+  else topo = '<div class="tc-banner tc-b-ok">Atualizado: última medição às ' + esc(horaCurtaT(maisNova)) + '. O coletor lê a cada 5 minutos.</div>';
+  const cartoes = cams.map((c) => {
+    const e = estadoCamara(c, agora, velhoMin);
+    const m24 = (c.ativa && c.min24 != null) ? '<div class="tc-linha"><span>Últimas 24h</span><b>' + esc(tfmt(c.min24)) + ' a ' + esc(tfmt(c.max24)) + '</b></div>' : '';
+    return '<div class="tc-card ' + e.cls + '">' +
+      '<div class="tc-nome">' + esc(c.nome) + '</div><div class="tc-loja">' + esc(c.loja) + '</div>' +
+      '<div class="tc-temp">' + esc(tfmt(c.temperatura)) + '</div>' +
+      '<div class="tc-selo">' + esc(e.rotulo) + '</div>' +
+      (e.aviso ? '<div class="tc-aviso">' + esc(e.aviso) + '</div>' : '') +
+      '<div class="tc-linha"><span>Medido</span><b>' + esc(horaCurtaT(c.medido_em)) + '</b></div>' +
+      '<div class="tc-linha"><span>Faixa certa</span><b>' + esc(faixaTexto(c)) + '</b></div>' + m24 +
+      '</div>';
+  }).join('');
+  return topo + '<div class="tc-grade">' + cartoes + '</div>';
+}
+
+let ULTIMO = null;
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+function mostrarErro(txt) {
+  document.getElementById('conteudo').innerHTML = '<div class="tc-erro">' + esc(txt) + '</div>';
+  document.getElementById('rodape').textContent = '';
+  ULTIMO = null;   // falha não pode ser apagada pelo repintar automático
+}
+let ULTIMA_REQ = 0;
+async function carregar() {
+  const minhaReq = ++ULTIMA_REQ;
+  let r;
+  try { r = await trRpcSeguro('erp_camaras_ler', {}); }
+  catch (e) { if (minhaReq === ULTIMA_REQ) mostrarErro('Não foi possível consultar agora. As temperaturas não foram atualizadas.'); return; }
+  if (minhaReq !== ULTIMA_REQ) return;
+  if (r.status === 401) { exigirLogin('Entre de novo para ver as temperaturas.'); return; }
+  if (r.status === 403) { mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.'); return; }
+  if (r.status === 404) { mostrarErro('Esta consulta ainda não está disponível no servidor.'); return; }
+  if (!r.ok) { mostrarErro('Não foi possível completar a consulta agora. Tente novamente.'); return; }
+  let dados;
+  try { dados = await r.json(); } catch (e) { if (minhaReq === ULTIMA_REQ) mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (minhaReq !== ULTIMA_REQ) return;
+  if (!dados || !Array.isArray(dados.camaras)) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  ULTIMO = dados;
+  pintar();
+}
+function pintar() {
+  if (!ULTIMO) return;
+  document.getElementById('conteudo').innerHTML = desenharCamaras(ULTIMO, esc);
+  const f = ULTIMO.fonte || {};
+  let rod = 'Fonte: sensores Jaalee da Água Verde, gravados no ERP pelo coletor a cada 5 minutos. Consultado às ' + horaCurtaT(ULTIMO.consultado_em) + '.';
+  if (f.ultimo_status && f.ultimo_status !== 'OK' && f.ultima_tentativa) rod += ' ⚠️ A última tentativa do coletor falhou às ' + horaCurtaT(f.ultima_tentativa) + '.';
+  rod += ' Avisa nos grupos só depois de ' + (ULTIMO.minutos_fora || 30) + ' minutos seguidos fora da faixa.';
+  document.getElementById('rodape').textContent = rod;
+}
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+if (!rmbSessao()) exigirLogin('Entre para ver as temperaturas.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  carregar();
+  setInterval(() => { if (!document.hidden) carregar(); }, 60000);
+  setInterval(pintar, 30000);   // reavalia "dado velho" mesmo sem resposta nova
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>
