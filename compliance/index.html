@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Documentos e renovações · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- DOCUMENTOS E RENOVAÇÕES (frente Compliance, sex 13/11/2026; dono 02:46 e agenda #569 14:16: "entregamos uma tela completa para
+     acompanhamento e controle"; proposta contexto/propostas-telas/2026-11-13-compliance-renovacoes.md).
+     Lê vw_cmp_renovacao (filial só vê a própria). "Minha lista" = responsavel_email do login. Grava por cmp_renovacao_registrar
+     (Fiz em → próximo pela periodicidade) e cmp_renovacao_nao_se_aplica. Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .cp-campo { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-compliance" class="modulo" style="display:none;"><div id="view-compliance"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const CP = { L: null, erro: null, minha: null, filtro: null, loja: null, aberto: null, form: null };
+const cpE = (s) => trEscH(String(s == null ? '' : s));
+const cpD = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '–';
+const cpHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+const cpMais = (iso, dias) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + Number(dias)); return d.toLocaleDateString('en-CA'); };
+const cpLoja = (u) => ({ 'AGUA VERDE': 'Água Verde', AHU: 'Ahú', 'SÃO BRAZ': 'São Braz', BOQUEIRAO: 'Boqueirão', REDE: 'Rede (CNPJ/geral)' }[u] || u || '');
+const cpQuem = (e) => e ? String(e).split('@')[0].replace(/^./, (c) => c.toUpperCase()) : '';
+const CP_GRUPO = { VENCIDO: 'venc', 'VENCE EM 7 DIAS': 'vai', 'VENCE EM 30 DIAS': 'vai', 'VENCE EM 60 DIAS': 'vai', 'DATA DESCONHECIDA': 'sem', 'SEM VENCIMENTO': 'ok', 'EM DIA': 'ok' };
+const CP_COR = { venc: 'var(--farol-fora)', vai: 'var(--farol-perto)', sem: 'var(--tx-3)', ok: 'var(--farol-ok)' };
+const CP_FREQ = { LEI: 'lei', CONTRATO: 'contrato', DOCUMENTO: 'documento', SUGERIDA: 'sugerido' };
+
+async function entrarCompliance() {
+  const alvo = document.getElementById('view-compliance');
+  if (!CP.L) alvo.innerHTML = '<h2>Documentos e renovações</h2><div class="contexto">Carregando…</div>';
+  try { CP.L = await consultarTudo('vw_cmp_renovacao?select=*&order=id'); CP.erro = null; }
+  catch (e) { CP.erro = e.message; }
+  const eu = String((rmbSessao() || {}).email || '').toLowerCase();
+  if (CP.minha === null) CP.minha = !!(CP.L || []).some((x) => String(x.responsavel_email || '').toLowerCase() === eu);
+  cpDesenhar();
+}
+function cpDiasTxt(x) {
+  const n = Number(x.dias_para_vencer);
+  if (x.dias_para_vencer == null || !x.vencimento) return '';
+  return n < 0 ? `venceu há ${-n} ${n === -1 ? 'dia' : 'dias'}` : n === 0 ? 'vence hoje' : `faltam ${n} ${n === 1 ? 'dia' : 'dias'}`;
+}
+function cpDesenhar() {
+  const alvo = document.getElementById('view-compliance');
+  if (CP.erro) { alvo.innerHTML = `<h2>Documentos e renovações</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler: ${cpE(CP.erro)} <button type="button" class="preset-btn" onclick="entrarCompliance()">Tentar de novo</button></div>`; return; }
+  const eu = String((rmbSessao() || {}).email || '').toLowerCase();
+  const base = (CP.L || []).filter((x) => !CP.minha || String(x.responsavel_email || '').toLowerCase() === eu);
+  const daLoja = base.filter((x) => !CP.loja || x.unidade === CP.loja);
+  const g = (k) => daLoja.filter((x) => CP_GRUPO[x.situacao] === k).length;
+  const vis = daLoja.filter((x) => !CP.filtro || CP_GRUPO[x.situacao] === CP.filtro)
+    .sort((a, b) => (CP.minha ? (CP_GRUPO[a.situacao] === 'sem' ? 0 : 1) - (CP_GRUPO[b.situacao] === 'sem' ? 0 : 1) : 0)
+      || (a.dias_para_vencer == null ? 1e6 : Number(a.dias_para_vencer)) - (b.dias_para_vencer == null ? 1e6 : Number(b.dias_para_vencer))
+      || String(a.item).localeCompare(String(b.item), 'pt-BR'));
+  const card = (k, cls, rot, sub) => `<div class="card ${cls}" style="cursor:pointer;${CP.filtro === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CP.filtro=CP.filtro==='${k}'?null:'${k}';cpDesenhar()">
+      <div class="card-lbl">${rot}</div><div class="card-val">${g(k)}</div><div class="card-pct">${sub}</div></div>`;
+  const lojas = [...new Set(base.map((x) => x.unidade))].sort();
+  let h = `<h2>Documentos e renovações</h2>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;">
+      <button type="button" class="preset-btn${CP.minha ? ' active' : ''}" onclick="CP.minha=true;cpDesenhar()">Minha lista</button>
+      <button type="button" class="preset-btn${CP.minha ? '' : ' active'}" onclick="CP.minha=false;cpDesenhar()">Todos</button>
+      <span style="width:12px;"></span>
+      ${lojas.length > 1 ? lojas.map((u) => `<button type="button" class="preset-btn${CP.loja === u ? ' active' : ''}" onclick="CP.loja=CP.loja==='${cpE(u)}'?null:'${cpE(u)}';cpDesenhar()">${cpE(cpLoja(u))}</button>`).join('') : ''}</div>
+    <div class="cards">${card('venc', g('venc') ? 'neg' : 'pos', 'Vencidos', 'renovar já')}${card('vai', g('vai') ? 'highlight' : 'neutral', 'Vencem em 60 dias', 'programar')}${card('sem', g('sem') ? 'highlight' : 'neutral', 'Sem data', 'diga quando foi feito')}${card('ok', 'pos', 'Em dia', 'nada a fazer')}</div>`;
+  if (CP.minha && !base.length) h += `<div class="contexto" style="text-align:left;">Nada na sua lista. <a href="javascript:void(0)" onclick="CP.minha=false;cpDesenhar()" style="color:var(--info);">ver todos</a></div>`;
+  h += `<div id="tabelaCompliance"><table><thead><tr><th>Item</th><th>Loja</th><th>Vence em</th><th>Situação</th><th>Responsável</th><th>Ação</th></tr></thead><tbody>
+    ${vis.length ? vis.map((x) => cpLinha(x)).join('') : '<tr><td colspan="6">Nada neste filtro.</td></tr>'}</tbody></table></div>`;
+  alvo.innerHTML = h;
+}
+function cpLinha(x) {
+  const k = CP_GRUPO[x.situacao] || 'ok', ab = CP.aberto === x.id, f = CP.form && CP.form.id === x.id ? CP.form : null;
+  const prazo = Number(x.periodicidade_dias) ? `a cada ${Number(x.periodicidade_dias) % 30 === 0 && Number(x.periodicidade_dias) >= 30 ? (Number(x.periodicidade_dias) / 30) + (Number(x.periodicidade_dias) === 30 ? ' mês' : ' meses') : x.periodicidade_dias + ' dias'}` : '';
+  const acao = f ? '' : `<button type="button" class="preset-btn active" onclick="cpForm(${Number(x.id)}, 'FIZ')">Fiz em…</button>
+    <button type="button" class="preset-btn" onclick="cpForm(${Number(x.id)}, 'NAO')">Não se aplica</button>`;
+  let h = `<tr${ab || f ? ' class="sub"' : ''}><td style="white-space:normal;cursor:pointer;" onclick="CP.aberto=CP.aberto===${Number(x.id)}?null:${Number(x.id)};cpDesenhar()">${ab ? '▾' : '▸'} <b>${cpE(x.item)}</b>
+      ${prazo ? `<div style="font-size:11.5px;color:var(--tx-4);">${prazo}${x.freq_fonte ? ' · ' + cpE(CP_FREQ[x.freq_fonte] || String(x.freq_fonte).toLowerCase()) : ''}</div>` : ''}</td>
+    <td>${cpE(cpLoja(x.unidade))}</td>
+    <td style="white-space:nowrap;">${x.vencimento ? cpD(x.vencimento) + `<div style="font-size:11.5px;color:${CP_COR[k]};">${cpDiasTxt(x)}</div>` : '–'}</td>
+    <td style="color:${CP_COR[k]};font-weight:700;">${cpE(String(x.situacao || '').toLowerCase())}</td>
+    <td>${cpE(cpQuem(x.responsavel_email) || x.responsavel || '')}</td>
+    <td style="white-space:nowrap;">${acao}</td></tr>`;
+  if (f) {
+    const venc = f.venc || (Number(x.periodicidade_dias) ? cpMais(f.feito || cpHoje(), x.periodicidade_dias) : '');
+    h += `<tr><td colspan="6" style="white-space:normal;">${f.tipo === 'FIZ'
+      ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+          <label style="font-size:11.5px;color:var(--tx-4);display:flex;flex-direction:column;gap:2px;">Feito em<input id="cpFeito" type="date" class="cp-campo" value="${cpE(f.feito || cpHoje())}" onchange="CP.form.feito=this.value;CP.form.venc=null;cpDesenhar()"></label>
+          <label style="font-size:11.5px;color:var(--tx-4);display:flex;flex-direction:column;gap:2px;">Próximo vencimento${Number(x.periodicidade_dias) ? ' (pelo prazo)' : ' (está no documento)'}<input id="cpVenc" type="date" class="cp-campo" value="${cpE(venc)}" onchange="CP.form.venc=this.value"></label>
+          <label style="font-size:11.5px;color:var(--tx-4);display:flex;flex-direction:column;gap:2px;flex:1 1 200px;">Documento (link, opcional)<input id="cpDoc" class="cp-campo" placeholder="link do Drive"></label>
+          <button type="button" class="preset-btn active" onclick="cpGravarFiz(${Number(x.id)})">Gravar</button>
+          <button type="button" class="preset-btn" onclick="CP.form=null;cpDesenhar()">Voltar</button></div>`
+      : `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+          <label style="font-size:11.5px;color:var(--tx-4);display:flex;flex-direction:column;gap:2px;flex:1 1 260px;">Por que não se aplica nesta loja?<input id="cpMotivo" class="cp-campo" placeholder="ex.: a loja não tem fritadeira"></label>
+          <button type="button" class="preset-btn" style="color:var(--farol-fora);" onclick="cpGravarNao(${Number(x.id)})">Tirar da lista</button>
+          <button type="button" class="preset-btn" onclick="CP.form=null;cpDesenhar()">Voltar</button></div>`}</td></tr>`;
+  } else if (ab) {
+    h += `<tr><td colspan="6" style="white-space:normal;font-size:12.5px;">
+      ${x.orgao ? `<div><b>Órgão:</b> ${cpE(x.orgao)}</div>` : ''}
+      ${x.como_renovar ? `<div><b>Como renovar:</b> ${cpE(x.como_renovar)}</div>` : ''}
+      ${x.ultima_data ? `<div><b>Última vez:</b> ${cpD(x.ultima_data)}</div>` : ''}
+      ${x.freq_referencia ? `<div style="color:var(--tx-4);">Prazo: ${cpE(x.freq_referencia)}</div>` : ''}
+      ${x.razao_social || x.cnpj ? `<div style="color:var(--tx-4);">${cpE(x.razao_social || '')}${x.cnpj ? ' · CNPJ ' + cpE(x.cnpj) : ''}</div>` : ''}
+      ${x.documento ? `<div><b>Documento:</b> ${/^https?:/.test(x.documento) ? `<a href="${cpE(x.documento)}" target="_blank" rel="noopener" style="color:var(--info);">abrir</a>` : cpE(x.documento)}</div>` : ''}
+      ${x.obs ? `<div style="color:var(--tx-4);">${cpE(x.obs)}</div>` : ''}</td></tr>`;
+  }
+  return h;
+}
+function cpForm(id, tipo) { CP.form = { id, tipo, feito: null, venc: null }; CP.aberto = null; cpDesenhar(); }
+async function cpGravarFiz(id) {
+  const feito = (document.getElementById('cpFeito') || {}).value, venc = (document.getElementById('cpVenc') || {}).value, doc = ((document.getElementById('cpDoc') || {}).value || '').trim();
+  if (!feito) return avisoAcao('atencao', '! Diga em que dia foi feito.');
+  if (feito > cpHoje()) return avisoAcao('atencao', '! A data feita não pode ser depois de hoje.');
+  avisoAcao('enviando', 'Gravando…');
+  const r = await trRpcSeguro('cmp_renovacao_registrar', { p_id: id, p_ultima: feito, p_vencimento: venc || null, p_documento: doc || null, p_obs: null });
+  if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => cpGravarFiz(id));
+  let fr = ''; try { fr = await r.json(); } catch (e) {}
+  CP.form = null;
+  avisoAcao('ok', `✓ ${typeof fr === 'string' && fr ? fr : 'Gravado.'} — às ${avisoHora()}.`);
+  await entrarCompliance();
+}
+async function cpGravarNao(id) {
+  const m = ((document.getElementById('cpMotivo') || {}).value || '').trim();
+  if (!m) return avisoAcao('atencao', '! Diga por que não se aplica.');
+  avisoAcao('enviando', 'Gravando…');
+  const r = await trRpcSeguro('cmp_renovacao_nao_se_aplica', { p_id: id, p_motivo: m });
+  if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => cpGravarNao(id));
+  let fr = ''; try { fr = await r.json(); } catch (e) {}
+  CP.form = null;
+  avisoAcao('ok', `✓ ${typeof fr === 'string' && fr ? fr : 'Saiu da lista.'} — às ${avisoHora()}.`);
+  await entrarCompliance();
+}
+
+const TELA = 'compliance';
+let MODULO_ATUAL = 'compliance';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-compliance').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarCompliance(); };
+entrarCompliance();
+</script>
+</body>
+</html>

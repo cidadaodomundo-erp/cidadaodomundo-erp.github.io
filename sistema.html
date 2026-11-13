@@ -256,10 +256,10 @@
 </div>
 
 <script src="casca/menu.js?v=20261113rh"></script>
-<script src="casca/paginas.js?v=20261113cc"></script>
-<script src="casca/modulos.js?v=20261113cc"></script>
+<script src="casca/paginas.js?v=20261113cp"></script>
+<script src="casca/modulos.js?v=20261113cp"></script>
 <script src="casca/setores-fabio.js?v=20261113a"></script>
-<script src="casca/busca.js?v=20261113cc"></script>
+<script src="casca/busca.js?v=20261113cp"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -479,6 +479,8 @@ function visivel(chave) {
   if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');
   // 13/11/2026: Compra no cartão abre para todo login; o banco decide o que cada um vê (fin_cartao_meus_cartoes: filial só o cartão da loja)
   if (chave === 'cartao') return true;
+  // 13/11/2026: Documentos e renovações — cada responsável vê a sua lista; a view já filtra a filial
+  if (chave === 'compliance') return true;
   // item de junção que não é tela (Motoboys): visível se o login abre alguma das abas
   if (JUNCOES[chave] && !abasJuncao(chave).includes(chave)) return abasJuncao(chave).some((k) => visivel(k));
   if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;

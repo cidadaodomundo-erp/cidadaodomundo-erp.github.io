@@ -45,7 +45,8 @@ window.CASCA_PAGINAS = {
   // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
   agenda: 'agenda/index.html',
   notasfaltam: 'notas/index.html',
-  cartao: 'cartao/index.html',   // 13/11/2026: Compra no cartão + Anexar fatura (Financeiro; missão do dono 02:26/02:29)   // 12/11/2026: notas sem conta / sem entrada (tarefas 30 e 82 da Rita)
+  cartao: 'cartao/index.html',
+  compliance: 'compliance/index.html',   // 13/11/2026: Documentos e renovações (Compliance; dono #569)   // 13/11/2026: Compra no cartão + Anexar fatura (Financeiro; missão do dono 02:26/02:29)   // 12/11/2026: notas sem conta / sem entrada (tarefas 30 e 82 da Rita)
   cargos: 'pessoas/index.html#cargos',
   // 29/10/2026 (dono): cada passo da folha é uma tela
   pcalc: 'pessoas/index.html#pcalc',
@@ -115,7 +116,7 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao'];
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance'];
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
