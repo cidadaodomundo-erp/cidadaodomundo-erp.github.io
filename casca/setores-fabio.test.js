@@ -137,7 +137,7 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   // setor Delivery: Delivery do dia e Chegada; Fila/Escala só como aviso em texto, sem botão nem link
   const setorDl = casa.slice(casa.indexOf('Delivery<'), casa.indexOf('Salão<'));
   assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada']);
-  assert.match(setorDl, /class="setor-aviso">Em migração para este portal: Fila de pedidos e edição da Escala\.</);
+  assert.match(setorDl, /class="setor-aviso">Ainda sem tela: Fila de pedidos e edição da Escala\.</);
   assert.doesNotMatch(setorDl, /Chegada completa/, 'Chegada não é mais pendência');
   assert.doesNotMatch(casa, /antigo:|github\.io|portal antigo|href=|<iframe|↗/i, 'agrupamento outras sem link para o portal antigo');
   assert.doesNotMatch(t.$('menu').innerHTML, /antigo:|portal antigo/i);
