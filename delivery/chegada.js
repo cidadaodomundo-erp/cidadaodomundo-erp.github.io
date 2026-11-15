@@ -1,4 +1,4 @@
-// MOTOBOYS RODANDO NO DIA · tela (12/11/2026, Fabio). UMD: no navegador vira window.ChegadaTela; no Node, require().
+// MOTOBOYS RODANDO NO DIA · tela. UMD: no navegador vira window.ChegadaTela; no Node, require().
 // Só leitura (GET) da função fabio-delivery-chegada com o JWT do ERP da sessão atual. Nenhum botão que mude dado,
 // nenhuma moldura do portal antigo. Atualiza a cada 10 s só no dia operacional atual e com a tela visível, sem sobrepor.
 // Cada leitura tem prazo de 30 s e só vale para a mesma sequência, conta, loja e dia; ao ocultar, a leitura em voo é abortada.
@@ -45,7 +45,7 @@
       item('Situação informada pela fonte', M.txt(l.direito)) +
       '</dl><p class="cg-nota">O intervalo registrado vai da chegada (Fila do TrackEat ou pátio GPS) à saída registrada e pode conter pausas: não é hora líquida trabalhada.</p></details>';
   }
-  // 13/11/2026 (Fabio): embaixo da saída registrada, última entrega e última vez no pátio, separadas e rotuladas;
+  // 13/11/2026: embaixo da saída registrada, última entrega e última vez no pátio, separadas e rotuladas;
   // "Foi embora por volta de" só como estimativa. Sem dado = pendência visível, nunca hora inventada.
   function fimHtml(M, l, aoVivo) {
     const f = M.fimDoTurno(l, aoVivo);
@@ -53,7 +53,7 @@
     return lin('Última entrega', f.entrega) + lin('Última vez no pátio', f.patio) +
       (f.foiEmbora ? '<small class="cg-motivo cg-estimativa">Foi embora por volta de <strong>' + M.esc(f.foiEmbora) + '</strong> · estimativa, não é saída registrada</small>' : '');
   }
-  // 13/11/2026 (Fabio): embaixo da chegada observada, a hora em que o GPS viu a pessoa no pátio pela primeira vez,
+  // 13/11/2026: embaixo da chegada observada, a hora em que o GPS viu a pessoa no pátio pela primeira vez,
   // separada e rotulada. Não repete quando a própria chegada observada já é a do GPS. Sem dado = pendência visível.
   function patioHtml(M, l, ch) {
     if (ch && ch.fonte === 'patio_gps') return '';

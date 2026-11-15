@@ -280,7 +280,7 @@
       vazioSel(); return;
     }
     // 'ok' | 'parcial'
-    fonte.appendChild(el('p', 'mn-fonte', 'Fonte: Cadastro de prestadores do portal novo · consultado em ' + carimbo() + '.'));
+    fonte.appendChild(el('p', 'mn-fonte', 'Fonte: Cadastro de prestadores deste sistema · consultado em ' + carimbo() + '.'));
     if (f === 'parcial') status.appendChild(el('p', 'mn-estado mn-aviso', 'Lista parcial: a consulta chegou ao limite de ' + (M.LIMITE_PAGINA * M.MAX_PAGINAS) + ' registros e pode haver mais prestadores que não aparecem aqui.'));
     var inv = LEIT.dados.avisos ? LEIT.dados.avisos.invalidas : 0;
     if (inv > 0) status.appendChild(el('p', 'mn-estado mn-aviso', inv + ' registro(s) com dados incompletos foram ignorados.'));
@@ -293,7 +293,7 @@
     if (!achou) FILTRO.setor = '';
     sel.value = FILTRO.setor;
     if (!linhas.length) {
-      lista.appendChild(el('p', 'mn-estado', 'Nenhum prestador ativo no Cadastro de prestadores do portal novo (consulta de ' + carimbo() + ').'));
+      lista.appendChild(el('p', 'mn-estado', 'Nenhum prestador ativo no Cadastro de prestadores deste sistema (consulta de ' + carimbo() + ').'));
       return;
     }
     var vis = M.filtrarPrestadores(linhas, FILTRO);

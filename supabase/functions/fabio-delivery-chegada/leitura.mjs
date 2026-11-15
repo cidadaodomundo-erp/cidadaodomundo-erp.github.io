@@ -202,7 +202,7 @@ export function projetarLinha(x, un, ctx) {
     primeira_entrega_txt: campo(ctx, x.primeira_entrega_txt, hmDe),   // evidência separada; NÃO é chegada
     chegada_fila_fonte: campo(ctx, x.chegada_fila_fonte, enumDe(FONTES_FILA)),   // 13/11: site do TrackEat (principal) ou API
     saida_registrada_txt: saida,
-    // 13/11/2026 (Fabio #6729): evidências do fim do turno, SEPARADAS da saída registrada; nunca viram saída
+    // 13/11/2026: evidências do fim do turno, SEPARADAS da saída registrada; nunca viram saída
     ultima_entrega_txt: campo(ctx, x.ultima_entrega_txt, hmDe),
     ultimo_patio_txt: campo(ctx, x.ultimo_patio_txt, hmDe),
     ultimo_sinal_txt: campo(ctx, x.ultimo_sinal_txt, hmDe),

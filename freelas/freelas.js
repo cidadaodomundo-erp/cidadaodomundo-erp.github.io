@@ -280,7 +280,7 @@
       return false;
     }
     // 'ok' | 'parcial'
-    fonte.appendChild(el('p', 'fl-fonte', 'Fonte: portal novo, ' + o.fonte + ' · lojas: ' + lojasTexto(L) + ' · consultado em ' + carimbo(L) + '.'));
+    fonte.appendChild(el('p', 'fl-fonte', 'Fonte: este sistema, ' + o.fonte + ' · lojas: ' + lojasTexto(L) + ' · consultado em ' + carimbo(L) + '.'));
     if (f === 'parcial') status.appendChild(el('p', 'fl-estado fl-aviso', 'Lista parcial: a consulta chegou ao limite de ' + (M.LIMITE_PAGINA * M.MAX_PAGINAS) + ' registros e pode haver mais cadastros que não aparecem aqui.'));
     var av = L.dados.avisos || {};
     if (av.semLoja > 0) status.appendChild(el('p', 'fl-estado fl-aviso', 'Há cadastros sem loja definida (ou com loja não reconhecida). Eles não foram incluídos nem ligados a nenhuma loja.'));
@@ -335,7 +335,7 @@
       lista.appendChild(el('p', 'fl-estado', 'Sem registros de valor-hora para ' + lojasTexto(L) + ' no cadastro de valores por hora (consulta de ' + carimbo(L) + ').'));
       return;
     }
-    lista.appendChild(el('p', 'fl-nota', 'Valores cadastrados no portal novo, sem cálculo de pagamento. O cadastro não indica qual valor está em vigor: confirme com quem mantém o cadastro.'));
+    lista.appendChild(el('p', 'fl-nota', 'Valores cadastrados neste sistema, sem cálculo de pagamento. O cadastro não indica qual valor está em vigor: confirme com quem mantém o cadastro.'));
     linhas.forEach(function (v) {
       var card = el('article', 'fl-card');
       card.appendChild(el('h3', 'fl-nome', rotuloLoja(v.loja)));

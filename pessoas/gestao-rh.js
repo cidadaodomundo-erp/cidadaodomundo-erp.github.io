@@ -1,4 +1,4 @@
-// GESTÃO DO RH — ERROS DO DIA (rota prh, Sistema operacional do Fábio > RH). Só LEITURA: um GET ao leitor próprio
+// GESTÃO DO RH — ERROS DO DIA (rota prh, Operação das lojas > RH). Só LEITURA: um GET ao leitor próprio
 // (Edge Function fabio-ponto-leitura, com o JWT de quem está logado) por dia/loja escolhidos. Não escreve nada, não tem
 // temporizador, não guarda dado de pessoa no navegador, não toca em robô/tabela/tela do Neto.
 // Regras em window.GestaoRhModelo (pessoas/gestao-rh-modelo.js); aqui só buscar e mostrar. Todo texto entra por textContent.
@@ -133,7 +133,7 @@
         ui.sem.appendChild(det);
       }
       const notas = d.avisos.slice();
-      notas.push('Ainda não aparece nesta tela: hora extra, jornada a menor, falta confirmada e atraso de dias passados (dependem de jornada contratada e escala no portal novo).');
+      notas.push('Ainda não aparece nesta tela: hora extra, jornada a menor, falta confirmada e atraso de dias passados (dependem de jornada contratada e escala neste sistema).');
       notas.forEach((a) => ui.avisos.appendChild(el('div', 'grh-aviso', a)));
     }
 

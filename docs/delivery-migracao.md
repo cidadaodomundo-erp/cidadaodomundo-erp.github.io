@@ -1,12 +1,12 @@
 # Migração do Delivery para o portal novo (12/11/2026)
 
-Pedido do Fabio. Só arquivos locais do frontend: nada publicado, nada de git nem de banco.
+Pedido registrado. Só arquivos locais do frontend: nada publicado, nada de git nem de banco.
 
 ## Correção desta revisão (12/11/2026)
 
 A etapa anterior pôs no setor Delivery três atalhos externos para o portal antigo (`antigo:chegada`, `antigo:fila`,
 `antigo:escala`), abrindo `cidadaodomundo.github.io` em outra aba, e ampliou `visivel()` para liberar esses links por
-chave. **Isso estava errado**: os botões do Sistema operacional do Fábio devem funcionar dentro do portal novo.
+chave. **Isso estava errado**: os botões do Operação das lojas devem funcionar dentro do portal novo.
 
 Corrigido nesta revisão:
 
@@ -25,9 +25,9 @@ Corrigido nesta revisão:
 
 | O quê | Onde | Situação |
 |---|---|---|
-| Setores dentro do agrupamento **Sistema operacional do Fábio** (`id: 'outras'`): Delivery, Salão, RH, Cozinha e encomendas, Manutenção e compras, Gestão e lojas, Demais telas | `casca/setores-fabio.js`, `sistema.html` (`outrasTelas()` / `setoresDe()`) | Só apresentação. A lista do agrupamento é a sobra inteira; nenhuma tela saiu. Módulos do Neto, junções e hashes intactos. Ponto ao Vivo (`pao`) no RH. |
+| Setores dentro do agrupamento **Operação das lojas** (`id: 'outras'`): Delivery, Salão, RH, Cozinha e encomendas, Manutenção e compras, Gestão e lojas, Demais telas | `casca/setores-fabio.js`, `sistema.html` (`outrasTelas()` / `setoresDe()`) | Só apresentação. A lista do agrupamento é a sobra inteira; nenhuma tela saiu. Módulos do Neto, junções e hashes intactos. Ponto ao Vivo (`pao`) no RH. |
 | `delivery` → `delivery/index.html` | `casca/paginas.js` | Delivery do dia. Já consultam dados (`delivery_dia`): Placar, Tempo de entrega, Cancelamentos, Avaliações do dia. Leitura parcial, em construção: Chegada do dia (só atividade registrada nas entregas, não é chegada nem saída real) e Escala (só consulta). |
-| `salao`, `reservas`, `pausados` | `casca/paginas.js` | Rotas no setor Salão (Reservas e Pausados religados em outro chat; preservados). |
+| `salao`, `reservas`, `pausados` | `casca/paginas.js` | Rotas no setor Salão (Reservas e Pausados religados; preservados). |
 
 ## Em migração (sem tela neste portal, sem botão, sem link externo)
 

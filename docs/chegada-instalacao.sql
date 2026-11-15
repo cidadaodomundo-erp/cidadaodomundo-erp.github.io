@@ -174,7 +174,7 @@ begin
               when v.na_fila then 'na fila'
               when v.disponivel then 'disponivel'
               else 'indisponivel' end,
-         -- 24/09/2026, pedido do Fabio: "rodando" e quem esta trabalhando de verdade:
+         -- "rodando" e quem esta trabalhando de verdade:
          -- no patio, na fila, disponivel ou se mexeu 100 m ou mais nos ultimos 20 min.
          -- Aplicativo ligado, parado, fora da fila e indisponivel NAO e rodando (em geral e o motoboy em casa).
          case when v.chave is null then null
@@ -238,7 +238,7 @@ begin
                           and m.campo = 'rango' and m.n_turno = coalesce((x.e->>'n_turno')::integer, 1)
                         order by m.id desc limit 1) r on true;
 
-  -- Fabio 11/11: chegada da fila com segundos; janelas de turno e saída QR copiadas de chegada_conferir.
+  -- 11/11: chegada da fila com segundos; janelas de turno e saída QR copiadas de chegada_conferir.
   -- Tempo registrado: saída QR menos fila TrackEat, ou pátio GPS (vw.chegou_gps). Nunca vw.chegada (pode ser 1ª entrega).
   with t as (
    select v.*, lead(v.combinado_em) over w as proximo,

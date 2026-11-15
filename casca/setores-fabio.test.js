@@ -1,4 +1,4 @@
-/* Setores do agrupamento "Sistema operacional do Fábio" + Delivery na casca (etapa 1, 12/11/2026).
+/* Setores do agrupamento "Operação das lojas" + Delivery na casca (etapa 1, 12/11/2026).
  * Roda o script REAL do sistema.html com casca/*.js e nucleo/loja.js; DOM, rede, sessão e loja são ficções (só e-mail fake).
  * Node stdlib: node --test casca/ . Sem rede, sem git (o diff da revisão é auditado manualmente pelo coordenador). */
 'use strict';
@@ -87,8 +87,8 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(mods.map((m) => m.id), [...neto.map((m) => m.id), 'outras'], 'só o agrupamento outras foi acrescentado');
   neto.forEach((m, i) => assert.deepEqual(mods[i], m, 'módulo do Neto mudou: ' + m.id));
   const o = mods.find((m) => m.id === 'outras');
-  assert.equal(o.nome, 'Sistema operacional do Fábio');
-  fabioNoMenu.forEach((k) => assert.ok(o.acompanhar.includes(k), 'tela do Fábio saiu do agrupamento: ' + k));
+  assert.equal(o.nome, 'Operação das lojas');
+  fabioNoMenu.forEach((k) => assert.ok(o.acompanhar.includes(k), 'tela saiu do agrupamento: ' + k));
   // nenhum atalho externo no agrupamento: nenhuma chave antigo:*, nenhum item com link
   assert.ok(!o.acompanhar.some((k) => /^antigo:/.test(k)), 'chave antigo:* no agrupamento');
   o.acompanhar.forEach((k) => assert.equal(t.ev(`!!(ITENS[${JSON.stringify(k)}] || {}).link`), false, 'link externo no agrupamento: ' + k));
@@ -98,7 +98,7 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual([...nosSetores].sort(), [...o.acompanhar].sort());
   assert.equal(new Set(nosSetores).size, nosSetores.length);
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
-  assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento do Fábio');
+  assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento Operação das lojas');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
   assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada'], 'Delivery: Delivery do dia e Chegada nativos');
   assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados'], 'Reservas e Pausados no Salão');
@@ -126,7 +126,7 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   // tela do agrupamento sem página ligada: mostra o agrupamento, nunca a moldura dashboard.html
   t.ev("abrir('pcartao')");
   assert.ok(!molduras().some((u) => /dashboard\.html/.test(u)));
-  assert.match(t.$('titulo').textContent, /Sistema operacional do Fábio/);
+  assert.match(t.$('titulo').textContent, /Operação das lojas/);
   const casa = t.$('vista').querySelector('.home').innerHTML;
   ['Delivery', 'RH', 'Salão'].forEach((s) => assert.match(casa, new RegExp('class="gh">[^<]* ' + s + '<')));
   assert.ok(casa.indexOf('Delivery<') < casa.indexOf('Salão<') && casa.indexOf('Salão<') < casa.indexOf('RH<'), 'ordem dos setores');
@@ -194,16 +194,10 @@ test('setores-fabio.js: só configuração (sem rede, timer, sessão ou token); 
   assert.ok(SISTEMA.indexOf('casca/setores-fabio.js') < SISTEMA.indexOf('const MENU = '), 'carregado antes do script da casca');
 });
 
-test('delivery/index.html: diz o que consulta e o que está em migração; não manda ao portal antigo; nada de garantido/refeição calculado; um timer só', () => {
+test('delivery/index.html: sem quadro de migração nem texto de portal antigo; nada de garantido/refeição calculado; um timer só', () => {
   const html = ler('delivery', 'index.html');
-  assert.match(html, /Já consultam dados neste portal:<\/strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia/);
-  assert.match(html, /Em migração, ainda sem tela neste portal:<\/strong> Fila de pedidos/);
-  assert.match(html, /Com página própria neste portal:<\/strong> Chegada dos motoboys/);
-  assert.doesNotMatch(html, /<button data-aba="chegada"/, '13/11 (Fabio): a Chegada saiu das abas, era repetida; fica só no menu');
-  const bloco = (/<section class="dl-migracao"[\s\S]*?<\/section>/.exec(html) || [''])[0];
-  assert.ok(bloco, 'bloco de migração presente');
-  assert.doesNotMatch(bloco, /portal antigo|atalho|href=|<a\b|<button/i, 'só texto, sem mandar ao portal antigo');
-  assert.match(html, /Garantido e refeição <strong>não<\/strong> são calculados/);
+  assert.doesNotMatch(html, /dl-migracao|em migração|portal antigo/i, 'tela neutra: sem quadro de migração');
+  assert.doesNotMatch(html, /<button data-aba="chegada"/, '13/11: a Chegada saiu das abas, era repetida; fica só no menu');
   const semLink = html.replace(/<link[^>]*>/g, '');
   assert.doesNotMatch(semLink, /github\.io|target=|<iframe|<embed|<object/i, 'sem link, moldura ou embed do portal antigo');
   assert.equal((html.match(/data-aba=/g) || []).length, 6, 'abas do Delivery do dia: 6 desde 13/11 (Chegada saiu, era repetida)');
@@ -212,7 +206,7 @@ test('delivery/index.html: diz o que consulta e o que está em migração; não 
 });
 
 // ------------------------------------------------------------------------------- Chegada dos motoboys (12/11/2026)
-test('chegada: item do Fábio no grupo Entrega, rota delivery/chegada.html, por loja, cache-bust dos scripts da casca', () => {
+test('chegada: item no grupo Entrega, rota delivery/chegada.html, por loja, cache-bust dos scripts da casca', () => {
   const ent = C.CASCA_MENU.find((g) => g.id === 'gEntrega');
   const it = ent.itens.find((i) => i.chave === 'chegada');
   assert.ok(it, 'chegada no grupo Entrega');

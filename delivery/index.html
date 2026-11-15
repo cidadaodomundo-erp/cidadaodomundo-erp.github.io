@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
 <!-- DELIVERY DO DIA (06/11/2026, Fase 1 da mudança do portal do Fábio para o ERP). Só leitura, sem nenhum botão que
-     mude dado. Junta numa página as ideias de quatro telas do portal antigo: Tempo de Entrega, Placar do Delivery,
+     mude dado. Junta numa página as ideias de quatro telas anteriores: Tempo de Entrega, Placar do Delivery,
      Cancelamentos e Qualidade/Avaliações do dia. Lê só o banco do ERP, pela função delivery_dia(dia), que obedece
      as regras de leitura que o banco aplica a cada tabela (o isolamento por filial depende dessas regras e não é
      verificado nesta página). Sem caixa de anotação. -->
@@ -38,9 +38,6 @@
   .dl-ruim { color:var(--farol-fora); font-weight:700; }
   .dl-ok { color:var(--farol-ok); font-weight:700; }
   .dl-vazio { padding:18px; opacity:.75; }
-  .dl-migracao { margin:22px 0 8px; padding:12px 14px; border:1px solid var(--line-2); border-radius:10px; font-size:13px; line-height:1.5; }
-  .dl-migracao h2 { font-size:14px; margin:0 0 6px; }
-  .dl-migracao ul { margin:0; padding-left:18px; }
 </style>
 </head>
 <body>
@@ -65,17 +62,6 @@
       <div id="conteudo"><div class="dl-vazio">Carregando…</div></div>
     </div>
     <div id="operacao" style="display:none;"></div>
-    <!-- 12/11/2026 (Fabio): o que esta página já lê e o que está em migração. Só texto: nenhum botão, link ou moldura
-         para o portal antigo, nenhuma leitura nova, nenhum timer. Mapa em docs/delivery-migracao.md. -->
-    <section class="dl-migracao" aria-labelledby="dlMigT">
-      <h2 id="dlMigT">O que já está aqui e o que está em migração</h2>
-      <ul>
-        <li><strong>Já consultam dados neste portal:</strong> Placar, Tempo de entrega, Cancelamentos e Avaliações do dia (leitura do dia no banco do ERP, por loja autorizada).</li>
-        <li><strong>Com página própria neste portal:</strong> Chegada dos motoboys (abre pelo menu e não se repete nas abas desta página: entrada combinada, chegada, saída registrada, intervalo registrado, garantido e refeição como o servidor informa).</li>
-        <li><strong>Leitura parcial, em construção:</strong> Escala do Delivery (só consulta da escala prevista).</li>
-        <li><strong>Em migração, ainda sem tela neste portal:</strong> Fila de pedidos e a edição da Escala do Delivery. Garantido e refeição <strong>não</strong> são calculados nem mostrados nesta página.</li>
-      </ul>
-    </section>
   </div>
 </div>
 
@@ -89,8 +75,8 @@
 const TELA = 'delivery';
 const M = ModeloDelivery;
 let DADOS = null, ABA = DeliveryOperacao.abaDoHash(location.hash);
-// 12/11/2026 (Fabio): a aba Chegada e o endereço #chegada abrem a página nativa delivery/chegada.html NA MESMA moldura
-// (navegação normal do navegador; nada do portal antigo). As outras abas seguem iguais.
+// 12/11/2026: a aba Chegada e o endereço #chegada abrem a página nativa delivery/chegada.html NA MESMA moldura
+// (navegação normal do navegador). As outras abas seguem iguais.
 function irParaChegada(substituir) {
   try { if (substituir) location.replace('chegada.html'); else location.assign('chegada.html'); return true; } catch (e) { return false; }
 }

@@ -1,5 +1,5 @@
-// GESTÃO DO RH — ERROS DO DIA (rota prh, Sistema operacional do Fábio > RH). Regra PURA: não lê rede, não escreve, não guarda nada.
-// Pedido do Fábio (13/11/2026): levar a função da "Gestão do RH" do portal antigo (quem não lançou refeição, quem se atrasou,
+// GESTÃO DO RH — ERROS DO DIA (rota prh, Operação das lojas > RH). Regra PURA: não lê rede, não escreve, não guarda nada.
+// Pedido (13/11/2026): levar a função da "Gestão do RH" do portal antigo (quem não lançou refeição, quem se atrasou,
 // quem ficou com batida faltando), com o visual do portal novo. Entrada = a resposta do leitor próprio já existente
 // (Edge Function fabio-ponto-leitura: Flash direto + refeições do Saipos já recebidas). Nada do robô/tabelas/telas do Neto muda.
 //

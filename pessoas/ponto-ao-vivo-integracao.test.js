@@ -34,7 +34,7 @@ test('rota pao registrada na casca (menu, página, módulo, busca, por loja) com
   const mods = g('CASCA_MODULOS');
   assert.ok(!mods.some((m) => (m.lancar || []).includes('pao') || (m.acompanhar || []).includes('pao')));
   const sis = ler('sistema.html');
-  assert.match(sis, /nome: 'Sistema operacional do Fábio'/);
+  assert.match(sis, /nome: 'Operação das lojas'/);
   assert.doesNotMatch(sis, /nome: 'Outras telas'/);
 });
 

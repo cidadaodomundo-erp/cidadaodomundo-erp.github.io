@@ -83,7 +83,7 @@ test('fluxo: contatos ordenados, só da loja, telefone como texto, sem link, sem
   assert.equal(t.est.urls[0].metodo, 'GET');
   assert.ok(t.est.urls[0].url.startsWith('freela_contato?select=id,nome,setor,telefone,tipo,ativo,loja&ativo=eq.true&loja=in.'));
   assert.match(t.texto('listaContatos'), /\(41\) 90000-0000/);
-  assert.match(t.texto('fonteContatos'), /Fonte: portal novo, cadastro de contatos/);
+  assert.match(t.texto('fonteContatos'), /Fonte: este sistema, cadastro de contatos/);
   assert.match(t.texto('fonteContatos'), /consultado em \d\d\/\d\d\/\d{4} \d\d:\d\d/);
   assert.match(t.texto('statusContatos'), /sem loja definida/);   // aviso geral (Caio), sem expor o nome
   assert.ok(!/Caio|Bia|Dani|SEGREDO|99999|TOKEN/.test(t.pagina()));
@@ -106,7 +106,7 @@ test('abrir "Valores por hora": uma leitura, NULL não vira zero, data inválida
   assert.match(tx, /Não informado no cadastro/); assert.match(tx, /Data inválida no cadastro/);
   assert.ok(!/R\$ 0,00|R\$ 99|R\$ 31/.test(tx));
   assert.deepEqual(t.cartoes('listaValores').map((c) => c.children[0].textContent), ['Ahú', 'Ahú']);
-  assert.match(t.texto('fonteValores'), /Fonte: portal novo, cadastro de valores por hora/);
+  assert.match(t.texto('fonteValores'), /Fonte: este sistema, cadastro de valores por hora/);
   assert.match(tx, /não indica qual valor está em vigor/);
   t.ids.abaContatos.click(); t.ids.abaValores.click(); await settle();
   assert.equal(t.est.urls.length, 2);                       // voltar à aba já lida não relê
@@ -126,7 +126,7 @@ test('403 mostra "consulta não liberada" (nunca zero contatos); retry com 200 [
   t.botao('statusContatos').click(); await settle();
   assert.match(t.texto('listaContatos'), /Sem registros de contatos ativos para Ahú/);
   assert.match(t.texto('listaContatos'), /consulta de \d\d\/\d\d\/\d{4}/);
-  assert.match(t.texto('fonteContatos'), /Fonte: portal novo/);
+  assert.match(t.texto('fonteContatos'), /Fonte: este sistema/);
   assert.ok(!/ainda não foi liberada/.test(t.texto('statusContatos')));
 });
 
