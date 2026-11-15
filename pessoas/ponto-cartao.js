@@ -290,7 +290,7 @@
       if (!fl || !dir.horarios.has(fl)) return null;
       const id = String(r.pessoaId);
       const av = deps.marcas.avaliar({ dia: r.dia, horarios: dir.horarios.get(fl), jornada: dir.jornadas[id] || null,
-        refeicao: { disponivel: dir.refDisponivel, identificado: dir.refIdentificados.has(id), itens: Array.isArray(dir.refPorPessoa[id]) ? dir.refPorPessoa[id] : [] } });
+        refeicao: { pendente: true, disponivel: dir.refDisponivel, identificado: dir.refIdentificados.has(id), itens: Array.isArray(dir.refPorPessoa[id]) ? dir.refPorPessoa[id] : [] } });
       return deps.marcas.corrigir ? deps.marcas.corrigir(av, (dir.correcoes || []).filter((c) => String(c.pessoa_id) === id && c.dia === r.dia)) : av;
     }
 

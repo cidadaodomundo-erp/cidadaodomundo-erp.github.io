@@ -42,3 +42,11 @@ test('correção do RH deixa verde com o nome de quem corrigiu', () => {
   const c = corrigir(r, [{ tipo: 'hora_extra_autorizada', autor_nome: 'Rita', em: '2026-11-15T22:43:00Z' }, { tipo: 'refeicao', autor_nome: 'Rita', em: '2026-11-15T22:45:00Z' }]);
   assert.equal(c.geral, 'ok'); assert.match(c.saida.texto, /corrigido pelo RH: Rita, 19:43/);
 });
+
+test('refeição do dia pendente (Saipos só chega amanhã): não acusa e não impede "tudo certo"', () => {
+  const r = avaliar({ dia: '2026-11-15', horarios: ['2026-11-15T10:40:00', '2026-11-15T15:00:00', '2026-11-15T16:00:00', '2026-11-15T22:40:00'],
+    jornada: { entrada: '10:40', saida: '22:40' }, refeicao: { pendente: true, disponivel: true, identificado: true, itens: [] } });
+  assert.equal(r.refeicao.estado, 'espera');
+  assert.equal(r.geral, 'ok');
+  assert.deepEqual(r.problemas, []);
+});

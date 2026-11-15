@@ -32,7 +32,7 @@
     return { ini: base + e, fim: base + s + (s <= e ? 1440 : 0), texto: j.entrada.slice(0, 5) + ' às ' + j.saida.slice(0, 5) };
   }
 
-  // o: { dia, horarios:[ts...], jornada:{entrada,saida}|null, refeicao:{disponivel, identificado, itens:[{tipo,produto,hora}]} }
+  // o: { dia, horarios:[ts...], jornada:{entrada,saida}|null, refeicao:{disponivel, identificado, pendente, itens:[{tipo,produto,hora}]} }
   function avaliar(o) {
     const hs = (Array.isArray(o.horarios) ? o.horarios : []).map((t) => ({ t, m: minutosTs(t) })).filter((x) => x.m != null).sort((a, b) => a.m - b.m);
     const r = { andamento: false, entrada: null, saida: null, intervalo: null, refeicao: null, problemas: [], geral: 'neutro' };
@@ -67,12 +67,14 @@
       else marca('saida', 'ok', 'no horário');
     }
     // refeição
-    if (!ref.disponivel) marca('refeicao', 'sem', 'não deu para ler as refeições');
+    // refeição do dia só chega do Saipos na manhã seguinte: enquanto isso, espera (não acusa)
+    if (ref.pendente) marca('refeicao', itens.length ? 'ok' : 'espera', itens.length ? txtRef : 'confere amanhã, quando o Saipos mandar as vendas');
+    else if (!ref.disponivel) marca('refeicao', 'sem', 'não deu para ler as refeições');
     else if (itens.length) marca('refeicao', 'ok', txtRef);
     else if (!ref.identificado) marca('refeicao', 'sem', 'sem cartão de refeição cadastrado');
     else marca('refeicao', 'ruim', 'não pegou refeição');
     const est = ['entrada', 'saida', 'intervalo', 'refeicao'].map((k) => r[k] && r[k].estado);
-    r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok') ? 'ok' : 'neutro');
+    r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok' || e === 'espera') ? 'ok' : 'neutro');
     return r;
   }
   // correções do RH (respostas no grupo do WhatsApp): hora extra autorizada, refeição corrigida ou justificado
@@ -87,7 +89,7 @@
     }
     r.problemas = ['entrada', 'saida', 'intervalo', 'refeicao'].filter((k) => r[k] && r[k].estado === 'ruim').map((k) => r[k].texto);
     const est = ['entrada', 'saida', 'intervalo', 'refeicao'].map((k) => r[k] && r[k].estado);
-    r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok') ? 'ok' : 'neutro');
+    r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok' || e === 'espera') ? 'ok' : 'neutro');
     return r;
   }
   return { avaliar, corrigir, hora, TOL };
