@@ -1,5 +1,5 @@
-// SETORES DENTRO DO AGRUPAMENTO "Sistema operacional do Fábio" (id 'outras', montado em sistema.html outrasTelas()).
-// Pedido do Fabio (12/11/2026): organizar ESSE agrupamento por setor (Delivery, RH, Salão…), sem mexer nos módulos do
+// SETORES DENTRO DO AGRUPAMENTO "Operação das lojas" (id 'outras', montado em sistema.html outrasTelas()).
+// Pedido (12/11/2026): organizar ESSE agrupamento por setor (Delivery, RH, Salão…), sem mexer nos módulos do
 // Neto (casca/modulos.js), sem criar grupo paralelo e sem tirar nenhuma tela de lá. O Ponto ao Vivo (pao) fica aqui, no RH.
 //
 // Só apresentação: a lista de telas do agrupamento continua sendo a "sobra" calculada pela casca (nada some). Tela da sobra
@@ -7,7 +7,7 @@
 // Tela com integração pendente (acesso ainda não conectado: sem linha em casca/paginas.js, mesmo que o arquivo da página
 // exista) aparece SEM botão ativo, com o aviso.
 //
-// Correção 12/11/2026 (Fabio): os botões deste agrupamento funcionam DENTRO do portal novo. Nenhum atalho para o portal
+// Correção 12/11/2026: os botões deste agrupamento funcionam DENTRO do portal novo. Nenhum atalho para o portal
 // antigo. Chegada completa, Fila e edição da Escala estão em migração: só um aviso em texto, sem botão nem link.
 // Nenhum timer, nenhuma leitura de rede, nenhuma escrita neste arquivo.
 window.CASCA_SETORES_FABIO = {

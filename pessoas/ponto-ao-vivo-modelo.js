@@ -507,8 +507,8 @@
       escalaDiaria: comEscala > 0, pessoasComEscala: comEscala,
       atrasoJornadaIntervalo: comEscala > 0
         ? 'Avaliados só para ' + comEscala + ' pessoa(s) com escala fornecida.'
-        : 'NÃO AVALIADOS: não existe escala diária/horário oficial no ERP mínimo (rh_pessoa, rh_flash_batida, rh_flash_ausencia, rh_ocorrencia). Objeto futuro: escolha do Fabio.',
-      folga: o.dowConvencao === 'DOM0' || o.dowConvencao === 'SEG1' ? 'Folga fixa do cadastro usada (convenção ' + o.dowConvencao + ').' : 'Folga fixa do cadastro NÃO usada: convenção do dia da semana não definida (escolha do Fabio).',
+        : 'NÃO AVALIADOS: ainda não há escala do dia cadastrada.',
+      folga: o.dowConvencao === 'DOM0' || o.dowConvencao === 'SEG1' ? 'Folga fixa do cadastro usada (convenção ' + o.dowConvencao + ').' : 'Folga fixa do cadastro NÃO usada: dia da semana da folga ainda não definido.',
       cargoConfianca: cargoConfiancaDisponivel,
     });
     return Object.freeze({ dia, posicao, linhas: Object.freeze(linhas), listadas: Object.freeze(listadas), resumo: Object.freeze(resumo), avisos: Object.freeze(avisos), avaliacao, fonte, leituraIdadeMin });

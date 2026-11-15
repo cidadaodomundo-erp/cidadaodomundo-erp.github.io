@@ -10,7 +10,7 @@
 <title>Temperaturas das câmaras · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
-<!-- TEMPERATURAS DAS CÂMARAS FRIAS (12/11/2026, ordem do Fábio; frente 183). Só leitura. Mostra o que o coletor da
+<!-- TEMPERATURAS DAS CÂMARAS FRIAS (12/11/2026). Só leitura. Mostra o que o coletor da
      Jaalee (PC da loja, a cada 5 min) gravou no ERP: nome da câmara, loja, temperatura, hora da medição e faixa.
      Lê pela RPC erp_camaras_ler (mesma regra de acesso de erp_reservas_ler). Nenhuma senha, token ou identificador
      de sensor passa por esta tela. Dado velho nunca aparece como verde. -->
@@ -140,7 +140,7 @@ async function carregar() {
   catch (e) { if (minhaReq === ULTIMA_REQ) mostrarErro('Não foi possível consultar agora. As temperaturas não foram atualizadas.'); return; }
   if (minhaReq !== ULTIMA_REQ) return;
   if (r.status === 401) { exigirLogin('Entre de novo para ver as temperaturas.'); return; }
-  if (r.status === 403) { mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.'); return; }
+  if (r.status === 403) { mostrarErro('Você ainda não tem acesso a esta consulta. Peça acesso ao administrador.'); return; }
   if (r.status === 404) { mostrarErro('Esta consulta ainda não está disponível no servidor.'); return; }
   if (!r.ok) { mostrarErro('Não foi possível completar a consulta agora. Tente novamente.'); return; }
   let dados;

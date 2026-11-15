@@ -39,7 +39,7 @@ window.CASCA_PAGINAS = {
   // 02/11/2026 (dono): o que está pendente no módulo, numa tela só
   phoje: 'pessoas/index.html#phoje',
   pao: 'pessoas/index.html#pao',   // 12/11/2026: Ponto ao Vivo (RH), leitura de rh_flash_batida
-  prh: 'pessoas/index.html#prh',   // 13/11/2026 (Fabio): Gestão do RH — erros do dia (leitor próprio fabio-ponto-leitura, só leitura)
+  prh: 'pessoas/index.html#prh',   // 13/11/2026: Gestão do RH — erros do dia (leitor próprio fabio-ponto-leitura, só leitura)
   padm: 'pessoas/index.html#padm',
   pseguro: 'pessoas/index.html#pseguro',   // 13/11/2026: Seguro de vida (RH), só leitura
   // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
@@ -105,7 +105,7 @@ window.CASCA_PAGINAS = {
   // plano: saiu do menu em 12/11/2026 (dono 16:39); #plano abre a agenda no bloco Desenvolvimentos (sistema.html, abrir)
   rotinas: 'sistema/index.html#rotinas',
   telas: 'sistema/index.html#telas',
-  // 12/11/2026 (Fabio, etapa 1 do Delivery): telas do agrupamento "Sistema operacional do Fábio" que passam a abrir a
+  // 12/11/2026: telas do agrupamento "Operação das lojas" que passam a abrir a
   // página delas. As outras telas desse agrupamento ainda não têm linha aqui e aparecem sem botão ativo (docs/delivery-migracao.md).
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery

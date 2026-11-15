@@ -1,4 +1,4 @@
-// MOTOBOYS RODANDO NO DIA · regras de apresentação (12/11/2026, Fabio). UMD: roda no navegador (window.ChegadaModelo)
+// MOTOBOYS RODANDO NO DIA · regras de apresentação. UMD: roda no navegador (window.ChegadaModelo)
 // e no Node (require). Sem rede, sem DOM, sem sessão: só transforma a resposta da função fabio-delivery-chegada
 // (contrato do coordenador) no que a tela mostra. Quem decide o direito é o backend; aqui só se traduz, sem inventar perda.
 (function (raiz, fabrica) {
@@ -71,7 +71,7 @@
     if (!saidaRegistrada(l)) return null;
     return { min: m, texto: Math.floor(m / 60) + 'h ' + pad(m % 60) + 'min', fonte: l.tempo_fonte, rotulo: ROTULO_FONTE[l.tempo_fonte] };
   }
-  // 13/11/2026 (Fabio, caderneta #6729): embaixo da saída registrada, duas linhas separadas — última entrega e última
+  // 13/11/2026: embaixo da saída registrada, duas linhas separadas — última entrega e última
   // vez no pátio. "Foi embora por volta de" é ESTIMATIVA e só aparece quando a última vez no pátio é DEPOIS da última
   // entrega e o aplicativo não deu mais sinal (último sinal até 10 min depois do pátio; ao vivo, sem sinal há 30 min).
   // Nunca é saída registrada e não muda garantido, refeição, pagamento nem lacres. Sem dado = null (a tela mostra pendência).
@@ -89,7 +89,7 @@
     }
     return { entrega: entrega ? entrega.slice(0, 5) : null, patio: patio ? patio.slice(0, 5) : null, foiEmbora };
   }
-  // de onde veio a hora da fila: o site do TrackEat lido pelo nosso robô (principal, Fabio 12/11) ou a API (segunda fonte)
+  // de onde veio a hora da fila: o site do TrackEat lido pelo nosso robô (principal) ou a API (segunda fonte)
   const ROTULO_FILA_FONTE = { site: 'site do TrackEat (robô)', api: 'API do TrackEat' };
   function filaFonte(l) { const f = (l || {}).chegada_fila_fonte; return Object.prototype.hasOwnProperty.call(ROTULO_FILA_FONTE, f) ? ROTULO_FILA_FONTE[f] : null; }
   function marcaEscala(l) {

@@ -57,7 +57,7 @@ test('entra no grupo RH/Pessoas sem remover nem reordenar os itens originais (no
   preservaOriginais(rh, ['phoje', 'pcartao', 'pao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos'], 'Pessoas (menu)');
   const pessoas = C.CASCA_MODULOS.find((m) => m.id === 'pessoas');
   preservaOriginais(pessoas.lancar, ['phoje', 'pcartao', 'peventos', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pacertos'], 'Pessoas (módulo)');
-  assert.ok(!pessoas.lancar.includes('pao') && !pessoas.acompanhar.includes('pao'), 'pao fica no agrupamento Sistema operacional do Fábio, fora do módulo Pessoas (ordem expressa 12/11)');
+  assert.ok(!pessoas.lancar.includes('pao') && !pessoas.acompanhar.includes('pao'), 'pao fica no agrupamento Operação das lojas, fora do módulo Pessoas (ordem expressa 12/11)');
   assert.ok(!pessoas.acompanhar.includes('freelas'));
   // os itens vizinhos (RH do Neto) continuam como estavam
   ['pcartao', 'pao', 'peventos'].forEach((k) => assert.equal(itensMenu.find((i) => i.chave === k).origem, 'fabio'));

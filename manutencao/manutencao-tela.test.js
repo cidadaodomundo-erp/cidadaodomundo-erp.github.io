@@ -91,7 +91,7 @@ test('Chamados fora da casca: atalho abre o diretório na própria página e só
   assert.ok(t.est.urls[0].url.startsWith('prestador?select=id,setor,nome,telefone,ativo&ativo=eq.true'));
   assert.deepEqual(t.nomes(), ['ana', 'Zeca']);
   assert.equal(t.ids.painelPrestadores.hidden, false);
-  assert.match(t.texto('fontePrest'), /Fonte: Cadastro de prestadores do portal novo · consultado em \d\d\/\d\d\/\d{4} \d\d:\d\d/);
+  assert.match(t.texto('fontePrest'), /Fonte: Cadastro de prestadores deste sistema · consultado em \d\d\/\d\d\/\d{4} \d\d:\d\d/);
   assert.match(t.texto('listaPrest'), /\(41\) 3000-0000/);
   t.ids.abaChamados.click(); t.ids.abaPrestadores.click(); await settle();
   assert.equal(t.est.urls.length, 1);
@@ -124,7 +124,7 @@ test('diretório: 403 = "não liberada" (nunca zero); depois 200 [] = vazio dist
   assert.equal(t.texto('fontePrest'), ''); assert.equal(t.ids.listaPrest.children.length, 0);
   t.est.handler = () => resp(200, []);
   t.botao('statusPrest').click(); await settle();
-  assert.match(t.texto('listaPrest'), /Nenhum prestador ativo no Cadastro de prestadores do portal novo/);
+  assert.match(t.texto('listaPrest'), /Nenhum prestador ativo no Cadastro de prestadores deste sistema/);
   assert.match(t.texto('fontePrest'), /Fonte: Cadastro de prestadores/);
   assert.ok(!/ainda não foi liberada/.test(t.pagina()));
   for (const h of [() => { throw new Error('offline'); }, () => resp(500, {}), () => resp(200, [], { jsonErro: true })]) {

@@ -187,7 +187,7 @@ test('tela: só leitura — um GET ao leitor próprio, sem escrita, sem temporiz
   assert.doesNotMatch(src, /cidadaodomundo\.github\.io|kqvoatdprjwxyadhvtdd/);
 });
 
-test('ligação: página, menu com selo Fábio, busca, por loja e setor RH do agrupamento do Fábio', () => {
+test('ligação: página, menu com selo Fábio, busca, por loja e setor RH do agrupamento Operação das lojas', () => {
   const html = ler('pessoas', 'index.html');
   const pos = (f) => { const i = html.search(new RegExp('<script src="' + f.replace(/\./g, '\\.') + '[?"]')); assert.ok(i >= 0, 'falta ' + f); return i; };
   assert.ok(pos('pessoas.js') < pos('gestao-rh-modelo.js')); assert.ok(pos('gestao-rh-modelo.js') < pos('gestao-rh.js'));

@@ -208,7 +208,7 @@ async function carregar() {
   if (r.status === 401) { exigirLogin('Entre de novo para ver as reservas.'); return; }
   if (r.status === 403) {
     // 403 nunca limpa a sessão nem aparece como lista vazia — é "sem acesso", algo bem diferente
-    mostrarErro('Você ainda não tem acesso a esta consulta. Fale com o Fábio ou o Neto.');
+    mostrarErro('Você ainda não tem acesso a esta consulta. Peça acesso ao administrador.');
     return;
   }
   if (!r.ok) { mostrarErro(mensagemErro(r)); return; }
