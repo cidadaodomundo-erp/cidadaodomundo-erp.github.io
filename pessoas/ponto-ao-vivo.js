@@ -336,7 +336,7 @@
         return () => { document.removeEventListener('visibilitychange', fn); if (o) o.disconnect(); };
       },
       escalaDia: null,      // objeto futuro (escala diária): hoje não existe no ERP
-      dowConvencao: null,   // 'DOM0' | 'SEG1': escolha do Fabio
+      dowConvencao: null,   // 'DOM0' | 'SEG1': escolha pendente
       diaOperacional: () => M.diaOperacionalDe(new Date().toISOString()),   // antes das 07:00 (Brasília) ainda é o dia operacional de ontem
       refeicoes: null,      // modo antigo (lote) não tem refeição: coluna "fonte indisponível"; no modo direto a refeição vem na própria resposta
       // leitura separada enquanto a tela está aberta: só GET à Edge Function, com o JWT da pessoa logada (nenhum segredo no navegador)
