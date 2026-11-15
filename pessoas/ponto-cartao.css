@@ -17,12 +17,19 @@
 .pcart-tab th { background: var(--th-claro); color: var(--th-claro-tx); text-align: left; padding: 8px; white-space: nowrap; border-bottom: 1px solid var(--line-2); }
 .pcart-tab td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--tx-1); overflow-wrap: anywhere; }
 /* colunas factuais (Loja, Dia, Entrada, Saída, Batidas, Lido em): nunca quebram no meio; rolagem só dentro de .pcart-rolagem */
-.pcart-tab td:nth-child(n+2):nth-child(-n+7) { white-space: nowrap; overflow-wrap: normal; }
+.pcart-tab td:nth-child(n+2):nth-child(-n+5) { white-space: nowrap; overflow-wrap: normal; }
 .pcart-tab tr:nth-child(even) td { background: var(--zebra); }
 .pcart-conf { font-weight: 600; }
 .pcart-conf.pcart-conf-ok { color: var(--tx-1); }
 .pcart-conf.pcart-conf-ver { color: var(--farol-perto); }
 .pcart-conf.pcart-conf-ruim { color: var(--farol-fora); }
+.pcart-conf.pcart-conf-verde { color: #1e9e4a; }
+/* marcas do dia: verde = certo; vermelho no campo exato que está errado; cinza = não deu para avaliar */
+.pcart-tab td.pcart-mk-ok { box-shadow: inset 3px 0 0 #1e9e4a; }
+.pcart-tab td.pcart-mk-ruim { box-shadow: inset 3px 0 0 var(--farol-fora); color: var(--farol-fora); font-weight: 600; }
+.pcart-mk-txt { font-size: 11px; font-weight: 600; white-space: normal; margin-top: 2px; }
+.pcart-mk-ruim .pcart-mk-txt { color: var(--farol-fora); }
+.pcart-mk-sem .pcart-mk-txt { color: var(--tx-3); font-weight: 400; }
 @media (max-width: 640px) {
   .pcart-ctl { flex-direction: column; align-items: stretch; }
   .pcart-rolagem { overflow-x: visible; border: 0; }
