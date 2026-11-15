@@ -239,6 +239,8 @@
       const m = [];
       if (d) {
         m.push('Consulta feita neste navegador em ' + (fmtLidoEm(d.consultadoEm) || 'hora desconhecida') + ' (não é a hora de leitura do Flash; ela está na coluna "Lido em").');
+        if (d.direto) m.push(d.direto.ok ? 'Hoje veio direto do Flash agora' + (d.direto.lidoEm ? ' (lido em ' + d.direto.lidoEm + ')' : '') + '; os outros dias vêm da base.'
+          : 'Não deu para ler hoje direto no Flash agora; hoje mostra o que já estava na base.');
         if (d.notas.semUnidade) m.push(d.notas.semUnidade + ' cadastro(s) sem unidade válida ficaram de fora desta consulta (sem horários atribuídos); conferir o cadastro.');
         if (d.notas.cadastrosInvalidos) m.push(d.notas.cadastrosInvalidos + ' cadastro(s) em formato inválido ignorado(s).');
         if (d.notas.batidasInvalidas) m.push(d.notas.batidasInvalidas + ' leitura(s) com dado inválido, não atribuída(s).');
@@ -305,7 +307,7 @@
       const atual = deps.lojaAtual();
       if (!info || !Array.isArray(info.lojas) || !info.lojas.length || typeof atual !== 'string' || !info.lojas.includes(atual)) { st.lojas = []; st.loja = null; return falha('semloja'); }
       st.lojas = info.lojas.filter((l) => typeof l === 'string'); st.loja = atual; st.travado = info.travado === true;
-      let pessoas, batidas, ult;
+      let pessoas, batidas, ult;   // batidas pode receber as linhas de hoje lidas direto no Flash
       try {
         [pessoas, batidas, ult] = await Promise.all([
           deps.consultar(PESSOAS_PATH), deps.consultar(batidasPath(de, ate)),
@@ -315,6 +317,26 @@
       if (sessaoMudou()) return falha('sessao');
       if (deps.lojaAtual() !== atual) return;   // a loja mudou no meio: o ouvinte já recomeçou
       if (!Array.isArray(pessoas) || !Array.isArray(batidas)) return falha('dadosinvalidos');
+      // Hoje dentro do período: busca o dia de hoje direto no Flash (mesma leitura do Ponto ao Vivo, só GET com o JWT da
+      // pessoa). Deu certo: as linhas de hoje da base são trocadas pelas do Flash. Falhou: fica a base, com o aviso.
+      let direto = null;
+      const hoje = deps.hoje ? deps.hoje() : null;
+      if (hoje && typeof deps.leituraDireta === 'function' && de <= hoje && hoje <= ate) {
+        try {
+          const r = await deps.leituraDireta({ dia: hoje, unidade: atual });
+          if (!vivo()) return;
+          if (sessaoMudou()) return falha('sessao');
+          if (deps.lojaAtual() !== atual) return;
+          if (!ehObj(r) || !Array.isArray(r.batidas)) throw new Error('resposta inválida');
+          const deHoje = r.batidas.filter((x) => ehObj(x) && x.data === hoje)
+            .map((x) => ({ data: x.data, flash_id: x.flash_id, entrada: x.entrada == null ? null : x.entrada, saida: x.saida == null ? null : x.saida, n_batidas: x.n_batidas, lido_em: x.lido_em }));
+          batidas = batidas.filter((x) => !(ehObj(x) && x.data === hoje)).concat(deHoje);
+          direto = { ok: true, lidoEm: modelo.isoComFusoValido(r.lidoEm) ? fmtLidoEm(r.lidoEm) : null };
+        } catch (e) {
+          if (!vivo()) return;
+          direto = { ok: false };
+        }
+      }
       let ultima = { estado: 'indisponivel' };
       if (Array.isArray(ult)) ultima = ult.length === 0 ? { estado: 'vazio' } : (ehObj(ult[0]) && modelo.dataCalendarValida(ult[0].data) ? { estado: 'ok', data: ult[0].data, lidoEm: modelo.isoComFusoValido(ult[0].lido_em) ? fmtLidoEm(ult[0].lido_em) : null } : { estado: 'indisponivel' });
       const consultadoEm = deps.agora();
@@ -322,7 +344,7 @@
       st.ultima = ultima;
       if (!pessoas.length || !c.opcoes.length) { st.fase = 'semcadastro'; st.msg = pessoas.length ? 'Nenhum cadastro desta loja nesta consulta; não dá para concluir nada sobre a equipe.' : ''; desenhar(); return; }
       if (st.de !== de || st.ate !== ate) return;   // inputs mudaram no meio: resultado do período antigo é descartado
-      st.dados = { de, ate, linhas: c.linhas, notas: c.notas, opcoes: c.opcoes, consultadoEm };
+      st.dados = { de, ate, linhas: c.linhas, notas: c.notas, opcoes: c.opcoes, consultadoEm, direto };
       st.fase = batidas.length === 0 ? 'semregistros' : 'ok';
       desenhar();
     }
@@ -366,6 +388,8 @@
       sessaoVencida: () => { if (typeof exigirLogin === 'function') exigirLogin('Sua sessão venceu. Entre de novo.'); },
       agora: () => new Date().toISOString(),
       hoje: () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
+      // leitura do dia de hoje direto no Flash: pessoas/ponto-flash-direto.js (só GET à Edge Function do Ponto ao Vivo)
+      leituraDireta: typeof window.pontoFlashDireto === 'function' ? window.pontoFlashDireto : null,
     };
   }
   function entrarPesPonto() { if (!inst) inst = criar(depsPadrao()); return inst.entrar(); }
