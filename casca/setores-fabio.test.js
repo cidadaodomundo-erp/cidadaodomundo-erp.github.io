@@ -124,14 +124,14 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   assert.deepEqual(molduras(), ['delivery/index.html']);
   assert.equal(t.loc.hash, '#delivery');
   // tela do agrupamento sem página ligada: mostra o agrupamento, nunca a moldura dashboard.html
-  t.ev("abrir('pcartao')");
+  t.ev("abrir('cozinha')");
   assert.ok(!molduras().some((u) => /dashboard\.html/.test(u)));
   assert.match(t.$('titulo').textContent, /Operação das lojas/);
   const casa = t.$('vista').querySelector('.home').innerHTML;
   ['Delivery', 'RH', 'Salão'].forEach((s) => assert.match(casa, new RegExp('class="gh">[^<]* ' + s + '<')));
   assert.ok(casa.indexOf('Delivery<') < casa.indexOf('Salão<') && casa.indexOf('Salão<') < casa.indexOf('RH<'), 'ordem dos setores');
   assert.match(casa, /data-chave="delivery"/); assert.match(casa, /data-chave="salao"/); assert.match(casa, /data-chave="pao"/);
-  assert.doesNotMatch(casa, /data-chave="pcartao"/, 'sem página = sem botão ativo');
+  assert.doesNotMatch(casa, /data-chave="cozinha"/, 'sem página = sem botão ativo');
   assert.match(casa, /integração pendente · acesso ainda não conectado/);
   assert.doesNotMatch(casa + t.$('menu').innerHTML, /sem página/);
   // setor Delivery: Delivery do dia e Chegada; Fila/Escala só como aviso em texto, sem botão nem link
@@ -175,7 +175,7 @@ test('sem rede nova: a casca só chama as leituras que já chamava (nenhuma RPC 
   t.ev("abrir('salao')"); t.ev("abrir('reservas')"); t.ev("abrir('pausados')"); await settle();
   assert.equal(t.abertas.length, 0, 'nada abre outra aba');
   const rpcs = new Set(t.chamadas.map((c) => (/\/rpc\/(\w+)/.exec(c.url) || [])[1]).filter(Boolean));
-  const conhecidas = ['meus_modulos', 'painel_minhas_lojas', 'pode_ver_pessoal', 'tr_meu_papel', 'agenda_ve_equipe', 'painel_meu_tema', 'painel_registrar_uso', 'painel_tema_gravar'];
+  const conhecidas = ['meus_modulos', 'painel_minhas_lojas', 'pode_ver_pessoal', 'tr_meu_papel', 'agenda_ve_equipe', 'painel_meu_tema', 'painel_registrar_uso', 'painel_tema_gravar', 'pode_cadastrar_pessoal'];
   [...rpcs].forEach((r) => assert.ok(conhecidas.includes(r), 'rpc nova: ' + r));
   assert.ok(!t.chamadas.some((c) => /github\.io/.test(c.url)), 'nenhuma leitura do portal antigo');
 });

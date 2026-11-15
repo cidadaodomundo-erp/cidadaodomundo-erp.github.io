@@ -26,5 +26,7 @@ window.CASCA_SETORES_FABIO = {
   busca: {
     delivery: ['delivery do dia', 'placar do delivery', 'tempo de entrega', 'cancelamentos do dia', 'avaliacoes do dia', 'entregas'],
     salao: ['salao', 'mesas', 'comandas'],
+    pcartao: ['consulta de ponto', 'batidas', 'cartao de ponto', 'entrada e saida'],
+    peventos: ['eventos', 'ausencias', 'ocorrencias', 'faltas', 'atestados'],
   },
 };
