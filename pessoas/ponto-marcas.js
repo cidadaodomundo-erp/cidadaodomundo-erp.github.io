@@ -75,5 +75,20 @@
     r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok') ? 'ok' : 'neutro');
     return r;
   }
-  return { avaliar, hora, TOL };
+  // correções do RH (respostas no grupo do WhatsApp): hora extra autorizada, refeição corrigida ou justificado
+  function corrigir(r, cs) {
+    if (!r || !Array.isArray(cs) || !cs.length) return r;
+    const quem = (c) => 'corrigido pelo RH' + (c.autor_nome ? ': ' + c.autor_nome : '') + (typeof c.em === 'string' && c.em.length >= 16 ? ', ' + c.em.slice(11, 16) : '');
+    const ok = (k, c) => { if (r[k] && r[k].estado === 'ruim') r[k] = { estado: 'ok', texto: quem(c), corrigido: true }; };
+    for (const c of cs) {
+      if (c.tipo === 'hora_extra_autorizada') { if (r.entrada && /hora extra/.test(r.entrada.texto)) ok('entrada', c); if (r.saida && /hora extra/.test(r.saida.texto)) ok('saida', c); }
+      else if (c.tipo === 'refeicao') ok('refeicao', c);
+      else if (c.tipo === 'justificado') ['entrada', 'saida', 'intervalo', 'refeicao'].forEach((k) => ok(k, c));
+    }
+    r.problemas = ['entrada', 'saida', 'intervalo', 'refeicao'].filter((k) => r[k] && r[k].estado === 'ruim').map((k) => r[k].texto);
+    const est = ['entrada', 'saida', 'intervalo', 'refeicao'].map((k) => r[k] && r[k].estado);
+    r.geral = est.includes('ruim') ? 'ruim' : (est.every((e) => e === 'ok') ? 'ok' : 'neutro');
+    return r;
+  }
+  return { avaliar, corrigir, hora, TOL };
 });

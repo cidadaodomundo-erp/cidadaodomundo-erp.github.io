@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { avaliar } = require('./ponto-marcas.js');
+const { avaliar, corrigir } = require('./ponto-marcas.js');
 const D = '2026-11-15';
 const t = (h) => D + ' ' + h + ':00';
 const J = { entrada: '11:00', saida: '20:00' };
@@ -34,4 +34,11 @@ test('ainda trabalhando não julga; sem horário ou sem leitura de refeição fi
   assert.equal(a.andamento, true); assert.equal(a.geral, 'neutro'); assert.equal(a.problemas.length, 0);
   const b = avaliar({ dia: D, horarios: [t('11:00'), t('15:00'), t('16:00'), t('20:00')], jornada: null, refeicao: { disponivel: false } });
   assert.equal(b.geral, 'neutro'); assert.equal(b.saida.estado, 'sem'); assert.equal(b.refeicao.estado, 'sem');
+});
+
+test('correção do RH deixa verde com o nome de quem corrigiu', () => {
+  const r = avaliar({ dia: D, horarios: [t('11:00'), t('15:00'), t('16:00'), t('21:00')], jornada: J, refeicao: { disponivel: true, identificado: true, itens: [] } });
+  assert.equal(r.geral, 'ruim');
+  const c = corrigir(r, [{ tipo: 'hora_extra_autorizada', autor_nome: 'Rita', em: '2026-11-15T22:43:00Z' }, { tipo: 'refeicao', autor_nome: 'Rita', em: '2026-11-15T22:45:00Z' }]);
+  assert.equal(c.geral, 'ok'); assert.match(c.saida.texto, /corrigido pelo RH: Rita/);
 });
