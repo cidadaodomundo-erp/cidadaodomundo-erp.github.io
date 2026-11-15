@@ -278,3 +278,22 @@ test('só consome fontes de leitura permitidas', async () => {
   assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_cadastrar_pessoal', 'rpc:pode_ver_pessoal']);
   assert.ok(tabelas(t.log).every((c) => /^rh_(pessoa|flash_batida)\?select=[a-z_,]+/.test(c)));
 });
+
+// ---------- hoje direto no Flash (15/11/2026) ----------
+test('hoje direto no Flash: troca as linhas de hoje da base; outros dias e falha ficam na base, com aviso', async () => {
+  const t = mk();
+  t.deps.leituraDireta = async ({ dia, unidade }) => { t.log.push('direto:' + dia + ':' + unidade);
+    return { lidoEm: '2026-11-10T15:00:00-03:00', batidas: [B({ entrada: '2026-11-10T07:58:00', saida: null, n_batidas: 1 }), B({ data: '2026-11-09' })] }; };
+  await t.c.entrar();
+  assert.ok(t.log.includes('direto:2026-11-10:AHU'));
+  assert.equal(t.c.st.fase, 'ok');
+  assert.match(t.raiz.textContent, /Hoje veio direto do Flash agora/);
+  const falha = mk();
+  falha.deps.leituraDireta = async () => { throw new Error('HTTP 502'); };
+  await falha.c.entrar();
+  assert.equal(falha.c.st.fase, 'semregistros');
+  assert.match(falha.raiz.textContent, /Não deu para ler hoje direto no Flash agora/);
+  const semHoje = mk(); let chamou = false; semHoje.deps.leituraDireta = async () => { chamou = true; return { batidas: [] }; };
+  semHoje.c.st.de = semHoje.c.st.ate = '2026-11-09'; await semHoje.c.entrar();
+  assert.equal(chamou, false, 'período sem hoje não chama o Flash');
+});
