@@ -223,7 +223,7 @@
    *  - fontes: { ausencias, ocorrencias, anterior: true|false } (false/ausente = fonte NÃO carregada ou truncada)
    *  - batidasAnterior: linhas de rh_flash_batida do dia anterior (só usadas na virada da madrugada, hoje, antes das 06:00)
    *  - escalaDia: Map|objeto { [pessoaId]: escala } — objeto futuro; ausente em produção hoje
-   *  - dowConvencao: 'DOM0' | 'SEG1' | null (escolha do Fabio; null => folga fixa do cadastro não é usada)
+   *  - dowConvencao: 'DOM0' | 'SEG1' | null (escolha pendente; null => folga fixa do cadastro não é usada)
    *  - refeicoes: ver celulaRefeicao (fonte futura); ultimaLeituraGeral: ISO do último lido_em da tabela (frescor sem linhas no dia)
    *  Retorna: linhas (todas do cadastro da loja), listadas (só batida válida + vínculo ativo), resumo, fonte, avisos, avaliacao.
    */
