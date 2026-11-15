@@ -110,6 +110,9 @@ window.CASCA_PAGINAS = {
   // 12/11/2026: telas do agrupamento "Operação das lojas" que passam a abrir a
   // página delas. As outras telas desse agrupamento ainda não têm linha aqui e aparecem sem botão ativo (docs/delivery-migracao.md).
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
+  reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
+  manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
+  prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // Salão: em construção (a própria página diz)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
@@ -118,7 +121,8 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance'];
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance',
+  'prestadores'];   // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
@@ -129,5 +133,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'reservas', 'pausados', 'reuniao', 'manutencao'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 
