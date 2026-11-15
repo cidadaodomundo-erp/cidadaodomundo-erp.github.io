@@ -40,5 +40,5 @@ test('correção do RH deixa verde com o nome de quem corrigiu', () => {
   const r = avaliar({ dia: D, horarios: [t('11:00'), t('15:00'), t('16:00'), t('21:00')], jornada: J, refeicao: { disponivel: true, identificado: true, itens: [] } });
   assert.equal(r.geral, 'ruim');
   const c = corrigir(r, [{ tipo: 'hora_extra_autorizada', autor_nome: 'Rita', em: '2026-11-15T22:43:00Z' }, { tipo: 'refeicao', autor_nome: 'Rita', em: '2026-11-15T22:45:00Z' }]);
-  assert.equal(c.geral, 'ok'); assert.match(c.saida.texto, /corrigido pelo RH: Rita/);
+  assert.equal(c.geral, 'ok'); assert.match(c.saida.texto, /corrigido pelo RH: Rita, 19:43/);
 });
