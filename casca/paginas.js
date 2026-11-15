@@ -111,7 +111,6 @@ window.CASCA_PAGINAS = {
   // página delas. As outras telas desse agrupamento ainda não têm linha aqui e aparecem sem botão ativo (docs/delivery-migracao.md).
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
-  freelas: 'freelas/index.html?v=20261115a',        // Taxas e Freelas (consulta de freela_contato e freela_valor_hora)
   manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
   prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
@@ -134,5 +133,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados', 'reuniao', 'freelas', 'manutencao'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'reservas', 'pausados', 'reuniao', 'manutencao'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 
