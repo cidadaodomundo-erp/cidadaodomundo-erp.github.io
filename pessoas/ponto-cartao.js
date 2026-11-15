@@ -265,7 +265,7 @@
         const mk = marcasDe(d, r);
         const comMarca = (rot, t, m) => {
           const c = el('td', m ? 'pcart-mk pcart-mk-' + m.estado : null, t); c.setAttribute('data-rot', rot);
-          if (m && m.estado !== 'ok') c.appendChild(el('div', 'pcart-mk-txt', m.texto));
+          if (m && (m.estado !== 'ok' || (m.corrigido && t !== m.texto))) c.appendChild(el('div', 'pcart-mk-txt', m.texto));
           tr.appendChild(c);
         };
         comMarca('Entrada', r.entrada || '—', mk && mk.entrada); comMarca('Saída', r.saida || '—', mk && mk.saida);
@@ -289,8 +289,9 @@
       const fl = d.flashDe.get(String(r.pessoaId));
       if (!fl || !dir.horarios.has(fl)) return null;
       const id = String(r.pessoaId);
-      return deps.marcas.avaliar({ dia: r.dia, horarios: dir.horarios.get(fl), jornada: dir.jornadas[id] || null,
-        refeicao: { disponivel: dir.refDisponivel, identificado: dir.refIdentificados.has(id), itens: Array.isArray(dir.refPorPessoa[id]) ? dir.refPorPessoa[id] : [] } });
+      const av = deps.marcas.avaliar({ dia: r.dia, horarios: dir.horarios.get(fl), jornada: dir.jornadas[id] || null,
+        refeicao: { pendente: true, disponivel: dir.refDisponivel, identificado: dir.refIdentificados.has(id), itens: Array.isArray(dir.refPorPessoa[id]) ? dir.refPorPessoa[id] : [] } });
+      return deps.marcas.corrigir ? deps.marcas.corrigir(av, (dir.correcoes || []).filter((c) => String(c.pessoa_id) === id && c.dia === r.dia)) : av;
     }
 
     async function guarda(fn) {
@@ -355,7 +356,10 @@
           const horarios = new Map();
           r.batidas.forEach((x) => { if (ehObj(x) && x.data === hoje && Array.isArray(x.horarios)) horarios.set(x.flash_id, x.horarios.filter((h) => typeof h === 'string')); });
           const ref = ehObj(r.refeicoes) ? r.refeicoes : {};
-          direto = { ok: true, lidoEm: modelo.isoComFusoValido(r.lidoEm) ? fmtLidoEm(r.lidoEm) : null, dia: hoje, horarios,
+          let correcoes = [];
+          try { const c = await deps.consultar('ponto_correcao?select=dia,pessoa_id,tipo,autor_nome,em&dia=eq.' + hoje + '&order=em.asc'); if (Array.isArray(c)) correcoes = c.filter(ehObj); } catch (e) { correcoes = []; }
+          if (!vivo()) return;
+          direto = { correcoes, ok: true, lidoEm: modelo.isoComFusoValido(r.lidoEm) ? fmtLidoEm(r.lidoEm) : null, dia: hoje, horarios,
             jornadas: ehObj(r.jornadas) ? r.jornadas : {}, refDisponivel: ref.disponivel === true,
             refPorPessoa: ehObj(ref.porPessoa) ? ref.porPessoa : {}, refIdentificados: new Set(Array.isArray(ref.identificados) ? ref.identificados.map(String) : []) };
         } catch (e) {
