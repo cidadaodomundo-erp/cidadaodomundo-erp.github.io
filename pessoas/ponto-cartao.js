@@ -186,7 +186,7 @@
       raiz.replaceChildren();
       const w = el('div', 'pcart');
       w.appendChild(el('h2', 'pcart-titulo', 'Consulta de ponto'));
-      w.appendChild(el('div', 'pcart-aviso', 'Resumo recebido do Flash no ERP. Entrada, saída e contagem; não é espelho completo e não mostra intervalo. Entrada/saída aparecem como gravadas, sem fuso. Folga e ausência são desconhecidas nesta fonte. Disponível para quem já pode consultar o RH. A loja filtra apenas o que aparece nesta tela.'));
+      w.appendChild(el('div', 'pcart-aviso', 'Resumo recebido do Flash no ERP. Hoje vem direto do Flash, com intervalo, refeição e marcas (verde = tudo certo; vermelho no campo errado; hora extra pede conferir autorização). Dias anteriores: só entrada, saída e contagem. Entrada/saída aparecem como gravadas, sem fuso. Folga e ausência são desconhecidas nesta fonte. Disponível para quem já pode consultar o RH. A loja filtra apenas o que aparece nesta tela.'));
       const ctl = el('div', 'pcart-ctl');
       const de = el('input'); de.type = 'date';
       const ate = el('input'); ate.type = 'date';
@@ -228,7 +228,7 @@
       ui.status.className = 'pcart-status' + (f === 'erro' || f === 'sessao' || f === 'periodoinvalido' || f === 'dadosinvalidos' ? ' pcart-erro' : (f === 'periodoalterado' || f === 'semregistros' || f === 'semcadastro' || f === 'semacesso' || f === 'semloja' ? ' pcart-alerta' : ''));
       let txt = st.msg || MSG[f] || '';
       if (f === 'semregistros') txt = 'Nenhuma leitura do Flash recebida neste período. As linhas abaixo mostram "sem leitura recebida"; isso não é falta nem OK.';
-      if (f === 'ok') txt = 'Consulta concluída. Estados são só conferência; nenhum cálculo de falta, hora extra ou desconto.';
+      if (f === 'ok') txt = 'Consulta concluída. As marcas são conferência; nenhum cálculo de desconto.';
       ui.status.textContent = txt;
       ui.loja.disabled = st.travado || st.lojas.length < 2;
       opcoes(ui.loja, st.lojas.map((l) => [l, l]), st.loja);
@@ -255,21 +255,42 @@
       const linhas = st.pessoaSel ? d.linhas.filter((r) => String(r.pessoaId) === st.pessoaSel) : d.linhas;
       const tab = el('table', 'pcart-tab');
       const cab = el('tr');
-      ['Pessoa', 'Loja', 'Dia', 'Entrada', 'Saída', 'Batidas', 'Lido em', 'Conferência'].forEach((t) => cab.appendChild(el('th', null, t)));
+      ['Pessoa', 'Loja', 'Dia', 'Entrada', 'Saída', 'Intervalo', 'Refeição', 'Batidas', 'Lido em', 'Conferência'].forEach((t) => cab.appendChild(el('th', null, t)));
       const th = el('thead'); th.appendChild(cab); tab.appendChild(th);
       const tb = el('tbody');
       linhas.forEach((r) => {
         const tr = el('tr');
         const cel = (rot, t, cls) => { const c = el('td', cls, t); c.setAttribute('data-rot', rot); tr.appendChild(c); };
         cel('Pessoa', r.nome); cel('Loja', r.unidade); cel('Dia', fmtDia(r.dia));
-        cel('Entrada', r.entrada || '—'); cel('Saída', r.saida || '—');
+        const mk = marcasDe(d, r);
+        const comMarca = (rot, t, m) => {
+          const c = el('td', m ? 'pcart-mk pcart-mk-' + m.estado : null, t); c.setAttribute('data-rot', rot);
+          if (m && m.estado !== 'ok') c.appendChild(el('div', 'pcart-mk-txt', m.texto));
+          tr.appendChild(c);
+        };
+        comMarca('Entrada', r.entrada || '—', mk && mk.entrada); comMarca('Saída', r.saida || '—', mk && mk.saida);
+        comMarca('Intervalo', mk ? (mk.intervalo ? (mk.intervalo.estado === 'ok' ? mk.intervalo.texto : '') : (mk.andamento ? 'em andamento' : '—')) : '—', mk && mk.intervalo && mk.intervalo.estado !== 'ok' ? mk.intervalo : (mk && mk.intervalo ? mk.intervalo : null));
+        comMarca('Refeição', mk ? (mk.refeicao ? (mk.refeicao.estado === 'ok' ? mk.refeicao.texto : '') : (mk.andamento ? 'em andamento' : '—')) : '—', mk && mk.refeicao);
         cel('Batidas', r.nDesconhecido ? 'desconhecido' : (r.n == null ? '—' : String(r.n)));
         cel('Lido em', r.lidoEm || '—');
-        cel('Conferência', r.rotulo, 'pcart-conf pcart-conf-' + r.classe);
+        if (mk && mk.geral === 'ok') cel('Conferência', '✓ Tudo certo', 'pcart-conf pcart-conf-verde');
+        else if (mk && mk.geral === 'ruim') cel('Conferência', '✗ ' + mk.problemas.length + (mk.problemas.length > 1 ? ' problemas' : ' problema'), 'pcart-conf pcart-conf-ruim');
+        else cel('Conferência', r.rotulo, 'pcart-conf pcart-conf-' + r.classe);
         tb.appendChild(tr);
       });
       tab.appendChild(tb);
       ui.rol.appendChild(tab);
+    }
+
+    // marcas do dia (só o dia lido direto no Flash, com todas as batidas): pessoas/ponto-marcas.js
+    function marcasDe(d, r) {
+      const dir = d.direto;
+      if (!dir || !dir.ok || r.dia !== dir.dia || r.pessoaId == null || !deps.marcas) return null;
+      const fl = d.flashDe.get(String(r.pessoaId));
+      if (!fl || !dir.horarios.has(fl)) return null;
+      const id = String(r.pessoaId);
+      return deps.marcas.avaliar({ dia: r.dia, horarios: dir.horarios.get(fl), jornada: dir.jornadas[id] || null,
+        refeicao: { disponivel: dir.refDisponivel, identificado: dir.refIdentificados.has(id), itens: Array.isArray(dir.refPorPessoa[id]) ? dir.refPorPessoa[id] : [] } });
     }
 
     async function guarda(fn) {
@@ -331,7 +352,12 @@
           const deHoje = r.batidas.filter((x) => ehObj(x) && x.data === hoje)
             .map((x) => ({ data: x.data, flash_id: x.flash_id, entrada: x.entrada == null ? null : x.entrada, saida: x.saida == null ? null : x.saida, n_batidas: x.n_batidas, lido_em: x.lido_em }));
           batidas = batidas.filter((x) => !(ehObj(x) && x.data === hoje)).concat(deHoje);
-          direto = { ok: true, lidoEm: modelo.isoComFusoValido(r.lidoEm) ? fmtLidoEm(r.lidoEm) : null };
+          const horarios = new Map();
+          r.batidas.forEach((x) => { if (ehObj(x) && x.data === hoje && Array.isArray(x.horarios)) horarios.set(x.flash_id, x.horarios.filter((h) => typeof h === 'string')); });
+          const ref = ehObj(r.refeicoes) ? r.refeicoes : {};
+          direto = { ok: true, lidoEm: modelo.isoComFusoValido(r.lidoEm) ? fmtLidoEm(r.lidoEm) : null, dia: hoje, horarios,
+            jornadas: ehObj(r.jornadas) ? r.jornadas : {}, refDisponivel: ref.disponivel === true,
+            refPorPessoa: ehObj(ref.porPessoa) ? ref.porPessoa : {}, refIdentificados: new Set(Array.isArray(ref.identificados) ? ref.identificados.map(String) : []) };
         } catch (e) {
           if (!vivo()) return;
           direto = { ok: false };
@@ -344,7 +370,8 @@
       st.ultima = ultima;
       if (!pessoas.length || !c.opcoes.length) { st.fase = 'semcadastro'; st.msg = pessoas.length ? 'Nenhum cadastro desta loja nesta consulta; não dá para concluir nada sobre a equipe.' : ''; desenhar(); return; }
       if (st.de !== de || st.ate !== ate) return;   // inputs mudaram no meio: resultado do período antigo é descartado
-      st.dados = { de, ate, linhas: c.linhas, notas: c.notas, opcoes: c.opcoes, consultadoEm, direto };
+      const flashDe = new Map(pessoas.filter((p) => ehObj(p) && idOk(p.id)).map((p) => [String(p.id), p.flash_id]));
+      st.dados = { de, ate, linhas: c.linhas, notas: c.notas, opcoes: c.opcoes, consultadoEm, direto, flashDe };
       st.fase = batidas.length === 0 ? 'semregistros' : 'ok';
       desenhar();
     }
@@ -390,6 +417,7 @@
       hoje: () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
       // leitura do dia de hoje direto no Flash: pessoas/ponto-flash-direto.js (só GET à Edge Function do Ponto ao Vivo)
       leituraDireta: typeof window.pontoFlashDireto === 'function' ? window.pontoFlashDireto : null,
+      marcas: window.PontoMarcas || null,
     };
   }
   function entrarPesPonto() { if (!inst) inst = criar(depsPadrao()); return inst.entrar(); }
