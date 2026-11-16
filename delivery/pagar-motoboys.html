@@ -178,6 +178,12 @@ function exigirLogin(recado) {
     if (l.esc_jan) t.push({ r: 'jan', ini: l.esc_jan, fim: l.esc_jan_fim, h: l.esc_jan_horas });
     return t;
   }
+  // O que fez: com 2 turnos, uma linha por turno (almoço até a última entrega antes das 17h; jantar a partir da 1ª coleta depois das 17h).
+  function celReal(l, campo) {
+    if (!l.saida_alm && !l.chegada_jan) return esc((campo === 'ch' ? l.chegada : l.saida) || '—');
+    const a = campo === 'ch' ? [l.chegada, l.chegada_jan] : [l.saida_alm, l.saida];
+    return '<span class="pm-turno"><i>alm</i>' + esc(a[0] || '—') + '</span><span class="pm-turno"><i>jan</i>' + esc(a[1] || '—') + '</span>';
+  }
   function horasEsc(l) {
     const t = turnosEsc(l); if (!t.length || t.some((x) => x.h == null)) return null;
     return t.reduce((a, x) => a + Number(x.h), 0);
@@ -207,8 +213,8 @@ function exigirLogin(recado) {
       '<td data-rot="Escala: entrada" class="esc" title="Escala do Jaison">' + celEsc(l, 'ini') + '</td>' +
       '<td data-rot="Escala: saída" class="esc">' + celEsc(l, 'fim') + '</td>' +
       '<td data-rot="Escala: horas" class="esc fim"><b>' + (horasEsc(l) != null ? horasTxt(horasEsc(l)) : (turnosEsc(l).length ? '<span class="pm-tarde">?</span>' : '—')) + '</b></td>' +
-      '<td data-rot="Chegou" class="real' + (tarde ? ' pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + esc(l.chegada || '—') + '</td>' +
-      '<td data-rot="Saiu" class="real" title="Última entrega no TrackEat">' + esc(l.saida || '—') + '</td>' +
+      '<td data-rot="Chegou" class="real' + (tarde ? ' pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + celReal(l, 'ch') + '</td>' +
+      '<td data-rot="Saiu" class="real" title="Última entrega no TrackEat">' + celReal(l, 'sai') + '</td>' +
       '<td data-rot="Rodou" class="real' + (curta ? ' pm-tarde' : '') + '"' + (curta ? ' title="Rodou menos que o combinado na escala (da 1ª coleta à última entrega)"' : '') + '><b>' + horasTxt(l.horas) + '</b>' +
         (dif != null ? '<span class="pm-dif ' + (curta ? 'pm-tarde' : 'pm-fraco') + '">' + (dif >= 0 ? '+' : '−') + horasTxt(Math.abs(dif)) + '</span>' : '') + '</td>' +
       '<td data-rot="Entregas">' + esc(l.entregas) + '</td>' +
