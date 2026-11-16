@@ -12,7 +12,7 @@
 // Nenhum timer, nenhuma leitura de rede, nenhuma escrita neste arquivo.
 window.CASCA_SETORES_FABIO = {
   setores: [
-    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada'],
+    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto'],
       aviso: 'Ainda sem tela: Fila de pedidos e edição da Escala.' },
     { id: 'salao', nome: 'Salão', icone: '🍽️', chaves: ['salao', 'reservas', 'pausados'] },
     { id: 'rh', nome: 'RH', icone: '👥', chaves: ['prh', 'pao', 'pcartao', 'peventos', 'freelas'] },
@@ -24,6 +24,7 @@ window.CASCA_SETORES_FABIO = {
   demais: { id: 'demais', nome: 'Demais telas', icone: '📁' },
   // palavras de busca das telas do agrupamento que ainda não tinham (não sobrescreve casca/busca.js)
   busca: {
+    pagarmoto: ['pagar motoboys', 'pagamento motoboy', 'quanto pagar', 'garantido', 'motoboy pix'],
     delivery: ['delivery do dia', 'placar do delivery', 'tempo de entrega', 'cancelamentos do dia', 'avaliacoes do dia', 'entregas'],
     salao: ['salao', 'mesas', 'comandas'],
     pcartao: ['consulta de ponto', 'batidas', 'cartao de ponto', 'entrada e saida'],

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Pagar motoboys · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PAGAR MOTOBOYS (16/11/2026). Trazida do portal antigo com a cara do portal novo. Lê só o banco do ERP, pela função
+     pagar_motoboys_dia(dia), que só responde para o dono e quem cuida do pessoal (pode_ver_pessoal). Entregas e taxas vêm do
+     TrackEat, horários combinados da escala do Jaison, lanches da comanda Z Motoboys do Saipos, a régua de motoboy_param.
+     Chegada = 1ª coleta do TrackEat (decisão do Fábio 16/11); o GPS do pátio entra depois. Esta página não grava nada. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .pm-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .pm-topo h1 { font-size:22px; margin:0; letter-spacing:.3px; }
+  .pm-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
+  .pm-topo .acoes { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .pm-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .pm-btn:hover:not(:disabled) { border-color:var(--brand); }
+  .pm-btn:disabled { opacity:.45; cursor:default; }
+  .pm-abas { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .pm-abas button { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .pm-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .pm-selo { font-size:10px; font-weight:700; opacity:.75; margin-left:4px; }
+  .pm-caixa { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  .pm-dia { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .pm-dia input { font:inherit; padding:5px 8px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; }
+  .pm-dia .rot { font-size:12px; color:var(--tx-3); width:100%; }
+  .pm-lojas { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .pm-lojas .rot { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; margin-right:4px; }
+  .pm-lojas button { font:inherit; font-size:13px; padding:5px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; }
+  .pm-lojas button.on { background:var(--marca-amarelo, #e0a526); border-color:var(--marca-amarelo, #e0a526); color:#111; font-weight:700; }
+  .pm-aviso { border-left:4px solid var(--farol-atencao, #d29922); background:var(--surface); border-radius:10px; padding:9px 14px; margin:0 0 10px; font-size:13px; line-height:1.45; }
+  .pm-aviso.info { border-left-color:var(--brand); }
+  .pm-totais { display:flex; flex-wrap:wrap; gap:8px 28px; align-items:flex-end; }
+  .pm-totais .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; }
+  .pm-totais .v { font-size:20px; font-weight:800; }
+  .pm-totais .grande .v { font-size:34px; color:var(--marca-amarelo, #e0a526); line-height:1.05; }
+  .pm-totais .alerta .v { color:var(--farol-atencao, #d29922); }
+  .pm-loja { margin:16px 0 4px; display:flex; align-items:baseline; gap:10px; border-bottom:2px solid var(--marca-amarelo, #e0a526); padding-bottom:4px; }
+  .pm-loja h2 { font-size:17px; margin:0; text-transform:uppercase; letter-spacing:.5px; }
+  .pm-loja .meta { margin-left:auto; font-size:12px; color:var(--tx-3); }
+  .pm-loja .meta b { color:var(--tx-1); }
+  .pm-tab-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-top:8px; }
+  .pm-tab { width:100%; border-collapse:collapse; font-size:14px; }
+  .pm-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:9px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  .pm-tab th:first-child, .pm-tab td:first-child { text-align:left; white-space:normal; min-width:150px; }
+  .pm-tab td, .pm-tab th { padding-left:8px; padding-right:8px; }
+  .pm-tab td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .pm-tab tr.lin { cursor:pointer; }
+  .pm-tab tr.lin:hover td { background:var(--surface-2); }
+  .pm-nome { font-weight:700; }
+  .pm-nome small { display:block; font-weight:400; font-size:11px; color:var(--tx-3); }
+  .pm-conf { color:var(--farol-atencao, #d29922); font-size:11px; font-weight:700; margin-left:6px; }
+  .pm-vh { color:var(--marca-amarelo, #e0a526); font-weight:700; }
+  .pm-sim { color:var(--farol-ok); font-weight:700; }
+  .pm-nao { color:var(--farol-fora); font-weight:700; }
+  .pm-pagar { font-weight:800; }
+  .pm-fraco { color:var(--tx-3); }
+  .pm-tarde { color:var(--farol-atencao, #d29922); }
+  .pm-det td { white-space:normal; text-align:left; background:var(--surface-2); font-size:12.5px; line-height:1.5; }
+  .pm-det ul { margin:4px 0; padding-left:18px; }
+  .pm-nota { font-size:12px; color:var(--tx-3); margin:10px 0 0; line-height:1.5; }
+  .pm-vazio { padding:18px; color:var(--tx-3); }
+  .pm-regras { font-size:14px; line-height:1.6; }
+  .pm-regras h3 { font-size:15px; margin:14px 0 4px; }
+  .pm-regras li { margin:2px 0; }
+  @media (max-width: 720px) {
+    .pm-topo .acoes { margin-left:0; }
+    .pm-tab thead { display:none; }
+    .pm-tab, .pm-tab tbody, .pm-tab tr, .pm-tab td { display:block; width:100%; box-sizing:border-box; }
+    .pm-tab tr.lin { border-bottom:1px solid var(--line-2); padding:6px 0; }
+    .pm-tab td { border:none; padding:3px 12px; display:flex; justify-content:space-between; text-align:right; }
+    .pm-tab td::before { content:attr(data-rot); color:var(--tx-3); font-size:12px; text-align:left; }
+    .pm-tab td:first-child::before { content:''; }
+  }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="pm-topo">
+      <div>
+        <h1>💵 Pagar motoboys</h1>
+        <div class="sub">Quanto pagar a cada motoboy, por loja e turno. Só o dono e quem cuida do pessoal veem esta tela.</div>
+      </div>
+      <div class="acoes"><button type="button" class="pm-btn" id="btnAtualizar">🔄 Atualizar</button></div>
+    </div>
+
+    <div class="pm-abas" id="abas">
+      <button data-aba="pagar" class="on">💵 Quanto pagar</button>
+      <button data-aba="maquininha">🧾 Maquininha do dia <span class="pm-selo">Em construção</span></button>
+      <button data-aba="dobro">🔎 Corrida em dobro <span class="pm-selo">Em construção</span></button>
+      <button data-aba="acerto">📒 Acerto <span class="pm-selo">Em construção</span></button>
+      <button data-aba="regras">📜 As regras</button>
+    </div>
+
+    <div id="painelPagar">
+      <div class="pm-caixa pm-dia">
+        <div class="rot" id="diaRot">💵 Quanto pagar a cada motoboy</div>
+        <button type="button" class="pm-btn" id="btnAntes">◀ dia anterior</button>
+        <input type="date" id="dia" aria-label="Dia">
+        <button type="button" class="pm-btn" id="btnDepois">dia seguinte ▶</button>
+      </div>
+      <div class="pm-caixa pm-lojas" id="lojas"></div>
+      <div id="avisos"></div>
+      <div id="conteudo"><div class="pm-vazio">Carregando o dia…</div></div>
+    </div>
+
+    <div id="painelRegras" hidden></div>
+    <div id="painelObra" hidden></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script>
+function exigirLogin(recado) {
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const brl = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const LOJAS = ['Água Verde', 'São Braz', 'Ahú'];
+  let DADOS = null, LOJA = 'todas', ABERTO = {}, SEQ = 0;
+
+  function hojeSP() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
+  function somaDias(d, n) { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
+  function horasTxt(h) { if (h == null) return '—'; const m = Math.round(Number(h) * 60); return Math.floor(m / 60) + 'h' + String(m % 60).padStart(2, '0'); }
+
+  async function carregar() {
+    const dia = $('dia').value; const seq = ++SEQ;
+    $('btnDepois').disabled = dia >= somaDias(hojeSP(), -1);
+    $('conteudo').innerHTML = '<div class="pm-vazio">Carregando o dia…</div>'; $('avisos').innerHTML = '';
+    let r;
+    try { r = await trRpc('pagar_motoboys_dia', { p_dia: dia }); } catch (e) { if (seq === SEQ) erro('Sem conexão com o banco agora. Tente de novo.'); return; }
+    if (seq !== SEQ) return;
+    if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
+    if (!r.ok) { erro(r.status === 403 || r.status === 400 ? 'Esta tela é só do dono e de quem cuida do pessoal.' : await trErroDe(r)); return; }
+    DADOS = await r.json(); ABERTO = {};
+    if (seq === SEQ) desenhar();
+  }
+  function erro(msg) { $('conteudo').innerHTML = '<div class="pm-aviso">' + esc(msg) + '</div>'; }
+
+  function linhasVisiveis() { return (DADOS.linhas || []).filter((l) => LOJA === 'todas' || l.loja === LOJA); }
+
+  function desenharLojas() {
+    const cont = (k) => (DADOS ? (DADOS.linhas || []).filter((l) => k === 'todas' || l.loja === k).length : 0);
+    $('lojas').innerHTML = '<span class="rot">LOJA</span>' + ['todas'].concat(LOJAS).map((k) =>
+      '<button type="button" data-loja="' + esc(k) + '" class="' + (LOJA === k ? 'on' : '') + '">' + esc(k) + ' <span class="pm-fraco">' + cont(k) + '</span></button>').join('');
+  }
+
+  function refeicaoTxt(l) {
+    if (!l.direito_refeicoes) return '<span class="pm-nao">Não</span>';
+    if (l.direito_refeicoes > 1) return '<span class="pm-sim">' + l.direito_refeicoes + ' turnos</span>';
+    return '<span class="pm-sim">Sim</span>';
+  }
+
+  function linhaHtml(l, i) {
+    const k = l.loja + '|' + l.id_entregador;
+    const tarde = (l.atraso_alm > DADOS.tolerancia_min) || (l.atraso_jan > DADOS.tolerancia_min);
+    let h = '<tr class="lin" data-k="' + esc(k) + '">' +
+      '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
+        (l.turnos > 1 ? '<small>2 turnos</small>' : '') + '</span></td>' +
+      '<td data-rot="Chegada" class="' + (tarde ? 'pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + esc(l.chegada || '—') + '</td>' +
+      '<td data-rot="Saída">' + esc(l.saida || '—') + '</td>' +
+      '<td data-rot="Horas">' + horasTxt(l.horas) + '</td>' +
+      '<td data-rot="Entregas">' + esc(l.entregas) + '</td>' +
+      '<td data-rot="Taxas">' + brl(l.taxas) + '</td>' +
+      '<td data-rot="R$/hora"><span class="pm-vh">' + brl(l.valor_hora) + '</span></td>' +
+      '<td data-rot="Garantido">' + (Number(l.garantido) > 0 ? '<span class="pm-sim">' + brl(l.garantido) + '</span>' : '<span class="pm-nao">Não</span>') + '</td>' +
+      '<td data-rot="Refeição">' + refeicaoTxt(l) + (Number(l.cobrar_refeicao) > 0 ? '<br><small class="pm-nao">cobra ' + brl(l.cobrar_refeicao) + '</small>' : '') + '</td>' +
+      '<td data-rot="A pagar" class="pm-pagar">' + brl(l.pagar) + '</td>' +
+      '<td data-rot="Pix">' + (l.chave_pix ? '<span class="pm-sim">tem</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td class="pm-fraco">' + (ABERTO[k] ? '▾' : '▸') + '</td></tr>';
+    if (ABERTO[k]) {
+      const itens = String(l.detalhe || '').split(' · ').filter(Boolean);
+      itens.unshift('Taxas das entregas ' + brl(l.taxas) + ' × garantido ' + brl(l.garantido) + ': paga o maior' +
+        (Number(l.ajustes) ? ', ' + (l.ajustes > 0 ? '+ ' : '− ') + brl(Math.abs(l.ajustes)) + ' de acerto' : '') +
+        (Number(l.cobrar_refeicao) ? ', − ' + brl(l.cobrar_refeicao) + ' de lanche além do direito' : '') + ' = ' + brl(l.pagar) + '.');
+      if (l.esc_alm || l.esc_jan) itens.push('Escala: ' + [l.esc_alm ? 'almoço ' + l.esc_alm : '', l.esc_jan ? 'jantar ' + l.esc_jan : ''].filter(Boolean).join(' · '));
+      itens.push('Lanches na comanda Z Motoboys: ' + l.lanches + ' (direito: ' + l.direito_refeicoes + ')');
+      if (l.reprovadas) itens.push(l.reprovadas + ' corrida(s) reprovada(s) no TrackEat ficaram fora');
+      h += '<tr class="pm-det"><td colspan="12"><ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
+    }
+    return h;
+  }
+
+  function desenhar() {
+    desenharLojas();
+    const d = DADOS, ls = linhasVisiveis();
+    $('diaRot').innerHTML = '💵 Quanto pagar a cada motoboy · ' + esc(d.dia_semana) + ', ' + esc(d.dia_texto) + ' · tarifas por loja e turno';
+    const f = d.fontes || {};
+    let av = '';
+    if (d.dia >= hojeSP()) av += '<div class="pm-aviso">⏳ <b>Este dia ainda está em andamento.</b> Pague pelo dia que já fechou.</div>';
+    av += '<div class="pm-aviso info">De onde vêm os números: entregas e taxas do <b>TrackEat</b> (carregado ' + esc(f.trackeat_carregado_em || '—') +
+      '), horário combinado da <b>escala</b> (gravada ' + esc(f.escala_gravada_em || '—') + '), lanches do <b>Saipos</b> (carregado ' + esc(f.saipos_carregado_em || '—') +
+      '). A <b>chegada</b> é a 1ª coleta no TrackEat: o GPS do pátio ainda não chegou ao portal novo, então atraso só aparece em laranja e não corta garantido nem refeição.</div>';
+    const conf = ls.filter((l) => l.conferir).length;
+    if (conf) av += '<div class="pm-aviso"><b>Conferir antes de pagar:</b> ' + conf + ' motoboy(s) com escala incompleta ou lanche sem preço. O total inclui prévias.</div>';
+    $('avisos').innerHTML = av;
+    if (!ls.length) { $('conteudo').innerHTML = '<div class="pm-vazio">Nenhuma entrega do TrackEat neste dia' + (LOJA !== 'todas' ? ' em ' + esc(LOJA) : '') + '. O TrackEat entra no portal novo uma vez por dia, de manhã, com o dia anterior.</div>'; return; }
+    const tot = ls.reduce((a, l) => a + Number(l.pagar || 0), 0);
+    let h = '<div class="pm-caixa pm-totais"><div class="grande"><div class="k">Total a pagar</div><div class="v">' + brl(tot) + '</div></div>' +
+      '<div><div class="k">Motoboys</div><div class="v">' + ls.length + '</div></div>' +
+      '<div class="alerta"><div class="k">Sem chave Pix</div><div class="v">' + ls.filter((l) => !l.chave_pix).length + '</div></div>' +
+      '<div><div class="k">Entregas</div><div class="v">' + ls.reduce((a, l) => a + Number(l.entregas || 0), 0) + '</div></div></div>';
+    (LOJA === 'todas' ? LOJAS : [LOJA]).forEach((lj) => {
+      const g = ls.filter((l) => l.loja === lj); if (!g.length) return;
+      h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' +
+        '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Chegada</th><th>Saída</th><th>Horas</th><th>Entregas</th><th>Taxas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Pix</th><th></th></tr></thead><tbody>' +
+        g.map(linhaHtml).join('') + '</tbody></table></div>';
+    });
+    const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
+    if (sd.length) h += '<div class="pm-aviso" style="margin-top:12px">🍔 <b>' + sd.length + ' lanche(s) sem dono</b> na comanda Z Motoboys — ninguém está sendo cobrado: ' +
+      sd.map((x) => esc(x.loja) + ' venda ' + esc(x.numero_venda) + ' (' + esc(x.produto) + ')').join(' · ') + '. Falta o nome do motoboy na observação do lanche.</div>';
+    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. Planilha dos meninos, Pix feito e diferença (a Prova real) ainda estão no portal antigo. Quem decide é você.</p>';
+    $('conteudo').innerHTML = h;
+  }
+
+  function regras() {
+    $('painelRegras').innerHTML = '<div class="pm-caixa pm-regras">' +
+      '<h3>Quanto cada motoboy recebe</h3><ul>' +
+      '<li>Recebe o <b>maior</b> entre a soma das taxas das entregas e o <b>garantido</b> do dia, mais acertos à mão, menos lanche além do direito.</li>' +
+      '<li><b>Garantido</b> = horas da escala de cada turno × valor da hora. Turno conta quando ele estava na escala e rodou, ou rodou mais de 1h fora da escala.</li>' +
+      '<li><b>Valor da hora</b>: R$ 20 de segunda a sexta e R$ 25 no fim de semana na Água Verde; R$ 20 no São Braz; no Ahú, R$ 25 no jantar e no almoço R$ 25 com 1 motoboy ou R$ 20 com 2.</li>' +
+      '<li>Escala sem hora de saída: usa o piso do turno da loja e marca <b>conferir</b>.</li>' +
+      '<li>Corrida <b>reprovada</b> no TrackEat (repetida) fica fora da conta.</li></ul>' +
+      '<h3>Refeição</h3><ul>' +
+      '<li>Direito a 1 lanche por turno rodado. Lanche a mais na comanda <b>Z Motoboys</b> é cobrado: R$ 24,50, ou R$ 29,90 com batata ou onion de funcionário.</li>' +
+      '<li>O lanche é ligado ao motoboy pelo nome escrito na observação do item.</li></ul>' +
+      '<h3>Chegada e atraso</h3><ul>' +
+      '<li>Regra da casa: chegou mais de ' + esc((DADOS && DADOS.tolerancia_min) || 30) + ' min depois do combinado perde o garantido e a refeição daquele turno.</li>' +
+      '<li>Hoje o portal novo ainda não tem o GPS do pátio, só a 1ª coleta do TrackEat, que costuma ser depois da chegada real. Por isso o atraso só aparece em laranja e <b>não corta nada sozinho</b>.</li></ul></div>';
+  }
+
+  $('abas').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-aba]'); if (!b) return;
+    document.querySelectorAll('#abas button').forEach((x) => x.classList.toggle('on', x === b));
+    const a = b.dataset.aba;
+    $('painelPagar').hidden = a !== 'pagar'; $('painelRegras').hidden = a !== 'regras'; $('painelObra').hidden = a === 'pagar' || a === 'regras';
+    if (a === 'regras') regras();
+    if (!$('painelObra').hidden) $('painelObra').innerHTML = '<div class="pm-aviso info">Esta parte ainda está no portal antigo e vem para cá nos próximos passos.</div>';
+  });
+  $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); });
+  $('conteudo').addEventListener('click', (ev) => { const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
+  $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };
+  $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
+  $('dia').onchange = carregar;
+  $('btnAtualizar').onclick = carregar;
+  $('dia').max = somaDias(hojeSP(), -1);
+  $('dia').value = somaDias(hojeSP(), -1);
+  carregar();
+})();
+</script>
+</body>
+</html>

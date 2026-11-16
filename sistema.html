@@ -255,10 +255,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261113rh"></script>
-<script src="casca/paginas.js?v=20261116a"></script>
+<script src="casca/menu.js?v=20261116pm"></script>
+<script src="casca/paginas.js?v=20261116pm"></script>
 <script src="casca/modulos.js?v=20261113cp"></script>
-<script src="casca/setores-fabio.js?v=20261115b"></script>
+<script src="casca/setores-fabio.js?v=20261116pm"></script>
 <script src="casca/busca.js?v=20261116a"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -478,6 +478,8 @@ function visivel(chave) {
   if (!it) return false;
   // 12/11/2026: a Chegada dos motoboys usa a MESMA permissão do Delivery do dia (sem chave nova no painel_acesso)
   if (chave === 'chegada') return visivel('delivery');
+  // 16/11/2026: Pagar motoboys só para quem vê pessoal (dono, Fábio, Hellen) e vê o Delivery; o banco confere de novo (pode_ver_pessoal)
+  if (chave === 'pagarmoto') return VE_PESSOAL === true && visivel('delivery');
   // 13/11/2026: o Seguro de vida (RH) abre para quem vê Cargos e salários e vê pessoal (sem chave nova no painel_acesso)
   if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');
   // 13/11/2026: Compra no cartão abre para todo login; o banco decide o que cada um vê (fin_cartao_meus_cartoes: filial só o cartão da loja)
