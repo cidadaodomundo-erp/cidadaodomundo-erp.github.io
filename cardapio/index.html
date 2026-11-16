@@ -31,15 +31,17 @@
     <div id="modulo-fichas" class="modulo" style="display:none;"><div id="view-fichas"></div></div>
     <div id="modulo-engcard" class="modulo" style="display:none;"><div id="view-engcard"></div></div>
     <div id="modulo-rateio" class="modulo" style="display:none;"><div id="view-rateio"></div></div>
+    <div id="modulo-saiposcod" class="modulo" style="display:none;"><div id="view-saiposcod"></div></div>
   </div>
 </div>
 
 <script src="../nucleo/nucleo.js?v=20261109a"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="cardapio.js?v=20261113ft1"></script>
+<script src="saiposcod.js?v=20261116a"></script>
 <script>
 // O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
-const TELAS = { fichas: entrarFichas, engcard: entrarEngcard, rateio: entrarRateio };
+const TELAS = { fichas: entrarFichas, engcard: entrarEngcard, rateio: entrarRateio, saiposcod: entrarSaiposcod };
 const TELA = TELAS[location.hash.slice(1)] ? location.hash.slice(1) : 'fichas';
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
