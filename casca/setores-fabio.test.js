@@ -100,7 +100,7 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
   assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento Operação das lojas');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
-  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto'], 'Delivery: Delivery do dia, Chegada e Pagar motoboys nativos');
+  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto', 'pausadosdel'], 'Delivery: Delivery do dia, Chegada, Pagar motoboys e Itens pausados');
   assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados'], 'Reservas e Pausados no Salão');
 });
 
@@ -108,10 +108,11 @@ test('rotas: delivery, salao, reservas e pausados ligados; telas por loja e jun�
   assert.equal(C.CASCA_PAGINAS.delivery, 'delivery/index.html');
   assert.equal(C.CASCA_PAGINAS.salao, 'salao/index.html');
   assert.equal(C.CASCA_PAGINAS.reservas, 'reservas/index.html');
-  assert.equal(C.CASCA_PAGINAS.pausados, 'pausados/index.html');
+  assert.equal(C.CASCA_PAGINAS.pausados, 'pausados/index.html?modo=salao&v=20261116a');
+  assert.equal(C.CASCA_PAGINAS.pausadosdel, 'pausados/index.html?modo=delivery&v=20261116a');
   assert.ok(fs.existsSync(path.join(RAIZ, 'delivery', 'index.html')) && fs.existsSync(path.join(RAIZ, 'salao', 'index.html')));
   assert.equal(C.CASCA_PAGINAS.pao, 'pessoas/index.html#pao');
-  ['delivery', 'pao', 'reservas', 'pausados'].forEach((k) => assert.ok(C.CASCA_TELAS_POR_LOJA.includes(k), 'tela por loja: ' + k));
+  ['delivery', 'pao', 'reservas', 'pausados', 'pausadosdel'].forEach((k) => assert.ok(C.CASCA_TELAS_POR_LOJA.includes(k), 'tela por loja: ' + k));
   Object.entries(C.CASCA_PAGINAS).forEach(([k, v]) => assert.doesNotMatch(String(v), ANTIGO_RE, 'rota para o portal antigo: ' + k));
   assert.deepEqual(JSON.parse(JSON.stringify(C.CASCA_MODULOS_CFG.juncoes)), {
     cancelamentos: { abas: [['cancelamentos', 'Cancelamentos'], ['contestacoes', 'Contestações']] },
@@ -136,7 +137,7 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   assert.doesNotMatch(casa + t.$('menu').innerHTML, /sem página/);
   // setor Delivery: Delivery do dia e Chegada; Fila/Escala só como aviso em texto, sem botão nem link
   const setorDl = casa.slice(casa.indexOf('Delivery<'), casa.indexOf('Salão<'));
-  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada']);
+  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada', 'pausadosdel']);
   assert.match(setorDl, /class="setor-aviso">Ainda sem tela: Fila de pedidos e edição da Escala\.</);
   assert.doesNotMatch(setorDl, /Chegada completa/, 'Chegada não é mais pendência');
   assert.doesNotMatch(casa, /antigo:|github\.io|portal antigo|href=|<iframe|↗/i, 'agrupamento outras sem link para o portal antigo');
