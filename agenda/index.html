@@ -260,20 +260,22 @@ function agAvisosHtml() {
   const campo = 'width:100%;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:8px;font:inherit;';
   let h = `<div class="ag-bloco">Esperando o seu "manda" <span class="f">· ${g(1).length}</span></div>`;
   h += g(1).length ? g(1).map((a) => {
-    const est = a.estado === 'MUDAR' ? `<span style="color:var(--info);font-weight:700;">o chat Avisos está reescrevendo</span>${a.nota_dono ? ' · você pediu: ' + agE(a.nota_dono) : ''}`
+    const ob = agAvObsEstado(a);
+    const est = ob.pendente && a.estado !== 'MUDAR' ? '<span style="color:var(--info);font-weight:700;">em nova análise (Avisos)</span>'
+      : a.estado === 'MUDAR' ? `<span style="color:var(--info);font-weight:700;">o chat Avisos está reescrevendo</span>${a.nota_dono ? ' · você pediu: ' + agE(a.nota_dono) : ''}`
       : a.estado === 'APROVADO' ? `<span style="color:var(--farol-ok);font-weight:700;">aprovado</span>${a.espera_por ? ' · <b style="color:var(--farol-perto);">sai quando: ' + agE(a.espera_por) + '</b>' : ''}`
       : '<span style="color:var(--farol-perto);font-weight:700;">esperando você</span>';
     // 13/11/2026 12:37 (dono: "coloca a observação dos avisos da agenda na frente, quero usar agora"): o campo de observação
     // fica à vista em todo aviso que espera você; vale para os três botões (no Manda vira a observação do aviso)
     const bts = !a.botoes ? '' : `<div style="flex-basis:100%;margin-top:6px;"><textarea id="agAvNota_${Number(a.ref)}" oninput="AG_AV_NOTAS[${Number(a.ref)}]=this.value" rows="2" placeholder="observação (opcional no Manda e no Não manda; obrigatória no Muda o texto)" style="${campo}">${agE(AG_AV_NOTAS[a.ref] != null ? AG_AV_NOTAS[a.ref] : (a.obs_dono || ''))}</textarea>
-        ${a.obs_situacao ? `<div class="ag-ctx" style="color:var(--tx-4);">${agE(a.obs_situacao)}</div>` : ''}
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="preset-btn active" onclick="agAvDecidir(${Number(a.ref)}, 'MANDA')">Manda</button>
           <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'MUDA')">Muda o texto</button>
           <button type="button" class="preset-btn" onclick="agAvDecidir(${Number(a.ref)}, 'NAO')">Não manda</button>
-          ${a.alvo ? `<button type="button" class="preset-btn" title="só grava a observação, sem decidir" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, 'agAvNota_${Number(a.ref)}')">Salvar observação</button>` : ''}</div></div>`;
+          ${a.alvo ? `<button type="button" class="preset-btn" title="só grava a observação, sem decidir" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, 'agAvNota_${Number(a.ref)}', this)">Salvar observação</button>` : ''}</div></div>`;
     return `<div class="ag-lin ${a.estado === 'ESPERA' ? 'alerta' : ''}" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} <span class="f">${a.frente ? '· ' + agE(a.frente) : ''}</span> · ${est}
         <div style="white-space:pre-wrap;margin:6px 0 2px;padding:8px 10px;background:var(--surface-2);border-radius:8px;color:var(--tx-1);">${agE(a.texto || '')}</div>
-        ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}</span>${bts || agAvObsHtml(a)}</div>`;
+        ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}
+        ${a.obs_dono ? `<div style="margin:6px 0 2px;padding:6px 10px;border-left:3px solid ${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};background:var(--surface-2);border-radius:6px;font-size:12.5px;"><b>sua observação:</b> ${agE(a.obs_dono)}<div style="color:${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};font-weight:700;margin-top:2px;">${ob.linha}</div></div>` : ''}</span>${bts || agAvObsHtml(a)}</div>`;
   }).join('') : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nenhum aviso esperando você</span></div>';
   // 2) automáticos validados
   const G2 = g(2);
@@ -308,17 +310,40 @@ function agAvObsHtml(a, compacto) {
   const st = 'background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:6px 8px;font:inherit;font-size:12.5px;';
   return `<div style="${compacto ? '' : 'flex-basis:100%;margin-top:6px;'}display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;">
       <textarea id="${id}" rows="1" placeholder="observação" oninput="AG_AV_NOTAS[${agE(JSON.stringify(a.alvo))}]=this.value" style="flex:1 1 160px;min-width:0;${st}">${agE(v)}</textarea>
-      <button type="button" class="preset-btn" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, '${id}')">Salvar</button>
-      ${a.obs_situacao ? `<div style="flex-basis:100%;font-size:11.5px;color:var(--tx-4);">${agE(a.obs_situacao)}</div>` : ''}</div>`;
+      <button type="button" class="preset-btn" onclick="agAvObsSalvar(${agE(JSON.stringify(a.alvo))}, '${id}', this)">Salvar</button>
+      ${a.obs_dono ? (() => { const ob = agAvObsEstado(a); return `<div style="flex-basis:100%;font-size:11.5px;font-weight:700;color:${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};">${ob.linha}</div>`; })() : ''}</div>`;
 }
-async function agAvObsSalvar(alvo, campoId) {
+// 16/11/2026 13:36 (dono: "não acontece nada e deixa a dúvida se o comentário foi recebido"): o estado real da observação.
+// Usa obs_em / obs_lido_em da view quando existirem; senão a hora do salvar deste aparelho e o texto obs_situacao.
+const AG_AV_RECEBIDA = {};
+function agAvObsEstado(a) {
+  const q = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(t)}` : '';
+  const sit = String(a.obs_situacao || '');
+  const lida = a.obs_lido_em || /^lida /.test(sit);
+  const rec = a.obs_em || AG_AV_RECEBIDA[a.alvo];
+  if (lida) {
+    const nota = sit.replace(/^lida [0-9\/ :]+:?\s*/, '');
+    const hm = sit.match(/^lida ([0-9\/]+) ([0-9:]+)/);
+    const hora = a.obs_lido_em ? q(a.obs_lido_em) : hm ? `${hm[1]} às ${hm[2]}` : '';
+    return { pendente: false, linha: `✓ lida pelo Avisos ${agE(hora)}${nota ? ' — resposta: ' + agE(nota) : ''}` };
+  }
+  const segura = /segurado/.test(sit) ? ' · envio segurado até ele ler' : '';
+  return { pendente: true, linha: `✓ recebida${rec ? ' ' + q(rec) : ''} — em nova análise pelo chat Avisos${segura}` };
+}
+async function agAvObsSalvar(alvo, campoId, bt) {
   const txt = ((document.getElementById(campoId) || {}).value || '').trim();
+  const rot = bt ? bt.textContent : '';
+  if (bt) { bt.disabled = true; bt.textContent = 'salvando…'; }
   avisoAcao('enviando', txt ? 'Salvando a observação…' : 'Apagando a observação…');
   const r = await trRpcSeguro('wa_aviso_obs_gravar', { p_alvo: alvo, p_texto: txt });
-  if (!r.ok) return avisoAcao('erro', '✗ A observação NÃO foi salva: ' + (await trErroDe(r)), () => agAvObsSalvar(alvo, campoId));
+  if (!r.ok) { if (bt) { bt.disabled = false; bt.textContent = rot; }
+    return avisoAcao('erro', '✗ A observação NÃO chegou: ' + (await trErroDe(r)) + ' — o texto continua no campo.', () => agAvObsSalvar(alvo, campoId)); }
   const fr = await agAvFrase(r);
   delete AG_AV_NOTAS[alvo];
-  avisoAcao('ok', `✓ ${fr || (txt ? 'Observação salva.' : 'Observação apagada.')} — às ${avisoHora()}.`);
+  if (txt) AG_AV_RECEBIDA[alvo] = new Date().toISOString(); else delete AG_AV_RECEBIDA[alvo];
+  const d = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
+  avisoAcao('ok', txt ? `✓ Observação recebida em ${d} às ${avisoHora()} — o chat Avisos vai reanalisar.${/segurado/.test(fr) ? ' O envio fica segurado até ele ler.' : ''}`
+    : `✓ Observação apagada em ${d} às ${avisoHora()}.`);
   try { sessionStorage.setItem('agFiltro', 'avisos'); } catch (e) {}
   await entrarAgenda(true);
 }
