@@ -46,6 +46,7 @@ window.CASCA_PAGINAS = {
   pseguro: 'pessoas/index.html#pseguro',   // 13/11/2026: Seguro de vida (RH), só leitura
   // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
   agenda: 'agenda/index.html',
+  regras: 'regras/index.html',   // 16/11/2026: Regras em vigor (só o dono; vw_regras_em_vigor)
   notasfaltam: 'notas/index.html',
   cartao: 'cartao/index.html',
   compliance: 'compliance/index.html',   // 13/11/2026: Documentos e renovações (Compliance; dono #569)   // 13/11/2026: Compra no cartão + Anexar fatura (Financeiro; missão do dono 02:26/02:29)   // 12/11/2026: notas sem conta / sem entrada (tarefas 30 e 82 da Rita)
@@ -127,7 +128,7 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance',
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras',
   'prestadores'];   // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
