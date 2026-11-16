@@ -288,7 +288,15 @@
       raiz.replaceChildren();
       const w = el('div', 'peve');
       w.appendChild(el('h2', 'peve-titulo', 'Eventos e ausências'));
-      w.appendChild(el('div', 'peve-aviso', 'O que é esta tela: tudo o que foi registrado de cada pessoa no período, vindo de dois lugares. Do Flash (o app do ponto) vêm férias e ausências pedidas pelo funcionário. Do Registro do RH vêm advertência, suspensão e atestado. É só consulta: não muda folha, falta nem desconto.'));
+      const aula = el('details', 'peve-aula'); aula.open = true;
+      aula.appendChild(el('summary', null, 'Como ler esta tela (clique para fechar)'));
+      [['Para que serve', 'Mostra tudo o que aconteceu com cada funcionário no período escolhido: férias, faltas avisadas, atestados, advertências e suspensões. É só para consultar; nada aqui muda a folha de pagamento.'],
+       ['De onde vem cada linha', 'Coluna ORIGEM. "Flash" = o aplicativo de ponto: lá o funcionário pede férias ou avisa que vai faltar, e o RH aprova ou cancela. "Registro do RH" = o que o RH lançou: advertência, suspensão, atestado.'],
+       ['O que quer dizer cada tipo', 'Férias = descanso marcado. Ausência = o funcionário avisou pelo Flash que não vem (o dia todo ou parte do dia). Atestado = faltou por saúde, com papel do médico. Advertência = chamada de atenção por escrito. Suspensão = ficou dias sem trabalhar como punição.'],
+       ['Coluna DETALHE', 'Aprovado = o RH aceitou o pedido. Cancelado (riscado) = o pedido foi desfeito, não vale. Dia inteiro / Parte do dia = quanto tempo a pessoa ficou fora. Fonte: Drive = o RH guardou o papel no Google Drive.'],
+       ['Como usar', 'Escolha as datas em De e Até e clique Atualizar. Depois clique num botão colorido (Férias, Advertência...) para ver só aquele tipo, ou digite o nome da pessoa na busca.']]
+        .forEach(([t, x], i) => { const d = el('div', 'peve-aula-item'); d.appendChild(el('strong', null, (i + 1) + '. ' + t + ': ')); d.appendChild(el('span', null, x)); aula.appendChild(d); });
+      w.appendChild(aula);
       const ctl = el('div', 'peve-ctl');
       const de = el('input'); de.type = 'date';
       const ate = el('input'); ate.type = 'date';
@@ -336,7 +344,7 @@
       if (f === 'ok') {
         txt = fl && !fl.filtradas.length
           ? 'Nenhum item com os filtros atuais (' + fl.naUnidade.length + ' item(ns) na unidade, antes de tipo e busca). Registro recebido, não decisão de folha.'
-          : 'Consulta concluída. Registros recebidos, não decisão de folha: nenhum cálculo de falta, abono, desconto ou bônus.';
+          : 'Pronto. Abaixo está tudo o que foi registrado no período escolhido.';
       }
       ui.status.textContent = txt;
       ui.loja.disabled = st.travado || st.lojas.length < 2;

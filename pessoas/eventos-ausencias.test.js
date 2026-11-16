@@ -447,7 +447,7 @@ test('fonte e frescor: última data recebida por fonte (mes_lido e lido_em) e r�
   assert.ok(l.some((r) => r[COL.origem] === 'Flash' && r[COL.recebido] === 'mês lido 11/2026'));
   assert.ok(l.some((r) => r[COL.origem] === 'Registro do RH' && /\d{2}\/\d{2}\/\d{4}/.test(r[COL.recebido])));
   assert.match(tudoTxt(t.raiz), /Registro recebido, não decisão de folha/);
-  assert.match(tudoTxt(t.raiz), /É só consulta: não muda folha, falta nem desconto/);
+  assert.match(tudoTxt(t.raiz), /É só para consultar; nada aqui muda a folha de pagamento/);
 });
 test('frescor: fonte sem registro e fonte indisponível são ditas como tal, sem inventar data', async () => {
   const t = mk({ aus: [A()], ultAus: [], consultar: async (c) => { if (c.startsWith('rh_ocorrencia') && ehUltima(c)) throw new Error('falhou'); } });
