@@ -188,6 +188,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "avaldel",
+    "rotulo": "Avaliações do dia · iFood e Site",
+    "icone": "⭐",
+    "origem": "fabio"
+   },
+   {
     "chave": "reservas",
     "rotulo": "Reservas (GetIn)",
     "icone": "📖",
@@ -197,6 +203,12 @@ window.CASCA_MENU = [
     "chave": "pausados",
     "rotulo": "Itens pausados · Salão (Goomer)",
     "icone": "⏸️",
+    "origem": "fabio"
+   },
+   {
+    "chave": "avalsalao",
+    "rotulo": "Avaliações do dia · Google",
+    "icone": "⭐",
     "origem": "fabio"
    },
    {

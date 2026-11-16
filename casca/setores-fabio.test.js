@@ -102,8 +102,8 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
   assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento Operação das lojas');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
-  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto', 'pausadosdel'], 'Delivery: Delivery do dia, Chegada, Pagar motoboys e Itens pausados');
-  assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados'], 'Reservas e Pausados no Salão');
+  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto', 'pausadosdel', 'avaldel'], 'Delivery: Delivery do dia, Chegada, Pagar motoboys e Itens pausados');
+  assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados', 'avalsalao'], 'Reservas, Pausados e Avaliações no Salão');
 });
 
 test('rotas: delivery, salao, reservas e pausados ligados; telas por loja e junções preservadas', () => {
@@ -139,7 +139,7 @@ test('navegação sem restrição: #delivery abre a página própria; tela sem p
   assert.doesNotMatch(casa + t.$('menu').innerHTML, /sem página/);
   // setor Delivery: Delivery do dia e Chegada; Fila/Escala só como aviso em texto, sem botão nem link
   const setorDl = casa.slice(casa.indexOf('Delivery<'), casa.indexOf('Salão<'));
-  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada', 'pausadosdel']);
+  assert.deepEqual([...setorDl.matchAll(/data-chave="([^"]+)"/g)].map((m) => m[1]), ['delivery', 'chegada', 'pausadosdel', 'avaldel']);
   assert.match(setorDl, /class="setor-aviso">Ainda sem tela: Fila de pedidos e edição da Escala\.</);
   assert.doesNotMatch(setorDl, /Chegada completa/, 'Chegada não é mais pendência');
   assert.doesNotMatch(casa, /antigo:|github\.io|portal antigo|href=|<iframe|↗/i, 'agrupamento outras sem link para o portal antigo');
