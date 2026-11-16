@@ -1009,6 +1009,7 @@ const CG_ADM_DOCS_G = [
   ['Só quando se aplica', ['Certidão e CPF dos dependentes', 'Termo de opção sindical']]];
 const CG_ADM_DOCS = CG_ADM_DOCS_G.flatMap(([, L]) => L);
 // os 4 obrigatórios, reconhecendo também os nomes antigos do anexo (RG, CNH, CTPS, Exame admissional)
+const CG_ADM_OBRIG_DEP = ['certidão e CPF dos dependentes', /dependente/i];   // 16/11: obrigatório quando "Tem dependentes?" = Sim
 const CG_ADM_OBRIG = [['RG ou CNH', /\b(RG|CNH|CIN)\b/i], ['CTPS digital', /CTPS/i], ['comprovante de endereço', /endere/i], ['exame admissional', /exame|ASO/i]];
 // campos que a leitura dos documentos preenche (rotina rh-admissao-leitura, 06/11/2026); os outros a pessoa informa
 const CG_ADM_LEIT = { nome_mae: 'RG/CNH/certidão/título', nome_pai: 'RG/CNH/certidão/título', nascimento: 'RG/CNH/certidão/título', municipio_nascimento: 'RG/certidão', sexo: 'RG/certidão',
@@ -1042,7 +1043,7 @@ const CG_ADM_BLOCOS = [
 const CG_ADM_PADRAO = { experiencia_dias: '30', prorrogavel_dias: '60',   // 06/11/2026 (dono): 30 + 60 = 90; alertas aos 30 e aos 90
   tipo_salario: 'MENSAL', ctps_uf: 'PR', vt_valor_passagem: '6.13', va_valor_dia: '160' };
 const CG_ADM_ON = { cpf: 'oninput="cgMascara(this,\'cpf\')" onchange="cgAdmCpf(this.value)"', telefone: 'oninput="cgMascara(this,\'tel\')"',
-  cep: 'oninput="cgMascara(this,\'cep\')" onchange="cgAdmCep(this.value)"', experiencia_dias: 'onchange="cgAdmProrrog()"' };
+  cep: 'oninput="cgMascara(this,\'cep\')" onchange="cgAdmCep(this.value)"', experiencia_dias: 'onchange="cgAdmProrrog()"', estado_civil: 'onchange="cgAdmDocsPintar()"' };
 function cgMascara(el, tipo) {
   const d = el.value.replace(/\D/g, '');
   if (tipo === 'cpf') el.value = d.slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
@@ -1086,12 +1087,18 @@ function cgFormAdmissao(a, id, parte) {   // parte: 'docs' (anexos, vão no topo
   const bloco = ([t, cs]) => `${titulo(t)}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${cs.map((c) => campo(c[1].replace(/^(Nascimento|Nome da mãe) \*$/, '$1 * (ou anexe RG/CNH)'), ctl(c) + selo(c[0]))).join('')}</div>`;
   const recolhidos = CG_ADM_BLOCOS.filter((b) => b[2] === true);
   const obrig = CG_ADM_BLOCOS.filter((b) => !b[2] && b[1].some((c) => /\*/.test(c[1]))), resto = CG_ADM_BLOCOS.filter((b) => !b[2] && !obrig.includes(b));
-  const abreResto = resto.some(([, cs]) => cs.some((c) => lido[c[0]] && lido[c[0]].doc || (a.id && a[c[0]] != null && a[c[0]] !== ''))) || (a.dependentes || []).length || !!a.obs;
+  const abreResto = resto.some(([, cs]) => cs.some((c) => lido[c[0]] && lido[c[0]].doc || (a.id && a[c[0]] != null && a[c[0]] !== ''))) || !!a.obs;
+  // 16/11/2026 (RH; proposta 2026-11-16-rh-admissao-dependentes-obrigatorio): "Tem dependentes?" obrigatório, sem padrão;
+  // com Sim, o bloco abre e pede 1 dependente completo + a certidão (a Maria Aurélia entrou sem os filhos porque era opcional e escondido)
+  const temDep = (a.dependentes || []).length ? 'SIM' : a.tem_dependentes === true ? 'SIM' : a.tem_dependentes === false ? 'NÃO' : '';
   const ficha = `${obrig.map(bloco).join('')}
-    <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')}, dependentes)</span></summary>
+    ${titulo('Dependentes')}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;">${campo('Tem filhos ou outros dependentes? *', `<select id="cgA_tem_dependentes" onchange="cgAdmTemDep()" style="width:100%">${['', 'NÃO', 'SIM'].map((o) => `<option value="${o}" ${o === temDep ? 'selected' : ''}>${o === '' ? '—' : o === 'SIM' ? 'Sim' : 'Não'}</option>`).join('')}</select>`)}</div>
+    <div id="cgAdmDepsBox" style="margin-top:6px;${temDep === 'SIM' ? '' : 'display:none;'}"><div class="caption-label" style="text-align:left;margin:0 0 4px;">Nome, nascimento, CPF e parentesco de cada um · anexe em 1 a "Certidão e CPF dos dependentes"</div>
+      <div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd();cgObrigPintar(0)">+ Dependente</button></div>
+    <details ${abreResto ? 'open' : ''} style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">Resto da ficha <span style="font-weight:400;color:var(--tx-4);">(${resto.map(([t]) => t.toLowerCase()).join(', ')})</span></summary>
     ${resto.map(bloco).join('')}
     <label style="display:inline-flex;gap:4px;align-items:center;margin-top:8px;font-size:12px;"><input id="cgA_va_no_local" type="checkbox" ${a.va_no_local ? 'checked' : ''}>faz a refeição no local</label>
-    ${titulo('Dependentes')}<div id="cgAdmDeps"></div><button type="button" class="preset-btn" onclick="cgAdmDepAdd()">+ Dependente</button>
     </details>
     ${recolhidos.map(([t, cs]) => `<details style="margin-top:14px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--tx-1);">${t} <span style="font-weight:400;color:var(--tx-4);">(${cs.filter((c) => a[c[0]] != null && a[c[0]] !== '').length} de ${cs.length} preenchidos)</span></summary>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:6px;">${cs.map((c) => campo(c[1], ctl(c) + selo(c[0]))).join('')}</div></details>`).join('')}
@@ -1104,6 +1111,14 @@ function cgAdmData(v) {
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   el.innerHTML = v && v <= hoje ? '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);margin:8px 0;"><b style="color:var(--farol-perto);">A admissão deve ser enviada antes do início do trabalho, por causa do e-Social.</b></div>' : '';
 }
+function cgAdmTemDep() {
+  const sim = (document.getElementById('cgA_tem_dependentes') || {}).value === 'SIM', box = document.getElementById('cgAdmDepsBox');
+  if (box) box.style.display = sim ? '' : 'none';
+  if (sim && !document.querySelector('.cg-adm-dep')) cgAdmDepAdd();
+  cgAdmDocsPintar(); cgObrigPintar(0);
+}
+// dependente completo = nome, nascimento, CPF com 11 dígitos e parentesco
+function cgAdmDepCompleto(d) { return !!(d.nome && d.nascimento && String(d.cpf || '').replace(/\D/g, '').length === 11 && d.parentesco); }
 function cgAdmDepAdd(d) {
   const v = d || {}, box = document.getElementById('cgAdmDeps');
   if (!box) return;
@@ -1111,8 +1126,8 @@ function cgAdmDepAdd(d) {
   e.className = 'cg-adm-dep';
   e.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:6px;';
   e.innerHTML = `<input data-c="nome" placeholder="Nome" value="${cgEsc(v.nome || '')}"><input data-c="nascimento" type="date" title="Nascimento" value="${cgEsc(v.nascimento || '')}">
-    <input data-c="cpf" placeholder="CPF" value="${cgEsc(v.cpf || '')}"><select data-c="parentesco">${['', 'FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].concat(v.parentesco && !['FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].includes(String(v.parentesco).toUpperCase()) ? [v.parentesco] : []).map((o) => `<option value="${cgEsc(o)}" ${String(o).toUpperCase() === String(v.parentesco || '').toUpperCase() ? 'selected' : ''}>${o ? cgEsc(o) : 'parentesco'}</option>`).join('')}</select>
-    <button type="button" class="preset-btn" onclick="this.parentNode.remove()">Tirar</button>`;
+    <input data-c="cpf" placeholder="CPF" oninput="cgMascara(this,'cpf')" value="${cgEsc(v.cpf || '')}"><select data-c="parentesco">${['', 'FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].concat(v.parentesco && !['FILHO(A)', 'ENTEADO(A)', 'CÔNJUGE', 'COMPANHEIRO(A)', 'PAI/MÃE', 'OUTRO'].includes(String(v.parentesco).toUpperCase()) ? [v.parentesco] : []).map((o) => `<option value="${cgEsc(o)}" ${String(o).toUpperCase() === String(v.parentesco || '').toUpperCase() ? 'selected' : ''}>${o ? cgEsc(o) : 'parentesco'}</option>`).join('')}</select>
+    <button type="button" class="preset-btn" onclick="this.parentNode.remove();cgObrigPintar(0)">Tirar</button>`;
   box.appendChild(e);
 }
 function cgAdmDocEscolher(inp) {
@@ -1131,8 +1146,11 @@ function cgAdmDocsPintar() {
   const linha = (t, n, i, novo) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px;">✓ <b>${cgEsc(t)}</b> <span style="color:var(--tx-3);overflow-wrap:anywhere;">${cgEsc(n)}</span> <a href="javascript:void(0)" style="color:var(--tx-3);" onclick="cgAdmDocTirar(${i},${novo})">tirar</a></div>`;
   const soma = CG_ADM.novos.reduce((s, n) => s + n.arquivo.size, 0);
   setTimeout(() => cgObrigPintar(CG_ADM.id || 0));
-  const tipos = cgAdmTiposAnexados(), falta = CG_ADM_OBRIG.filter(([, re]) => !tipos.some((t) => re.test(t))).map(([r]) => r);
-  el.innerHTML = `<div style="margin-bottom:4px;font-weight:700;color:${falta.length ? 'var(--farol-perto)' : 'var(--farol-ok)'};">Obrigatórios: ${4 - falta.length} de 4${falta.length ? ` · ! falta subir: ${falta.join(', ')} (dá para salvar e subir depois)` : ' ✓'}</div>`
+  const tipos = cgAdmTiposAnexados(), sim = (document.getElementById('cgA_tem_dependentes') || {}).value === 'SIM';
+  const obrigL = sim ? [...CG_ADM_OBRIG, CG_ADM_OBRIG_DEP] : CG_ADM_OBRIG, falta = obrigL.filter(([, re]) => !tipos.some((t) => re.test(t))).map(([r]) => r);
+  const casado = (document.getElementById('cgA_estado_civil') || {}).value === 'CASADO' && !tipos.some((t) => /casamento/i.test(t));
+  el.innerHTML = `<div style="margin-bottom:4px;font-weight:700;color:${falta.length ? 'var(--farol-perto)' : 'var(--farol-ok)'};">Obrigatórios: ${obrigL.length - falta.length} de ${obrigL.length}${falta.length ? ` · ! falta subir: ${falta.join(', ')} (dá para salvar e subir depois)` : ' ✓'}</div>`
+    + (casado ? '<div style="margin-bottom:4px;color:var(--farol-perto);">Casado(a): anexe a certidão de casamento (tipo "Certidão de nascimento ou casamento").</div>' : '')
     + CG_ADM.docs.map((d, i) => linha(d.tipo, d.nome, i, false)).join('') + CG_ADM.novos.map((n, i) => linha(n.tipo, n.arquivo.name, i, true)).join('')
     + (soma > CG_ADM_MAX_EMAIL ? '<div style="color:var(--farol-perto);font-weight:700;">Mais de 22 MB: pode não caber num e-mail só.</div>' : '');
 }
@@ -1160,6 +1178,9 @@ function cgAdmColher() {
   a.va_no_local = document.getElementById('cgA_va_no_local').checked;
   a.obs = document.getElementById('cgA_obs').value.trim();
   a.dependentes = [...document.querySelectorAll('.cg-adm-dep')].map((e) => Object.fromEntries([...e.querySelectorAll('input,select')].map((i) => [i.dataset.c, i.value.trim()]))).filter((d) => d.nome);
+  const td = (document.getElementById('cgA_tem_dependentes') || {}).value;
+  a.tem_dependentes = td === 'SIM' ? true : td === 'NÃO' ? false : null;   // declaração; o banco grava quando a coluna existir (RH)
+  if (td === 'NÃO') a.dependentes = [];
   return a;
 }
 function cgAdmEtapa(rot, sit, em, motivo, a, etapa) {
@@ -1194,7 +1215,7 @@ function cgAdmAndamento() {
 }
 // 07/11/2026 (dono 11:54, chat RH; proposta 2026-11-07-rh-admissao-editar): a admissão se edita enquanto está em andamento
 // ou falta algum dos 4 documentos obrigatórios. Flash e contabilidade ✓ e os 4 anexados: o botão some.
-function cgAdmFaltaDocs(a) { const t = (a.documentos || []).map((d) => d.tipo || ''); return CG_ADM_OBRIG.filter(([, re]) => !t.some((x) => re.test(x))).map(([r]) => r); }
+function cgAdmFaltaDocs(a) { const t = (a.documentos || []).map((d) => d.tipo || ''); return ((a.dependentes || []).length || a.tem_dependentes === true ? [...CG_ADM_OBRIG, CG_ADM_OBRIG_DEP] : CG_ADM_OBRIG).filter(([, re]) => !t.some((x) => re.test(x))).map(([r]) => r); }
 function cgAdmEditavel(a) {
   return a.flash_situacao === 'ENVIANDO' || a.contab_situacao === 'ENVIANDO' || a.flash_situacao === 'ERRO' || a.contab_situacao === 'ERRO' || !!a.flash_aviso
     || a.leitura_situacao === 'ESPERANDO' || a.leitura_situacao === 'DUVIDA' || cgAdmFaltaDocs(a).length > 0;
@@ -1323,6 +1344,10 @@ function cgObrigPintar(id) {
   const fora = g('cargo') && g('cargo').value === 'FORA DO PLANO';
   if (g('departamento')) { if (fora) g('departamento').classList.remove('cg-obrig-vazio'); else L.push([g('departamento')]); }
   if (g('cargo_completo')) { if (fora) L.push([g('cargo_completo')]); else g('cargo_completo').classList.remove('cg-obrig-vazio'); }
+  const td = A('tem_dependentes');
+  if (td) { L.push([td]); document.querySelectorAll('.cg-adm-dep').forEach((e, i) => e.querySelectorAll('input,select').forEach((c) => {
+    if (td.value === 'SIM' && (i === 0 || String(e.querySelector('[data-c=nome]').value || '').trim())) L.push([c, c.dataset.c === 'cpf' ? (x) => x.value.replace(/\D/g, '').length === 11 : null]);
+    else c.classList.remove('cg-obrig-vazio'); })); }
   const semId = !cgAdmTemIdentidade();
   [A('nascimento'), A('nome_mae')].forEach((e) => { if (e) { if (semId) L.push([e]); else e.classList.remove('cg-obrig-vazio'); } });
   const nome = g('nome'), ap = g('apelidos'), emp = g('empresa');
@@ -1365,6 +1390,12 @@ async function cgSalvar(id) {
     if (!cgAdmTemIdentidade()) {   // com RG/CNH/certidão/título anexado, a leitura preenche (banco, 06/11)
       if (!A.nascimento) falta.push('nascimento (ou anexe o RG/CNH)');
       if (!A.nome_mae) falta.push('nome da mãe (ou anexe o RG/CNH)');
+    }
+    if (A.tem_dependentes === null) falta.push('se tem filhos ou outros dependentes (Sim ou Não)');
+    else if (A.tem_dependentes) {
+      if (!A.dependentes.length) falta.push('pelo menos 1 dependente');
+      else if (!A.dependentes.every(cgAdmDepCompleto)) falta.push('nome, nascimento, CPF e parentesco de cada dependente');
+      if (!cgAdmTiposAnexados().some((t) => CG_ADM_OBRIG_DEP[1].test(t))) falta.push('anexar a certidão e o CPF dos dependentes (em 1 · Documentos)');
     }
     const pn = corpo.nome.trim().toUpperCase().split(/\s+/)[0];
     if (!nomes.length && pn && CARGOS.pessoas.some((x) => x.ativo && x.empresa === corpo.empresa && String(x.nome || '').trim().toUpperCase().split(/\s+/)[0] === pn))
