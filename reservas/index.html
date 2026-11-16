@@ -42,6 +42,8 @@
   .rv-tab th, .rv-tab td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
   .rv-tab td.n, .rv-tab th.n { text-align:right; white-space:nowrap; }
   .rv-vazio { padding:18px; opacity:.75; }
+  .rv-resumo { font-size:15px; margin:0 0 10px; }
+  .rv-dia td { font-weight:800; font-size:13px; padding-top:14px; border-bottom:2px solid var(--line-2); }
   .rv-trunc { font-size:12px; color:var(--farol-perto, #e0a33a); margin:6px 0 0; }
 </style>
 </head>
@@ -62,6 +64,7 @@
       </label>
       <label>De <input type="date" id="fInicio"></label>
       <label>Até <input type="date" id="fFim"></label>
+      <button type="button" id="btnFrente">Daqui pra frente</button>
       <button type="button" id="btnAtualizar">Atualizar</button>
     </div>
     <div class="rv-fonte" id="fonte"></div>
@@ -79,7 +82,7 @@ const TELA = 'reservas';
 const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' };
 const un = (u) => NOME_UN[u] || u || '—';
 const esc = trEscH;
-const MAX_DIFF_DIAS = 30;   // fim-início <= 30 => 31 dias corridos, inclusive
+const MAX_DIFF_DIAS = 365;  // fim-início <= 365 => até 1 ano (16/11: Fábio quer ver todas as reservas daqui pra frente)
 
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
@@ -107,7 +110,7 @@ function diasEntreUTC(iniStr, fimStr) {
 function padraoFiltros() {
   const h = hojeBR();
   document.getElementById('fInicio').value = h;
-  document.getElementById('fFim').value = somaDiasUTC(h, 6);
+  document.getElementById('fFim').value = somaDiasUTC(h, 365);   // padrão: tudo daqui pra frente (1 ano)
 }
 
 let ULTIMA_REQ = 0;
@@ -135,6 +138,10 @@ function dataFmt(d) {
   if (!d) return '—';
   const [a, m, dd] = String(d).slice(0, 10).split('-');
   return dd + '/' + m + '/' + a;
+}
+function diaSemana(d) {
+  const { a, m, d: dd } = partesData(String(d).slice(0, 10));
+  return ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date(Date.UTC(a, m - 1, dd)).getUTCDay()];
 }
 function horaCurta(ts) {
   if (!ts) return '—';
@@ -190,7 +197,7 @@ async function carregar() {
 
   if (!inicio || !fim) { mostrarErro('Informe o intervalo de datas.'); return; }
   if (fim < inicio) { mostrarErro('A data final não pode ser antes da data inicial.'); return; }
-  if (diasEntreUTC(inicio, fim) > MAX_DIFF_DIAS) { mostrarErro('O intervalo máximo é de 31 dias corridos.'); return; }
+  if (diasEntreUTC(inicio, fim) > MAX_DIFF_DIAS) { mostrarErro('O intervalo máximo é de 1 ano.'); return; }
 
   document.getElementById('conteudo').innerHTML = '<div class="rv-vazio">Carregando…</div>';
   document.getElementById('erroMsg').style.display = 'none';
@@ -267,15 +274,20 @@ function desenhar(dados) {
 
   const linhas = Array.isArray(dados.reservas) ? dados.reservas : [];
   const c = document.getElementById('conteudo');
+  const totPessoas = linhas.reduce((t, x) => t + (Number(x.pessoas) || 0), 0);
   if (!linhas.length) {
     c.innerHTML = '<div class="rv-vazio">Nenhuma reserva encontrada para este filtro. Isto não significa que não existam reservas no GetIn — pode ser que a leitura ainda não tenha trazido dado para este período.</div>';
   } else {
     // só os campos da whitelist combinada com o Fábio: data/hora/unidade/nome/pessoas/área/
     // status/fonte. Telefone, observação e pagamento nunca são lidos nem aparecem aqui.
-    c.innerHTML = '<div id="tabelaReservas"><table class="rv-tab"><thead><tr>' +
+    const nDias = new Set(linhas.map((x) => x.data)).size;
+    c.innerHTML = '<div class="rv-resumo"><b>' + linhas.length + '</b> reserva' + (linhas.length === 1 ? '' : 's') +
+      ' · <b>' + totPessoas + '</b> pessoas · ' + nDias + ' dia' + (nDias === 1 ? '' : 's') + '</div>' +
+      '<div id="tabelaReservas"><table class="rv-tab"><thead><tr>' +
       '<th>Data</th><th>Hora</th><th>Unidade</th><th>Nome</th><th class="n">Pessoas</th><th>Área</th><th>Status</th><th>Fonte</th>' +
       '</tr></thead><tbody>' +
-      linhas.map((x) => '<tr>' +
+      linhas.map((x, i) => ((i === 0 || linhas[i - 1].data !== x.data)
+          ? '<tr class="rv-dia"><td colspan="8">' + esc(diaSemana(x.data)) + ' ' + esc(dataFmt(x.data)) + '</td></tr>' : '') + '<tr>' +
         '<td>' + esc(dataFmt(x.data)) + '</td>' +
         '<td>' + esc(horaFmt(x.hora)) + '</td>' +
         '<td>' + esc(un(x.unidade)) + '</td>' +
@@ -300,6 +312,7 @@ function desenhar(dados) {
 }
 
 document.getElementById('btnAtualizar').addEventListener('click', carregar);
+document.getElementById('btnFrente').addEventListener('click', () => { padraoFiltros(); carregar(); });
 document.getElementById('fUnidade').addEventListener('change', () => {
   // "Todas" pede REDE à casca — nunca string vazia, que lojaEscolher() recusaria em silêncio.
   // Se a loja estiver travada (lojaTravada()), a casca já ignora o pedido; não insiste.
