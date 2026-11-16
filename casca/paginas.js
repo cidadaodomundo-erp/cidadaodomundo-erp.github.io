@@ -114,7 +114,7 @@ window.CASCA_PAGINAS = {
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
   manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
   prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
-  pagarmoto: 'delivery/pagar-motoboys.html?v=20261116a',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
+  pagarmoto: 'delivery/pagar-motoboys.html?v=20261116b',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // Salão: em construção (a própria página diz)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
