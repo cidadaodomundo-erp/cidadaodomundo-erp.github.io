@@ -4495,7 +4495,7 @@ const CONF_FICHA = {
   produtos: { aba: 'PRODUTOS', chave: 'conferencia_produtos', escala: null, rende: false, naofaz: true,
               st: { vende: 'vendeu nos últimos 90 dias', atacado: 'atacado', parado: 'sem venda em 90 dias', sem_ficha: 'sem ficha — escrever' } },
   bebidas: { aba: 'BEBIDAS', chave: 'conferencia_bebidas', escala: null, rende: false, naofaz: true,
-             st: { vende: 'vendeu nos últimos 90 dias' } },
+             st: { vende: 'vendeu nos últimos 90 dias', sem_ficha: 'sem ficha — escrever' } },
 };
 const CF = { fila: {}, feita: {}, nomes: null, aberto: null, filtro: 'falta', busca: '', ordem: 'venda', venda: undefined };
 const CF_META_LANA = 30;   // dono, 06/10 (livro pauta-da-semana/respostas/meta-lana)
@@ -4535,6 +4535,12 @@ async function cfCarregar(c) {
     r: l.r, ru: l.ru, rs: l.rs, i: Array.isArray(l.itens) ? l.itens : [] }));
   CF.feita[c.aba] = new Map(feita.map((x) => [x.ficha, x]));
   if (c.aba === 'RECEITAS') await cfReceitasAoVivo(c);
+  // 16/11/2026 (Cardápio, porta 549765071bfd8e9e): bebidas enviadas pelo salão esperam o OK da Rita (ft_conferencia_aprovar);
+  // o botão Aprovar só aparece para quem passa em ft_pode_mudar_ficha (Rita, Lana, Neto)
+  if (c.aba === 'BEBIDAS' && CF.podeOk === undefined) {
+    const rp = await trRpcSeguro('ft_pode_mudar_ficha', {}).catch(() => null);
+    CF.podeOk = !!(rp && rp.ok && await rp.json().catch(() => false));
+  }
   await cfEstadoCarregar();
   // 12/11/2026 (dono, 06/10, livro pauta-da-semana/respostas/meta-lana: "30 produtos por semana, começando pelos que mais
   // saem"): a venda de 30 dias é a mesma da tela Preço alvo (vw_margem_produto.qtd_vendida), somada por nome da base.
@@ -4597,6 +4603,10 @@ async function cfEstadoCarregar(ficha) {
 const cfMsgOperador = (m) => String(m || '').replace(/;\s*se estiver certo[^—]*/i, ' ').replace(/\s*\(grama no lugar[^)]*\)/i, '').replace(/alguem le antes:?\s*/i, '').replace(/:\s*—/, ' —').replace(/\s+/g, ' ').trim();
 // o que aconteceu com o último envio: entrou na ficha, parado (com o motivo) ou na fila
 function cfEstadoEnvio(c, fe, i) {
+  if (fe && fe.exige_ok && !fe.aprovado_em && !fe.aplicado && !fe.nao_fazemos_mais) {
+    const idAba = Object.keys(CONF_FICHA).find((k) => CONF_FICHA[k].aba === c.aba);
+    return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">⏳ esperando o OK da Rita</span>${CF.podeOk ? ` <button class="preset-btn" onclick='event.stopPropagation(); cfAprovar("${idAba}", ${trEscH(JSON.stringify(fe.ficha))})'>✓ Aprovar</button>` : ''}`;
+  }
   const est = CF.estado && i ? CF.estado.get(i.f || i.nb) : null;
   if (est && est.estado !== 'SUBSTITUIDO') {
     const cor = est.estado === 'ENTROU' ? 'var(--farol-ok)' : est.estado === 'PARADO' ? 'var(--farol-perto)' : 'var(--tx-3)';
@@ -4604,9 +4614,20 @@ function cfEstadoEnvio(c, fe, i) {
   }
   if (!fe || fe.nao_fazemos_mais) return '';
   const alvo = c.aba === 'RECEITAS' ? 'receita' : 'ficha';
-  if (fe.aplicado) return `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">✓ aplicada na ${alvo}${fe.aplicado_em ? ' ' + embQuando(fe.aplicado_em) : ''}</span>`;
+  const okDe = fe.exige_ok && fe.aprovado_em ? `OK de ${trEscH(estNome(fe.aprovado_por) || fe.aprovado_por || '')} · ` : '';
+  if (fe.aplicado) return `<span style="font-size:12px; font-weight:700; color:var(--farol-ok);">${okDe}✓ aplicada na ${alvo}${fe.aplicado_em ? ' ' + embQuando(fe.aplicado_em) : ''}</span>`;
   if (fe.trava_motivo) return `<span style="font-size:12px; font-weight:700; color:var(--farol-fora); white-space:normal;">✗ não entrou: ${trEscH(fe.trava_motivo)} — já avisamos</span>`;
-  return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">⏳ recebida, entra na ${alvo} na próxima passada (até 2 h)</span>`;
+  return `<span style="font-size:12px; font-weight:700; color:var(--farol-perto);">${okDe}⏳ recebida, entra na ${alvo} na próxima passada (até 2 h)</span>`;
+}
+async function cfAprovar(id, ficha) {
+  const c = CONF_FICHA[id];
+  avisoAcao('enviando', `Dando o OK em ${ficha}…`);
+  const r = await trRpcSeguro('ft_conferencia_aprovar', { p_ficha: ficha });
+  if (!r.ok) return avisoAcao('erro', `✗ ${ficha}: o OK não entrou — ${await trErroDe(r)}.`, () => cfAprovar(id, ficha));
+  const volta = await r.json().catch(() => []);
+  if (volta && volta[0]) CF.feita[c.aba].set(volta[0].ficha, volta[0]);
+  avisoAcao('ok', `✓ OK dado em ${ficha} às ${avisoHora()} — entra na ficha na próxima passada (até 2 h).`);
+  cfRender(id);
 }
 async function cfEntrar(id) {
   const c = CONF_FICHA[id], alvo = document.getElementById('cfCorpo');
@@ -4673,7 +4694,7 @@ function cfRender(id) {
   }
   // 12/11/2026 (Estoque): o envio fica à vista; antes parecia que não tinha salvado e a Rita mandou 5 vezes
   if (CF.enviada && CF.enviada.aba === c.aba) { const est = CF.estado && CF.estado.get(CF.enviada.f);
-    h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Recebido: ${trEscH(CF.enviada.nb)} às ${CF.enviada.hora}</b>${est && est.estado !== 'SUBSTITUIDO' && new Date(est.enviado_em) >= new Date(CF.enviada.quando) ? ' — ' + trEscH(cfMsgOperador(est.mensagem)) : ` — entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h). Não precisa mandar de novo.`}</div>`; }
+    h += `<div class="contexto" style="text-align:left; border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Recebido: ${trEscH(CF.enviada.nb)} às ${CF.enviada.hora}</b>${est && est.estado !== 'SUBSTITUIDO' && new Date(est.enviado_em) >= new Date(CF.enviada.quando) ? ' — ' + trEscH(cfMsgOperador(est.mensagem)) : CF.enviada.espera ? ' — agora espera o OK da Rita. Não precisa mandar de novo.' : ` — entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h). Não precisa mandar de novo.`}</div>`; }
   if (comecadas.length) h += `<div class="contexto" style="text-align:left; border-color:var(--farol-perto);"><b>${comecadas.length} ${comecadas.length === 1 ? 'conferência começada' : 'conferências começadas'} neste aparelho e ainda não ${comecadas.length === 1 ? 'enviada' : 'enviadas'}.</b>
       Os números que você digitou já estão nos campos — abra, confira e clique em <b>Marcar como conferida</b>.
       <a href="javascript:void(0)" onclick='CF.filtro="falta"; CF.busca=""; CF.aberto=${J(comecadas[0].id)}; cfRender("${id}");'>abrir a primeira</a></div>`;
@@ -4799,7 +4820,9 @@ async function cfEnviar(id, iid, naofaz) {
   cfMexeResp(id, iid, (x) => { x.feito = true; x.enviado_em = new Date().toISOString(); delete x.itens; delete x.extras; delete x.obs; delete x.rende; delete x.removidos; });
   CF.aberto = null;
   CF.enviada = { aba: c.aba, f: i.f || i.nb, nb: i.nb + (naofaz ? ' (não fazemos mais)' : ''), hora: avisoHora(), quando: new Date(Date.now() - 60000).toISOString() };
-  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h).`);
+  const espera = volta && volta[0] && volta[0].exige_ok && !volta[0].aprovado_em;
+  if (espera) CF.enviada.espera = true;
+  avisoAcao('ok', `✓ ${i.nb}${naofaz ? ' — não fazemos mais' : ''}: recebida às ${CF.enviada.hora} — ${espera ? 'agora espera o OK da Rita' : `entra na ${id === 'receitas' ? 'receita' : 'ficha'} na próxima passada (até 2 h)`}.`);
   cfRender(id);
   confAbasPintar();
   // o estado do envio que acabou de chegar (na fila, ou parado com o motivo), sem esperar recarregar a tela
