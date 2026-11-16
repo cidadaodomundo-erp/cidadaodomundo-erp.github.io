@@ -76,7 +76,9 @@ function abrirCasca({ pode = null, hash = '' } = {}) {
 }
 
 const C = abrirCasca().ctx;   // só para ler as constantes dos arquivos da casca
-const fabioNoMenu = C.CASCA_MENU.flatMap((g) => g.itens).filter((i) => i.origem === 'fabio').map((i) => i.chave);
+// 16/11/2026 (Fábio): Gestão do RH (prh) e Encomendas saem do menu de propósito (FORA_DO_MENU); o resto continua.
+const TIRADAS_PELO_FABIO = ['prh', 'encomendas'];
+const fabioNoMenu = C.CASCA_MENU.flatMap((g) => g.itens).filter((i) => i.origem === 'fabio').map((i) => i.chave).filter((k) => !TIRADAS_PELO_FABIO.includes(k));
 const ANTIGO_RE = /cidadaodomundo\.github\.io|portal antigo/i;
 
 // --------------------------------------------------------------------------------------------------------- testes
