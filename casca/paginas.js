@@ -66,6 +66,7 @@ window.CASCA_PAGINAS = {
   fichas: 'cardapio/index.html#fichas',
   engcard: 'cardapio/index.html#engcard',
   rateio: 'cardapio/index.html#rateio',
+  saiposcod: 'cardapio/index.html#saiposcod',   // 16/11/2026: Código que falhou no Saipos (Cardápio; dono 12/11)
   // 01/11/2026 (dono): acompanhamento do dia, sem a carga de vendas do painel
   vendasagora: 'vendas/index.html',
   // 05/11/2026 (bloco 6): Canal · iFood, Site próprio e Entrega
@@ -134,7 +135,7 @@ window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'psegu
 window.CASCA_TELAS_POR_LOJA = ['caixa',
   'contagem', 'processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno', 'comprateto', 'prodhist', 'controle', 'posicao', 'reqpedir', 'reqseparar',
   'listas', 'listasfin',
-  'phoje', 'pcartao', 'pao', 'peventos', 'prh', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio',
+  'phoje', 'pcartao', 'pao', 'peventos', 'prh', 'padm', 'cargos', 'pcalc', 'pferias', 'presc', 'penvio', 'pconf', 'pcusto', 'pacertos', 'flash', 'rateio', 'saiposcod',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',

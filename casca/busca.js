@@ -17,6 +17,7 @@ window.CASCA_BUSCA = {
   rateio: ['preco alvo', 'precificacao', 'preco de venda', 'markup'],
   lucrouni: ['lucro por loja', 'resultado por loja', 'qual loja da lucro'],
   engcard: ['engenharia', 'estrela', 'abacaxi', 'mix do cardapio', 'margem por produto'],
+  saiposcod: ['diversos', 'codigo pdv', 'codigo do saipos', 'erro de codigo', 'item sem codigo', 'caiu no diversos'],
   fichas: ['ficha tecnica', 'receita', 'cmv', 'custo do prato', 'custo do produto', 'ingredientes'],
   vendasagora: ['vendas hoje', 'pedidos agora', 'tempo real', 'quanto vendeu hoje'],
   resumo: ['ifood', 'resumo do ifood', 'canal ifood'],
