@@ -277,6 +277,15 @@ function agAvisosHtml() {
         ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}
         ${a.obs_dono ? `<div style="margin:6px 0 2px;padding:6px 10px;border-left:3px solid ${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};background:var(--surface-2);border-radius:6px;font-size:12.5px;"><b>sua observação:</b> ${agE(a.obs_dono)}<div style="color:${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};font-weight:700;margin-top:2px;">${ob.linha}</div></div>` : ''}</span>${bts || agAvObsHtml(a)}</div>`;
   }).join('') : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nenhum aviso esperando você</span></div>';
+  // 16/11/2026 (Avisos): rascunho decidido pela observação sai do grupo 1 — o grupo 4 mostra a resposta por 24 h
+  const G4 = g(4);
+  if (G4.length) {
+    const dec = { NAO: 'não vai', MUDOU: 'texto mudado', MANDOU: 'mandado' };
+    h += `<div class="ag-bloco">Respondidos pelo Avisos <span class="f">· últimas 24 h · ${G4.length}</span></div>`;
+    h += G4.map((a) => { const ob = agAvObsEstado(a);
+      return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} · <span style="color:var(--farol-ok);font-weight:700;">${agE(dec[a.estado] || String(a.estado || '').toLowerCase())}</span>
+        ${a.obs_dono ? `<div style="margin:6px 0 2px;padding:6px 10px;border-left:3px solid var(--farol-ok);background:var(--surface-2);border-radius:6px;font-size:12.5px;"><b>sua observação:</b> ${agE(a.obs_dono)}<div style="color:var(--farol-ok);font-weight:700;margin-top:2px;">${ob.linha}</div></div>` : ''}</span></div>`; }).join('');
+  }
   // 2) automáticos validados
   const G2 = g(2);
   h += `<div class="ag-bloco">Automáticos validados <span class="f">· saem sozinhos; números da semana</span></div>`;
