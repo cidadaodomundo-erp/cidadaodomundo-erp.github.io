@@ -56,8 +56,8 @@
   .pm-tab { width:100%; border-collapse:collapse; font-size:14px; }
   .pm-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:9px 10px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
   .pm-tab th:first-child, .pm-tab td:first-child { text-align:left; white-space:normal; min-width:150px; }
-  .pm-tab td, .pm-tab th { padding-left:8px; padding-right:8px; }
-  .pm-tab td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .pm-tab td, .pm-tab th { padding-left:6px; padding-right:6px; }
+  .pm-tab td { padding:8px 7px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .pm-tab tr.lin { cursor:pointer; }
   .pm-tab tr.lin:hover td { background:var(--surface-2); }
   .pm-nome { font-weight:700; }
@@ -70,6 +70,13 @@
   .pm-fraco { color:var(--tx-3); }
   .pm-sub { display:block; font-size:11px; color:var(--tx-3); font-weight:400; }
   .pm-tarde { color:var(--farol-atencao, #d29922); }
+  .pm-tab th.grp { text-align:center; font-size:11px; letter-spacing:.04em; border-bottom:2px solid var(--line-2); }
+  .pm-tab th.grp.esc, .pm-tab td.esc { background:color-mix(in srgb, var(--marca-amarelo, #e0a526) 9%, transparent); }
+  .pm-tab th.grp.real, .pm-tab td.real { background:color-mix(in srgb, var(--farol-ok, #2ea043) 8%, transparent); }
+  .pm-tab td.esc.fim, .pm-tab th.esc.fim { border-right:2px solid var(--line-2); }
+  .pm-turno { display:block; line-height:1.35; }
+  .pm-turno i { font-style:normal; font-size:10.5px; color:var(--tx-3); margin-right:4px; }
+  .pm-dif { display:block; font-size:11px; font-weight:700; }
   .pm-det td { white-space:normal; text-align:left; background:var(--surface-2); font-size:12.5px; line-height:1.5; }
   .pm-det ul { margin:4px 0; padding-left:18px; }
   .pm-nota { font-size:12px; color:var(--tx-3); margin:10px 0 0; line-height:1.5; }
@@ -164,10 +171,23 @@ function exigirLogin(recado) {
       '<button type="button" data-loja="' + esc(k) + '" class="' + (LOJA === k ? 'on' : '') + '">' + esc(k) + ' <span class="pm-fraco">' + cont(k) + '</span></button>').join('');
   }
 
-  function escalaTxt(l) {
-    const p = [];
-    if (l.esc_alm) p.push(esc(l.esc_alm)); if (l.esc_jan) p.push(esc(l.esc_jan));
-    return p.length ? p.join('<small class="pm-sub">e </small>') : '<span class="pm-tarde">fora</span>';
+  // Escala combinada: uma linha por turno (almoço / jantar), com entrada, saída e horas.
+  function turnosEsc(l) {
+    const t = [];
+    if (l.esc_alm) t.push({ r: 'alm', ini: l.esc_alm, fim: l.esc_alm_fim, h: l.esc_alm_horas });
+    if (l.esc_jan) t.push({ r: 'jan', ini: l.esc_jan, fim: l.esc_jan_fim, h: l.esc_jan_horas });
+    return t;
+  }
+  function horasEsc(l) {
+    const t = turnosEsc(l); if (!t.length || t.some((x) => x.h == null)) return null;
+    return t.reduce((a, x) => a + Number(x.h), 0);
+  }
+  function celEsc(l, campo) {
+    const t = turnosEsc(l);
+    if (!t.length) return campo === 'ini' ? '<span class="pm-tarde">fora da escala</span>' : '';
+    return t.map((x) => '<span class="pm-turno">' + (t.length > 1 ? '<i>' + x.r + '</i>' : '') +
+      (campo === 'ini' ? esc(x.ini) : campo === 'fim' ? (x.fim ? esc(x.fim) : '<span class="pm-tarde">fecha</span>') :
+        (x.h != null ? horasTxt(x.h) : '<span class="pm-tarde">?</span>')) + '</span>').join('');
   }
   function refeicaoTxt(l) {
     if (!l.direito_refeicoes) return '<span class="pm-nao">Não</span>';
@@ -178,15 +198,19 @@ function exigirLogin(recado) {
   function linhaHtml(l, i) {
     const k = l.loja + '|' + l.id_entregador;
     const tarde = (l.atraso_alm > DADOS.tolerancia_min) || (l.atraso_jan > DADOS.tolerancia_min);
-    const curta = Number(l.horas_garantido) > 0 && Number(l.horas) < Number(l.horas_garantido) - DADOS.tolerancia_min / 60;
+    const prev = horasEsc(l) != null ? horasEsc(l) : (Number(l.horas_garantido) || null);
+    const dif = prev ? Number(l.horas) - prev : null;
+    const curta = dif != null && dif < -DADOS.tolerancia_min / 60;
     let h = '<tr class="lin" data-k="' + esc(k) + '">' +
       '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
         (l.turnos > 1 ? '<small>2 turnos</small>' : '') + '</span></td>' +
-      '<td data-rot="Escala" title="Horário combinado na escala do Jaison">' + escalaTxt(l) + '</td>' +
-      '<td data-rot="Chegada" class="' + (tarde ? 'pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + esc(l.chegada || '—') + '</td>' +
-      '<td data-rot="Saída">' + esc(l.saida || '—') + '</td>' +
-      '<td data-rot="Horas"' + (curta ? ' class="pm-tarde" title="Fez menos horas do que as do garantido (horas pelo TrackEat, da 1ª coleta à última entrega)"' : '') + '>' + horasTxt(l.horas) +
-        (Number(l.horas_garantido) > 0 ? '<small class="pm-sub">de ' + horasTxt(l.horas_garantido) + '</small>' : '') + '</td>' +
+      '<td data-rot="Escala: entrada" class="esc" title="Escala do Jaison">' + celEsc(l, 'ini') + '</td>' +
+      '<td data-rot="Escala: saída" class="esc">' + celEsc(l, 'fim') + '</td>' +
+      '<td data-rot="Escala: horas" class="esc fim"><b>' + (horasEsc(l) != null ? horasTxt(horasEsc(l)) : (turnosEsc(l).length ? '<span class="pm-tarde">?</span>' : '—')) + '</b></td>' +
+      '<td data-rot="Chegou" class="real' + (tarde ? ' pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + esc(l.chegada || '—') + '</td>' +
+      '<td data-rot="Saiu" class="real" title="Última entrega no TrackEat">' + esc(l.saida || '—') + '</td>' +
+      '<td data-rot="Rodou" class="real' + (curta ? ' pm-tarde' : '') + '"' + (curta ? ' title="Rodou menos que o combinado na escala (da 1ª coleta à última entrega)"' : '') + '><b>' + horasTxt(l.horas) + '</b>' +
+        (dif != null ? '<span class="pm-dif ' + (curta ? 'pm-tarde' : 'pm-fraco') + '">' + (dif >= 0 ? '+' : '−') + horasTxt(Math.abs(dif)) + '</span>' : '') + '</td>' +
       '<td data-rot="Entregas">' + esc(l.entregas) + '</td>' +
       '<td data-rot="Taxas">' + brl(l.taxas) + '</td>' +
       '<td data-rot="R$/hora"><span class="pm-vh">' + brl(l.valor_hora) + '</span></td>' +
@@ -200,10 +224,11 @@ function exigirLogin(recado) {
       itens.unshift('Taxas das entregas ' + brl(l.taxas) + ' × garantido ' + brl(l.garantido) + ': paga o maior' +
         (Number(l.ajustes) ? ', ' + (l.ajustes > 0 ? '+ ' : '− ') + brl(Math.abs(l.ajustes)) + ' de acerto' : '') +
         (Number(l.cobrar_refeicao) ? ', − ' + brl(l.cobrar_refeicao) + ' de lanche além do direito' : '') + ' = ' + brl(l.pagar) + '.');
-      if (l.esc_alm || l.esc_jan) itens.push('Escala: ' + [l.esc_alm ? 'almoço ' + l.esc_alm : '', l.esc_jan ? 'jantar ' + l.esc_jan : ''].filter(Boolean).join(' · '));
+      if (turnosEsc(l).length) itens.push('Escala do Jaison: ' + turnosEsc(l).map((x) => (x.r === 'alm' ? 'almoço ' : 'jantar ') + x.ini + ' às ' + (x.fim || 'fecha') + (x.h != null ? ' (' + horasTxt(x.h) + ')' : '')).join(' · ') +
+        (horasEsc(l) != null ? ' = ' + horasTxt(horasEsc(l)) + ' combinadas; rodou ' + horasTxt(l.horas) : ''));
       itens.push('Lanches na comanda Z Motoboys: ' + l.lanches + ' (direito: ' + l.direito_refeicoes + ')');
       if (l.reprovadas) itens.push(l.reprovadas + ' corrida(s) reprovada(s) no TrackEat ficaram fora');
-      h += '<tr class="pm-det"><td colspan="13"><ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
+      h += '<tr class="pm-det"><td colspan="15"><ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
     }
     return h;
   }
@@ -230,7 +255,8 @@ function exigirLogin(recado) {
     (LOJA === 'todas' ? LOJAS : [LOJA]).forEach((lj) => {
       const g = ls.filter((l) => l.loja === lj); if (!g.length) return;
       h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' +
-        '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Escala</th><th>Chegada</th><th>Saída</th><th>Horas</th><th>Entregas</th><th>Taxas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Pix</th><th></th></tr></thead><tbody>' +
+        '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th></th><th colspan="3" class="grp esc fim">COMBINADO NA ESCALA</th><th colspan="3" class="grp real">O QUE FEZ (TRACKEAT)</th><th colspan="8"></th></tr>' +
+        '<tr><th>Motoboy</th><th class="esc">Entrada</th><th class="esc">Saída</th><th class="esc fim">Horas</th><th class="real">Chegou</th><th class="real">Saiu</th><th class="real">Rodou</th><th>Entregas</th><th>Taxas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Pix</th><th></th></tr></thead><tbody>' +
         g.map(linhaHtml).join('') + '</tbody></table></div>';
     });
     const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
