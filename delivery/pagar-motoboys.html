@@ -155,12 +155,36 @@ function exigirLogin(recado) {
     $('btnDepois').disabled = dia >= somaDias(hojeSP(), -1);
     $('conteudo').innerHTML = '<div class="pm-vazio">Carregando o dia…</div>'; $('avisos').innerHTML = '';
     let r;
-    try { r = await trRpc('pagar_motoboys_dia', { p_dia: dia }); } catch (e) { if (seq === SEQ) erro('Sem conexão com o banco agora. Tente de novo.'); return; }
+    const cheg = await lerChegadas(dia);
+    if (seq !== SEQ) return;
+    CHEG_OK = cheg !== null;
+    try { r = await trRpc('pagar_motoboys_dia', { p_dia: dia, p_chegadas: cheg || [] }); } catch (e) { if (seq === SEQ) erro('Sem conexão com o banco agora. Tente de novo.'); return; }
     if (seq !== SEQ) return;
     if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
     if (!r.ok) { erro(r.status === 403 || r.status === 400 ? 'Esta tela é só do dono e de quem cuida do pessoal.' : await trErroDe(r)); return; }
     DADOS = await r.json(); ABERTO = {};
     if (seq === SEQ) desenhar();
+  }
+  // Chegada no pátio: a MESMA fonte da tela Chegada (fila do TrackEat, GPS do pátio, anotado no balcão e a decisão à mão
+  // de garantido/refeição). Só leitura (GET). Se falhar, a conta sai sem hora do pátio e não corta ninguém.
+  const CHEG_URL = 'https://kqvoatdprjwxyadhvtdd.supabase.co/functions/v1/fabio-delivery-chegada';
+  let CHEG_OK = false;
+  async function lerChegadas(dia) {
+    const auth = (typeof cabecalhoLeitura === 'function' ? cabecalhoLeitura() : {}) || {};
+    if (!auth.Authorization) return null;
+    const lojas = ['AGUA VERDE', 'SAO BRAZ', 'AHU'];
+    const res = await Promise.allSettled(lojas.map((u) => fetch(CHEG_URL + '?dia=' + encodeURIComponent(dia) + '&unidade=' + encodeURIComponent(u),
+      { method: 'GET', headers: { Authorization: auth.Authorization }, cache: 'no-store', credentials: 'omit' }).then((x) => (x.ok ? x.json() : null))));
+    const out = []; let algum = false;
+    res.forEach((x) => {
+      const j = x.status === 'fulfilled' ? x.value : null;
+      (j && j.por_unidade || []).forEach((u) => {
+        if (u.status !== 'ok' || !Array.isArray(u.linhas)) return; algum = true;
+        u.linhas.forEach((l) => out.push({ unidade: u.unidade, motoboy: l.motoboy, fila: l.chegada_fila_txt, gps: l.patio_gps_txt, anotado: l.anotado_txt,
+          gar_manual: l.garantido_manual, rango_manual: l.rango_manual }));
+      });
+    });
+    return algum ? out : null;
   }
   function erro(msg) { $('conteudo').innerHTML = '<div class="pm-aviso">' + esc(msg) + '</div>'; }
 
@@ -256,7 +280,7 @@ function exigirLogin(recado) {
     if (d.dia >= hojeSP()) av += '<div class="pm-aviso">⏳ <b>Este dia ainda está em andamento.</b> Pague pelo dia que já fechou.</div>';
     av += '<div class="pm-aviso info">De onde vêm os números: entregas e taxas do <b>TrackEat</b> (carregado ' + esc(f.trackeat_carregado_em || '—') +
       '), horário combinado da <b>escala</b> (gravada ' + esc(f.escala_gravada_em || '—') + '), lanches do <b>Saipos</b> (carregado ' + esc(f.saipos_carregado_em || '—') +
-      '). A <b>chegada</b> é a hora em que entrou no pátio (fila do TrackEat ou GPS). Passou de ' + esc(d.tolerancia_min) + ' min da escala, perde garantido e refeição do dia (em vermelho). Quando ainda não há hora do pátio, vale a 1ª coleta só como aviso, em laranja, sem cortar.</div>';
+      '). A <b>chegada</b> é a hora em que entrou no pátio, da mesma fonte da tela Chegada (fila do TrackEat, GPS do pátio ou anotado no balcão)' + (CHEG_OK ? '' : ' <b>— indisponível agora, ninguém foi cortado</b>') + '. Passou de ' + esc(d.tolerancia_min) + ' min da escala, perde garantido e refeição do dia (em vermelho). Quando ainda não há hora do pátio, vale a 1ª coleta só como aviso, em laranja, sem cortar.</div>';
     const conf = ls.filter((l) => l.conferir).length;
     if (conf) av += '<div class="pm-aviso"><b>Conferir antes de pagar:</b> ' + conf + ' motoboy(s) com escala incompleta ou lanche sem preço. O total inclui prévias.</div>';
     $('avisos').innerHTML = av;
