@@ -182,6 +182,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "pausadosdel",
+    "rotulo": "Itens pausados · iFood x Site",
+    "icone": "⏸️",
+    "origem": "fabio"
+   },
+   {
     "chave": "reservas",
     "rotulo": "Reservas (GetIn)",
     "icone": "📖",
@@ -189,7 +195,7 @@ window.CASCA_MENU = [
    },
    {
     "chave": "pausados",
-    "rotulo": "Produtos pausados",
+    "rotulo": "Itens pausados · Salão (Goomer)",
     "icone": "⏸️",
     "origem": "fabio"
    },

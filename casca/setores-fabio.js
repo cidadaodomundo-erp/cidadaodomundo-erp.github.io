@@ -12,7 +12,7 @@
 // Nenhum timer, nenhuma leitura de rede, nenhuma escrita neste arquivo.
 window.CASCA_SETORES_FABIO = {
   setores: [
-    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto'],
+    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto', 'pausadosdel'],
       aviso: 'Ainda sem tela: Fila de pedidos e edição da Escala.' },
     { id: 'salao', nome: 'Salão', icone: '🍽️', chaves: ['salao', 'reservas', 'pausados'] },
     { id: 'rh', nome: 'RH', icone: '👥', chaves: ['prh', 'pao', 'pcartao', 'peventos', 'freelas'] },

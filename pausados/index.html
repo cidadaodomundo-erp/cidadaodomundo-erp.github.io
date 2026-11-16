@@ -10,6 +10,7 @@
 <title>Produtos pausados · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
+<!-- 16/11/2026: entra o iFood (API oficial) e o comparativo iFood x Site (Accon); iFood é a referência. -->
 <!-- PRODUTOS PAUSADOS (10/11/2026, tela incorporada a este sistema; revisada 10/11/2026). Só leitura da
      tabela cardapio_pausado (Goomer/Accon). Sem pausar, despausar ou editar motivo — nenhum botão de ação. Os
      leitores próprios do Goomer/Accon ainda não foram ativados nesta etapa: a tela não afirma estar lendo hoje,
@@ -43,13 +44,23 @@
   .ps-vazio { padding:18px; opacity:.75; }
   .ps-trunc { font-size:12px; color:var(--farol-perto, #e0a33a); margin:6px 0 0; }
   .ps-est { font-weight:700; }
+  .ps-comp { margin:0 0 18px; }
+  .ps-comp h2 { font-size:16px; margin:0 0 4px; }
+  .ps-comp-sub { font-size:12px; opacity:.75; margin:0 0 10px; line-height:1.45; }
+  .ps-comp-resumo { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
+  .ps-comp-card { border:1px solid var(--line-2); border-radius:10px; padding:8px 12px; background:var(--surface); min-width:150px; }
+  .ps-comp-card b { font-size:22px; display:block; }
+  .ps-comp-card span { font-size:12px; opacity:.8; }
+  .ps-bate { color:var(--farol-ok, #3fb950); }
+  .ps-difere { color:var(--farol-fora, #ff6b6b); }
+  .ps-titulo-lista { font-size:15px; margin:14px 0 6px; }
 </style>
 </head>
 <body>
 <div class="main-content">
   <div class="wrap">
     <div class="ps-topo">
-      <h1>Produtos pausados</h1>
+      <h1 id="titulo">Itens pausados</h1>
     </div>
     <div class="ps-filtros">
       <label>Unidade
@@ -60,11 +71,12 @@
           <option value="AHU">Ahú</option>
         </select>
       </label>
-      <label>Canal
+      <label id="lblCanal">Canal
         <select id="fCanal">
           <option value="">Todos</option>
+          <option value="iFood">iFood</option>
           <option value="Tablet (Goomer)">Tablet (Goomer)</option>
-          <option value="Accon">Accon</option>
+          <option value="Accon">Site (Accon)</option>
         </select>
       </label>
       <button type="button" id="btnAtualizar">Atualizar</button>
@@ -72,6 +84,7 @@
     <div class="ps-fonte" id="fonte"></div>
     <div class="ps-consultado" id="consultado"></div>
     <div id="erroMsg" style="display:none;"></div>
+    <div id="comparativo"></div>
     <div id="conteudo"><div class="ps-vazio">Carregando…</div></div>
   </div>
 </div>
@@ -80,7 +93,25 @@
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="../nucleo/telas-extra.js?v=20261106a"></script>
 <script>
-const TELA = 'pausados';
+// 16/11/2026: a mesma página abre em dois lugares do menu (pedido do Fábio):
+//   ?modo=delivery -> Delivery: iFood x Site (Accon), com o comparativo (iFood é a referência)
+//   ?modo=salao    -> Salão: só Tablet (Goomer)
+const MODO = new URLSearchParams(location.search).get('modo') === 'delivery' ? 'delivery'
+  : (new URLSearchParams(location.search).get('modo') === 'salao' ? 'salao' : 'todos');
+const CANAIS_DO_MODO = { delivery: ['iFood', 'Accon'], salao: ['Tablet (Goomer)'], todos: null }[MODO];
+const TELA = MODO === 'delivery' ? 'pausadosdel' : 'pausados';
+(function ajustarModo() {
+  const sel = document.getElementById('fCanal');
+  if (MODO === 'salao') {
+    document.getElementById('titulo').textContent = 'Itens pausados · Salão (Goomer)';
+    sel.value = 'Tablet (Goomer)';
+    document.getElementById('lblCanal').style.display = 'none';
+  } else if (MODO === 'delivery') {
+    document.getElementById('titulo').textContent = 'Itens pausados · iFood x Site (Accon)';
+    [...sel.options].forEach((o) => { if (o.value === 'Tablet (Goomer)') o.remove(); });
+    sel.options[0].textContent = 'iFood e Site';
+  }
+})();
 const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' };
 const un = (u) => NOME_UN[u] || u || '—';
 const esc = trEscH;
@@ -233,8 +264,48 @@ function estadoHtml(e) {
   return '<span class="ps-est" style="color:' + cor + '">' + esc(e) + '</span>';
 }
 
+// Comparativo iFood x Site (Accon): o iFood é a referência (decisão do Fábio, 16/11/2026).
+// Só aparece quando o filtro de canal está em "Todos" e o site tem leitura gravada para a unidade.
+const ROT_GRUPO = { '1-bate': 'Pausado nos dois', '2-so-site': 'Pausado só no site', '3-so-ifood': 'Pausado só no iFood' };
+function desenharComparativo(dados) {
+  const el = document.getElementById('comparativo');
+  const canal = document.getElementById('fCanal').value;
+  const lista = Array.isArray(dados.comparativo) ? dados.comparativo : [];
+  if (canal || !lista.length) { el.innerHTML = ''; return; }
+  const fontes = (dados.fonte && dados.fonte.fontes) || [];
+  const quando = (c) => fontes.filter((f) => f.canal === c && f.ultimo_ok).map((f) => un(f.unidade) + ' ' + horaCurta(f.ultimo_ok)).join(' · ') || 'sem leitura';
+  const conta = (g) => lista.filter((x) => x.grupo === g).length;
+  const bate = conta('1-bate'), soSite = conta('2-so-site'), soIfood = conta('3-so-ifood');
+  const ifoodTxt = (v) => v === 'vendendo' ? 'vendendo' : v === 'pausado' ? 'pausado' : 'não achado nos itens do iFood';
+  el.innerHTML = '<div class="ps-comp">' +
+    '<h2>iFood x Site (Accon): ' + (soSite + soIfood === 0 ? '<span class="ps-bate">bate</span>' : '<span class="ps-difere">não bate</span>') + '</h2>' +
+    '<p class="ps-comp-sub">O iFood é a referência: o site deve ficar igual a ele. Leitura do iFood: ' + esc(quando('iFood')) + '. Leitura do site: ' + esc(quando('Accon')) + '. Compara pelo nome do item; adicional do iFood não entra (a leitura do iFood só traz itens principais).</p>' +
+    '<div class="ps-comp-resumo">' +
+      '<div class="ps-comp-card"><b class="ps-bate">' + bate + '</b><span>pausados nos dois</span></div>' +
+      '<div class="ps-comp-card"><b class="ps-difere">' + soSite + '</b><span>pausados só no site</span></div>' +
+      '<div class="ps-comp-card"><b class="ps-difere">' + soIfood + '</b><span>pausados só no iFood</span></div>' +
+    '</div>' +
+    '<table class="ps-tab"><thead><tr><th>Unidade</th><th>Item</th><th>Situação</th><th>No iFood</th><th>No site</th></tr></thead><tbody>' +
+    lista.map((x) => '<tr>' +
+      '<td>' + esc(un(x.unidade)) + '</td>' +
+      '<td>' + esc(x.item || '—') + '</td>' +
+      '<td class="' + (x.grupo === '1-bate' ? 'ps-bate' : 'ps-difere') + '" style="font-weight:700">' + esc(ROT_GRUPO[x.grupo] || '—') + '</td>' +
+      '<td>' + esc(ifoodTxt(x.ifood)) + '</td>' +
+      '<td>' + esc(x.site || '—') + '</td>' +
+      '</tr>').join('') +
+    '</tbody></table>' +
+    '<h3 class="ps-titulo-lista">Todos os pausados, por canal</h3>' +
+  '</div>';
+}
+
 function desenhar(dados) {
+  if (CANAIS_DO_MODO) {
+    dados.itens = (dados.itens || []).filter((x) => CANAIS_DO_MODO.includes(x.canal));
+    if (dados.fonte && dados.fonte.fontes) dados.fonte.fontes = dados.fonte.fontes.filter((f) => CANAIS_DO_MODO.includes(f.canal));
+  }
+  if (MODO === 'salao') dados.comparativo = [];
   montarFontes(dados.fonte && dados.fonte.fontes);
+  desenharComparativo(dados);
   document.getElementById('consultado').textContent = dados.consultado_em ? 'Consultado em ' + horaCurta(dados.consultado_em) : '';
 
   const linhas = Array.isArray(dados.itens) ? dados.itens : [];
@@ -247,7 +318,7 @@ function desenhar(dados) {
       '</tr></thead><tbody>' +
       linhas.map((x) => '<tr>' +
         '<td>' + esc(un(x.unidade)) + '</td>' +
-        '<td>' + esc(x.canal || '—') + '</td>' +
+        '<td>' + esc(x.canal === 'Accon' ? 'Site (Accon)' : (x.canal || '—')) + '</td>' +
         '<td>' + esc(x.item || '—') + '</td>' +
         '<td>' + esc(x.tipo || '—') + '</td>' +
         '<td data-valor="' + esc(x.estado || '') + '">' + estadoHtml(x.estado) + '</td>' +
@@ -264,7 +335,7 @@ function desenhar(dados) {
   }
   const nota = document.createElement('p');
   nota.className = 'ps-nota';
-  nota.textContent = 'Fonte esperada: Goomer (tablet) e Accon, gravados no ERP pelos leitores próprios. Só consulta — pausar, despausar e editar motivo continuam nos próprios sistemas. Goomer cobre Água Verde e São Braz; Ahú aparece como "sem coleta prevista". Accon pode cobrir até três unidades.';
+  nota.textContent = 'Fontes: iFood pela API oficial (uma leitura por dia, só itens principais, Boqueirão fora); Tablet (Goomer) e Site (Accon) pelos leitores próprios. Só consulta: pausar e despausar continuam nos próprios sistemas. Goomer cobre Água Verde e São Braz.';
   c.appendChild(nota);
 }
 

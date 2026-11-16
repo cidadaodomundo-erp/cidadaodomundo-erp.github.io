@@ -118,7 +118,8 @@ window.CASCA_PAGINAS = {
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // Salão: em construção (a própria página diz)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
-  pausados: 'pausados/index.html',   // 12/11/2026: Produtos pausados, mesma página, religada no novo local do Fábio
+  pausados: 'pausados/index.html?modo=salao&v=20261116a',   // 16/11/2026: Itens pausados do Salão = só Goomer (tablet)
+  pausadosdel: 'pausados/index.html?modo=delivery&v=20261116a',   // 16/11/2026: Itens pausados do Delivery = iFood x Site (Accon), iFood é a referência
 };
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
@@ -135,5 +136,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 
