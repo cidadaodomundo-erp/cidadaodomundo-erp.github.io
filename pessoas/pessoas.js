@@ -1234,8 +1234,8 @@ function cgFormPessoa(p, soAdm) {   // soAdm: edição da admissão na tela Admi
       ${campo(ob('Empresa da folha'), sel('empresa', cgEmpresasDaLoja(v.unidade), v.empresa || (p ? '' : cgEmpresasDaLoja(v.unidade)[0])))}
       ${campo('Contrato', sel('contrato', ['CLT', 'INTERMITENTE', 'SEM REGISTRO'], v.contrato).replace('<select ', `<select onchange="cgFormContrato(${id})" `))}
       ${campo(ob('Cargo do plano'), `<select id="cgF_cargo_${id}" style="width:100%" onchange="cgFormCargo(${id})">${cgOpcoesCargo(v.unidade, v.cargo)}</select>`)}
-      ${campo('Setor no nome do cargo', sel('departamento', ['', ...CG_DEPTOS], v.departamento).replace('<select ', `<select onchange="cgFormCargo(${id})" `))}
-      ${campo('Nome do cargo com setor', inp('cargo_completo', v.cargo_completo))}
+      ${campo(ob('Setor no nome do cargo'), sel('departamento', ['', ...CG_DEPTOS], v.departamento).replace('<select ', `<select onchange="cgFormCargo(${id})" `))}
+      ${campo(p ? 'Nome do cargo com setor' : 'Nome do cargo com setor (* fora do plano)', inp('cargo_completo', v.cargo_completo))}
       ${campo('Jornada (horas/mês)', `<select id="cgF_horas_${id}" style="width:100%" onchange="cgSugerirSalario(${id})">${[...new Set(['180', '220', String(v.horas ?? '220')])].map((o) => `<option value="${o}" ${o === String(v.horas ?? '220') ? 'selected' : ''}>${o}</option>`).join('')}</select>`)}
       ${campo(ob('Salário base'), inp('salario', v.salario, 'number').replace('<input ', `<input oninput="cgSalarioConf(${id})" `))}
       ${campo('Setor do rateio dos canais', sel('setor_rateio', ['', ...CG_SETORES], v.setor_rateio))}
@@ -1319,6 +1319,10 @@ function cgObrigPintar(id) {
   const g = (n) => document.getElementById(`cgF_${n}_${id}`), A = (c) => document.getElementById('cgA_' + c);
   const L = [[g('nome')], [g('empresa')], [g('cargo')], [g('salario'), (e) => cgN(e.value) > 0], [g('admissao')],
     [A('cpf'), (e) => e.value.replace(/\D/g, '').length === 11], [A('telefone'), (e) => e.value.replace(/\D/g, '').length >= 10]];
+  // setor obrigatório (RH 13/11: na Flash o cargo leva o setor); fora do plano vale o nome do cargo escrito
+  const fora = g('cargo') && g('cargo').value === 'FORA DO PLANO';
+  if (g('departamento')) { if (fora) g('departamento').classList.remove('cg-obrig-vazio'); else L.push([g('departamento')]); }
+  if (g('cargo_completo')) { if (fora) L.push([g('cargo_completo')]); else g('cargo_completo').classList.remove('cg-obrig-vazio'); }
   const semId = !cgAdmTemIdentidade();
   [A('nascimento'), A('nome_mae')].forEach((e) => { if (e) { if (semId) L.push([e]); else e.classList.remove('cg-obrig-vazio'); } });
   const nome = g('nome'), ap = g('apelidos'), emp = g('empresa');
@@ -1355,6 +1359,7 @@ async function cgSalvar(id) {
     if (String(A.telefone).replace(/\D/g, '').length < 10) falta.push('telefone com DDD');
     if (!corpo.empresa) falta.push('empresa da folha');
     if (!cargo) falta.push('cargo (fora do plano: escreva o nome do cargo com setor)');
+    else if (g('cargo').value !== 'FORA DO PLANO' && !corpo.departamento) falta.push('setor no nome do cargo (a Flash só aceita o cargo com o setor)');
     if (!(Number(corpo.salario) > 0)) falta.push('salário maior que zero');
     if (!corpo.admissao) falta.push('data de admissão');
     if (!cgAdmTemIdentidade()) {   // com RG/CNH/certidão/título anexado, a leitura preenche (banco, 06/11)
