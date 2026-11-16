@@ -258,12 +258,15 @@ function agAvisosHtml() {
   if (!A || A.erro) return `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler os avisos${A && A.erro ? ': ' + agE(A.erro) : ''}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
   const g = (n) => A.filter((a) => Number(a.grupo) === n);
   const campo = 'width:100%;background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;color:var(--tx-1);padding:8px;font:inherit;';
-  let h = `<div class="ag-bloco">Esperando o seu "manda" <span class="f">· ${g(1).length}</span></div>`;
+  // 16/11/2026 (Avisos 2d23a4f): o grupo 1 traz também os decididos nas últimas 24 h (botoes = false, MANDADO / NAO_MANDA)
+  const DECIDIDO = { MANDADO: 'mandado', NAO_MANDA: 'não vai' };
+  let h = `<div class="ag-bloco">Esperando o seu "manda" <span class="f">· ${g(1).filter((a) => !DECIDIDO[a.estado]).length}${g(1).some((a) => DECIDIDO[a.estado]) ? ' · e os decididos nas últimas 24 h' : ''}</span></div>`;
   h += g(1).length ? g(1).map((a) => {
     const ob = agAvObsEstado(a);
     const est = a.obs_dono && ob.pendente && a.estado !== 'MUDAR' ? '<span style="color:var(--info);font-weight:700;">em nova análise (Avisos)</span>'
       : a.estado === 'MUDAR' ? `<span style="color:var(--info);font-weight:700;">o chat Avisos está reescrevendo</span>${a.nota_dono ? ' · você pediu: ' + agE(a.nota_dono) : ''}`
       : a.estado === 'APROVADO' ? `<span style="color:var(--farol-ok);font-weight:700;">aprovado</span>${a.espera_por ? ' · <b style="color:var(--farol-perto);">sai quando: ' + agE(a.espera_por) + '</b>' : ''}`
+      : DECIDIDO[a.estado] ? `<span style="color:var(--farol-ok);font-weight:700;">✓ decidido: ${DECIDIDO[a.estado]}</span>`
       : '<span style="color:var(--farol-perto);font-weight:700;">esperando você</span>';
     // 13/11/2026 12:37 (dono: "coloca a observação dos avisos da agenda na frente, quero usar agora"): o campo de observação
     // fica à vista em todo aviso que espera você; vale para os três botões (no Manda vira a observação do aviso)
@@ -275,7 +278,7 @@ function agAvisosHtml() {
     return `<div class="ag-lin ${a.estado === 'ESPERA' ? 'alerta' : ''}" style="flex-wrap:wrap;"><span class="t"><b>${agE(a.para_quem || '')}</b> · ${agE(a.assunto || '')} <span class="f">${a.frente ? '· ' + agE(a.frente) : ''}</span> · ${est}
         <div style="white-space:pre-wrap;margin:6px 0 2px;padding:8px 10px;background:var(--surface-2);border-radius:8px;color:var(--tx-1);">${agE(a.texto || '')}</div>
         ${a.por_que ? `<div class="ag-ctx">por quê: ${agE(a.por_que)}</div>` : ''}
-        ${a.obs_dono ? `<div style="margin:6px 0 2px;padding:6px 10px;border-left:3px solid ${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};background:var(--surface-2);border-radius:6px;font-size:12.5px;"><b>sua observação:</b> ${agE(a.obs_dono)}<div style="color:${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};font-weight:700;margin-top:2px;">${ob.linha}</div></div>` : ''}</span>${bts || agAvObsHtml(a)}</div>`;
+        ${a.obs_dono ? `<div style="margin:6px 0 2px;padding:6px 10px;border-left:3px solid ${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};background:var(--surface-2);border-radius:6px;font-size:12.5px;"><b>sua observação:</b> ${agE(a.obs_dono)}<div style="color:${ob.pendente ? 'var(--info)' : 'var(--farol-ok)'};font-weight:700;margin-top:2px;">${ob.linha}</div></div>` : ''}</span>${bts || (DECIDIDO[a.estado] ? '' : agAvObsHtml(a))}</div>`;
   }).join('') : '<div class="ag-lin"><span class="t" style="color:var(--farol-ok);">✓ nenhum aviso esperando você</span></div>';
   // 16/11/2026 (Avisos): rascunho decidido pela observação sai do grupo 1 — o grupo 4 mostra a resposta por 24 h
   const G4 = g(4);
