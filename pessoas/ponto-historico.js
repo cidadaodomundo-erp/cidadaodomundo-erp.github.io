@@ -1,7 +1,8 @@
 // HISTÓRICO DE PONTO DE UMA PESSOA (topo da Consulta de ponto, rota pcartao). Escolhe a pessoa e já aparecem todas as
-// infrações desde a admissão, sem digitar data. Fonte: rh_ponto_historico (carga do Flash, desde 21/03/2026), pelas funções
-// do banco ponto_historico_pessoas / ponto_historico_pessoa (conferem a permissão de RH). Regras: pessoas/ponto-marcas.js.
-// Dia antigo é calculado com o horário cadastrado HOJE. Refeição não entra no histórico (só no dia, na consulta abaixo).
+// infrações desde a admissão, sem digitar data. Fontes (pela função do banco ponto_historico_pessoa, que confere a
+// permissão de RH): batidas do Flash (rh_ponto_historico, desde 21/03/2026), refeição do Saipos (vínculos de cartão,
+// apelido e venda), advertência/suspensão/atestado (rh_ocorrencia) e férias/eventos do Flash (rh_flash_ausencia).
+// Regras do dia: pessoas/ponto-marcas.js. Dia antigo é calculado com o horário cadastrado HOJE.
 (function (root, factory) {
   'use strict';
   const mod = factory(typeof require === 'function' && typeof module !== 'undefined' ? require('./ponto-marcas.js') : (root && root.PontoMarcas));
@@ -9,39 +10,62 @@
   if (root && typeof document !== 'undefined') root.PontoHistorico = mod;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null), function (marcas) {
   'use strict';
+  // ordem dos botões
   const TIPOS = Object.freeze({
-    cedo: 'Saiu mais cedo', extra: 'Hora extra (conferir autorização)', intervalo: 'Intervalo menor que 1h',
-    semintervalo: 'Sem intervalo em turno longo', impar: 'Batida faltando (número ímpar)',
+    cedo: 'Saiu cedo', extra: 'Hora extra', intervalo: 'Intervalo curto', semintervalo: 'Sem intervalo',
+    impar: 'Batida faltando', refeicao: 'Sem refeição', ADVERTENCIA: 'Advertência', SUSPENSAO: 'Suspensão',
+    ATESTADO: 'Atestado', DECLARACAO: 'Declaração', FERIAS: 'Férias', EVENTO: 'Ausência (Flash)',
   });
-  const fmt = (d) => (typeof d === 'string' && d.length >= 10 ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '—');
+  const GRAVE = new Set(['ADVERTENCIA', 'SUSPENSAO']);
+  const NEUTRO = new Set(['ATESTADO', 'DECLARACAO', 'FERIAS', 'EVENTO']);
+  const fmt = (d) => (typeof d === 'string' && d.length >= 10 ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) : '—');
 
-  // dias: [{dia, empresa, horarios:[ts]}]; devolve {linhas:[{dia, empresa, batidas, tipos:[], textos:[]}], contagem:{tipo:n}, total}
-  function resumir(dias, jornada) {
+  // d = resposta de ponto_historico_pessoa. Devolve {linhas, contagem, total}. Cada linha = um dia de ponto ou um registro do RH.
+  function resumir(d) {
+    d = d || {};
     const contagem = {}; Object.keys(TIPOS).forEach((k) => { contagem[k] = 0; });
     const linhas = [];
-    for (const d of Array.isArray(dias) ? dias : []) {
-      if (!d || typeof d.dia !== 'string' || !Array.isArray(d.horarios)) continue;
-      const hs = d.horarios.filter((h) => typeof h === 'string');
-      const l = { dia: d.dia, empresa: d.empresa || '', batidas: hs.map(marcas.hora), tipos: [], textos: [] };
-      const add = (k, t) => { l.tipos.push(k); l.textos.push(t); contagem[k]++; };
-      if (hs.length % 2 === 1) add('impar', hs.length + ' batida(s): faltou bater entrada ou saída');
+    const ref = d.refeicao || {}, refDias = ref.dias || {}, refAte = typeof ref.ate === 'string' ? ref.ate : '';
+    for (const x of Array.isArray(d.dias) ? d.dias : []) {
+      if (!x || typeof x.dia !== 'string' || !Array.isArray(x.horarios)) continue;
+      const hs = x.horarios.filter((h) => typeof h === 'string');
+      const itens = Array.isArray(refDias[x.dia]) ? refDias[x.dia] : [];
+      const l = { tipo: 'ponto', dia: x.dia, loja: x.empresa || '', batidas: hs.map(marcas.hora), intervalo: '', refeicao: '', tipos: [], textos: [] };
+      const add = (k, t) => { if (!l.tipos.includes(k)) { l.tipos.push(k); contagem[k]++; } l.textos.push(t); };
+      const r = marcas.avaliar({ dia: x.dia, horarios: hs, jornada: d.jornada || null,
+        refeicao: { pendente: !refAte || x.dia > refAte, disponivel: !!refAte, identificado: ref.identificado === true, itens } });
+      l.refeicao = itens.length ? itens.map((i) => (i.produto || 'refeição') + (i.hora ? ' ' + i.hora : '')).join('; ') : (r.refeicao ? r.refeicao.texto : '—');
+      l.refeicaoRuim = !!(r.refeicao && r.refeicao.estado === 'ruim');
+      if (hs.length % 2 === 1) add('impar', hs.length + ' batida(s): faltou bater');
       else if (hs.length) {
-        const r = marcas.avaliar({ dia: d.dia, horarios: hs, jornada: jornada || null, refeicao: { disponivel: true, identificado: false, itens: [] } });
+        if (r.intervalo) l.intervalo = r.intervalo.estado === 'ruim' ? r.intervalo.texto.replace(/^intervalo de /, '') : r.intervalo.texto;
         if (r.intervalo && r.intervalo.estado === 'ruim') add(/sem intervalo/.test(r.intervalo.texto) ? 'semintervalo' : 'intervalo', r.intervalo.texto);
-        if (r.entrada && r.entrada.estado === 'ruim') add('extra', r.entrada.texto);
-        if (r.saida && r.saida.estado === 'ruim') add(/mais cedo/.test(r.saida.texto) ? 'cedo' : 'extra', r.saida.texto);
+        if (r.entrada && r.entrada.estado === 'ruim') add('extra', r.entrada.texto.replace(/; conferir autorização$/, ''));
+        if (r.saida && r.saida.estado === 'ruim') add(/mais cedo/.test(r.saida.texto) ? 'cedo' : 'extra', r.saida.texto.replace(/; conferir autorização$/, ''));
+        if (l.refeicaoRuim) add('refeicao', 'não pegou refeição');
       }
       linhas.push(l);
     }
-    linhas.sort((a, b) => (a.dia < b.dia ? 1 : -1));
-    return { linhas, contagem, total: linhas.filter((l) => l.tipos.length).length };
+    for (const o of Array.isArray(d.ocorrencias) ? d.ocorrencias : []) {
+      if (!o || typeof o.dia !== 'string' || !TIPOS[o.tipo]) continue;
+      contagem[o.tipo]++;
+      linhas.push({ tipo: 'rh', dia: o.dia, loja: '', batidas: [], intervalo: '', refeicao: '', tipos: [o.tipo], textos: [typeof o.motivo === 'string' && o.motivo.trim() ? o.motivo.trim() : TIPOS[o.tipo]] });
+    }
+    for (const a of Array.isArray(d.ausencias) ? d.ausencias : []) {
+      if (!a || typeof a.inicio !== 'string' || !TIPOS[a.tipo]) continue;
+      contagem[a.tipo]++;
+      const ate = typeof a.fim === 'string' && a.fim !== a.inicio ? ' até ' + fmt(a.fim) : '';
+      linhas.push({ tipo: 'rh', dia: a.inicio, loja: '', batidas: [], intervalo: '', refeicao: '', tipos: [a.tipo], textos: [TIPOS[a.tipo] + ate] });
+    }
+    linhas.sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : (a.tipo === 'rh' ? -1 : 1)));
+    return { linhas, contagem, total: linhas.filter((l) => l.tipos.some((t) => !NEUTRO.has(t))).length };
   }
 
-  if (typeof document === 'undefined') return { resumir, TIPOS };
+  if (typeof document === 'undefined') return { resumir, TIPOS, fmt };
 
   // ---------- tela (só no navegador) ----------
   const original = window.entrarPesPonto;
-  let pessoas = null, gen = 0, sel = '', todos = false, filtro = '';
+  let pessoas = null, gen = 0, sel = '', filtro = 'inf';
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   async function rpc(fn, args) {
     const r = await trRpc(fn, args || {});
@@ -58,28 +82,26 @@
     const g = ++gen;
     box.replaceChildren();
     const sec = el('section', 'phist');
-    sec.appendChild(el('h2', 'phist-tit', 'Histórico de infrações de uma pessoa'));
-    sec.appendChild(el('p', 'phist-nota', 'Escolha a pessoa: aparecem todas as infrações desde a admissão, sem digitar data.'));
-    const linha = el('div', 'phist-ctl');
+    const topo = el('div', 'phist-topo');
+    topo.appendChild(el('h2', 'phist-tit', 'Histórico da pessoa'));
     const s = el('select', 'phist-sel'); s.setAttribute('aria-label', 'Pessoa');
     s.appendChild(new Option('Carregando pessoas…', ''));
-    linha.appendChild(s);
-    sec.appendChild(linha);
+    topo.appendChild(s);
+    sec.appendChild(topo);
     const corpo = el('div'); sec.appendChild(corpo);
     box.appendChild(sec);
     try { if (!pessoas) pessoas = await rpc('ponto_historico_pessoas'); }
-    catch (e) { if (g === gen) { s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); } return; }
+    catch (e) { if (g === gen) s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); return; }
     if (g !== gen) return;
-    s.replaceChildren(new Option('— escolha a pessoa —', ''));
-    const grupos = [['Trabalhando', pessoas.filter((p) => !p.desligamento)], ['Já saíram', pessoas.filter((p) => p.desligamento)]];
-    for (const [nome, lista] of grupos) {
+    s.replaceChildren(new Option('Escolha a pessoa: aparecem todas as infrações desde a admissão', ''));
+    for (const [nome, lista] of [['Trabalhando', pessoas.filter((p) => !p.desligamento)], ['Já saíram', pessoas.filter((p) => p.desligamento)]]) {
       if (!lista.length) continue;
       const og = document.createElement('optgroup'); og.label = nome;
-      for (const p of lista) og.appendChild(new Option(p.nome + ' — ' + (p.unidade || '') + (p.dias ? '' : ' (sem batidas)'), String(p.id)));
+      for (const p of lista) og.appendChild(new Option(p.nome + ' · ' + (p.unidade || ''), String(p.id)));
       s.appendChild(og);
     }
     s.value = sel;
-    s.addEventListener('change', () => { sel = s.value; todos = false; filtro = ''; abrir(corpo); });
+    s.addEventListener('change', () => { sel = s.value; filtro = 'inf'; abrir(corpo); });
     if (sel) abrir(corpo);
   }
   async function abrir(corpo) {
@@ -92,50 +114,71 @@
     if (g !== gen) return;
     corpo.replaceChildren();
     if (!d || !d.pessoa) { corpo.appendChild(el('p', 'phist-erro', 'Não deu para carregar o histórico agora.')); return; }
+    desenharPessoa(corpo, d);
+  }
+  function desenharPessoa(corpo, d) {
     const p = d.pessoa, f = d.fonte || {};
-    const r = resumir(d.dias, d.jornada);
-    const info = el('p', 'phist-info');
-    info.textContent = 'Admissão: ' + fmt(p.admissao) + (p.desligamento ? ' · Saiu: ' + fmt(p.desligamento) : '') + ' · Horário cadastrado: ' +
-      (d.jornada ? d.jornada.entrada + ' às ' + d.jornada.saida : 'nenhum (sem horário não dá para marcar saída cedo nem hora extra)') +
-      ' · Dias com batida: ' + r.linhas.length + ' · Dias com infração: ' + r.total;
-    corpo.appendChild(info);
-    const chips = el('div', 'phist-chips');
-    const chip = (k, txt, n) => {
-      const b = el('button', 'phist-chip' + (filtro === k ? ' phist-on' : '') + (n ? ' phist-ruim' : ''), txt + ': ' + n); b.type = 'button';
-      b.addEventListener('click', () => { filtro = filtro === k ? '' : k; todos = false; desenhar(); }); chips.appendChild(b);
+    const r = resumir(d);
+    const cards = el('div', 'phist-cards');
+    const card = (rot, val, cls) => { const c = el('div', 'phist-card' + (cls ? ' ' + cls : '')); c.appendChild(el('span', 'phist-card-rot', rot)); c.appendChild(el('b', null, val)); cards.appendChild(c); };
+    card('Admissão', fmt(p.admissao));
+    if (p.desligamento) card('Saiu', fmt(p.desligamento));
+    card('Horário', d.jornada ? d.jornada.entrada + '–' + d.jornada.saida : 'sem horário', d.jornada ? '' : 'phist-c-alerta');
+    card('Dias trabalhados', String(r.linhas.filter((l) => l.tipo === 'ponto').length));
+    card('Dias com infração', String(r.total), r.total ? 'phist-c-ruim' : 'phist-c-ok');
+    card('Advertências', String(r.contagem.ADVERTENCIA), r.contagem.ADVERTENCIA ? 'phist-c-ruim' : '');
+    card('Suspensões', String(r.contagem.SUSPENSAO), r.contagem.SUSPENSAO ? 'phist-c-ruim' : '');
+    corpo.appendChild(cards);
+    const bar = el('div', 'phist-bar'); corpo.appendChild(bar);
+    const lista = el('div'); corpo.appendChild(lista);
+    const botao = (k, txt, n, cls) => {
+      const b = el('button', 'phist-bt' + (filtro === k ? ' phist-on' : '') + (cls ? ' ' + cls : '')); b.type = 'button';
+      b.appendChild(document.createTextNode(txt)); if (n != null) b.appendChild(el('span', 'phist-n', String(n)));
+      b.addEventListener('click', () => { filtro = k; desenhar(); }); bar.appendChild(b);
     };
-    const lista = el('div');
     function desenhar() {
-      chips.replaceChildren();
-      Object.keys(TIPOS).forEach((k) => chip(k, TIPOS[k], r.contagem[k]));
-      const bt = el('button', 'phist-chip' + (todos ? ' phist-on' : ''), todos ? 'Mostrar só as infrações' : 'Mostrar todos os dias'); bt.type = 'button';
-      bt.addEventListener('click', () => { todos = !todos; filtro = ''; desenhar(); }); chips.appendChild(bt);
+      bar.replaceChildren();
+      botao('inf', 'Só infrações', r.total);
+      botao('todos', 'Todos os dias', null);
+      Object.keys(TIPOS).forEach((k) => { if (r.contagem[k]) botao(k, TIPOS[k], r.contagem[k], GRAVE.has(k) ? 'phist-grave' : NEUTRO.has(k) ? '' : 'phist-ruim'); });
       lista.replaceChildren();
-      const ls = r.linhas.filter((l) => (filtro ? l.tipos.includes(filtro) : (todos || l.tipos.length)));
-      if (!ls.length) { lista.appendChild(el('p', 'phist-nota', r.linhas.length ? 'Nenhuma infração encontrada neste histórico.' : 'Nenhuma batida desta pessoa no histórico do Flash.')); return; }
-      const rol = el('div', 'pcart-rolagem'); const t = el('table', 'pcart-tab');
-      const th = el('tr'); ['Dia', 'Loja', 'Batidas', 'O que aconteceu'].forEach((x) => th.appendChild(el('th', null, x)));
+      const ls = r.linhas.filter((l) => filtro === 'todos' ? true : filtro === 'inf' ? l.tipos.some((t) => !NEUTRO.has(t)) : l.tipos.includes(filtro));
+      if (!ls.length) { lista.appendChild(el('p', 'phist-nota', r.linhas.length ? 'Nenhuma infração encontrada.' : 'Nenhuma batida desta pessoa no Flash.')); return; }
+      const rol = el('div', 'phist-rol'); const t = el('table', 'phist-tab');
+      const th = el('tr'); ['Dia', 'Loja', 'Entrada', 'Intervalo', 'Saída', 'Pausa', 'Refeição', 'O que aconteceu'].forEach((x) => th.appendChild(el('th', null, x)));
       const thead = el('thead'); thead.appendChild(th); t.appendChild(thead);
       const tb = el('tbody');
+      const td = (tr, txt, cls) => { const c = el('td', cls, txt); if (txt && txt.length > 14) c.title = txt; tr.appendChild(c); return c; };
       for (const l of ls) {
-        const tr = el('tr');
-        tr.appendChild(el('td', null, fmt(l.dia)));
-        tr.appendChild(el('td', null, l.empresa));
-        tr.appendChild(el('td', null, l.batidas.join(' · ')));
-        tr.appendChild(el('td', l.tipos.length ? 'phist-ruim-tx' : 'phist-ok-tx', l.tipos.length ? l.textos.join('; ') : 'tudo certo'));
+        const tr = el('tr', l.tipo === 'rh' ? 'phist-tr-rh' : null);
+        td(tr, fmt(l.dia));
+        td(tr, l.loja ? l.loja.replace('AGUA VERDE', 'Água Verde').replace('SAO BRAZ', 'São Braz').replace('AHU', 'Ahú') : '');
+        const b = l.batidas, n = b.length;
+        td(tr, n ? b[0] : '');
+        td(tr, n >= 4 ? b[1] + '–' + b[2] : (n === 3 ? b[1] + '–?' : ''));
+        td(tr, n >= 2 ? b[n - 1] : (n === 1 ? '?' : ''));
+        td(tr, l.intervalo, /mínimo|sem intervalo/.test(l.intervalo) ? 'phist-tx-ruim' : null);
+        td(tr, l.refeicao, l.refeicaoRuim ? 'phist-tx-ruim' : 'phist-tx-fraco');
+        const c = el('td', 'phist-oque');
+        if (!l.tipos.length) c.appendChild(el('span', 'phist-tag phist-tag-ok', 'tudo certo'));
+        l.tipos.forEach((k) => c.appendChild(el('span', 'phist-tag ' + (GRAVE.has(k) ? 'phist-tag-grave' : NEUTRO.has(k) ? 'phist-tag-neutro' : 'phist-tag-ruim'), TIPOS[k])));
+        const txt = l.textos.filter((x) => !Object.values(TIPOS).includes(x) && x !== 'não pegou refeição')
+          .map((x) => x.replace(/^hora extra: /, '').replace(/ \(\d\d:\d\d às \d\d:\d\d\)/, '')).join('; ');
+        if (txt) c.appendChild(el('span', 'phist-det', txt));
+        c.title = l.textos.join('; ');
+        tr.appendChild(c);
         tb.appendChild(tr);
       }
       t.appendChild(tb); rol.appendChild(t); lista.appendChild(rol);
     }
-    corpo.appendChild(chips); corpo.appendChild(lista);
     desenhar();
-    corpo.appendChild(el('p', 'phist-nota', 'Fonte: Flash, de ' + fmt(f.de) + ' a ' + fmt(f.ate) + '. O Flash não tem batidas antes disso. ' +
-      'Dias antigos usam o horário cadastrado hoje. Refeição não entra aqui; o dia de hoje aparece na consulta abaixo.'));
+    corpo.appendChild(el('p', 'phist-nota', 'Fontes: batidas do Flash de ' + fmt(f.de) + ' a ' + fmt(f.ate) + ' (o Flash não tem antes disso); refeição do Saipos até ' + fmt((d.refeicao || {}).ate) +
+      '; advertência, suspensão e atestado do cadastro do RH; férias e ausências do Flash. Dias antigos usam o horário cadastrado hoje. O dia de hoje aparece na consulta abaixo.'));
   }
   window.entrarPesPonto = function () {
-    const r = original ? original.apply(this, arguments) : undefined;
+    const res = original ? original.apply(this, arguments) : undefined;
     try { montar(); } catch (e) { }
-    return r;
+    return res;
   };
-  return { resumir, TIPOS };
+  return { resumir, TIPOS, fmt, _desenharPessoa: desenharPessoa };
 });

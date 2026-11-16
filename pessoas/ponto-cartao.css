@@ -47,17 +47,37 @@
   .pcart-tab td:nth-child(n+2):nth-child(-n+7) { white-space: normal; overflow-wrap: anywhere; }   /* cartões: sem nowrap, não estoura 390px */
   .pcart-tab td::before { content: attr(data-rot) ": "; color: var(--tx-3); font-size: 12px; }
 }
-/* Histórico de infrações de uma pessoa (pessoas/ponto-historico.js) */
+/* Histórico da pessoa (pessoas/ponto-historico.js): tudo em uma linha, sem quebrar */
 .phist { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 12px; margin: 0 0 16px; color: var(--tx-1); }
-.phist-tit { font-size: 18px; font-weight: 800; margin: 0 0 4px; }
-.phist-nota { font-size: 13px; color: var(--tx-3); margin: 6px 0; line-height: 1.4; }
-.phist-info { font-size: 14px; margin: 8px 0; line-height: 1.5; }
+.phist-topo { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; }
+.phist-tit { font-size: 18px; font-weight: 800; margin: 0; white-space: nowrap; }
+.phist-sel { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px; font: inherit; font-size: 14px; flex: 1 1 320px; max-width: 560px; min-width: 0; }
+.phist-nota { font-size: 12px; color: var(--tx-3); margin: 8px 0 0; line-height: 1.4; }
 .phist-erro { color: var(--farol-fora); }
-.phist-ctl { margin: 6px 0; }
-.phist-sel { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px; font: inherit; font-size: 15px; width: 100%; max-width: 520px; }
-.phist-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.phist-chip { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-.phist-chip.phist-ruim { border-color: var(--farol-fora); }
-.phist-chip.phist-on { outline: 2px solid var(--farol-perto); }
-.phist-ruim-tx { color: var(--farol-fora); font-weight: 600; }
-.phist-ok-tx { color: var(--farol-ok, var(--tx-2)); }
+.phist-cards { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.phist-card { background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; min-width: 96px; }
+.phist-card-rot { font-size: 11px; color: var(--tx-3); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.phist-card b { font-size: 16px; white-space: nowrap; }
+.phist-c-ruim b { color: var(--farol-fora); } .phist-c-ok b { color: var(--farol-ok); } .phist-c-alerta b { color: var(--farol-perto); }
+.phist-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.phist-bt { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 10px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.phist-bt.phist-on { background: var(--farol-perto); color: #111; border-color: var(--farol-perto); }
+.phist-bt.phist-ruim .phist-n { background: var(--farol-fora); color: #fff; }
+.phist-bt.phist-grave { border-color: var(--farol-fora); }
+.phist-bt.phist-grave .phist-n { background: #b00020; color: #fff; }
+.phist-n { background: var(--line-2); color: var(--tx-1); border-radius: 999px; padding: 0 7px; font-size: 12px; }
+.phist-rol { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.phist-tab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.phist-tab th { background: var(--th-claro); color: var(--th-claro-tx); text-align: left; padding: 7px 8px; white-space: nowrap; border-bottom: 1px solid var(--line-2); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.phist-tab td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.phist-tab td:nth-child(7) { max-width: 180px; }
+.phist-tab td.phist-oque { max-width: 420px; }
+.phist-tr-rh td { background: color-mix(in srgb, var(--farol-fora) 8%, transparent); }
+.phist-tx-ruim { color: var(--farol-fora); font-weight: 600; }
+.phist-tx-fraco { color: var(--tx-3); }
+.phist-tag { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+.phist-tag-ruim { background: color-mix(in srgb, var(--farol-fora) 22%, transparent); color: var(--farol-fora); }
+.phist-tag-grave { background: #b00020; color: #fff; }
+.phist-tag-neutro { background: var(--line-2); color: var(--tx-2); }
+.phist-tag-ok { background: color-mix(in srgb, var(--farol-ok) 20%, transparent); color: var(--farol-ok); }
+.phist-det { color: var(--tx-2); }
