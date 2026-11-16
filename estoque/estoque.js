@@ -4678,6 +4678,8 @@ function cfRender(id) {
   let lista = L.filter((i) => (CF.filtro === 'todas' || (CF.filtro === 'feitas') === !!cfFeito(c, i)) && (!b || (i.nb || '').toLowerCase().includes(b)));
   const ehProd = id === 'produtos', porVenda = ehProd && CF.venda && CF.ordem === 'venda';
   if (porVenda) lista = [...lista].sort((x, y) => cfVendeu(y) - cfVendeu(x));
+  // 16/11/2026: nas bebidas, o drink que vende sem ficha vem primeiro (os 4 do dono, #204) — antes ficavam depois do corte de 60
+  if (id === 'bebidas') lista = [...lista].sort((x, y) => (y.g === 'sem_ficha') - (x.g === 'sem_ficha'));
   const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px;';
   const J = (v) => trEscH(JSON.stringify(v));
   let h = `<div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px;">
