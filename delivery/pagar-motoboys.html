@@ -13,7 +13,7 @@
 <!-- PAGAR MOTOBOYS (16/11/2026). Trazida do portal antigo com a cara do portal novo. Lê só o banco do ERP, pela função
      pagar_motoboys_dia(dia), que só responde para o dono e quem cuida do pessoal (pode_ver_pessoal). Entregas e taxas vêm do
      TrackEat, horários combinados da escala do Jaison, lanches da comanda Z Motoboys do Saipos, a régua de motoboy_param.
-     Chegada = 1ª coleta do TrackEat (decisão do Fábio 16/11); o GPS do pátio entra depois. Esta página não grava nada. -->
+     Chegada = hora no pátio (fila do TrackEat/GPS, robô do Escritório 2); sem ela, 1ª coleta só avisa. Tolerância 15 min corta garantido e refeição do dia (Fábio 16/11). Esta página não grava nada. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -62,6 +62,7 @@
   .pm-tab tr.lin:hover td { background:var(--surface-2); }
   .pm-nome { font-weight:700; }
   .pm-nome small { display:block; font-weight:400; font-size:11px; color:var(--tx-3); }
+  .pm-nome small.pm-nao { color:var(--farol-fora); font-weight:700; }
   .pm-conf { color:var(--farol-atencao, #d29922); font-size:11px; font-weight:700; margin-left:6px; }
   .pm-vh { color:var(--marca-amarelo, #e0a526); font-weight:700; }
   .pm-sim { color:var(--farol-ok); font-weight:700; }
@@ -179,10 +180,17 @@ function exigirLogin(recado) {
     return t;
   }
   // O que fez: com 2 turnos, uma linha por turno (almoço até a última entrega antes das 17h; jantar a partir da 1ª coleta depois das 17h).
+  function chTxt(patio, coleta, corta) {
+    if (!patio) return esc(coleta || '—');
+    return '<span class="' + (corta ? 'pm-nao' : '') + '" title="Entrou no pátio (fila TrackEat/GPS)">' + esc(patio) + '</span>' + (coleta ? '<small class="pm-sub">coleta ' + esc(coleta) + '</small>' : '');
+  }
   function celReal(l, campo) {
-    if (!l.saida_alm && !l.chegada_jan) return esc((campo === 'ch' ? l.chegada : l.saida) || '—');
-    const a = campo === 'ch' ? [l.chegada, l.chegada_jan] : [l.saida_alm, l.saida];
-    return '<span class="pm-turno"><i>alm</i>' + esc(a[0] || '—') + '</span><span class="pm-turno"><i>jan</i>' + esc(a[1] || '—') + '</span>';
+    if (!l.saida_alm && !l.chegada_jan) {
+      if (campo !== 'ch') return esc(l.saida || '—');
+      return chTxt(l.patio_alm || l.patio_jan, l.chegada, l.corta_alm || l.corta_jan);
+    }
+    const a = campo === 'ch' ? [chTxt(l.patio_alm, l.chegada, l.corta_alm), chTxt(l.patio_jan, l.chegada_jan, l.corta_jan)] : [esc(l.saida_alm || '—'), esc(l.saida || '—')];
+    return '<span class="pm-turno"><i>alm</i>' + a[0] + '</span><span class="pm-turno"><i>jan</i>' + a[1] + '</span>';
   }
   function horasEsc(l) {
     const t = turnosEsc(l); if (!t.length || t.some((x) => x.h == null)) return null;
@@ -203,13 +211,13 @@ function exigirLogin(recado) {
 
   function linhaHtml(l, i) {
     const k = l.loja + '|' + l.id_entregador;
-    const tarde = (l.atraso_alm > DADOS.tolerancia_min) || (l.atraso_jan > DADOS.tolerancia_min);
+    const tarde = !!l.coleta_tarde;
     const prev = horasEsc(l) != null ? horasEsc(l) : (Number(l.horas_garantido) || null);
     const dif = prev ? Number(l.horas) - prev : null;
     const curta = dif != null && dif < -DADOS.tolerancia_min / 60;
     let h = '<tr class="lin" data-k="' + esc(k) + '">' +
       '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
-        (l.turnos > 1 ? '<small>2 turnos</small>' : '') + '</span></td>' +
+        (l.turnos > 1 ? '<small>2 turnos</small>' : '') + (l.corta_dia ? '<small class="pm-nao">✂ atrasou: sem garantido e refeição</small>' : '') + '</span></td>' +
       '<td data-rot="Escala: entrada" class="esc" title="Escala do Jaison">' + celEsc(l, 'ini') + '</td>' +
       '<td data-rot="Escala: saída" class="esc">' + celEsc(l, 'fim') + '</td>' +
       '<td data-rot="Escala: horas" class="esc fim"><b>' + (horasEsc(l) != null ? horasTxt(horasEsc(l)) : (turnosEsc(l).length ? '<span class="pm-tarde">?</span>' : '—')) + '</b></td>' +
@@ -248,7 +256,7 @@ function exigirLogin(recado) {
     if (d.dia >= hojeSP()) av += '<div class="pm-aviso">⏳ <b>Este dia ainda está em andamento.</b> Pague pelo dia que já fechou.</div>';
     av += '<div class="pm-aviso info">De onde vêm os números: entregas e taxas do <b>TrackEat</b> (carregado ' + esc(f.trackeat_carregado_em || '—') +
       '), horário combinado da <b>escala</b> (gravada ' + esc(f.escala_gravada_em || '—') + '), lanches do <b>Saipos</b> (carregado ' + esc(f.saipos_carregado_em || '—') +
-      '). A <b>chegada</b> é a 1ª coleta no TrackEat: o GPS do pátio ainda não chegou ao portal novo, então atraso só aparece em laranja e não corta garantido nem refeição.</div>';
+      '). A <b>chegada</b> é a hora em que entrou no pátio (fila do TrackEat ou GPS). Passou de ' + esc(d.tolerancia_min) + ' min da escala, perde garantido e refeição do dia (em vermelho). Quando ainda não há hora do pátio, vale a 1ª coleta só como aviso, em laranja, sem cortar.</div>';
     const conf = ls.filter((l) => l.conferir).length;
     if (conf) av += '<div class="pm-aviso"><b>Conferir antes de pagar:</b> ' + conf + ' motoboy(s) com escala incompleta ou lanche sem preço. O total inclui prévias.</div>';
     $('avisos').innerHTML = av;
@@ -285,8 +293,8 @@ function exigirLogin(recado) {
       '<li>Direito a 1 lanche por turno rodado. Lanche a mais na comanda <b>Z Motoboys</b> é cobrado: R$ 24,50, ou R$ 29,90 com batata ou onion de funcionário.</li>' +
       '<li>O lanche é ligado ao motoboy pelo nome escrito na observação do item.</li></ul>' +
       '<h3>Chegada e atraso</h3><ul>' +
-      '<li>Regra da casa: chegou mais de ' + esc((DADOS && DADOS.tolerancia_min) || 30) + ' min depois do combinado perde o garantido e a refeição daquele turno.</li>' +
-      '<li>Hoje o portal novo ainda não tem o GPS do pátio, só a 1ª coleta do TrackEat, que costuma ser depois da chegada real. Por isso o atraso só aparece em laranja e <b>não corta nada sozinho</b>.</li></ul></div>';
+      '<li>Regra da casa: chegou no pátio mais de ' + esc((DADOS && DADOS.tolerancia_min) || 15) + ' min depois do combinado na escala, perde o garantido e a refeição <b>do dia</b> (fica com as taxas das entregas).</li>' +
+      '<li>A hora do pátio vem da fila do TrackEat e do GPS, pelo robô do Escritório 2. Se num dia não houver essa hora, a 1ª coleta aparece em laranja só como aviso e <b>não corta</b>, porque a 1ª coleta costuma ser bem depois da chegada.</li></ul></div>';
   }
 
   $('abas').addEventListener('click', (ev) => {
