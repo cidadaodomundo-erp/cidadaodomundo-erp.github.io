@@ -176,6 +176,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "pagarmoto",
+    "rotulo": "Pagar motoboys",
+    "icone": "💵",
+    "origem": "fabio"
+   },
+   {
     "chave": "reservas",
     "rotulo": "Reservas (GetIn)",
     "icone": "📖",
