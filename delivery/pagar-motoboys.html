@@ -180,7 +180,7 @@ function exigirLogin(recado) {
       const j = x.status === 'fulfilled' ? x.value : null;
       (j && j.por_unidade || []).forEach((u) => {
         if (u.status !== 'ok' || !Array.isArray(u.linhas)) return; algum = true;
-        u.linhas.forEach((l) => out.push({ unidade: u.unidade, motoboy: l.motoboy, fila: l.chegada_fila_txt, gps: l.patio_gps_txt, anotado: l.anotado_txt,
+        u.linhas.forEach((l) => out.push({ unidade: u.unidade, motoboy: l.motoboy, fila: l.chegada_fila_txt, gps: l.patio_gps_txt, anotado: l.anotado_txt, escala: l.escala_txt,
           gar_manual: l.garantido_manual, rango_manual: l.rango_manual }));
       });
     });
