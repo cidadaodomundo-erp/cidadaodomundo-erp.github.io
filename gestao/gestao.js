@@ -464,7 +464,7 @@ async function entrarConcbanco() {
     // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
     // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
     const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, parcial, robo] = await Promise.all([
+           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
@@ -483,9 +483,12 @@ async function entrarConcbanco() {
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
       // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): o que o robô está baixando
       consultarTudo('vw_fin_robo_baixando?select=conta,fitid,estado,feito_em').catch(() => []),
+      // 16/11/2026 (dono 14:10, repetida; proposta 2026-11-16-frequencia-conta-conciliacao.md): a frequência normal de
+      // cada conta vem do banco (fin_conta_frequencia); sem ela, vale a régua antiga de 30 dias
+      consultarTudo('vw_fin_conta_cobertura?select=conta,situacao,coberto_ate,esperado_em,nota').catch(() => null),
     ]);
     CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, parcial, robo };
+              diaSaldo, duvidas, parcial, robo, cobertura };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -1294,10 +1297,22 @@ function renderConcbanco() {
       // Quem nao movimenta mostra o ULTIMO DIA MOVIMENTADO, em tom neutro, e
       // segue com a conferencia de saldo normal.
       const diaria = sd.movimenta_diariamente !== false;
-      const semExtratoDe = !sd.extrato_ate ? 'nunca'
-        : (diaria && Math.round((new Date(ontem) - new Date(sd.extrato_ate)) / 86400000) > 2
-            ? ddmm(sd.extrato_ate) : null);
-      const ultimoMov = (!diaria && sd.ultimo_movimento) ? ddmm(sd.ultimo_movimento) : null;
+      // 16/11/2026: com vw_fin_conta_cobertura, o "parado" é pela frequência normal da conta (Santander às quartas,
+      // Participações só com envio à XP, FF quase todo dia). Só fica âmbar o que falta de verdade.
+      const cob = cru.cobertura && diaAlvo === ontem ? cru.cobertura.find(x => x.conta === conta) : null;
+      let semExtratoDe, ultimoMov, faltouMov = null, notaNormal = null;
+      if (cob) {
+        const atrasado = cob.situacao === 'EXTRATO ATRASADO' || cob.situacao === 'SEM EXTRATO';
+        semExtratoDe = atrasado ? (cob.coberto_ate ? ddmm(cob.coberto_ate) : 'nunca') : null;
+        faltouMov = cob.situacao === 'FALTA O MOVIMENTO ESPERADO' ? (cob.esperado_em ? ddmm(cob.esperado_em) : '') : null;
+        notaNormal = cob.situacao === 'EM DIA' && cob.nota ? String(cob.nota).replace(/: normal para esta conta$/, ' — normal') : null;
+        ultimoMov = null;
+      } else {
+        semExtratoDe = !sd.extrato_ate ? 'nunca'
+          : (diaria && Math.round((new Date(ontem) - new Date(sd.extrato_ate)) / 86400000) > 2
+              ? ddmm(sd.extrato_ate) : null);
+        ultimoMov = (!diaria && sd.ultimo_movimento) ? ddmm(sd.ultimo_movimento) : null;
+      }
       const dif = n(sd.diferenca);
       saldoTitulo = 'banco ' + rs(sd.saldo_banco) + ' · Saipos ' + rs(sd.saldo_saipos)
         + ' · diferença ' + rs(dif) + ' · na fila ' + rs(sd.explicado_pela_fila)
@@ -1314,6 +1329,8 @@ function renderConcbanco() {
         // conciliando. Mostrar o saldo velho como se fosse o de ontem mente.
         saldoTxt = '<span style="color:var(--farol-perto)">extrato parado'
           + (semExtratoDe === 'nunca' ? '' : ' em ' + semExtratoDe) + '</span>';
+      } else if (faltouMov !== null) {
+        saldoTxt = '<span style="color:var(--farol-perto)">faltou o movimento' + (faltouMov ? ' de ' + faltouMov : '') + '</span>';
       } else if (parcialDia && parcialDia === diaAlvo) {
         saldoTxt = '<span style="color:var(--farol-perto)">extrato parcial de ' + ddmm(parcialDia) + '</span>';
         if (marca === '✗' || !c.temOntem) { marca = '?'; cor = 'var(--farol-perto)'; }
@@ -1342,7 +1359,8 @@ function renderConcbanco() {
         // acabou — não importa que a decomposição em termos deixe um resto (ela
         // é aproximada por natureza; a PARTICIPAÇÕES tinha saldo igual e R$ 0,55
         // de resto, e a tela pintava de vermelho uma conta fechada).
-        saldoTxt = (ultimoMov ? '<span style="opacity:.7">último movimento ' + ultimoMov + '</span> · ' : '')
+        saldoTxt = (notaNormal ? '<span style="opacity:.7">' + esc(notaNormal) + '</span> · '
+            : ultimoMov ? '<span style="opacity:.7">último movimento ' + ultimoMov + '</span> · ' : '')
           + '<b>' + rs(sd.saldo_banco) + '</b> · '
           + (bateu ? '<span style="color:var(--farol-ok)">Saipos igual</span>'
              : Math.abs(sobra) >= TOL_SALDO
