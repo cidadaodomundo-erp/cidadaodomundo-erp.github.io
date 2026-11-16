@@ -81,6 +81,7 @@
   }
 
   function descartarTudo() {
+    if (window.FreelasLoja) FreelasLoja.esquecer();
     ABAS.forEach(function (a) { var g = LEIT[a].gen + 1; LEIT[a] = novaLeitura(); LEIT[a].gen = g; });
     SEQ_LOJAS++;
     CARREGANDO_LOJAS = false;
@@ -169,6 +170,7 @@
       if (!info || !Array.isArray(info.lojas)) { LOJAS_FALHA = true; desenhar(); return; }   // falha NÃO é lista vazia
       PRONTO = true;
       LOJA = typeof lojaAtual === 'function' ? lojaAtual() : null;
+      if (window.FreelasLoja) { FreelasLoja.definirLojas(info.lojas); FreelasLoja.carregarSemLoja(); }
       desenhar();
       carregarAba(ABA);
     });
@@ -321,6 +323,7 @@
         dl.appendChild(grupo);
       });
       card.appendChild(dl);
+      if (window.FreelasLoja) FreelasLoja.enfeitarContato(card, c);
       lista.appendChild(card);
     });
   }
@@ -370,7 +373,12 @@
     });
     $('abaContatos').addEventListener('click', function () { trocarAba('contatos'); });
     $('abaValores').addEventListener('click', function () { trocarAba('valores'); });
-    $('btnAtualizar').addEventListener('click', function () { if (guarda()) carregarAba(ABA, true); });
+    $('btnAtualizar').addEventListener('click', function () {
+      if (!guarda()) return;
+      carregarAba(ABA, true);
+      if (window.FreelasLoja) FreelasLoja.carregarSemLoja();
+    });
+    if (window.FreelasLoja) FreelasLoja.aoMudar(function () { if (guarda()) { carregarAba('contatos', true); FreelasLoja.carregarSemLoja(); } });
     $('buscaTexto').addEventListener('input', function () {
       if (!guarda()) return;
       FILTRO.texto = $('buscaTexto').value;
