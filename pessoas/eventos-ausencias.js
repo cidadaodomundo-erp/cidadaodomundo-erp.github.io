@@ -232,6 +232,19 @@
     const ini = (p - 1) * POR_PAGINA;
     return { pagina: p, paginas, total, itens: lista.slice(ini, ini + POR_PAGINA), de: total ? ini + 1 : 0, ate: Math.min(total, ini + POR_PAGINA) };
   }
+  // ---------- exibição em português (só na tela; o dado guardado não muda) ----------
+  const TIPO_PT = Object.freeze({ FERIAS: 'Férias', EVENTO: 'Ausência', ATESTADO: 'Atestado', ADVERTENCIA: 'Advertência', SUSPENSAO: 'Suspensão',
+    DECLARACAO: 'Declaração', LICENCA: 'Licença', FALTA: 'Falta', FOLGA: 'Folga' });
+  const DETALHE_PT = Object.freeze({ APPROVED: 'Aprovado', CANCELED: 'Cancelado', CANCELLED: 'Cancelado', PENDING: 'Pendente', REJECTED: 'Recusado',
+    ALL_DAY: 'Dia inteiro', PERIOD: 'Parte do dia', HOURS: 'Algumas horas' });
+  const TIPO_COR = Object.freeze({ ADVERTENCIA: 'grave', SUSPENSAO: 'grave', FALTA: 'ruim', ATESTADO: 'neutro', DECLARACAO: 'neutro', FERIAS: 'ok', EVENTO: 'neutro' });
+  const chaveTipo = (t) => normKey(t).toUpperCase().replace(/\s+/g, '_');
+  function tipoPt(t) { if (!t) return '—'; const k = chaveTipo(t); return TIPO_PT[k] || (t.charAt(0) + t.slice(1).toLowerCase()); }
+  function detalhePt(d) {
+    if (!d || d === '—') return '—';
+    const f = /^fonte: (.*)$/.exec(d); if (f) return 'Fonte: ' + f[1].charAt(0) + f[1].slice(1).toLowerCase();
+    return DETALHE_PT[chaveTipo(d)] || d;
+  }
   function situacao(r) { return [r.programado ? 'Programado' : '', r.tambem ? 'Consta também na outra fonte' : ''].filter(Boolean).join(' · ') || '—'; }
 
   // ---------- controlador ----------
@@ -275,7 +288,7 @@
       raiz.replaceChildren();
       const w = el('div', 'peve');
       w.appendChild(el('h2', 'peve-titulo', 'Eventos e ausências'));
-      w.appendChild(el('div', 'peve-aviso', 'Somente consulta. Registro recebido, não decisão de folha: nada aqui indica falta, abono, desconto, bônus ou efeito financeiro. Cada linha mostra a fonte (Flash ou Registro do RH); as fontes não são mescladas. Disponível para quem pode ver e cadastrar pessoal. A unidade acompanha a loja escolhida na casca.'));
+      w.appendChild(el('div', 'peve-aviso', 'O que é esta tela: tudo o que foi registrado de cada pessoa no período, vindo de dois lugares. Do Flash (o app do ponto) vêm férias e ausências pedidas pelo funcionário. Do Registro do RH vêm advertência, suspensão e atestado. É só consulta: não muda folha, falta nem desconto.'));
       const ctl = el('div', 'peve-ctl');
       const de = el('input'); de.type = 'date';
       const ate = el('input'); ate.type = 'date';
@@ -285,13 +298,15 @@
       ctl.appendChild(campo('De', de)); ctl.appendChild(campo('Até', ate)); ctl.appendChild(campo('Unidade', loja));
       ctl.appendChild(campo('Tipo', tipo)); ctl.appendChild(campo('Buscar por nome', busca)); ctl.appendChild(bAtu);
       const status = el('div', 'peve-status'); status.setAttribute('role', 'status');
-      const meta = el('div', 'peve-meta');
+      const chips = el('div', 'peve-chips');
+      const metaBox = el('details', 'peve-metabox'); metaBox.appendChild(el('summary', null, 'Detalhes da consulta'));
+      const meta = el('div', 'peve-meta'); metaBox.appendChild(meta);
       const rotulo = el('div', 'peve-rotulo');
       const rol = el('div', 'peve-rolagem');
       const pag = el('div', 'peve-pag');
-      [ctl, status, meta, rotulo, rol, pag].forEach((x) => w.appendChild(x));
+      [ctl, status, chips, rol, pag, metaBox, rotulo].forEach((x) => w.appendChild(x));
       raiz.appendChild(w);
-      ui = { de, ate, loja, tipo, busca, bAtu, status, meta, rotulo, rol, pag };
+      ui = { de, ate, loja, tipo, busca, bAtu, status, chips, meta, rotulo, rol, pag };
       de.value = st.de; ate.value = st.ate;
       // editar o período invalida a carga em curso e apaga o quadro; só o botão Atualizar busca de novo
       const alterou = () => {
@@ -332,6 +347,17 @@
       opcoes(ui.tipo, [['', 'Todos os tipos']].concat(tipos, temSem ? [[SEM_TIPO, '(sem tipo informado)']] : []), st.tipo);
       if (d && st.tipo && ui.tipo.value !== st.tipo) st.tipo = '';
       if (ui.busca.value !== st.busca) ui.busca.value = st.busca;
+      ui.chips.replaceChildren();
+      if (fl && fl.naUnidade.length) {
+        const cont = new Map(); fl.naUnidade.forEach((r) => { const k = r.tipo || SEM_TIPO; cont.set(k, (cont.get(k) || 0) + 1); });
+        const chip = (val, txt, n, cor) => {
+          const b = el('button', 'peve-chip' + (st.tipo === val ? ' peve-on' : '') + (cor ? ' peve-chip-' + cor : '')); b.type = 'button';
+          b.appendChild(el('span', null, txt)); b.appendChild(el('span', 'peve-n', String(n)));
+          b.addEventListener('click', () => { st.tipo = st.tipo === val ? '' : val; st.pagina = 1; desenhar(); }); ui.chips.appendChild(b);
+        };
+        chip('', 'Todos', fl.naUnidade.length);
+        [...cont.keys()].sort((a, b) => cont.get(b) - cont.get(a)).forEach((k) => chip(k, k === SEM_TIPO ? 'Sem tipo' : tipoPt(k), cont.get(k), TIPO_COR[chaveTipo(k)] || ''));
+      }
 
       const m = [];
       if (d) {
@@ -372,11 +398,12 @@
       const tb = el('tbody');
       pg.itens.forEach((r) => {
         const tr = el('tr', 'peve-o-' + r.origemKey);
-        const cel = (rot, t, cls) => { const c = el('td', cls, t); c.setAttribute('data-rot', rot); tr.appendChild(c); };
+        const cel = (rot, t, cls) => { const c = el('td', cls, t); c.setAttribute('data-rot', rot); if (t && t.length > 18) c.title = t; tr.appendChild(c); return c; };
         cel('Pessoa', r.apelido && r.apelido !== r.nome ? r.nome + ' (' + r.apelido + ')' : r.nome);
-        cel('Unidade', r.unidade); cel('Origem', r.origem, 'peve-origem');
-        cel('Tipo', r.tipo || '—'); cel('Início', fmtDia(r.inicio)); cel('Fim', r.fim ? fmtDia(r.fim) : '—');
-        cel('Detalhe', r.detalhe); cel('Recebido', r.recebido);
+        cel('Unidade', deps.lojaNome && r.unidade ? deps.lojaNome(r.unidade) : r.unidade); cel('Origem', r.origem, 'peve-origem');
+        const ct = cel('Tipo', ''); ct.appendChild(el('span', 'peve-tag peve-tag-' + (TIPO_COR[chaveTipo(r.tipo)] || 'neutro'), r.tipo ? tipoPt(r.tipo) : '—')); cel('Início', fmtDia(r.inicio)); cel('Fim', r.fim ? fmtDia(r.fim) : '—');
+        const dt = detalhePt(r.detalhe); cel('Detalhe', dt, dt === 'Cancelado' ? 'peve-cancel' : (dt === 'Aprovado' ? 'peve-aprov' : ''));
+        if (dt === 'Cancelado') tr.className += ' peve-tr-cancel'; cel('Recebido', r.recebido);
         cel('Situação', situacao(r), r.programado ? 'peve-prog' : '');
         tb.appendChild(tr);
       });

@@ -428,7 +428,7 @@ test('ausência e ocorrência futuras são aceitas e marcadas "Programado", sem 
   assert.equal(t.c.st.fase, 'ok'); assert.doesNotMatch(statusCls(t.raiz), /peve-erro/);
   const l = linhas(t.raiz);
   assert.equal(l.filter((r) => /Programado/.test(r[COL.situacao])).length, 2);
-  assert.ok(!/Programado/.test(l.find((r) => r[COL.tipo] === 'HOJE')[COL.situacao]));
+  assert.ok(!/Programado/.test(l.find((r) => r[COL.tipo] === 'Hoje')[COL.situacao]));
 });
 test('período inteiro no futuro é aceito', async () => {
   const t = mk({ oco: [O({ data: '2027-01-15' })] }); t.c.st.de = '2027-01-01'; t.c.st.ate = '2027-01-31';
@@ -447,7 +447,7 @@ test('fonte e frescor: última data recebida por fonte (mes_lido e lido_em) e r�
   assert.ok(l.some((r) => r[COL.origem] === 'Flash' && r[COL.recebido] === 'mês lido 11/2026'));
   assert.ok(l.some((r) => r[COL.origem] === 'Registro do RH' && /\d{2}\/\d{2}\/\d{4}/.test(r[COL.recebido])));
   assert.match(tudoTxt(t.raiz), /Registro recebido, não decisão de folha/);
-  assert.match(tudoTxt(t.raiz), /não decisão de folha: nada aqui indica falta, abono, desconto, bônus ou efeito financeiro/);
+  assert.match(tudoTxt(t.raiz), /É só consulta: não muda folha, falta nem desconto/);
 });
 test('frescor: fonte sem registro e fonte indisponível são ditas como tal, sem inventar data', async () => {
   const t = mk({ aus: [A()], ultAus: [], consultar: async (c) => { if (c.startsWith('rh_ocorrencia') && ehUltima(c)) throw new Error('falhou'); } });
@@ -630,4 +630,12 @@ test('ligação padrão: usa trRpc, consultarTudo e o seletor de loja da casca (
     for (const k of Object.keys(globais)) { if (salvos[k]) Object.defineProperty(globalThis, k, salvos[k]); else delete globalThis[k]; }
   }
 });
-
+test('tela em português: tipos e detalhes do Flash traduzidos; botões por tipo com contagem', async () => {
+  const t = mk({ aus: [A({ tipo: 'FERIAS', periodo: 'Approved' }), A({ tipo: 'EVENTO', periodo: 'ALL_DAY', inicio: '2026-11-11', fim: '2026-11-11' })], oco: [O({ tipo: 'ADVERTENCIA' })] });
+  await t.c.entrar();
+  const l = linhas(t.raiz);
+  assert.ok(l.some((r) => r[COL.tipo] === 'Férias' && r[COL.detalhe] === 'Aprovado'));
+  assert.ok(l.some((r) => r[COL.tipo] === 'Ausência' && r[COL.detalhe] === 'Dia inteiro'));
+  assert.ok(l.some((r) => r[COL.tipo] === 'Advertência'));
+  assert.match(tudoTxt(t.raiz), /Todos3/);
+});
