@@ -323,7 +323,7 @@ function agAvObsEstado(a) {
   const rec = a.obs_em || AG_AV_RECEBIDA[a.alvo];
   if (lida) {
     const nota = sit.replace(/^lida [0-9\/ :]+:?\s*/, '');
-    const hm = sit.match(/^lida ([0-9\/]+) ([0-9:]+)/);
+    const hm = sit.match(/^lida ([0-9\/]+) ([0-9]{2}:[0-9]{2})/);
     const hora = a.obs_lido_em ? q(a.obs_lido_em) : hm ? `${hm[1]} às ${hm[2]}` : '';
     return { pendente: false, linha: `✓ lida pelo Avisos ${agE(hora)}${nota ? ' — resposta: ' + agE(nota) : ''}` };
   }
