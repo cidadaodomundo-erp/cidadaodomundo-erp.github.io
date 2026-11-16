@@ -1299,12 +1299,13 @@ function renderConcbanco() {
       const diaria = sd.movimenta_diariamente !== false;
       // 16/11/2026: com vw_fin_conta_cobertura, o "parado" é pela frequência normal da conta (Santander às quartas,
       // Participações só com envio à XP, FF quase todo dia). Só fica âmbar o que falta de verdade.
-      const cob = cru.cobertura && diaAlvo === ontem ? cru.cobertura.find(x => x.conta === conta) : null;
+      const cob = cru.cobertura ? cru.cobertura.find(x => x.conta === conta) : null;
       let semExtratoDe, ultimoMov, faltouMov = null, notaNormal = null;
       if (cob) {
         const atrasado = cob.situacao === 'EXTRATO ATRASADO' || cob.situacao === 'SEM EXTRATO';
-        semExtratoDe = atrasado ? (cob.coberto_ate ? ddmm(cob.coberto_ate) : 'nunca') : null;
-        faltouMov = cob.situacao === 'FALTA O MOVIMENTO ESPERADO' ? (cob.esperado_em ? ddmm(cob.esperado_em) : '') : null;
+        // dia já coberto pelo extrato mostra o saldo dele; só o dia depois do coberto_ate fica "parado"
+        semExtratoDe = atrasado && (!cob.coberto_ate || diaAlvo > cob.coberto_ate) ? (cob.coberto_ate ? ddmm(cob.coberto_ate) : 'nunca') : null;
+        faltouMov = cob.situacao === 'FALTA O MOVIMENTO ESPERADO' && (!cob.esperado_em || diaAlvo >= cob.esperado_em) ? (cob.esperado_em ? ddmm(cob.esperado_em) : '') : null;
         notaNormal = cob.situacao === 'EM DIA' && cob.nota ? String(cob.nota).replace(/: normal para esta conta$/, ' — normal') : null;
         ultimoMov = null;
       } else {
