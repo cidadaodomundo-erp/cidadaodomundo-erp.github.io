@@ -16,15 +16,15 @@
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="freelas.css?v=20261111a">
+<link rel="stylesheet" href="freelas.css?v=20261116a">
 </head>
 <body>
 <div class="main-content">
   <div class="wrap fl">
     <h1>Taxas e Freelas <span class="fl-obras">Em construção</span></h1>
     <div class="fl-aviso" role="note">
-      <strong>Só consulta.</strong> Aqui aparecem os contatos de freela e os valores por hora que já estão cadastrados neste sistema.
-      Ponto, QR de presença e pagamentos ainda estão em construção. Nada nesta tela grava, calcula pagamento ou envia mensagem.
+      <strong>Só consulta</strong>, menos a loja de cada freela. Aqui aparecem os contatos de freela e os valores por hora que já estão cadastrados neste sistema.
+      A única coisa que esta tela grava é a loja do freela (ligar ou trocar). Ponto, QR de presença e pagamentos ainda estão em construção. Nada aqui calcula pagamento ou envia mensagem.
     </div>
 
     <div id="bloqueio" hidden role="alert"></div>
@@ -40,6 +40,7 @@
       </div>
 
       <section id="painelContatos" role="tabpanel" aria-label="Contatos">
+        <div id="semLoja" class="fl-semloja" hidden></div>
         <div class="fl-filtros">
           <label class="fl-campo"><span class="fl-rot">Buscar por nome ou setor</span>
             <input type="search" id="buscaTexto" maxlength="80" autocomplete="off"></label>
@@ -49,7 +50,7 @@
         <div id="fonteContatos"></div>
         <div id="statusContatos" role="status" aria-live="polite"></div>
         <div id="listaContatos" class="fl-lista"></div>
-        <p class="fl-nota">Contatos em ordem alfabética, só os ativos da loja escolhida. Cadastros sem loja definida só entram depois que alguém definir a loja no cadastro.</p>
+        <p class="fl-nota">Contatos em ordem alfabética, só os ativos da loja escolhida. Freelas sem loja aparecem no quadro amarelo acima até alguém escolher a loja. Para mudar a loja de um freela, use "Trocar loja" no cartão dele.</p>
       </section>
 
       <section id="painelValores" role="tabpanel" aria-label="Valores por hora" hidden>
@@ -81,7 +82,8 @@
 <script src="../nucleo/loja.js?v=20261028a"></script>
 <script src="freelas-modelo.js?v=20261111a"></script>
 <script src="freelas-dados.js?v=20261111a"></script>
-<script src="freelas.js?v=20261115a"></script>
+<script src="freelas.js?v=20261116a"></script>
+<script src="freelas-loja.js?v=20261116a"></script>
 <script>FreelasTela.iniciar();</script>
 </body>
 </html>

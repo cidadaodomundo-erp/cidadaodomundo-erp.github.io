@@ -85,6 +85,7 @@ window.CASCA_BUSCA = {
   rotinas: ['rotina', 'robo', 'mini pc', 'automacao'],
   telas: ['telas', 'menu', 'uso do painel'],
   reembolsos: ['reembolso', 'pedir reembolso', 'gastei do meu bolso', 'nota fiscal de gasto'],
+  freelas: ['freela', 'freelas', 'ponto freela', 'taxa', 'valor-hora', 'valor hora', 'extra', 'diarista'],
   'link:promos.html': ['calendario', 'calendario de promocoes'],
 };
 

@@ -48,3 +48,16 @@
   .fl-barra .fl-btn, .fl-abas { width: 100%; }
   .fl-aba { flex: 1 1 auto; }
 }
+
+/* Freelas por loja (16/11/2026) */
+.fl-semloja { border: 1px solid var(--farol-perto, #f5a623); border-radius: 10px; padding: 12px; margin: 0 0 16px; }
+.fl-semloja h2 { margin: 0 0 4px; }
+.fl-escolha { margin-top: 8px; }
+.fl-escolha-linha { display: flex; gap: 8px; align-items: flex-end; }
+.fl-escolha-linha .fl-campo { flex: 1 1 auto; }
+.fl-recado { margin: 6px 0 0; font-size: 13.5px; min-height: 0; }
+.fl-recado:empty { display: none; }
+.fl-recado-ok { color: var(--farol-dentro, #3fb950); font-weight: 800; }
+.fl-recado-erro { color: var(--farol-fora, #ff6b6b); font-weight: 700; }
+.fl-trocar { margin-top: 8px; font-size: 13.5px; }
+.fl-trocar summary { cursor: pointer; color: var(--tx-2, #c3c2b7); font-weight: 700; min-height: 32px; }
