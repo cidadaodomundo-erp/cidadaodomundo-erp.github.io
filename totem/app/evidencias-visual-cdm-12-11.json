@@ -1,0 +1,61 @@
+{
+  "data": "2026-11-12",
+  "escopo": "TESTE_ISOLADO HML93936",
+  "executor": "Claude, sessao 197f9f13-3d8b-4b44-857c-23884be04a8d",
+  "revisao": "Codex",
+  "testes": {
+    "app": 148,
+    "passaram": 148,
+    "falhas": 0
+  },
+  "assetsHttpIntegro": 9,
+  "video": {
+    "largura": 800,
+    "altura": 1280,
+    "tocandoConferido": true
+  },
+  "ui": {
+    "busca": true,
+    "adicionais": true,
+    "obrigatorios": true,
+    "excessoBloqueiaAdicionar": true,
+    "carrinhoMantidoAoRecarregar": true,
+    "fecharEsc": true,
+    "navegacaoMouseTeclado": true,
+    "viewports": [
+      [
+        1080,
+        1920
+      ],
+      [
+        1440,
+        900
+      ],
+      [
+        768,
+        1024
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "overflowHorizontalPagina": false
+  },
+  "nenhumPostSaiposNestaRevisao": true,
+  "registrosHml": 7,
+  "registrosInalterados": true,
+  "alterados": [
+    "public/cardapio-hml.css",
+    "public/cardapio-hml.html",
+    "public/cardapio-hml.js",
+    "src/saipos-hml.js"
+  ],
+  "limites": [
+    "Cardapio congelado 11/11",
+    "Avisos externos continuam desativados",
+    "JOOG fisico nao instalado",
+    "Sem pagamento e impressao",
+    "Sem publicacao externa"
+  ]
+}

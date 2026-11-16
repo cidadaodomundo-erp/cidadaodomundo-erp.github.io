@@ -1,0 +1,3446 @@
+{
+  "formato": "menu-cidadao-gama/1",
+  "somenteTeste": true,
+  "fornecedor": "Gama/VNDX",
+  "fonte": {
+    "origem": "cidadaodomundo.vndx.app",
+    "consultadoEm": "2026-11-11T04:42:27.768Z",
+    "sha256": "97b2ff1a9e299a644995ecdf33cc21115cdead71124d1653e533c3d8bf48616c",
+    "categoriasDisponiveisNaConsulta": [
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      39,
+      38,
+      40,
+      42,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      55
+    ]
+  },
+  "categorias": [
+    {
+      "id": 29,
+      "nome": "Burgers Clássicos",
+      "posicao": 29,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 30,
+      "nome": "Burgers Especiais",
+      "posicao": 30,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 31,
+      "nome": "Smash Burgers",
+      "posicao": 31,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 32,
+      "nome": "UFO Burgers",
+      "posicao": 32,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 33,
+      "nome": "Sanduíches de Frango",
+      "posicao": 33,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 34,
+      "nome": "Porções",
+      "posicao": 34,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 35,
+      "nome": "Pratos Clássicos",
+      "posicao": 35,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 36,
+      "nome": "Pratos Defumados",
+      "posicao": 36,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 39,
+      "nome": "Carnes Defumadas",
+      "posicao": 38,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 38,
+      "nome": "Caldos",
+      "posicao": 39,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 40,
+      "nome": "Churrasco",
+      "posicao": 40,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 41,
+      "nome": "Feijoada",
+      "posicao": 41,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "11,12,13,14,15,16,17"
+    },
+    {
+      "id": 42,
+      "nome": "Sobremesas",
+      "posicao": 42,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 45,
+      "nome": "Burgers Veganos",
+      "posicao": 45,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 46,
+      "nome": "UFO Burger Vegan",
+      "posicao": 46,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 47,
+      "nome": "Porções Veganas",
+      "posicao": 47,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 48,
+      "nome": "Pratos Veganos",
+      "posicao": 48,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 49,
+      "nome": "Sobremesas Veganas",
+      "posicao": 49,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 50,
+      "nome": "Bebidas",
+      "posicao": 50,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    },
+    {
+      "id": 55,
+      "nome": "Cervejas e chopes",
+      "posicao": 55,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23"
+    }
+  ],
+  "produtos": [
+    {
+      "id": 145,
+      "nome": "Nelson Piquet",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha e mozarela.",
+      "categoria": 29,
+      "posicao": 145,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_94dfe4f11c782828f091275cc7ef58a3.webp",
+      "fotoLocal": "/gama-fotos/p145.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3399
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 146,
+      "nome": "Michael Schumacher",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha e cheddar cremoso",
+      "categoria": 29,
+      "posicao": 146,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_113e9086c2523877d01752baedf9b1d4.webp",
+      "fotoLocal": "/gama-fotos/p146.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3499
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 147,
+      "nome": "Alain Prost",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, mozarela, alface, tomate e picles.",
+      "categoria": 29,
+      "posicao": 147,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b6521971629a27013b4ca7468954a8d3.webp",
+      "fotoLocal": "/gama-fotos/p147.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 148,
+      "nome": "Ayrton Senna",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, mozarela e bacon em cubos.",
+      "categoria": 29,
+      "posicao": 148,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_62d51c97d2c0a7446d17558ca35d0be7.webp",
+      "fotoLocal": "/gama-fotos/p148.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 149,
+      "nome": "Rubens Barrichello",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, cheddar cremoso e bacon em cubos.",
+      "categoria": 29,
+      "posicao": 149,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_9e7669c359fea19a4c29aac080b0821a.webp",
+      "fotoLocal": "/gama-fotos/p149.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 150,
+      "nome": "Jesse Pinkman",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, mozarela, três onion rings e molho barbecue.",
+      "categoria": 30,
+      "posicao": 150,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_40221829911fce3849a5a571c87c86bb.webp",
+      "fotoLocal": "/gama-fotos/p150.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3499
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 151,
+      "nome": "Charles Chaplin",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, cheddar cremoso e cebola grelhada.",
+      "categoria": 30,
+      "posicao": 151,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_ca87b994cea08cbfd2b26e01cf9fb6b4.webp",
+      "fotoLocal": "/gama-fotos/p151.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 152,
+      "nome": "Cheech e Chong",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, Catupiry Original, bacon em cubos e cebola crispy.",
+      "categoria": 30,
+      "posicao": 152,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_d2b2bb21a5f9eb1ebb070f4344c82cf5.webp",
+      "fotoLocal": "/gama-fotos/p152.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4099
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 153,
+      "nome": "James Brown",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, mozarela, cebola grelhada, bacon em cubos e molho barbecue.",
+      "categoria": 30,
+      "posicao": 153,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_3608ed0166831bf590b165fd2ea701fc.webp",
+      "fotoLocal": "/gama-fotos/p153.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4099
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 154,
+      "nome": "John Lennon",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, gorgonzola, geléia de pimenta e bacon em cubos.",
+      "categoria": 30,
+      "posicao": 154,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_a341618e0d7d8e6fda8344aff4fd94cb.webp",
+      "fotoLocal": "/gama-fotos/p154.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4499
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 155,
+      "nome": "Honolulu Burger",
+      "descricao": "Pão brioche, maionese de cebolinha, burger de carne, gorgonzola, geléia de abacaxi com pimenta, cebola crispy e catchup Heinz de bacon e cebola caramelizada.",
+      "categoria": 30,
+      "posicao": 155,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_e4ff557866b468f51fcc07378fedec53.webp",
+      "fotoLocal": "/gama-fotos/p155.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4399
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 156,
+      "nome": "Gaudério Burger",
+      "descricao": "Uma explosão de sabor com a combinação perfeita de Costela Defumada com Catupiry Original!!\r\nPão brioche, maionese de cebolinha, burger de carne, Catupiry Original, costela defumada e desfiada e bacon em cubos.",
+      "categoria": 30,
+      "posicao": 156,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b4b2c58361ab7bb5eb6e33634beeb8ef.webp",
+      "fotoLocal": "/gama-fotos/p156.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4899
+        }
+      ],
+      "grupos": [
+        4,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 157,
+      "nome": "Cidadão Do Mundo",
+      "descricao": "Pão brioche, burger de carne, maionese de cebolinha, queijo mozarela empanada e molho barbecue.",
+      "categoria": 30,
+      "posicao": 157,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b6b09d04a205deb461b45a22e1c6c174.webp",
+      "fotoLocal": "/gama-fotos/p157.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4599
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 158,
+      "nome": "Shack Citizen",
+      "descricao": "Pão brioche, dois smash burgers de 60g cada, duas fatias de queijo cheddar, alface americana, tomate e molho especial.",
+      "categoria": 31,
+      "posicao": 158,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_9335d39d1c064f6e1bd1129ad61017ea.webp",
+      "fotoLocal": "/gama-fotos/p158.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 159,
+      "nome": "Big Citizen",
+      "descricao": "Pão brioche, dois smash burgers de 60g cada, duas fatias de queijo cheddar, alface americana, em cubos, picles e molho especial.",
+      "categoria": 31,
+      "posicao": 159,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_da7fef932d503f09f721deaef458ab48.webp",
+      "fotoLocal": "/gama-fotos/p159.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 160,
+      "nome": "Stacker Citizen",
+      "descricao": "Pão brioche, dois smash burgers de 60g cada, duas fatias de queijo cheddar, bacon em cubos e molho barbecue.",
+      "categoria": 31,
+      "posicao": 160,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_3b6e78789a8793113c6d3ec917b461e1.webp",
+      "fotoLocal": "/gama-fotos/p160.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 161,
+      "nome": "UFO Burger Salada",
+      "descricao": "Pão brioche, burger de carne defumado, cheddar fatiado, alface americana, tomate, picles e molho especial.\r\nAdicione opcional de crosta de mozarela e tenha uma experiência incrível!\r\nFeito na máquina da linha Ufo para garantir um visual digno de Outro Mundo!",
+      "categoria": 32,
+      "posicao": 161,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_eb389f70ca6986a48d033caf98f4ecdf.webp",
+      "fotoLocal": "/gama-fotos/p161.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3999
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        30
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 162,
+      "nome": "UFO Burger Gorgonzola Crispy",
+      "descricao": "Pão brioche, burger de carne defumado, maionese de cebolinha, gorgonzola e cebola crispy.\r\nAdicione opcional de crosta de mozarela e tenha uma experiência incrível!\r\nFeito na máquina da linha Ufo para garantir um visual digno de Outro Mundo!",
+      "categoria": 32,
+      "posicao": 162,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_568da102c8d1702e191bc59756db581e.webp",
+      "fotoLocal": "/gama-fotos/p162.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4099
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        30
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 163,
+      "nome": "UFO Burger Cheddar Bacon",
+      "descricao": "Pão brioche, carne suculenta, maionese especial, bacon em cubos e cheddar cremoso.\r\nAdicione opcional de crosta de mozarela e tenha uma experiência incrível!\r\nFeito na máquina da linha Ufo para garantir um visual digno de Outro Mundo!",
+      "categoria": 32,
+      "posicao": 163,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_cfac998e4ec272b455d02d9d9283a5a4.webp",
+      "fotoLocal": "/gama-fotos/p163.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4199
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        30
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 164,
+      "nome": "UFO Burger Costela Catupiry",
+      "descricao": "Pão brioche, carne suculenta, maionese especial, costela bovina defumada e desfiada, requeijão Catupiry Original e bacon em cubos.\r\nAdicione opcional de crosta de mozarela e tenha uma experiência incrível!\r\nFeito na máquina da linha Ufo para garantir um visual digno de Outro Mundo!",
+      "categoria": 32,
+      "posicao": 164,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_fd5f743b3898485f00a4476dc79e8167.webp",
+      "fotoLocal": "/gama-fotos/p164.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5199
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        30
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 165,
+      "nome": "KF Citizen",
+      "descricao": "Pão brioche, maionese de cebolinha, alface americana, tomate, picles, pedaços de frango crocante empanado, cheddar fatiado e molho especial",
+      "categoria": 33,
+      "posicao": 165,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_60047b0c3ab14b3893181a2daaff2919.webp",
+      "fotoLocal": "/gama-fotos/p165.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3899
+        }
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 166,
+      "nome": "João Frango",
+      "descricao": "Pão brioche, maionese de cebolinha, alface americana, tomate, pedaços de frango crocante empanado, Catupiry Original e bacon em cubos.",
+      "categoria": 33,
+      "posicao": 166,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_75839c600f4550556a0637043ec49f8a.webp",
+      "fotoLocal": "/gama-fotos/p166.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3899
+        }
+      ],
+      "grupos": [
+        4,
+        13
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 167,
+      "nome": "Porção individual de batata frita",
+      "descricao": "Porção de batata palito. Serve 1 pessoa.",
+      "categoria": 34,
+      "posicao": 167,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_213b15e0a8c0e89d3a4023ba1eeee1f5.webp",
+      "fotoLocal": "/gama-fotos/p167.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1499
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 168,
+      "nome": "Ribs Fries (batata, costela desfiada e catupiry)",
+      "descricao": "Porção grande de batata crinckle, costela bovina defumada e desfiada e catupiry original.",
+      "categoria": 34,
+      "posicao": 168,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_9c6d2de52d5f154f53a7dd5aa647d4e2.webp",
+      "fotoLocal": "/gama-fotos/p168.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5799
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 169,
+      "nome": "Porção individual de anéis de cebola.",
+      "descricao": "Porção de anéis de cebola. Serve 1 pessoa.",
+      "categoria": 34,
+      "posicao": 169,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_c17ac9a1519d7db600618ab243841432.webp",
+      "fotoLocal": "/gama-fotos/p169.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1299
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 170,
+      "nome": "Porção mista (tilápia empanada e fritas)",
+      "descricao": "Porção mista de tilápia empanada e batata frita.",
+      "categoria": 34,
+      "posicao": 170,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_75edfdd4f997a3cccb463c17b8d2ebc1.webp",
+      "fotoLocal": "/gama-fotos/p170.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5999
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 171,
+      "nome": "Porção de tilápia empanada",
+      "descricao": "Porção de tilápia empanada\r\nServe de 1 a 2 pessoas.",
+      "categoria": 34,
+      "posicao": 171,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_05afb3cdfe23e17369fdc4a05acc3caf.webp",
+      "fotoLocal": "/gama-fotos/p171.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 6499
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 172,
+      "nome": "Fritas",
+      "descricao": "Porção de batatas palito. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 172,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_47dda9d29ce1e22859c927bb79777ba1.webp",
+      "fotoLocal": "/gama-fotos/p172.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2099
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 173,
+      "nome": "Anéis de Cebola Empanado",
+      "descricao": "Porção de anéis de cebola. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 173,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_41f43e1af3ce03cb01d60460919f49bc.webp",
+      "fotoLocal": "/gama-fotos/p173.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2999
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 174,
+      "nome": "Franguinho Empanado Estilo Caseiro",
+      "descricao": "Porção de nuggets de frango pequena ou grande",
+      "categoria": 34,
+      "posicao": 174,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b56935c73efbafe70b786b7ccd3191e2.webp",
+      "fotoLocal": "/gama-fotos/p174.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 175,
+      "nome": "Franguinho a Passarinho",
+      "descricao": "Porção de de frango a passarinho.",
+      "categoria": 34,
+      "posicao": 175,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_841712f9e87a53ad392524e6b3c7bbe5.webp",
+      "fotoLocal": "/gama-fotos/p175.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3299
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 176,
+      "nome": "Pastelzinho de Queijo",
+      "descricao": "Porção de 10 mini pastéis, recheados com queijo mozarela e orégano.",
+      "categoria": 34,
+      "posicao": 176,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_f47e576e184ae4aebeeaf0b40c0917a3.webp",
+      "fotoLocal": "/gama-fotos/p176.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 177,
+      "nome": "Porção Mista (Anéis de Cebola e Fritas)",
+      "descricao": "Porção grande, mista de batatas palito\r\ne anéis de cebola. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 177,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_a80f2e1ba95812ebf303bab0e3136d56.webp",
+      "fotoLocal": "/gama-fotos/p177.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3199
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 178,
+      "nome": "Fritas com Cheddar e Bacon",
+      "descricao": "Porção de batatas palito, acompanhada de\r\ncheddar cremoso e bacon em cubos. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 178,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_84d8375b179b1904caa8b48dc7b78309.webp",
+      "fotoLocal": "/gama-fotos/p178.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4199
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 179,
+      "nome": "Pernil com Fritas",
+      "descricao": "Porção de batatas palito, acompanhada\r\nde pernil desfiado e defumado, molho\r\nbarbecue e pimenta jalapeño. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 179,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_379c5429b8a3b7532333effc46ae49c4.webp",
+      "fotoLocal": "/gama-fotos/p179.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4799
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 180,
+      "nome": "Bolinho de Pernil Recheado com Queijo",
+      "descricao": "Bolinhos de pernil desfiado e defumado,\r\nrecheado com mozarela e empanado na\r\nfarinha Panco. Serve 2 pessoas.",
+      "categoria": 34,
+      "posicao": 180,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b9b84f33fb7bf7050387c9facd394d02.webp",
+      "fotoLocal": "/gama-fotos/p180.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5699
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 181,
+      "nome": "Torresmo de Rolo Mineiro",
+      "descricao": "Porção de torresmo de rolo, temperada com lemon pepper. Serve duas pessoas.",
+      "categoria": 34,
+      "posicao": 181,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_5b76abdcc26a29a887f253dd0d178b80.webp",
+      "fotoLocal": "/gama-fotos/p181.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5899
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 182,
+      "nome": "Torresmo em cubos",
+      "descricao": "Porção de torresmo em cubos, temperada com lemon pepper. Serve duas pessoas.",
+      "categoria": 34,
+      "posicao": 182,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_fe0dc0a5a3c15bbdc76fc9ab1520e2f1.webp",
+      "fotoLocal": "/gama-fotos/p182.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 5799
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 183,
+      "nome": "Paulo Cintura (Peito de frango grelhado)",
+      "descricao": "Peito de frango grelhado, acompanhado de arroz integral, farofa, vinagrete e salada do dia.",
+      "categoria": 35,
+      "posicao": 183,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_1cc483bf85ba2d3b23b74e9fd853a2df.webp",
+      "fotoLocal": "/gama-fotos/p183.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3499
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 184,
+      "nome": "Severino (Carne desfiada)",
+      "descricao": "Carne de panela desfiada, acompanhado de arroz, feijão, farofa e salada do dia.",
+      "categoria": 35,
+      "posicao": 184,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_ef4309050e120bf48526f1b7e6631daf.webp",
+      "fotoLocal": "/gama-fotos/p184.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 185,
+      "nome": "Silvio Santos (Bife e batata frita)",
+      "descricao": "Bife de carne, acompanhado de arroz, feijão, batata frita e salada do dia.",
+      "categoria": 35,
+      "posicao": 185,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_5257dd2dfab5c0dc87bc1c95b9ba5f4e.webp",
+      "fotoLocal": "/gama-fotos/p185.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 186,
+      "nome": "Bezerra da Silva (Milanesa de frango)",
+      "descricao": "Milanesa de carne ou frango (Frango farinha de rosca e Carne na farinha panko), acompanhado de arroz, feijão, farofa e salada de cenoura e beterraba.",
+      "categoria": 35,
+      "posicao": 186,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_9d070210978fe66bd7c06a303c5f779a.webp",
+      "fotoLocal": "/gama-fotos/p186.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3499
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 187,
+      "nome": "Bezerra da Silva (Milanesa de Carne)",
+      "descricao": "Milanesa de carne empanado em pedaços, acompanhado de arroz, feijão, farofa e salada do dia.",
+      "categoria": 35,
+      "posicao": 187,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b09caabb0661ecc6c5c33d5e55215668.webp",
+      "fotoLocal": "/gama-fotos/p187.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3699
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 188,
+      "nome": "Agostinho Carrara (Strogonoff de frango)",
+      "descricao": "Strogonoff de frango com champignon, acompanhado de arroz, batata palha e salada do dia.",
+      "categoria": 35,
+      "posicao": 188,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_39d9dc0ef98e233142d673c1442711a8.webp",
+      "fotoLocal": "/gama-fotos/p188.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 189,
+      "nome": "Agostinho Carrara (Strogonoff de carne)",
+      "descricao": "Strogonoff de carne com champignon, acompanhado de arroz, batata palha e salada do dia.",
+      "categoria": 35,
+      "posicao": 189,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_9c138a8cd5741a45e4af60a52000424c.webp",
+      "fotoLocal": "/gama-fotos/p189.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3999
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 190,
+      "nome": "Adoniran Barbosa (Parmegiana de Frango)",
+      "descricao": "Parmegiana de frango, acompanhado de arroz, feijão, farofa e salada do dia.",
+      "categoria": 35,
+      "posicao": 190,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_633f21444d7d190e4d56b235f5d9d869.webp",
+      "fotoLocal": "/gama-fotos/p190.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 191,
+      "nome": "Adoniran Barbosa (Parmegiana de carne)",
+      "descricao": "Parmegiana de carne, acompanhado de arroz, feijão, farofa e salada do dia.",
+      "categoria": 35,
+      "posicao": 191,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_acabd7794e3f3df22d178caa248120d6.webp",
+      "fotoLocal": "/gama-fotos/p191.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3999
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 192,
+      "nome": "Pf De Pernil",
+      "descricao": "Pernil defumado e desfiado temperado\r\ncom vinagre de maçã e molho barbecue,\r\nacompanhada de arroz, feijão,\r\nfarofa e coleslaw.",
+      "categoria": 36,
+      "posicao": 192,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_ca9545fafc998b56c92d8d2f03e93028.webp",
+      "fotoLocal": "/gama-fotos/p192.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 193,
+      "nome": "Pf De Costela Bovina",
+      "descricao": "Costela bovina defumada e desfiada,\r\nacompanhada de arroz, feijão, farofa e\r\nvinagrete.",
+      "categoria": 36,
+      "posicao": 193,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b928bfb9d58b206ecccaae7dbb9e220f.webp",
+      "fotoLocal": "/gama-fotos/p193.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3999
+        }
+      ],
+      "grupos": [
+        14
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 196,
+      "nome": "Canja de galinha",
+      "descricao": null,
+      "categoria": 38,
+      "posicao": 196,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_db91a07a736f87766976559eca8ac756.webp",
+      "fotoLocal": "/gama-fotos/p196.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2799
+        }
+      ],
+      "grupos": [
+        21
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 197,
+      "nome": "Caldo de mandioquinha",
+      "descricao": null,
+      "categoria": 38,
+      "posicao": 197,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_64c9a588d1f51e599e7eca2357d9783b.webp",
+      "fotoLocal": "/gama-fotos/p197.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2599
+        }
+      ],
+      "grupos": [
+        21
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 198,
+      "nome": "Caldo de mandioca com costela desfiada",
+      "descricao": null,
+      "categoria": 38,
+      "posicao": 198,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b95025394e9c742c2d2c0b3d23eb7ec2.webp",
+      "fotoLocal": "/gama-fotos/p198.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2799
+        }
+      ],
+      "grupos": [
+        21
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 199,
+      "nome": "1/2 Costelinha Suína Barbecue",
+      "descricao": "1/2 Costelinha suína defumada coberta\r\ncom molho barbecue. Serve 1 a 2 pessoas.",
+      "categoria": 39,
+      "posicao": 199,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b0a6e18c270798f4c6d2f91a58471677.webp",
+      "fotoLocal": "/gama-fotos/p199.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 4499
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 200,
+      "nome": "1/2 Combo Costelinha Suína Barbecue",
+      "descricao": "Combo de costelinha suína defumada coberta com molho barbecue. Acompanha arroz, batata frita, farofa e coleslaw. Serve 1 a 2 pessoas.",
+      "categoria": 39,
+      "posicao": 200,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_d111f80567f41da5d705590b755105b5.webp",
+      "fotoLocal": "/gama-fotos/p200.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 6499
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 201,
+      "nome": "Costelinha Suína Barbecue",
+      "descricao": "Costelinha suína defumada coberta\r\ncom molho barbecue. Serve de 2 a 3 pessoas.",
+      "categoria": 39,
+      "posicao": 201,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_61b97be7f63337e4ebf2cd95f3de3c3f.webp",
+      "fotoLocal": "/gama-fotos/p201.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 7999
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 202,
+      "nome": "Combo Costelinha Suína Barbecue",
+      "descricao": "Combo de costelinha suína defumada coberta com molho barbecue. Acompanha arroz, batata frita, farofa e coleslaw. Serve de 2 a 3 pessoas.",
+      "categoria": 39,
+      "posicao": 202,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_4f3c78d9f897a027edb94495e93b55d1.webp",
+      "fotoLocal": "/gama-fotos/p202.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 10999
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 203,
+      "nome": "Costela Bovina",
+      "descricao": "Costela bovina defumada.",
+      "categoria": 39,
+      "posicao": 203,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_21a56628f1e0acf0484bc66d8c2c7416.webp",
+      "fotoLocal": "/gama-fotos/p203.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 10999
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 204,
+      "nome": "Combo Costela Bovina",
+      "descricao": "Combo de costela bovina defumada. Acompanha arroz, batata frita, farofa e vinagrete.",
+      "categoria": 39,
+      "posicao": 204,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_2ca9e0e8ef255951afee75dcfcb12322.webp",
+      "fotoLocal": "/gama-fotos/p204.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 13999
+        }
+      ],
+      "grupos": [
+        14,
+        33
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 205,
+      "nome": "Churrasco + acompanhamentos.",
+      "descricao": "T-Bone, conhecido como Filé de Igreja, muito bem temperados e assados no ponto perfeito!\r\nAcompanha arroz, farofa, batata frita e salada de tomate e cebola. Serve 2.",
+      "categoria": 40,
+      "posicao": 205,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_23c654a4d01c2ff1170e5f5cd89450c1.webp",
+      "fotoLocal": "/gama-fotos/p205.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "T-bone (file De Igreja) 2 Pessoas",
+          "centavos": 12799
+        },
+        {
+          "indice": 2,
+          "nome": "Alcatra (orelha De Elefante) 3 Pessoas",
+          "centavos": 16799
+        }
+      ],
+      "grupos": [
+        5,
+        14,
+        33,
+        34,
+        35
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 206,
+      "nome": "Feijoada",
+      "descricao": "Cumbuca com feijoada contendo costelinha, paio, lombo e calabresa, acompanhada de arroz, couve refogada, bacon em cubos frito, farofa, laranja, torresmo e vinagrete.",
+      "categoria": 41,
+      "posicao": 206,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_4c5c17230990db0dee4ff687d64b7d0f.webp",
+      "fotoLocal": "/gama-fotos/p206.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "1 pessoa",
+          "centavos": 6199
+        },
+        {
+          "indice": 2,
+          "nome": "2 pessoas",
+          "centavos": 10199
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 207,
+      "nome": "PF Feijoada",
+      "descricao": "Feijoada contendo costelinha, paio, lombo e calabresa, acompanhada de arroz, farofa e vinagrete.",
+      "categoria": 41,
+      "posicao": 207,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_4a851ad8afab339a6340d4775fb2e19d.webp",
+      "fotoLocal": "/gama-fotos/p207.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3199
+        }
+      ],
+      "grupos": [
+        5,
+        14,
+        33,
+        35
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 208,
+      "nome": "Brownie",
+      "descricao": "Brownie tradicional de chocolate",
+      "categoria": 42,
+      "posicao": 208,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_0cdd53d580c180f814e92403b9e3f250.webp",
+      "fotoLocal": "/gama-fotos/p208.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 899
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 209,
+      "nome": "Torta Alemã",
+      "descricao": "Torta de bolacha, com creme branco e cobertura de chocolate.",
+      "categoria": 42,
+      "posicao": 209,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_7766a5b8d8ece5d12d65e02a4b8d1d0a.webp",
+      "fotoLocal": "/gama-fotos/p209.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1599
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 210,
+      "nome": "Salvador Dali",
+      "descricao": "Cheese cake estilo inglesa, não assada,\r\ncoberta com calda de frutas vermelhas\r\nartesanal.",
+      "categoria": 42,
+      "posicao": 210,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_e123871e390351481d72be369679241a.webp",
+      "fotoLocal": "/gama-fotos/p210.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1599
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 220,
+      "nome": "Lewis Hamilton",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, queijo de castanha, três onion rings e molho barbecue.",
+      "categoria": 45,
+      "posicao": 220,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_19915eb60559ce03da91bcd8d9096611.webp",
+      "fotoLocal": "/gama-fotos/p220.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3399
+        }
+      ],
+      "grupos": [
+        16,
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 221,
+      "nome": "Ogros Veganos",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, queijo de castanha, alface, tomate, vinagrete, guacamole e pimenta jalapeño.",
+      "categoria": 45,
+      "posicao": 221,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_b7f96a256216abe5873f6acb61188aff.webp",
+      "fotoLocal": "/gama-fotos/p221.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        16,
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 222,
+      "nome": "Cidadão Vegano",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, disco de queijo de castanha empanado e molho barbecue.",
+      "categoria": 45,
+      "posicao": 222,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_d22c2d34527dc5f1356e0b7847eaea4f.webp",
+      "fotoLocal": "/gama-fotos/p222.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        16,
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 223,
+      "nome": "Da Vinci",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, queijo de castanha, confit de tomate cereja e manjericão fresco.",
+      "categoria": 45,
+      "posicao": 223,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_69c3811c800448facb1167df9b4b4cbb.webp",
+      "fotoLocal": "/gama-fotos/p223.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3399
+        }
+      ],
+      "grupos": [
+        16,
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 224,
+      "nome": "Helio Gracie",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, queijo de castanha, alface, tomate, picles, cebola grelhada, molho barbecue e pimenta jalapeño.",
+      "categoria": 45,
+      "posicao": 224,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_c92808a5c69a78496b4d573e0c4b1b15.webp",
+      "fotoLocal": "/gama-fotos/p224.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3899
+        }
+      ],
+      "grupos": [
+        16,
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 225,
+      "nome": "UFO Burger Vegan",
+      "descricao": "Pão com gergelim, maionese vegana Not Mayo, burger de feijão com PTS, queijo de castanha, alface americana, tomate, picles",
+      "categoria": 46,
+      "posicao": 225,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_500a3501821943592ef3cfe3accc517d.webp",
+      "fotoLocal": "/gama-fotos/p225.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        17,
+        18
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 226,
+      "nome": "Fritas",
+      "descricao": "Porção de batatas fritas",
+      "categoria": 47,
+      "posicao": 226,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_3ca989b3ff4c78f42e3bab06ab9fd004.webp",
+      "fotoLocal": "/gama-fotos/p226.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2599
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 227,
+      "nome": "Anéis de Cebola Empanado",
+      "descricao": "Porção de anéis de cebola.",
+      "categoria": 47,
+      "posicao": 227,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_8de5110c5a6835412afbc877ff55338c.webp",
+      "fotoLocal": "/gama-fotos/p227.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2599
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 228,
+      "nome": "Porção Mista (Anéis de Cebola e Fritas)",
+      "descricao": "Porção mista de batatas fritas\r\ne anéis de cebola.",
+      "categoria": 47,
+      "posicao": 228,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_91aef177e2491f0d01beff2bf2236869.webp",
+      "fotoLocal": "/gama-fotos/p228.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 2799
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 229,
+      "nome": "Bolinho Vegan Recheado com Queijo de Castanha",
+      "descricao": "Bolinhos de feijão com PTS recheados\r\ncom queijo de castanha.",
+      "categoria": 47,
+      "posicao": 229,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_92622dfd2064a891f80c5138821f37a6.webp",
+      "fotoLocal": "/gama-fotos/p229.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        5
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 230,
+      "nome": "Mahatma Gandhi (Burger de feijão com Pts)",
+      "descricao": "Burger de feijão com pts, coberto com mozarela ou queijo vegano de castanha e cebola grelhada, arroz, feijão, farofa e salada do dia.",
+      "categoria": 48,
+      "posicao": 230,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_d4f5751bc700de1a870904b441e6ee16.webp",
+      "fotoLocal": "/gama-fotos/p230.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3399
+        }
+      ],
+      "grupos": [
+        5,
+        14,
+        35,
+        36,
+        37
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 231,
+      "nome": "Cid Moreira (Strogonoff de Pts)",
+      "descricao": "Strogonoff de pts com champignon, acompanhado de arroz, batata palha e salada do dia.",
+      "categoria": 48,
+      "posicao": 231,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_2d3fb9b69e72c26048b9fc182a995ab7.webp",
+      "fotoLocal": "/gama-fotos/p231.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3599
+        }
+      ],
+      "grupos": [
+        5,
+        14,
+        35,
+        37
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 232,
+      "nome": "Lisa Simpson (Espetinho de Pts)",
+      "descricao": "02 espetinhos de PTS, cebola, pimentão\r\ne tomate, acompanhados de arroz, feijão,\r\nfarofa e vinagrete.",
+      "categoria": 48,
+      "posicao": 232,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_a14475d8606f5168a61b07e24e7df35a.webp",
+      "fotoLocal": "/gama-fotos/p232.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 3799
+        }
+      ],
+      "grupos": [
+        5,
+        14,
+        35,
+        37
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 233,
+      "nome": "Brownie Vegano",
+      "descricao": "Brownie vegano de chocolate.",
+      "categoria": 49,
+      "posicao": 233,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_c7cd94bad35f691a82b3d92fb49bbf58.webp",
+      "fotoLocal": "/gama-fotos/p233.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 899
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 234,
+      "nome": "Rita Lee",
+      "descricao": "Cheese cake estilo inglesa, não assada,\r\ncoberta com calda de frutas vermelhas\r\nartesanal.",
+      "categoria": 49,
+      "posicao": 234,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_bee819d8c288b357ce1e9e3e91e3cdd3.webp",
+      "fotoLocal": "/gama-fotos/p234.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1599
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 249,
+      "nome": "Água Mineral sem gás 500ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 239,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_99ec78efea0f7590458f114262295012.webp",
+      "fotoLocal": "/gama-fotos/p249.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 500
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 250,
+      "nome": "Água Mineral com gás 500ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 240,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_3e14811a9aa81c2762188e64f1f8f1c2.webp",
+      "fotoLocal": "/gama-fotos/p250.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 500
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 239,
+      "nome": "Pepsi Lata 350ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 241,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_e76d74bd3b4c898f3fd02f070e55cb69.webp",
+      "fotoLocal": "/gama-fotos/p239.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 600
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 240,
+      "nome": "Pepsi Black Lata 350ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 242,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_de0d01427000bab10788dd06a635f538.webp",
+      "fotoLocal": "/gama-fotos/p240.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 600
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 241,
+      "nome": "Guaraná Antarctica Lata 350ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 249,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_a3c801657bc757234206dfd6c0cf6bef.webp",
+      "fotoLocal": "/gama-fotos/p241.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 600
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 242,
+      "nome": "Guaraná Antarctica Zero 350ml",
+      "descricao": null,
+      "categoria": 50,
+      "posicao": 250,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_fc33960f7e5dc69725fd6c0c3196141e.webp",
+      "fotoLocal": "/gama-fotos/p242.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 600
+        }
+      ],
+      "grupos": [
+        38
+      ],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 259,
+      "nome": "Corona Long Neck 330ml",
+      "descricao": "Contém Glúten",
+      "categoria": 55,
+      "posicao": 252,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_33c39f7cdee0111cf89ba6a67e01f60f.webp",
+      "fotoLocal": "/gama-fotos/p259.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1200
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 260,
+      "nome": "Corona Cero Long Neck 330ml",
+      "descricao": "Contém Glúten",
+      "categoria": 55,
+      "posicao": 253,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_f618718247eb924cdeb26164a665a31a.webp",
+      "fotoLocal": "/gama-fotos/p260.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "Unidade",
+          "centavos": 1200
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 252,
+      "nome": "Pilsen Bird Beer",
+      "descricao": "ABV 4,2/IBU 8,9. Contém Glúten",
+      "categoria": 55,
+      "posicao": 254,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_730519bceeb39adfebb3b0ea974f1218.webp",
+      "fotoLocal": "/gama-fotos/p252.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 800
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 1200
+        },
+        {
+          "indice": 3,
+          "nome": "1lt",
+          "centavos": 2000
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 253,
+      "nome": "Pilsen Brahma",
+      "descricao": "ABV 4,80 /IBU 10,00. Contém Glúten",
+      "categoria": 55,
+      "posicao": 255,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_dfe788bafee246fc3769062abada4df2.webp",
+      "fotoLocal": "/gama-fotos/p253.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 900
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 1500
+        },
+        {
+          "indice": 3,
+          "nome": "1lt",
+          "centavos": 2800
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 254,
+      "nome": "Curitipa Bird Beer",
+      "descricao": "ABV 4,9/IBU 31,8. Contém Glúten",
+      "categoria": 55,
+      "posicao": 256,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_72d58a777967c113b44f279439f3b134.webp",
+      "fotoLocal": "/gama-fotos/p254.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 900
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 1500
+        },
+        {
+          "indice": 3,
+          "nome": "1lt",
+          "centavos": 2800
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 255,
+      "nome": "Avela Porter Way Beer. Contém Glúten",
+      "descricao": "ABV 5,2/IBU 31,3. Contém Glúten",
+      "categoria": 55,
+      "posicao": 257,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_74d1ace3ccf508c789648869259cd09e.webp",
+      "fotoLocal": "/gama-fotos/p255.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 900
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 1500
+        },
+        {
+          "indice": 3,
+          "nome": "1lt",
+          "centavos": 2800
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 256,
+      "nome": "MutuM Cavalo Ignorus",
+      "descricao": "ABV 7/IBU 70. Contém Glúten",
+      "categoria": 55,
+      "posicao": 259,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_28f5e2bfe18e5b5587de757345c372be.webp",
+      "fotoLocal": "/gama-fotos/p256.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 1300
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 2100
+        },
+        {
+          "indice": 3,
+          "nome": "1lt",
+          "centavos": 4000
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    },
+    {
+      "id": 257,
+      "nome": "Trooper Brasil BodeBrown",
+      "descricao": "ABV 5% / IBU 21. Contém Glúten",
+      "categoria": 55,
+      "posicao": 260,
+      "ativo": 1,
+      "visivel": 1,
+      "dias": "Domingo,Segunda-Feira,Terça-Feira,Quarta-Feira,Quinta-Feira,Sexta-Feira,Sábado",
+      "horarios": "00,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23",
+      "fotoOriginal": "https://cidadaodomundo.vndx.app/temp/produto_710652f28baff7d5ec74860e14e38a8a.webp",
+      "fotoLocal": "/gama-fotos/p257.webp",
+      "variacoes": [
+        {
+          "indice": 1,
+          "nome": "300ml",
+          "centavos": 1300
+        },
+        {
+          "indice": 2,
+          "nome": "500ml",
+          "centavos": 2100
+        },
+        {
+          "indice": 3,
+          "nome": "1L",
+          "centavos": 4000
+        }
+      ],
+      "grupos": [],
+      "ingredientes": [],
+      "ocultarObservacao": false,
+      "ocultarQuantidade": false
+    }
+  ],
+  "grupos": [
+    {
+      "id": 4,
+      "nome": "Esse lanche não merece um parceiro??",
+      "posicao": 19,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 3,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 5,
+      "nome": "Vai um molhinho pra mergulhar?",
+      "posicao": 20,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 2,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 13,
+      "nome": "Vai turbinar seu lanche hoje?",
+      "posicao": 12,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 3,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 14,
+      "nome": "Deseja turbinar o seu prato?",
+      "posicao": 9,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 3,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 16,
+      "nome": "Esse lanche não merece um parceiro veg?",
+      "posicao": 17,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 1,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 17,
+      "nome": "Vai um molhinho pra mergulhar veg?",
+      "posicao": 21,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 6,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 18,
+      "nome": "Deseja turbinar sua opção veg?",
+      "posicao": 13,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 3,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 21,
+      "nome": "Deseja turbinar seu caldo?",
+      "posicao": 14,
+      "ativo": 1,
+      "minimo": 0,
+      "maximo": 6,
+      "permitir_quantidade": 1,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 30,
+      "nome": "Deseja adicionar nossa incrível crosta de mozarela crocante?",
+      "posicao": 30,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 1,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 33,
+      "nome": "Deseja turbinar o seu prato? x",
+      "posicao": 33,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 3,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 34,
+      "nome": "Qual ponto gostaria na carne do churrasco?",
+      "posicao": 34,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 1,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 35,
+      "nome": "Deseja algum acompanhamento para o seu prato?",
+      "posicao": 35,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 1,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 36,
+      "nome": "Escolha seu queijo",
+      "posicao": 36,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 1,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 37,
+      "nome": "Deseja adicionar uma proteína veg ao seu prato?",
+      "posicao": 37,
+      "ativo": 1,
+      "minimo": 1,
+      "maximo": 3,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    },
+    {
+      "id": 38,
+      "nome": "Deseja adicionar algo na sua bebida?",
+      "posicao": 38,
+      "ativo": 0,
+      "minimo": 1,
+      "maximo": 2,
+      "permitir_quantidade": 0,
+      "cobrar_apartir_de": 0
+    }
+  ],
+  "opcoes": [
+    {
+      "id": 22,
+      "nome": "Anéis de cebola",
+      "adicional": 4,
+      "descricao": null,
+      "posicao": 22,
+      "ativo": 1,
+      "centavos": 1299
+    },
+    {
+      "id": 100,
+      "nome": "Anéis de cebola",
+      "adicional": 16,
+      "descricao": null,
+      "posicao": 22,
+      "ativo": 1,
+      "centavos": 1299
+    },
+    {
+      "id": 23,
+      "nome": "Batata Frita",
+      "adicional": 4,
+      "descricao": null,
+      "posicao": 23,
+      "ativo": 1,
+      "centavos": 1499
+    },
+    {
+      "id": 101,
+      "nome": "Batata Frita",
+      "adicional": 16,
+      "descricao": null,
+      "posicao": 23,
+      "ativo": 1,
+      "centavos": 1499
+    },
+    {
+      "id": 24,
+      "nome": "Frango crocante empanado",
+      "adicional": 4,
+      "descricao": null,
+      "posicao": 24,
+      "ativo": 1,
+      "centavos": 1799
+    },
+    {
+      "id": 25,
+      "nome": "Kit sachê",
+      "adicional": 5,
+      "descricao": "3 sachês de catchup e 3 sachês de mostarda",
+      "posicao": 25,
+      "ativo": 1,
+      "centavos": 400
+    },
+    {
+      "id": 103,
+      "nome": "Kit sachê",
+      "adicional": 17,
+      "descricao": "3 sachês de catchup e 3 sachês de mostarda",
+      "posicao": 25,
+      "ativo": 1,
+      "centavos": 200
+    },
+    {
+      "id": 26,
+      "nome": "Maionese de cebolinha",
+      "adicional": 5,
+      "descricao": "Porção individual de maionese de cebolinha",
+      "posicao": 26,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 104,
+      "nome": "Maionese Vegana (Not Mayo)",
+      "adicional": 17,
+      "descricao": null,
+      "posicao": 26,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 27,
+      "nome": "Molho Especial",
+      "adicional": 5,
+      "descricao": "Porção individual de molho especial (Big Mac)",
+      "posicao": 27,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 28,
+      "nome": "Molho Barbecue",
+      "adicional": 5,
+      "descricao": "Porção individual de molho barbecue",
+      "posicao": 28,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 106,
+      "nome": "Molho Barbecue",
+      "adicional": 17,
+      "descricao": "Porção individual de molho barbecue",
+      "posicao": 28,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 29,
+      "nome": "Molho de pimenta",
+      "adicional": 5,
+      "descricao": null,
+      "posicao": 29,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 107,
+      "nome": "Molho de pimenta",
+      "adicional": 17,
+      "descricao": null,
+      "posicao": 29,
+      "ativo": 1,
+      "centavos": 500
+    },
+    {
+      "id": 78,
+      "nome": "Ovo frito (dentro do lanche)",
+      "adicional": 13,
+      "descricao": null,
+      "posicao": 78,
+      "ativo": 1,
+      "centavos": 400
+    },
+    {
+      "id": 79,
+      "nome": "Bacon em cubos (dentro do lanche)",
+      "adicional": 13,
+      "descricao": null,
+      "posicao": 79,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 80,
+      "nome": "Alface, tomate e picles (dentro do lanche)",
+      "adicional": 13,
+      "descricao": null,
+      "posicao": 80,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 110,
+      "nome": "Salada (alface, tomate e picles) vegano",
+      "adicional": 18,
+      "descricao": null,
+      "posicao": 80,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 81,
+      "nome": "Cebola crispy (dentro do lanche)",
+      "adicional": 13,
+      "descricao": null,
+      "posicao": 81,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 111,
+      "nome": "Cebola crispy (vegano)",
+      "adicional": 18,
+      "descricao": null,
+      "posicao": 81,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 82,
+      "nome": "Burger de carne (dentro do lanche)",
+      "adicional": 13,
+      "descricao": null,
+      "posicao": 82,
+      "ativo": 1,
+      "centavos": 1800
+    },
+    {
+      "id": 112,
+      "nome": "Burger de feijão com Pts (vegano)",
+      "adicional": 18,
+      "descricao": null,
+      "posicao": 82,
+      "ativo": 1,
+      "centavos": 900
+    },
+    {
+      "id": 83,
+      "nome": "Ovo frito",
+      "adicional": 14,
+      "descricao": "1 unidade de ovo frito",
+      "posicao": 83,
+      "ativo": 1,
+      "centavos": 400
+    },
+    {
+      "id": 84,
+      "nome": "Cebola grelhada",
+      "adicional": 14,
+      "descricao": null,
+      "posicao": 84,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 85,
+      "nome": "Salada do Dia",
+      "adicional": 14,
+      "descricao": null,
+      "posicao": 85,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 86,
+      "nome": "Kit molhos salada",
+      "adicional": 14,
+      "descricao": "1 sache de azeite de oliva, 1 sache de vinagre de álcool e 1 sache de sal.",
+      "posicao": 86,
+      "ativo": 1,
+      "centavos": 200
+    },
+    {
+      "id": 87,
+      "nome": "Batata frita",
+      "adicional": 14,
+      "descricao": "Porção individual de batata frita",
+      "posicao": 87,
+      "ativo": 1,
+      "centavos": 1499
+    },
+    {
+      "id": 88,
+      "nome": "Anéis de cebola",
+      "adicional": 14,
+      "descricao": "Porção individual de anéis de cebola empanados e fritos (6 unidades)",
+      "posicao": 88,
+      "ativo": 1,
+      "centavos": 1299
+    },
+    {
+      "id": 89,
+      "nome": "Tiras de peito de frango grelhado",
+      "adicional": 14,
+      "descricao": null,
+      "posicao": 89,
+      "ativo": 1,
+      "centavos": 1200
+    },
+    {
+      "id": 90,
+      "nome": "02 unidades de linguiça toscana",
+      "adicional": 14,
+      "descricao": null,
+      "posicao": 90,
+      "ativo": 1,
+      "centavos": 1400
+    },
+    {
+      "id": 120,
+      "nome": "Cheiro Verde",
+      "adicional": 21,
+      "descricao": null,
+      "posicao": 120,
+      "ativo": 1,
+      "centavos": 200
+    },
+    {
+      "id": 122,
+      "nome": "Bacon",
+      "adicional": 21,
+      "descricao": null,
+      "posicao": 122,
+      "ativo": 1,
+      "centavos": 400
+    },
+    {
+      "id": 123,
+      "nome": "Pernil desfiado",
+      "adicional": 21,
+      "descricao": null,
+      "posicao": 123,
+      "ativo": 0,
+      "centavos": 800
+    },
+    {
+      "id": 124,
+      "nome": "Carne Desfiada",
+      "adicional": 21,
+      "descricao": null,
+      "posicao": 124,
+      "ativo": 1,
+      "centavos": 800
+    },
+    {
+      "id": 125,
+      "nome": "Costela desfiada",
+      "adicional": 21,
+      "descricao": null,
+      "posicao": 125,
+      "ativo": 1,
+      "centavos": 1000
+    },
+    {
+      "id": 165,
+      "nome": "Crosta de Mozarela",
+      "adicional": 30,
+      "descricao": "Crosta de mozarela crocante!!",
+      "posicao": 165,
+      "ativo": 1,
+      "centavos": 800
+    },
+    {
+      "id": 166,
+      "nome": "Sem Crosta de Mozarela",
+      "adicional": 30,
+      "descricao": null,
+      "posicao": 166,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 175,
+      "nome": "Ovo frito",
+      "adicional": 33,
+      "descricao": null,
+      "posicao": 175,
+      "ativo": 1,
+      "centavos": 400
+    },
+    {
+      "id": 176,
+      "nome": "Cebola grelhada",
+      "adicional": 33,
+      "descricao": null,
+      "posicao": 176,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 177,
+      "nome": "Burger de carne",
+      "adicional": 33,
+      "descricao": null,
+      "posicao": 177,
+      "ativo": 1,
+      "centavos": 1300
+    },
+    {
+      "id": 178,
+      "nome": "02 unidades de linguicas toscana",
+      "adicional": 33,
+      "descricao": null,
+      "posicao": 178,
+      "ativo": 1,
+      "centavos": 1400
+    },
+    {
+      "id": 179,
+      "nome": "Salada do dia",
+      "adicional": 33,
+      "descricao": null,
+      "posicao": 179,
+      "ativo": 1,
+      "centavos": 600
+    },
+    {
+      "id": 180,
+      "nome": "Mal Passada",
+      "adicional": 34,
+      "descricao": null,
+      "posicao": 180,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 181,
+      "nome": "Ao Ponto",
+      "adicional": 34,
+      "descricao": null,
+      "posicao": 181,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 182,
+      "nome": "Bem Passada",
+      "adicional": 34,
+      "descricao": null,
+      "posicao": 182,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 183,
+      "nome": "Batata frita individual",
+      "adicional": 35,
+      "descricao": null,
+      "posicao": 183,
+      "ativo": 1,
+      "centavos": 1499
+    },
+    {
+      "id": 184,
+      "nome": "Aneis de cebola individual",
+      "adicional": 35,
+      "descricao": null,
+      "posicao": 184,
+      "ativo": 1,
+      "centavos": 1299
+    },
+    {
+      "id": 185,
+      "nome": "Bolinho de PTS com recheio de queijo de castanha (5 Unidades)",
+      "adicional": 16,
+      "descricao": null,
+      "posicao": 185,
+      "ativo": 1,
+      "centavos": 799
+    },
+    {
+      "id": 186,
+      "nome": "Queijo mozarela",
+      "adicional": 36,
+      "descricao": null,
+      "posicao": 186,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 187,
+      "nome": "Queijo de castanha",
+      "adicional": 36,
+      "descricao": null,
+      "posicao": 187,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 188,
+      "nome": "Burger de feijão com PTS",
+      "adicional": 37,
+      "descricao": null,
+      "posicao": 188,
+      "ativo": 1,
+      "centavos": 1000
+    },
+    {
+      "id": 189,
+      "nome": "Burger de beterraba",
+      "adicional": 37,
+      "descricao": null,
+      "posicao": 189,
+      "ativo": 1,
+      "centavos": 1000
+    },
+    {
+      "id": 190,
+      "nome": "02 unidades de espetinho de PTS",
+      "adicional": 37,
+      "descricao": null,
+      "posicao": 190,
+      "ativo": 1,
+      "centavos": 1200
+    },
+    {
+      "id": 191,
+      "nome": "Nada",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 191,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 192,
+      "nome": "Gelo",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 192,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 193,
+      "nome": "Limão em rodelas",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 193,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 194,
+      "nome": "Limão espremido",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 194,
+      "ativo": 0,
+      "centavos": 300
+    },
+    {
+      "id": 195,
+      "nome": "Limão e gelo",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 195,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 196,
+      "nome": "Laranja",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 196,
+      "ativo": 1,
+      "centavos": 0
+    },
+    {
+      "id": 197,
+      "nome": "Laranja e gelo",
+      "adicional": 38,
+      "descricao": null,
+      "posicao": 197,
+      "ativo": 1,
+      "centavos": 0
+    }
+  ],
+  "ingredientes": []
+}

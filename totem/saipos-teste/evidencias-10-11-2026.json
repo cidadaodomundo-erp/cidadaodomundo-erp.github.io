@@ -1,0 +1,89 @@
+{
+  "titulo": "Evidências do ensaio TESTE Saipos",
+  "data": "2026-11-10",
+  "horario_referencia": "~23h35 BRT",
+  "ambiente": "Saipos DEV, loja TESTE 93936 (Cidadão do Mundo - HML)",
+  "pedido_apenas_teste": true,
+  "passos": [
+    {
+      "passo": "autenticacao",
+      "fonte": "POST /auth",
+      "esperado": "token aceito",
+      "realizado": "aceito",
+      "status": "ok"
+    },
+    {
+      "passo": "catalogo",
+      "fonte": "GET /v2/catalog",
+      "esperado": "catálogo real normalizado",
+      "realizado": "envelope {data: [...]} com um produto normalizado pelo helper",
+      "status": "ok"
+    },
+    {
+      "passo": "testes_offline",
+      "fonte": "node --test test/",
+      "esperado": "todos os testes passam",
+      "realizado": "37 de 37 aprovados",
+      "status": "ok"
+    },
+    {
+      "passo": "conferencia_loja",
+      "fonte": "UI do Developer",
+      "esperado": "loja TESTE 93936 confirmada",
+      "realizado": "Cidadão do Mundo - HML confirmada; codStore é UUID diferente do número da loja (valor não incluído)",
+      "status": "ok"
+    },
+    {
+      "passo": "envio_unico",
+      "fonte": "POST /order via adaptador CLI",
+      "esperado": "uma ficha TICKET de teste enviada",
+      "realizado": "order_id HML-20261111023156-2b454ddf, display_id 9101, ticket_reference TESTE-9101, item Diversos código 40101353 qtd 1 preço 0 total 0, observação TESTE-NAOPRODUZIR",
+      "resposta": "HTTP 200 {}",
+      "status": "ok"
+    },
+    {
+      "passo": "confirmacao_ui",
+      "fonte": "UI Saipos",
+      "esperado": "ficha aparece na cozinha",
+      "realizado": "Ficha 1, id Saipos 936102693, operador integration-api-int-sale, coluna COZINHA",
+      "status": "ok"
+    },
+    {
+      "passo": "impressao",
+      "fonte": "UI Saipos",
+      "esperado": "nenhuma impressão",
+      "realizado": "não imprimiu",
+      "status": "ok"
+    },
+    {
+      "passo": "pedido_pronto",
+      "fonte": "UI Saipos, só Ficha 1",
+      "esperado": "avanço de Cozinha para Entregue",
+      "realizado": "Cozinha 1 → 0, Entregue 0 → 1; sem etapa Pronto para retirada nessa ficha",
+      "status": "ok"
+    }
+  ],
+  "evidencias_imagem": [
+    "pedido-recebido-saipos-teste-10-11-2026.png",
+    "pedido-cozinha-saipos-teste-10-11-2026.png",
+    "detalhes-cozinha-saipos-teste-10-11-2026.png",
+    "pedido-pronto-saipos-teste-10-11-2026.png"
+  ],
+  "fontes": [
+    "Saipos /reference/criar-pedido",
+    "Saipos /reference/consultar-cardapio",
+    "provas de UI de 10/11/2026"
+  ],
+  "limitacoes": [
+    "Ensaio em loja TESTE, um único pedido; não é homologação.",
+    "Resposta 200 {} não traz id Saipos; vínculo pelo order_id próprio e pela Ficha 1 na UI.",
+    "Tela própria ainda não amarrada ao adaptador CLI.",
+    "Cardápio completo, adicionais e testes de valores não feitos.",
+    "Pagamento real não implementado.",
+    "Webhook e TV não ligados.",
+    "Nesta ficha TICKET de teste, Pedido Pronto levou diretamente a Entregue; conferir mapeamento antes de ligar a TV própria.",
+    "Consulta e cancelamento não implementados; a ficha permaneceu em Entregue como registro do ensaio e não foi cancelada.",
+    "Custo da API, taxas e liberação para produção não confirmados."
+  ],
+  "segredos": "nenhum segredo, chave, token, idPartner ou link assinado incluído neste arquivo"
+}

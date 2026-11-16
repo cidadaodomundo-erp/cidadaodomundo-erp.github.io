@@ -1,0 +1,18 @@
+# Limites deste laboratório
+
+Este laboratório é uma demonstração de fluxo, não um produto nem um conector real.
+
+- **Não envia nada à Saipos.** Não existe nenhuma chamada de rede para `order-api.saipos.com` ou qualquer domínio da Saipos neste código. `src/validador-offline-saipos.js` só confere formato de campos e gera payload fictício localmente, sem rede, sem credencial.
+- **Não processa pagamento real.** Pix/cartão são simulados; "aprovado" só ocorre se confirmado explicitamente, e nunca por reenvio com resultado diferente do original.
+- **Não imprime nada.** Não há integração com impressora real.
+- **Não roda no totem físico do Cidadão do Mundo.** É local, em qualquer computador com Node 18+, isolado.
+- **Não é serviço de longa duração automático.** Só inicia quando alguém roda `node bin/start.js` manualmente; os autoensaios (`node --test`) abrem e fecham o servidor em cada teste, sem deixar nada rodando.
+- **Só escuta em 127.0.0.1.** Não aceita conexão de outros computadores da rede, confere o cabeçalho Host, sem CORS habilitado, sem allowlist de arquivo fora da lista fixa.
+- **Sem IA por pedido.** As regras de cálculo, validação e transição de status são deterministas (código fixo), não usam modelo de linguagem.
+- **A senha da TV deste laboratório não é a mesma coisa que um número de venda/ticket da Saipos.** Conforme a documentação oficial (ver `docs/saipos-oficial.md`), o `ticket_reference` enviado à Saipos é só uma observação; o número de venda do TICKET é gerado internamente pela Saipos (incremental ou aleatório, não confirmado qual). Se um dia este laboratório enviar pedidos à Saipos de verdade, será preciso guardar explicitamente o vínculo entre a senha nossa e o identificador retornado pela Saipos — eles não são automaticamente iguais.
+- **O módulo TICKET da Saipos (recomendado pela própria documentação para totem de autoatendimento) só tem os eventos de callback `CONFIRMED`, `CONCLUDED` e `CANCELLED`.** Não existe um evento `READY_TO_DELIVER`/"pronto" no módulo TICKET (esse evento só existe em DELIVERY/TAKEOUT). Por isso, mesmo numa integração real, o botão de "pronto" deste laboratório continuaria sendo um controle nosso, da nossa cozinha — não um reflexo automático de algo que a Saipos manda.
+- **Credenciamento real ainda não foi feito.** O cadastro no Saipos Developer pode gerar um `Secret` e `idPartner`, além de dados de uma loja de TESTE (ID da loja, URL de acesso, usuário, opção de redefinir senha) — mas esse acesso **não foi configurado nesta sessão**. Nenhuma chamada `POST` real para `/auth` ou `/order` da Saipos foi executada. Cadastrar-se exigiria o Fabio definir senha e aceitar condições formalmente; isso não foi feito por conta própria aqui.
+- **Produção real ainda precisaria, no mínimo:** homologação formal com a Saipos (critérios documentados por módulo, incluindo cenários como pedido duplicado, cliente anônimo, mapeamento de código PDV de produto/complemento, múltiplas formas de pagamento), configuração de impressora/KDS e roteamento por setor no sistema real da Saipos, formas de pagamento mapeadas em Canais de Venda e Integrações (sem alterar nada disso agora), e verificação de hardware (tablet, impressora, maquininha) quanto a propriedade e compatibilidade — nada disso foi tocado.
+- **Custo de uso da Order API não foi confirmado** em nenhuma fonte oficial lida até agora. Não inventar valor.
+- **Nenhuma configuração de loja real foi alterada.** Nada neste laboratório lê, grava ou se conecta a qualquer conta Saipos existente.
+- **Dados fictícios.** Cardápio, preços e senhas não têm relação com o cardápio real do Cidadão do Mundo.

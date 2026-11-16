@@ -1,0 +1,11 @@
+{
+  "name": "laboratorio-totem",
+  "version": "0.1.0",
+  "description": "Laboratorio local isolado de demonstracao - NAO conecta ao Saipos, sem cobranca real",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {}
+}
