@@ -237,7 +237,7 @@ window.CASCA_MENU = [
    },
    {
     "chave": "salao",
-    "rotulo": "Salão",
+    "rotulo": "Central do Salão",
     "icone": "🍽️",
     "origem": "fabio"
    },
