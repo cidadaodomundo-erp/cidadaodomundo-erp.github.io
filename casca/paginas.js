@@ -123,6 +123,7 @@ window.CASCA_PAGINAS = {
   pausados: 'pausados/index.html?modo=salao&v=20261116a',   // 16/11/2026: Itens pausados do Salão = só Goomer (tablet)
   pausadosdel: 'pausados/index.html?modo=delivery&v=20261116a',   // 16/11/2026: Itens pausados do Delivery = iFood x Site (Accon), iFood é a referência
   motodocs: 'delivery/motoboys-documentos.html?v=20261117a',   // 17/11/2026: Documentos dos motoboys (erp_motoboys_ler); só quem vê pessoal
+  escalaclima: 'delivery/escala.html?v=20261117a',   // 17/11/2026: Escala e Clima (erp_escala_clima_ler + Open-Meteo), só leitura
   avaldel: 'avaliacoes/index.html?modo=delivery&v=20261116a',     // 16/11/2026: Avaliações do dia do Delivery (iFood; Accon sem avaliações no sistema)
   avalsalao: 'avaliacoes/index.html?modo=salao&v=20261116a',      // 16/11/2026: Avaliações do dia do Salão (Google, API oficial)
 };
@@ -141,5 +142,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'avalsalao', 'motodocs', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'avalsalao', 'motodocs', 'escalaclima', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 

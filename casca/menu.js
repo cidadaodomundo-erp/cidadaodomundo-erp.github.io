@@ -188,6 +188,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "escalaclima",
+    "rotulo": "Escala e Clima",
+    "icone": "🌧",
+    "origem": "fabio"
+   },
+   {
     "chave": "pausadosdel",
     "rotulo": "Itens pausados · iFood x Site",
     "icone": "⏸️",
