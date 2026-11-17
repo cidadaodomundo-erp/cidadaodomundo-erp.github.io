@@ -102,7 +102,7 @@ test('um agrupamento só (id outras, nome exato), com TODAS as telas da sobra; n
   assert.deepEqual(o.setores.slice(0, 3).map((s) => s.nome), ['Delivery', 'Salão', 'RH']);
   assert.ok(o.setores.find((s) => s.id === 'rh').chaves.includes('pao'), 'Ponto ao vivo fica no RH do agrupamento Operação das lojas');
   assert.ok(!mods.find((m) => m.id === 'pessoas').lancar.includes('pao') && !mods.find((m) => m.id === 'pessoas').acompanhar.includes('pao'));
-  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto', 'pausadosdel', 'avaldel'], 'Delivery: Delivery do dia, Chegada, Pagar motoboys e Itens pausados');
+  assert.deepEqual(o.setores.find((s) => s.id === 'delivery').chaves, ['delivery', 'chegada', 'pagarmoto', 'motodocs', 'pausadosdel', 'avaldel'], 'Delivery: Delivery do dia, Chegada, Pagar motoboys e Itens pausados');
   assert.deepEqual(o.setores.find((s) => s.id === 'salao').chaves, ['salao', 'reservas', 'pausados', 'avalsalao'], 'Reservas, Pausados e Avaliações no Salão');
 });
 

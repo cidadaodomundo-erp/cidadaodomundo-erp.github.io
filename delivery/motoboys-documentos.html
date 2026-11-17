@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Documentos dos motoboys · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- DOCUMENTOS DOS MOTOBOYS (17/11/2026). Trazida do portal antigo (motoboys/index.html) com a cara do portal novo.
+     Lê e grava só no banco do ERP: erp_motoboys_ler() (fichas, documentos, equipamento, entregas do TrackEat em 30 dias e
+     quem rodou sem ficha), erp_motoboy_doc_salvar() e erp_motoboy_equip_salvar(). As três só respondem para o dono e quem
+     cuida do pessoal (pode_ver_pessoal). Não trouxe do antigo: observações livres, avaliação e fotos dos documentos. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .md-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .md-topo h1 { font-size:22px; margin:0; }
+  .md-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
+  .md-topo .acoes { margin-left:auto; }
+  .md-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .md-btn:hover:not(:disabled) { border-color:var(--brand); }
+  .md-btn:disabled { opacity:.45; cursor:default; }
+  .md-btn.pri { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+  .md-totais { display:flex; flex-wrap:wrap; gap:8px 26px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  .md-totais .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; }
+  .md-totais .v { font-size:22px; font-weight:800; }
+  .md-totais .alerta .v { color:var(--farol-atencao, #d29922); }
+  .md-filtros { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .md-filtros button { font:inherit; font-size:12.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .md-filtros button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .md-filtros button .n { opacity:.75; margin-left:4px; font-weight:700; }
+  .md-busca { font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; min-width:200px; margin:0 0 10px; }
+  .md-lista { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:10px; }
+  .md-card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .md-card.falta { border-left:4px solid var(--farol-fora, #e5534b); }
+  .md-card.ok { border-left:4px solid var(--farol-ok, #3fb950); }
+  .md-card.atencao { border-left:4px solid var(--farol-atencao, #d29922); }
+  .md-card .nome { font-weight:800; font-size:15px; }
+  .md-card .meta { font-size:12px; color:var(--tx-3); margin:2px 0 8px; }
+  .md-chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .md-chip { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid var(--line-2); white-space:nowrap; }
+  .md-chip.ok { background:rgba(63,185,80,.14); border-color:rgba(63,185,80,.5); }
+  .md-chip.falta { background:rgba(229,83,75,.14); border-color:rgba(229,83,75,.55); }
+  .md-chip.atencao, .md-chip.pasta { background:rgba(210,153,34,.14); border-color:rgba(210,153,34,.55); }
+  .md-chip.nao_sei { opacity:.75; border-style:dashed; }
+  .md-pede { font-size:12.5px; margin:8px 0 0; color:var(--farol-fora, #e5534b); font-weight:600; }
+  .md-card .abrir { margin-top:8px; }
+  .md-form { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; display:none; }
+  .md-form.on { display:block; }
+  .md-linha { display:grid; grid-template-columns:80px 1fr; gap:4px 8px; align-items:center; margin:0 0 8px; font-size:13px; }
+  .md-linha .campos { display:flex; flex-wrap:wrap; gap:6px; }
+  .md-linha select, .md-linha input { font:inherit; font-size:13px; padding:4px 6px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; }
+  .md-linha input[type=text] { width:130px; }
+  .md-linha .quando { grid-column:2; font-size:11px; color:var(--tx-3); }
+  .md-msg { font-size:12.5px; margin-top:6px; }
+  .md-msg.erro { color:var(--farol-fora, #e5534b); }
+  .md-msg.ok { color:var(--farol-ok, #3fb950); }
+  .md-sem { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:16px 0 0; }
+  .md-sem h2 { font-size:15px; margin:0 0 6px; }
+  .md-sem table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .md-sem td, .md-sem th { padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; }
+  .md-sem td.n, .md-sem th.n { text-align:right; }
+  .md-nota { font-size:12px; color:var(--tx-3); margin:12px 0 0; line-height:1.5; }
+  .md-vazio { padding:18px; opacity:.75; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="md-topo">
+      <div>
+        <h1>Documentos dos motoboys</h1>
+        <div class="sub" id="sub">Carregando…</div>
+      </div>
+      <div class="acoes"><button class="md-btn" id="btnAtualizar" type="button">Atualizar</button></div>
+    </div>
+    <div id="erroMsg" class="md-msg erro" style="display:none;"></div>
+    <div class="md-totais" id="totais"></div>
+    <div class="md-filtros" id="filtros"></div>
+    <input class="md-busca" id="busca" type="search" placeholder="Procurar pelo nome">
+    <div class="md-lista" id="lista"></div>
+    <div id="semFicha"></div>
+    <p class="md-nota">
+      <b>Como ler:</b> cada cartão é um motoboy com ficha. As bolinhas mostram MEI, CNH, moto, contrato, Pix, bag térmica e baú.
+      Verde = conferido; amarelo = na pasta ou para olhar; vermelho = falta. CNH vencida conta como falta, e CNH que vence em até 60 dias fica amarela.
+      Entregas = corridas no TrackEat nos últimos 30 dias. "Rodaram sem ficha" = nomes do TrackEat que não casaram com nenhuma ficha
+      (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica aqui para não juntar errado).
+      Ainda não vieram do portal antigo: fotos dos documentos e a avaliação de cada motoboy.
+    </p>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script>
+const TELA = 'motodocs';
+const esc = trEscH;
+const DOCS = [
+  { k: 'mei', nome: 'MEI', ic: '🧾', num: 'CNPJ do MEI' },
+  { k: 'cnh', nome: 'CNH', ic: '🪪', num: 'Categoria (precisa ter A)', validade: true },
+  { k: 'moto', nome: 'Moto', ic: '🏍️', num: 'Placa' },
+  { k: 'contrato', nome: 'Contrato', ic: '📄' },
+];
+const SIT = { ok: 'Conferido', pasta: 'Na pasta', atencao: 'Olhar', falta: 'Falta', nao_sei: 'Não sei' };
+const PROT = { bag: 'Bag térmica', vedacao: 'Vedação', nenhuma: 'Sem proteção', nao_sei: 'Não sei' };
+const BAU = { grande: 'Grande', pequeno: 'Pequeno', nao_sei: 'Não sei' };
+const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú', 'BOQUEIRAO': 'Boqueirão', 'BOQUEIRÃO': 'Boqueirão' };
+let DADOS = null, FILTRO = 'pedir', ULTIMA_REQ = 0;
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+function dataFmt(d) { if (!d) return '—'; const [a, m, dd] = String(d).slice(0, 10).split('-'); return dd + '/' + m + '/' + a; }
+function quandoFmt(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function diasAte(hoje, d) {
+  const p = (s) => { const [a, m, dd] = String(s).slice(0, 10).split('-').map(Number); return Date.UTC(a, m - 1, dd); };
+  return Math.round((p(d) - p(hoje)) / 86400000);
+}
+// regra do portal antigo: CNH vencida = falta; vence em até 60 dias = atenção
+function sitDoc(f, k) {
+  const d = (f.docs || {})[k];
+  if (!d || !d.situacao) return 'nao_sei';
+  if (k === 'cnh' && d.validade && DADOS) {
+    const n = diasAte(DADOS.hoje, d.validade);
+    if (n < 0) return 'falta';
+    if (n <= 60 && d.situacao === 'ok') return 'atencao';
+  }
+  return d.situacao;
+}
+function faltas(f) {
+  const l = DOCS.filter((d) => sitDoc(f, d.k) === 'falta').map((d) => d.nome);
+  if (f.pix === false) l.push('chave Pix');
+  return l;
+}
+function conferido(f) { return DOCS.every((d) => sitDoc(f, d.k) === 'ok') && f.pix === true; }
+
+const FILTROS = [
+  ['pedir', 'Precisa pedir algo', (f) => faltas(f).length > 0],
+  ['semcontrato', 'Sem contrato', (f) => sitDoc(f, 'contrato') !== 'ok'],
+  ['comcontrato', 'Com contrato', (f) => sitDoc(f, 'contrato') === 'ok'],
+  ['semmei', 'Sem MEI', (f) => sitDoc(f, 'mei') !== 'ok'],
+  ['cnh', 'CNH não conferida', (f) => sitDoc(f, 'cnh') !== 'ok'],
+  ['moto', 'Moto para conferir', (f) => sitDoc(f, 'moto') !== 'ok'],
+  ['pix', 'Pix não confirmado', (f) => f.pix !== true],
+  ['bag', 'Sem bag térmica', (f) => f.protecao === 'nenhuma'],
+  ['bau', 'Baú sem tamanho', (f) => !f.bau || f.bau === 'nao_sei'],
+  ['parado', 'Não rodou em 30 dias', (f) => !f.entregas],
+  ['tudo', 'Tudo conferido', conferido],
+  ['todos', 'Todos', () => true],
+];
+
+function lojaDaCasca() {
+  const l = typeof lojaAtual === 'function' ? lojaAtual() : null;
+  if (!l || l === 'REDE') return null;
+  return LOJA_NOME[l] || l;
+}
+function fichasVisiveis() {
+  const loja = lojaDaCasca();
+  const q = document.getElementById('busca').value.trim().toLowerCase();
+  return (DADOS.fichas || []).filter((f) => (!loja || f.loja === loja) && (!q || String(f.nome).toLowerCase().includes(q)));
+}
+
+async function carregar() {
+  const minha = ++ULTIMA_REQ;
+  const err = document.getElementById('erroMsg');
+  err.style.display = 'none';
+  const r = await trRpcSeguro('erp_motoboys_ler', {});
+  if (minha !== ULTIMA_REQ) return;
+  if (r.status === 401) { exigirLogin('Entre de novo para ver os documentos.'); return; }
+  if (r.status === 403 || r.status === 400) { mostrarErro('Esta tela é só para o dono e quem cuida do pessoal.'); return; }
+  if (!r.ok) { mostrarErro(r.status === 0 ? 'Sem conexão com o servidor.' : 'Não foi possível consultar agora. Tente de novo.'); return; }
+  let d; try { d = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (minha !== ULTIMA_REQ) return;
+  DADOS = d || { fichas: [], sem_ficha: [] };
+  desenhar();
+}
+function mostrarErro(t) {
+  const el = document.getElementById('erroMsg'); el.textContent = t; el.style.display = 'block';
+  document.getElementById('sub').textContent = '';
+}
+
+function desenhar() {
+  const todas = fichasVisiveis();
+  const ativas = todas.filter((f) => f.ativo !== false);
+  const loja = lojaDaCasca();
+  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + quandoFmt(DADOS.gerado_em) +
+    ' · entregas do TrackEat até ' + dataFmt(DADOS.entregas_ate);
+  const nPedir = ativas.filter((f) => faltas(f).length).length;
+  const sem = (DADOS.sem_ficha || []).filter((s) => !loja || (LOJA_NOME[s.loja] || s.loja) === loja);
+  document.getElementById('totais').innerHTML =
+    tot('Com ficha', ativas.length) + tot('Tudo conferido', ativas.filter(conferido).length) +
+    tot('Precisa pedir algo', nPedir, nPedir > 0) + tot('Rodaram sem ficha', sem.length, sem.length > 0);
+
+  document.getElementById('filtros').innerHTML = FILTROS.map(([id, nome, fn]) =>
+    '<button type="button" data-f="' + id + '" class="' + (FILTRO === id ? 'on' : '') + '">' + esc(nome) +
+    '<span class="n">' + ativas.filter(fn).length + '</span></button>').join('') +
+    '<button type="button" data-f="semficha" class="' + (FILTRO === 'semficha' ? 'on' : '') + '">Rodaram sem ficha<span class="n">' + sem.length + '</span></button>';
+
+  const lista = document.getElementById('lista');
+  if (FILTRO === 'semficha') { lista.innerHTML = ''; }
+  else {
+    const fn = (FILTROS.find((x) => x[0] === FILTRO) || FILTROS[0])[2];
+    const mostrar = ativas.filter(fn).sort((a, b) => (b.entregas || 0) - (a.entregas || 0));
+    lista.innerHTML = mostrar.length ? mostrar.map(cartao).join('') : '<div class="md-vazio">Ninguém neste filtro.</div>';
+  }
+  const semEl = document.getElementById('semFicha');
+  semEl.innerHTML = (FILTRO === 'semficha' || FILTRO === 'todos' || FILTRO === 'pedir') && sem.length
+    ? '<div class="md-sem"><h2>Rodaram no TrackEat sem ficha (30 dias)</h2><table><thead><tr><th>Nome no TrackEat</th><th>Loja</th><th class="n">Entregas</th><th>Última</th></tr></thead><tbody>' +
+      sem.map((s) => '<tr><td>' + esc(s.nome) + '</td><td>' + esc(LOJA_NOME[s.loja] || s.loja || '—') + '</td><td class="n">' + esc(s.n) + '</td><td>' + esc(dataFmt(s.ultima)) + '</td></tr>').join('') +
+      '</tbody></table><p class="md-nota">Para tirar alguém daqui, a ficha precisa ser criada no cadastro de motoboys (ainda pelo RH). Nome igual em duas fichas da mesma loja também cai aqui.</p></div>'
+    : '';
+}
+function tot(k, v, alerta) { return '<div class="' + (alerta ? 'alerta' : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>'; }
+
+function cartao(f) {
+  const fl = faltas(f);
+  const classe = fl.length ? 'falta' : conferido(f) ? 'ok' : 'atencao';
+  const chips = DOCS.map((d) => {
+    const s = sitDoc(f, d.k), doc = (f.docs || {})[d.k] || {};
+    let extra = '';
+    if (d.k === 'cnh' && doc.validade) extra = ' · vence ' + dataFmt(doc.validade);
+    return '<span class="md-chip ' + s + '" title="' + esc(SIT[s] || s) + '">' + d.ic + ' ' + esc(d.nome) + ': ' + esc(SIT[s] || s) + esc(extra) + '</span>';
+  }).join('') +
+    '<span class="md-chip ' + (f.pix === true ? 'ok' : f.pix === false ? 'falta' : 'nao_sei') + '">💸 Pix: ' + (f.pix === true ? 'tem' : f.pix === false ? 'falta' : 'não sei') + '</span>' +
+    '<span class="md-chip ' + (f.protecao === 'bag' || f.protecao === 'vedacao' ? 'ok' : f.protecao === 'nenhuma' ? 'falta' : 'nao_sei') + '">🎒 ' + esc(PROT[f.protecao] || 'Proteção: não sei') + '</span>' +
+    '<span class="md-chip ' + (f.bau && f.bau !== 'nao_sei' ? 'ok' : 'nao_sei') + '">📦 Baú: ' + esc(BAU[f.bau] || 'não sei') + (f.bau_litros ? ' (' + esc(f.bau_litros) + ' L)' : '') + '</span>';
+  return '<div class="md-card ' + classe + '" data-id="' + esc(f.id) + '">' +
+    '<div class="nome">' + esc(f.nome) + '</div>' +
+    '<div class="meta">' + esc(f.loja || '—') + (f.tipo ? ' · ' + esc(f.tipo) : '') + ' · ' + esc(f.entregas || 0) + ' entregas em 30 dias' +
+      (f.ultima ? ' · última ' + esc(dataFmt(f.ultima)) : '') + '</div>' +
+    '<div class="md-chips">' + chips + '</div>' +
+    (fl.length ? '<div class="md-pede">Pedir: ' + esc(fl.join(', ')) + '</div>' : '') +
+    '<button type="button" class="md-btn abrir" data-abrir="' + esc(f.id) + '">Atualizar documentos</button>' +
+    '<div class="md-form" id="form-' + esc(f.id) + '"></div></div>';
+}
+
+function opcoes(mapa, atual) {
+  return Object.entries(mapa).map(([k, v]) => '<option value="' + k + '"' + (k === atual ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+}
+function abrirForm(id) {
+  const f = DADOS.fichas.find((x) => String(x.id) === String(id));
+  const el = document.getElementById('form-' + id);
+  if (!f || !el) return;
+  if (el.classList.contains('on')) { el.classList.remove('on'); return; }
+  el.innerHTML = DOCS.map((d) => {
+    const doc = (f.docs || {})[d.k] || {};
+    return '<div class="md-linha"><b>' + d.ic + ' ' + esc(d.nome) + '</b><div class="campos">' +
+      '<select data-doc="' + d.k + '" data-c="sit">' + opcoes(SIT, doc.situacao || 'nao_sei') + '</select>' +
+      (d.num ? '<input type="text" data-doc="' + d.k + '" data-c="num" placeholder="' + esc(d.num) + '" value="' + esc(doc.numero || '') + '">' : '') +
+      (d.validade ? '<input type="date" data-doc="' + d.k + '" data-c="val" title="Validade da CNH" value="' + esc(doc.validade || '') + '">' : '') +
+      '</div>' + (doc.quando ? '<div class="quando">atualizado em ' + esc(quandoFmt(doc.quando)) + '</div>' : '') + '</div>';
+  }).join('') +
+    '<div class="md-linha"><b>🎒 Proteção</b><div class="campos"><select data-c="prot">' + opcoes(PROT, f.protecao || 'nao_sei') + '</select></div></div>' +
+    '<div class="md-linha"><b>📦 Baú</b><div class="campos"><select data-c="bau">' + opcoes(BAU, f.bau || 'nao_sei') + '</select></div>' +
+      (f.equip_quando ? '<div class="quando">atualizado em ' + esc(quandoFmt(f.equip_quando)) + '</div>' : '') + '</div>' +
+    '<button type="button" class="md-btn pri" data-salvar="' + esc(id) + '">Salvar</button> ' +
+    '<span class="md-msg" id="msg-' + esc(id) + '"></span>' +
+    '<p class="md-nota">O Pix vem do cadastro do motoboy e não se muda aqui.</p>';
+  el.classList.add('on');
+}
+
+async function salvar(id, botao) {
+  const f = DADOS.fichas.find((x) => String(x.id) === String(id));
+  const el = document.getElementById('form-' + id);
+  const msg = document.getElementById('msg-' + id);
+  const val = (doc, c) => { const i = el.querySelector('[data-doc="' + doc + '"][data-c="' + c + '"]'); return i ? i.value.trim() : ''; };
+  botao.disabled = true; msg.className = 'md-msg'; msg.textContent = 'Salvando…';
+  try {
+    for (const d of DOCS) {
+      const antes = (f.docs || {})[d.k] || {};
+      const sit = val(d.k, 'sit'), num = val(d.k, 'num') || null, vd = val(d.k, 'val') || null;
+      if (sit === (antes.situacao || 'nao_sei') && (num || null) === (antes.numero || null) && (vd || null) === (antes.validade || null)) continue;
+      const r = await trRpcSeguro('erp_motoboy_doc_salvar', { p_ficha: Number(id), p_item: d.k, p_situacao: sit, p_numero: num, p_validade: d.validade ? vd : null });
+      if (r.status === 401) { exigirLogin('Entre de novo para salvar.'); return; }
+      if (!r.ok) throw new Error(d.nome);
+    }
+    const prot = el.querySelector('[data-c="prot"]').value, bau = el.querySelector('[data-c="bau"]').value;
+    if (prot !== (f.protecao || 'nao_sei') || bau !== (f.bau || 'nao_sei')) {
+      const r = await trRpcSeguro('erp_motoboy_equip_salvar', { p_ficha: Number(id), p_protecao: prot, p_bau: bau });
+      if (!r.ok) throw new Error('equipamento');
+    }
+    msg.className = 'md-msg ok'; msg.textContent = 'Salvo.';
+    setTimeout(carregar, 600);
+  } catch (e) {
+    msg.className = 'md-msg erro'; msg.textContent = 'Não salvou (' + (e.message || 'erro') + '). Tente de novo.';
+  } finally { botao.disabled = false; }
+}
+
+document.getElementById('filtros').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-f]'); if (!b) return;
+  FILTRO = b.dataset.f; desenhar();
+});
+document.getElementById('lista').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-abrir]'); if (a) { abrirForm(a.dataset.abrir); return; }
+  const s = e.target.closest('[data-salvar]'); if (s) salvar(s.dataset.salvar, s);
+});
+document.getElementById('busca').addEventListener('input', () => { if (DADOS) desenhar(); });
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { if (DADOS) desenhar(); });
+
+if (!rmbSessao()) exigirLogin('Entre para ver os documentos dos motoboys.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { try { await lojaCarregar(); } catch (e) {} carregar(); })();
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>

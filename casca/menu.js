@@ -182,6 +182,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "motodocs",
+    "rotulo": "Documentos dos motoboys",
+    "icone": "🪪",
+    "origem": "fabio"
+   },
+   {
     "chave": "pausadosdel",
     "rotulo": "Itens pausados · iFood x Site",
     "icone": "⏸️",
