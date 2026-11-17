@@ -1668,9 +1668,9 @@ function sepSaldoTd(l) {
 // 17/11/2026 (dono 13:36, agenda #871: "rever as telas do estoque conferindo se os avisos pros usuários no passo a passo estão
 // claros pra eles saberem exatamente o que podem ou não fazer dentro do fluxo de produção"): uma linha por passo, do que o banco deixa
 const EST_PASSO = {
-  plano: ['Até fechar, pode pôr, mudar e tirar receitas (0 tira).', 'Fechado, as listas da Separação saem dele: com a separação gerada, o plano não reabre — corrija a quantidade na Separação.'],
+  plano: ['Até fechar, pode pôr, mudar e tirar receitas (0 tira). Fechado, "Desfazer o plano" volta para edição e "Excluir" apaga — a separação e a ordem vão junto.', 'Depois que a ordem começou, o plano não se desfaz.'],
   separacao: ['Pode escrever quanto saiu de cada item (0 se não saiu) e conferir.', 'Não pode incluir item (isso é no plano). Conferida, a lista vira a ordem e não muda mais.'],
-  ordem: ['Pode iniciar, anotar o que a cozinha produziu e encerrar. Cancelar, só antes de começar.', 'Não pode mudar o plano por baixo de uma ordem viva: cancele a ordem antes.'],
+  ordem: ['Pode iniciar, anotar o que a cozinha produziu e encerrar. Cancelar, só antes de começar.', 'Começada a ordem, o plano dela não se desfaz nem se exclui.'],
 };
 function estPassoHtml(p) {
   const x = EST_PASSO[p];
@@ -2388,7 +2388,7 @@ function plpBlocoPlano() {
   if (fech) {
     h += `<div class="contexto" style="border-color:var(--farol-ok);"><b>Plano de ${plpDm(fech.data_para || amanha)} fechado</b> com
       ${dec.length} ${dec.length === 1 ? 'receita' : 'receitas'}. Agora: separar e conferir cada lista; a ordem de produção nasce da lista conferida.
-      <button class="preset-btn" onclick="plpReabrir(${fech.id_plano}, '${String(fech.data_para || plpAmanha()).slice(0, 10)}')" title="Volta o plano para edição — só enquanto a separação dele não foi gerada.">Reabrir o plano</button>
+      ${plpDesfBotoes(fech.id_plano)}
       <span id="plpMsg" style="font-size:12.5px;"></span></div>`;
     const f = EST_FILA || {};
     const nL = (Number(f.listas_a_separar) || 0) + (Number(f.listas_a_conferir) || 0) + (Number(f.listas_a_virar_ordem) || 0);
@@ -2634,24 +2634,39 @@ async function plpGerarOrdem(id) {
   avisoAcao('ok', `✓ Ordem gerada — abra em Apontar produção. Às ${avisoHora()}.`);
   await plpCarregar();
 }
-async function plpReabrir(id, dataPara) {
-  // 17/11/2026 (dono 13:36, agenda #871: "essa exclusão vai estar amarrada ao ciclo todo?"): reabrir NÃO desfaz a separação, e
-  // com separação viva o banco não gera outra — o plano mudaria e as listas ficariam velhas. Até o Estoque ligar o "desfazer
-  // o ciclo" (plano + separação + ordem juntos), com separação viva a tela não reabre.
-  let seps = null;
-  // o plano é único por loja e data (est_plano.data_para): a separação dele é a da mesma loja e data
-  if (dataPara && PLP && PLP.unidade) { try { seps = await consultarTudo(`vw_est_separacao_lista?select=numero,situacao&unidade=eq.${encodeURIComponent(PLP.unidade)}&data_para=eq.${String(dataPara).slice(0, 10)}&situacao=neq.CANCELADA`); } catch (e) { seps = null; } }
-  const nums = [...new Set((seps || []).map((x) => x.numero))];
-  if (nums.length) {
-    avisoAcao('atencao', `! Este plano já gerou a separação (${nums.join(', ')}). Mudar o plano agora deixaria as listas velhas: ainda não dá para reabrir. Para corrigir uma quantidade, ajuste na Separação ou fale com o Neto.`);
-    return;
-  }
-  const motivo = (prompt('Por que reabrir o plano? (fica registrado)') || '').trim();
-  if (!motivo) return;
-  avisoAcao('enviando', 'Reabrindo o plano…');
-  const r = await trRpcSeguro('est_plano_reabrir', { p_id: id, p_motivo: motivo });
-  if (!r.ok) return avisoAcao('erro', `✗ O plano NÃO reabriu: ${await trErroDe(r)}. Tente de novo.`);
-  avisoAcao('ok', `✓ Plano reaberto — já dá para mudar. Às ${avisoHora()}.`);
+// 17/11/2026 (dono 13:36, agenda #871: "essa exclusão vai estar amarrada ao ciclo todo?"): Desfazer e Excluir amarram o
+// ciclo inteiro — est_plano_desfazer cancela juntas as ordens abertas e as separações e reabre o plano; est_plano_excluir faz
+// o mesmo e apaga (cópia guardada), liberando o dia. O banco recusa se alguma ordem já começou. Motivo escrito na tela.
+function plpDesfBotoes(id) {
+  return `<button class="preset-btn" onclick="plpDesfAbrir(${Number(id)}, 'desfazer')" title="Cancela junto a separação e a ordem ainda não começada e volta o plano para edição">Desfazer o plano (separação e ordem juntas)</button>
+      <button class="preset-btn" style="color:var(--farol-fora);" onclick="plpDesfAbrir(${Number(id)}, 'excluir')" title="Apaga o plano, a separação e a ordem ainda não começada; o dia fica livre para um plano novo">Excluir o plano</button>
+      <div id="plpDesfForm_${Number(id)}"></div>`;
+}
+function plpDesfAbrir(id, modo) {
+  const el = document.getElementById('plpDesfForm_' + id);
+  if (!el) return;
+  if (!modo) { el.innerHTML = ''; return; }
+  const exc = modo === 'excluir';
+  el.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px;">
+      <span style="font-size:12.5px; color:var(--farol-perto);">${exc ? 'Apaga o plano, as listas de separação e a ordem ainda não começada.' : 'Cancela as listas de separação e a ordem ainda não começada; o plano volta para edição.'}</span>
+      <input id="plpDesfMotivo_${id}" placeholder="por quê? (fica registrado)" style="flex:1 1 220px;">
+      <button class="preset-btn${exc ? '' : ' active'}" ${exc ? 'style="color:var(--farol-fora);"' : ''} onclick="plpDesfazer(${id}, ${exc})">${exc ? 'Excluir' : 'Desfazer'}</button>
+      <button class="preset-btn" onclick="plpDesfAbrir(${id}, null)">Voltar</button></div>`;
+  const i = document.getElementById('plpDesfMotivo_' + id); if (i) i.focus();
+}
+async function plpDesfazer(id, excluir) {
+  const motivo = ((document.getElementById('plpDesfMotivo_' + id) || {}).value || '').trim();
+  if (!motivo) return avisoAcao('atencao', '! Escreva o motivo antes (fica registrado).');
+  avisoAcao('enviando', excluir ? 'Excluindo o plano…' : 'Desfazendo o plano…');
+  const r = await trRpcSeguro(excluir ? 'est_plano_excluir' : 'est_plano_desfazer', { p_id: id, p_motivo: motivo });
+  if (!r.ok) return avisoAcao('erro', `✗ ${excluir ? 'O plano NÃO foi excluído' : 'O plano NÃO foi desfeito'}: ${await trErroDe(r)}`, () => plpDesfazer(id, excluir));
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (Array.isArray(j)) j = j[0] || {};
+  const n = (v) => Array.isArray(v) ? v.length : Number(v) || 0;
+  const partes = [n(j.separacoes_canceladas) ? `${n(j.separacoes_canceladas)} ${n(j.separacoes_canceladas) === 1 ? 'lista' : 'listas'} de separação` : '', n(j.ordens_canceladas) ? `${n(j.ordens_canceladas)} ${n(j.ordens_canceladas) === 1 ? 'ordem' : 'ordens'}` : ''].filter(Boolean);
+  const junto = partes.length ? ` (junto: ${partes.join(' e ')})` : '';
+  avisoAcao(j.aviso ? 'atencao' : 'ok', `✓ ${excluir ? 'Plano excluído — o dia está livre para um plano novo' : 'Plano desfeito — já dá para mudar'}${junto}. Às ${avisoHora()}.${j.aviso ? ' ! ' + j.aviso : ''}`);
+  if (PLP && PLP.man && excluir) { PLP.man.idPlano = null; PLP.man.sit = null; PLP.man.itens = new Map(); }
   await (PLP && PLP.manual ? plpManCarregar() : plpCarregar());
 }
 
@@ -2740,7 +2755,7 @@ function plpManRender() {
     h += `<div class="contexto" style="border-color:var(--farol-ok); text-align:left;"><b>Plano de ${plpDm(M.data)} fechado.</b>
       ${nL ? `${nL} ${nL === 1 ? 'lista espera' : 'listas esperam'} na Separação.` : 'As listas dele estão na Separação e nas Ordens.'}
       <button class="preset-btn active" onclick="mostrarModulo('separacao')">Abrir a Separação ›</button>
-      <button class="preset-btn" onclick="plpReabrir(${M.idPlano}, '${String(M.data).slice(0, 10)}')" title="Volta o plano para edição — só enquanto a separação dele não foi gerada.">Reabrir o plano</button></div>`;
+      ${plpDesfBotoes(M.idPlano)}</div>`;
   } else {
     h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;">
       <button id="plpManFecharBtn" class="preset-btn active est-ciclo" onclick="plpManFechar()" ${plpManNoPlano().length || Object.keys(M.dig).length ? '' : 'disabled title="Digite a quantidade de ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
