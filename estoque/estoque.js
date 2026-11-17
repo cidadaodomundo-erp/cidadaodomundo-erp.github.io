@@ -4894,7 +4894,16 @@ async function cfEnviar(id, iid, naofaz) {
 // 05/11/2026 ~02:30: banco aplicado (requisicao_pede_tudo_sai_por_ficha). A lista vem de vw_est_requisicao_catalogo (cada login
 // vê a própria loja), e "sai pela ficha" vem do banco em cada linha (catálogo, item, lista do dia). A praça vem do login
 // (est_requisicao_quem_pede ou o setor do líder); só quem separa escolhe a praça.
-const REQ = { itens: null, sai: {}, carrinho: {}, busca: '', manda: false, lider: null, praca: '', minhas: [], unidade: null };
+const REQ = { itens: null, sai: {}, carrinho: {}, carrinhos: {}, grade: [], busca: '', manda: false, lider: null, praca: '', minhas: [], unidade: null };
+// 17/11/2026 (dono 15:02: "Faz o mesmo esquema do pedido das listas, a grade mostrando todos os itens de cada praça, pra que o
+// usuário não esqueça de nada"; proposta 2026-11-17-pedir-material-grade-por-praca): a grade da praça vem de
+// vw_est_requisicao_grade, por grupo; em branco = não pede. A busca fica embaixo, para item fora da grade.
+// Quem separa troca a praça e cada praça guarda o próprio pedido (REQ.carrinhos).
+function reqTrocarPraca(p) {
+  if (p === REQ.praca) return;
+  REQ.carrinhos[REQ.praca] = REQ.carrinho; REQ.praca = p; REQ.carrinho = REQ.carrinhos[p] || {};
+  reqPedirDesenhar();
+}
 const REQ_PRACAS = ['COZINHA', 'DELIVERY', 'SALÃO', 'PRODUÇÃO'];
 const reqSaiPelaFicha = (nb) => !!REQ.sai[nb];
 const reqFmt = (v) => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
@@ -4913,12 +4922,15 @@ async function entrarReqPedir() {
   alvo.innerHTML = `<div class="contexto">Carregando…</div>`;
   const u = await estLojaDaTela(alvo, entrarReqPedir); if (!u) return;
   try {
-    const [itens, rl, rm] = await Promise.all([
+    const [itens, rl, rm, grade] = await Promise.all([
       consultarTudo(`vw_est_requisicao_catalogo?select=nome_base,un,sai_por_ficha&unidade=eq.${encodeURIComponent(u)}&order=nome_base`),
-      trRpcSeguro('rh_eu_lider', {}), trRpcSeguro('est_vejo_todas_as_pracas', {})]);
+      trRpcSeguro('rh_eu_lider', {}), trRpcSeguro('est_vejo_todas_as_pracas', {}),
+      consultarTudo(`vw_est_requisicao_grade?select=praca,grupo,ordem_grupo,ordem,nome_base,un,sai_por_ficha,a_rita_confirma&unidade=eq.${encodeURIComponent(u)}&order=ordem_grupo,ordem`).catch(() => [])]);
+    REQ.grade = grade || [];
     const vistos = new Set();
     REQ.itens = itens.filter((x) => x.nome_base && !vistos.has(x.nome_base) && vistos.add(x.nome_base));
     REQ.sai = {}; for (const x of REQ.itens) if (x.sai_por_ficha) REQ.sai[x.nome_base] = true;
+    for (const g of REQ.grade) if (g.sai_por_ficha) REQ.sai[g.nome_base] = true;
     const lid = rl.ok ? await rl.json() : [];
     REQ.lider = (Array.isArray(lid) ? lid : []).find((x) => x.unidade === u) || null;
     REQ.manda = rm.ok ? !!(await rm.json()) : false;
@@ -4942,23 +4954,32 @@ function reqPedirDesenhar() {
   const noCarrinho = Object.entries(REQ.carrinho).filter(([, q]) => Number(q) > 0);
   const lista = b.length < 2 ? [] : REQ.itens.filter((x) => x.nome_base.toLowerCase().includes(b)).slice(0, 40);
   const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:8px 10px; font:inherit;';
-  const linhaItem = (nb, un) => {
+  const linhaItem = (nb, un, confirmar) => {
     const q = REQ.carrinho[nb] || '';
     return `<div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line);">
-      <div style="flex:1 1 auto; min-width:0;"><b>${trEscH(nb)}</b>${reqSaiPelaFicha(nb) ? ' <span style="font-size:11.5px; color:var(--tx-4);">· sai pela ficha</span>' : ''}</div>
+      <div style="flex:1 1 auto; min-width:0;"><b>${trEscH(nb)}</b>${reqSaiPelaFicha(nb) ? ' <span style="font-size:11.5px; color:var(--tx-4);">· sai pela ficha</span>' : ''}${confirmar ? ' <span style="font-size:11px; color:var(--farol-perto);" title="Item da grade ainda a confirmar nesta praça">· confirmar</span>' : ''}</div>
       <input inputmode="decimal" value="${trEscH(q)}" placeholder="qtd" oninput='reqQtd(${JSON.stringify(nb)}, this.value)' style="width:76px; text-align:right; ${campo}">
       <span style="width:34px; font-size:12px; color:var(--tx-3);">${trEscH(String(un || '').toLowerCase())}</span></div>`;
   };
-  const unDe = (nb) => (REQ.itens.find((x) => x.nome_base === nb) || {}).un || '';
+  const unDe = (nb) => (REQ.itens.find((x) => x.nome_base === nb) || REQ.grade.find((x) => x.nome_base === nb) || {}).un || '';
+  const grade = REQ.grade.filter((g) => g.praca === REQ.praca), naGrade = new Set(grade.map((g) => g.nome_base));
+  let gradeHtml = '', grupoAt = null;
+  for (const g of grade) {
+    if (g.grupo !== grupoAt) { grupoAt = g.grupo; gradeHtml += `<div class="section-label" style="margin-top:12px;">${trEscH(g.grupo || 'Outros')}</div>`; }
+    gradeHtml += linhaItem(g.nome_base, g.un, REQ.manda && g.a_rita_confirma);
+  }
+  const fora = noCarrinho.filter(([nb]) => !naGrade.has(nb));
   alvo.innerHTML = `<h2>Pedir material</h2>
     <div class="caption-label">${trEscH(estNomeLoja(REQ.unidade))}${REQ.praca ? ' · praça <b>' + trEscH(REQ.praca) + '</b>' : ''}. Peça tudo o que a praça precisa; quem separa entrega e dá a baixa no estoque.</div>
-    ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='REQ.praca=${JSON.stringify(p)}; reqPedirDesenhar();'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
-    <input id="reqBusca" type="search" placeholder="buscar o item (2 letras ou mais)" value="${trEscH(REQ.busca)}" oninput="reqBuscar(this.value)" style="width:100%; max-width:420px; margin:8px 0; ${campo}">
-    <div id="reqLista">${lista.map((x) => linhaItem(x.nome_base, x.un)).join('') || (b.length >= 2 ? `<div class="caption-label">Nenhum item com "${trEscH(REQ.busca)}" na base desta loja. <a href="javascript:void(0)" onclick="reqForaDaBase()">Pedir mesmo assim (vai para o Neto validar)</a></div>` : '')}</div>
+    ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='reqTrocarPraca(${JSON.stringify(p)})'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
+    ${grade.length ? `<div class="caption-label" style="text-align:left;">Todos os itens da praça (${grade.length}): digite a quantidade do que precisa; em branco não pede.</div><div id="reqGrade">${gradeHtml}</div>
+      <div class="section-label" style="margin-top:16px;">Outro item (fora da lista da praça)</div>` : ''}
+    <input id="reqBusca" type="search" placeholder="${grade.length ? 'buscar outro item da base' : 'buscar o item'} (2 letras ou mais)" value="${trEscH(REQ.busca)}" oninput="reqBuscar(this.value)" style="width:100%; max-width:420px; margin:8px 0; ${campo}">
+    <div id="reqLista">${lista.filter((x) => !naGrade.has(x.nome_base)).map((x) => linhaItem(x.nome_base, x.un)).join('') || (b.length >= 2 ? `<div class="caption-label">Nenhum item com "${trEscH(REQ.busca)}" na base desta loja. <a href="javascript:void(0)" onclick="reqForaDaBase()">Pedir mesmo assim (vai para o Neto validar)</a></div>` : '')}</div>
     <div class="section-label" id="reqNoPedido" style="margin-top:14px;">No pedido: ${noCarrinho.length} ${noCarrinho.length === 1 ? 'item' : 'itens'}</div>
-    ${noCarrinho.map(([nb]) => linhaItem(nb, unDe(nb))).join('')}
+    ${(grade.length ? fora : noCarrinho).map(([nb]) => linhaItem(nb, unDe(nb))).join('')}
     <textarea id="reqObs" placeholder="observação (opcional)" style="width:100%; min-height:44px; margin-top:8px; ${campo}"></textarea>
-    <div style="margin:10px 0;"><button class="preset-btn" id="reqBtPedir" ${noCarrinho.length && podePedir ? '' : 'disabled'} style="font-size:15px; padding:10px 18px; border-color:var(--marca-amarelo);" onclick="reqEnviar()">Pedir</button></div>
+    <div style="position:sticky; bottom:0; z-index:2; background:var(--bg); padding:10px 0; margin:10px 0; border-top:1px solid var(--line);"><button class="preset-btn" id="reqBtPedir" ${noCarrinho.length && podePedir ? '' : 'disabled'} style="font-size:15px; padding:10px 18px; border-color:var(--marca-amarelo);" onclick="reqEnviar()">Pedir</button></div>
     <div class="section-label" style="margin-top:18px;">${REQ.manda ? 'Requisições desta loja' : 'Requisições da sua praça'}</div>
     ${REQ.minhas.length ? `<div id="tabelaReqMinhas" style="overflow-x:auto;"><table><thead><tr><th>Número</th><th>Quando</th><th>Praça</th><th style="text-align:right;">Itens</th><th>Situação</th></tr></thead><tbody>
       ${REQ.minhas.map((r) => `<tr><td>${trEscH(r.numero)}</td><td>${trEscH(reqQuando(r.criado_em))}</td><td>${trEscH(String(r.praca || '').toLowerCase())}</td><td style="text-align:right;">${r.itens}${r.itens_a_menos ? ` <span style="color:var(--farol-perto);">(${r.itens_a_menos} a menos)</span>` : ''}</td><td>${reqSituacao(r)}${r.situacao === 'ABERTA' ? ' ' + reqCancelarHtml(r) : ''}</td></tr>`).join('')}
