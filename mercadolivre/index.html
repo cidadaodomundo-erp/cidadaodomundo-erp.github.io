@@ -4,57 +4,349 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<title>Mercado Livre · Cidadão do Mundo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Compras · Mercado Livre · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
+<!-- COMPRAS · MERCADO LIVRE (17/11/2026, pedido do Fábio: "achar o melhor preço das compras da Rita").
+     Quem pede: escreve o produto ou cola o link do ML aqui, ou manda no WhatsApp 1602 começando com "compra".
+     O robô de Compras (Escritório 2) lê o site público do Mercado Livre e grava as ofertas (supabase/compras-mercadolivre.sql).
+     Nada é comprado por aqui: "Comprei esta" só registra a decisão. Nenhuma mensagem sai pelo WhatsApp. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ml-topo h1 { font-size:20px; margin:8px 0 4px; }
+  .ml-sub { font-size:13px; opacity:.8; margin:0 0 12px; line-height:1.45; }
+  .ml-pedir { border:1px solid var(--line-2); border-radius:12px; padding:12px 14px; background:var(--surface); margin:0 0 14px; }
+  .ml-pedir textarea { width:100%; box-sizing:border-box; min-height:64px; font:inherit; font-size:15px; padding:8px 10px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; resize:vertical; }
+  .ml-linha { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:8px; }
+  .ml-linha label { font-size:12.5px; opacity:.85; display:flex; flex-direction:column; gap:3px; }
+  .ml-linha select { font:inherit; padding:7px 8px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+  .ml-btn { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; font-weight:700; }
+  .ml-btn:hover, .ml-btn.on { border-color:var(--brand); }
+  .ml-btn.prim { background:var(--brand); border-color:var(--brand); color:#111; }
+  .ml-btn.peq { padding:4px 9px; font-size:12.5px; font-weight:600; }
+  .ml-btn[disabled] { opacity:.5; cursor:default; }
+  .ml-msg { font-size:13px; margin-top:8px; min-height:1em; }
+  .ml-msg.erro { color:var(--farol-fora, #ff6b6b); font-weight:700; }
+  .ml-msg.ok { color:var(--farol-ok, #3fb950); font-weight:700; }
+  .ml-robo { font-size:12.5px; margin:0 0 10px; opacity:.9; }
+  .ml-velho { color:var(--farol-fora, #ff6b6b); font-weight:700; }
+  .ml-filtros { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }
+  .ml-lista { display:flex; flex-direction:column; gap:12px; }
+  .ml-ped { border:1px solid var(--line-2); border-radius:12px; padding:10px 12px; background:var(--surface); }
+  .ml-ped-cab { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; font-size:12.5px; opacity:.92; }
+  .ml-ped-txt { font-size:15px; font-weight:700; margin:6px 0 2px; white-space:pre-wrap; word-break:break-word; }
+  .ml-ped-ref { font-size:12.5px; opacity:.85; margin:2px 0; }
+  .ml-selo { font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px; border:1px solid var(--line-2); white-space:nowrap; }
+  .ml-selo.novo, .ml-selo.buscando { color:var(--farol-perto, #e0a33a); border-color:var(--farol-perto, #e0a33a); }
+  .ml-selo.pronto { color:var(--farol-ok, #3fb950); border-color:var(--farol-ok, #3fb950); }
+  .ml-selo.erro { color:var(--farol-fora, #ff6b6b); border-color:var(--farol-fora, #ff6b6b); }
+  .ml-ofs { display:flex; flex-direction:column; gap:6px; margin:8px 0 4px; }
+  .ml-of { display:grid; grid-template-columns:56px 1fr auto; gap:4px 12px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:7px 10px; }
+  .ml-of.melhor { border-color:var(--farol-ok, #3fb950); }
+  .ml-of.escolhida { border-color:var(--brand); border-width:2px; }
+  .ml-of img { width:56px; height:56px; object-fit:contain; border-radius:6px; background:#fff; }
+  .ml-of .semimg { width:56px; height:56px; border-radius:6px; background:var(--surface-2); }
+  .ml-of-tit a { color:inherit; font-weight:600; font-size:13.5px; text-decoration:none; }
+  .ml-of-tit a:hover { text-decoration:underline; }
+  .ml-ped-ref a { color:var(--info); }
+  .ml-of-det { font-size:12px; opacity:.85; margin-top:2px; display:flex; flex-wrap:wrap; gap:2px 10px; }
+  .ml-of-preco { text-align:right; white-space:nowrap; }
+  .ml-of-preco .p { font-size:18px; font-weight:800; }
+  .ml-of-preco s { font-size:12px; opacity:.6; display:block; }
+  .ml-of-preco .f { font-size:12px; }
+  .ml-gratis { color:var(--farol-ok, #3fb950); font-weight:700; }
+  .ml-pago { color:var(--farol-perto, #e0a33a); }
+  .ml-tag { font-size:10.5px; font-weight:700; padding:0 6px; border-radius:10px; border:1px solid var(--line-2); opacity:.9; }
+  .ml-tag.ad { opacity:.6; }
+  .ml-tag.of { color:var(--brand); border-color:var(--brand); }
+  .ml-tag.mesmo { color:var(--farol-ok, #3fb950); border-color:var(--farol-ok, #3fb950); }
+  .ml-acoes { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ml-nota { font-size:12px; opacity:.75; margin:12px 0 0; line-height:1.5; }
+  .ml-vazio { padding:14px; opacity:.75; }
+  @media (max-width:560px) {
+    .ml-of { grid-template-columns:44px 1fr; }
+    .ml-of img, .ml-of .semimg { width:44px; height:44px; }
+    .ml-of-preco { grid-column:2; text-align:left; }
+  }
+</style>
 </head>
 <body>
 <div class="main-content">
-  <div class="wrap oc">
-    <h1>Mercado Livre <span class="oc-obras">Em construção</span></h1>
-    <div id="bloqueio" hidden role="alert"></div>
-    <div id="statusGeral" role="status" aria-live="polite"></div>
-    <div id="app" hidden></div>
+  <div class="wrap">
+    <div class="ml-topo">
+      <h1>Compras · Mercado Livre</h1>
+      <p class="ml-sub">Cole o link do produto ou escreva o que precisa comprar. O robô procura os preços mais baratos no Mercado Livre e mostra aqui.
+        Também dá para mandar pelo WhatsApp da empresa (1602), começando a mensagem com <b>compra</b> (ex.: <i>compra papel toalha interfolha 1000 folhas</i>) ou mandando o link.
+        <b>Nada é comprado sozinho.</b></p>
+    </div>
+    <div class="ml-pedir">
+      <textarea id="fTexto" maxlength="600" placeholder="Ex.: papel toalha interfolha 1000 folhas   ou   https://produto.mercadolivre.com.br/MLB-..."></textarea>
+      <div class="ml-linha">
+        <label>Entregar em
+          <select id="fLoja">
+            <option value="AGUA VERDE">Água Verde</option>
+            <option value="SÃO BRAZ">São Braz</option>
+            <option value="AHU">Ahú</option>
+          </select>
+        </label>
+        <button type="button" class="ml-btn prim" id="btnPedir">Buscar melhores preços</button>
+      </div>
+      <div class="ml-msg" id="msgPedir" role="status" aria-live="polite"></div>
+    </div>
+    <div class="ml-robo" id="robo"></div>
+    <div class="ml-filtros" id="filtros">
+      <button type="button" class="ml-btn peq on" data-f="abertas">Em aberto</button>
+      <button type="button" class="ml-btn peq" data-f="comprado">Compradas</button>
+      <button type="button" class="ml-btn peq" data-f="descartado">Descartadas</button>
+      <button type="button" class="ml-btn peq" data-f="todas">Todas</button>
+    </div>
+    <div id="erroMsg" class="ml-msg erro" style="display:none;"></div>
+    <div id="conteudo"><div class="ml-vazio">Carregando…</div></div>
+    <p class="ml-nota">Preços lidos pelo robô no site público do Mercado Livre (sem login), na hora indicada em cada pedido. Os mais baratos aparecem primeiro.
+      "Frete grátis" é o que o site mostra; quando o frete é pago, o valor só aparece no carrinho. Anúncio "patrocinado" é pago pelo vendedor.
+      Confira tamanho e quantidade antes de comprar: o robô compara pelo nome do produto.</p>
   </div>
 </div>
+
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
 <script>
-OperacaoConstrucao.iniciar({
-  titulo: 'Mercado Livre',
-  aviso: 'A comparação de ofertas e a ligação ao Mercado Livre ainda não estão ativas.',
-  extras: ['Finalidade: compras empresariais. Nenhuma conta pessoal é aberta e nenhum anúncio é buscado automaticamente.'],
-  legenda: 'Produto a comprar (preparado)',
-  campos: [
-    { r: 'Loja', t: 'loja' },
-    { r: 'Produto exato', t: 'text' },
-    { r: 'Marca/modelo', t: 'text' },
-    { r: 'Código do produto', t: 'text' },
-    { r: 'Embalagem', t: 'text' },
-    { r: 'Quantidade', t: 'number', m: 'numeric' },
-    { r: 'Prazo', t: 'date' },
-    { r: 'CEP de entrega', t: 'text', m: 'numeric' }
-  ],
-  camposFuturos: [
-    { r: 'Oferta/link', t: 'text' },
-    { r: 'Custo total', t: 'text' },
-    { r: 'Frete', t: 'text' },
-    { r: 'Vendedor', t: 'text' }
-  ],
-  atalhos: [
-    { r: 'Pedir material', chave: 'reqpedir' },
-    { r: 'Teto de compra', chave: 'comprateto' },
-    { r: 'Posição de estoque', chave: 'posicao' }
-  ]
+const TELA = 'mercadolivre';
+const esc = trEscH;
+const TZ = { timeZone: 'America/Sao_Paulo' };
+const NOME_LOJA = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú' };
+const STATUS = { novo: 'Na fila', buscando: 'Buscando', pronto: 'Preços prontos', erro: 'Não deu certo', comprado: 'Comprado', descartado: 'Descartado' };
+const brl = (v) => v == null ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function quando(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, TZ)) + ' ' +
+         d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, TZ));
+}
+const minutosDesde = (ts) => ts ? (Date.now() - new Date(ts).getTime()) / 60000 : Infinity;
+// agenda do robô = {a_cada_min, das, ate}, gravada pelo próprio robô no banco (compra_robo_estado.agenda)
+const hh = (t) => { const [h, m] = String(t || '').split(':'); return Number(h) + 'h' + (m && m !== '00' ? m : ''); };
+const paraMin = (t) => { const [h, m] = String(t || '').split(':'); return Number(h) * 60 + Number(m || 0); };
+function agoraMin() {
+  const t = new Date().toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit', hour12: false }, TZ));
+  return paraMin(t);
+}
+function agendaOk(a) { return !!(a && Number(a.a_cada_min) > 0 && /^\d{2}:\d{2}$/.test(String(a.das)) && /^\d{2}:\d{2}$/.test(String(a.ate))); }
+function noHorario(a) { if (!agendaOk(a)) return true; const n = agoraMin(); return n >= paraMin(a.das) && n < paraMin(a.ate); }
+const agendaDoRobo = () => (DADOS && DADOS.robo && agendaOk(DADOS.robo.agenda)) ? DADOS.robo.agenda : null;
+const linkSeguro = (u) => /^https:\/\/(www\.|produto\.)?mercadolivre\.com\.br\//.test(String(u || '')) ? String(u) : null;
+const linkPedido = (u) => /^https?:\/\/([a-z0-9-]+\.)*(mercadolivre\.com\.br|mercadolibre\.com|meli\.la)\//i.test(String(u || '')) ? String(u) : null;
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+
+let FILTRO = 'abertas';
+let DADOS = null;
+let ULTIMA = 0;
+let TIMER = null;
+
+async function lojasPermitidas() {
+  try { await lojaCarregar(); } catch (e) {}
+  const sel = document.getElementById('fLoja');
+  const info = (typeof LOJA_INFO !== 'undefined' && LOJA_INFO) ? LOJA_INFO.lojas || [] : [];
+  const ok = ['AGUA VERDE', 'SÃO BRAZ', 'AHU'].filter((l) => !info.length || info.includes(l) || info.includes('REDE'));
+  [...sel.options].forEach((o) => { o.hidden = ok.length > 0 && !ok.includes(o.value); });
+  if (ok.length && !ok.includes(sel.value)) sel.value = ok[0];
+}
+
+async function carregar(silencioso) {
+  const minha = ++ULTIMA;
+  if (!silencioso) document.getElementById('erroMsg').style.display = 'none';
+  let r;
+  try { r = await trRpcSeguro('compra_cotacao_listar', { p_dias: 60 }); } catch (e) { r = null; }
+  if (minha !== ULTIMA) return;
+  if (!r) { mostrarErro('Sem conexão com o servidor.'); return; }
+  if (r.status === 401) { exigirLogin('Entre de novo para ver as compras.'); return; }
+  if (!r.ok) { mostrarErro(r.status === 404 ? 'Esta tela ainda não está ligada no servidor.' : 'Não foi possível carregar agora. ' + await trErroDe(r)); return; }
+  let d; try { d = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (minha !== ULTIMA) return;
+  DADOS = d || {};
+  const sig = (Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []).map((p) => p.id + ':' + p.status).join(',');
+  SEM_MUDAR = sig === ASSINATURA ? SEM_MUDAR + 1 : 0;
+  ASSINATURA = sig;
+  desenhar();
+  agendar();
+}
+function mostrarErro(t) { const el = document.getElementById('erroMsg'); el.style.display = 'block'; el.textContent = t; }
+
+// Atualiza sozinha de 60 em 60 s só enquanto há pedido na fila, e só lê o banco com a tela à vista (aba do navegador e
+// moldura da casca), dentro do horário do robô e até 30 leituras seguidas sem mudança. Fora disso o timer só confere,
+// sem rede, se a tela voltou a aparecer. clearTimeout antes de rearmar: nunca fica timer sobrando.
+let SEM_MUDAR = 0;
+let ASSINATURA = '';
+function telaVisivel() {
+  if (document.hidden) return false;
+  try { if (window.frameElement && window.frameElement.offsetParent === null) return false; } catch (e) {}
+  return true;
+}
+function agendar() {
+  clearTimeout(TIMER);
+  const pend = (DADOS && DADOS.pedidos || []).some((p) => p.status === 'novo' || p.status === 'buscando');
+  if (!pend) return;
+  TIMER = setTimeout(() => {
+    if (telaVisivel() && noHorario(agendaDoRobo()) && SEM_MUDAR < 30) carregar(true); else agendar();
+  }, 60000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { SEM_MUDAR = 0; carregar(true); } });
+
+function desenharRobo(robo) {
+  const el = document.getElementById('robo');
+  const ag = robo && agendaOk(robo.agenda) ? robo.agenda : null;
+  const txtAg = ag ? ' Ele avisa que passa a cada ' + Number(ag.a_cada_min) + ' minutos, das ' + esc(hh(ag.das)) + ' às ' + esc(hh(ag.ate)) + '.' : '';
+  const v = robo && robo.ultima_volta;
+  if (!v) { el.innerHTML = 'Robô de Compras: <b>ainda não rodou</b>.' + txtAg; return; }
+  const m = minutosDesde(v);
+  // "parado" só com a agenda que o robô gravou: dentro do horário dele e sem passar há mais de 4 voltas (mínimo 20 min)
+  const limite = ag ? Math.max(20, 4 * Number(ag.a_cada_min)) : null;
+  const atraso = ag && noHorario(ag) && (agoraMin() - paraMin(ag.das)) > limite && m > limite;
+  el.innerHTML = 'Robô de Compras (Escritório 2): última passada em <b>' + esc(quando(v)) + '</b>' +
+    (atraso ? ' <span class="ml-velho">· parado há ' + Math.round(m) + ' min</span>' : '') + '.' + txtAg +
+    (robo.ultima_busca ? ' Última busca: ' + esc(quando(robo.ultima_busca)) + (robo.ultimo_status === 'falha' ? ' <span class="ml-velho">(falhou)</span>' : '') + '.' : '');
+}
+
+function filtrar(lista) {
+  if (FILTRO === 'todas') return lista;
+  if (FILTRO === 'abertas') return lista.filter((p) => ['novo', 'buscando', 'pronto', 'erro'].includes(p.status));
+  return lista.filter((p) => p.status === FILTRO);
+}
+
+function oferta(o, p, melhorId, melhorGratisId) {
+  const link = linkSeguro(o.link);
+  const tags = [];
+  if (o.id === melhorId) tags.push('<span class="ml-tag mesmo">mais barato</span>');
+  if (o.id === melhorGratisId && melhorGratisId !== melhorId) tags.push('<span class="ml-tag mesmo">mais barato com frete grátis</span>');
+  if (o.mesmo_produto) tags.push('<span class="ml-tag mesmo">mesmo produto do link</span>');
+  if (o.loja_oficial) tags.push('<span class="ml-tag of">loja oficial</span>');
+  if (o.patrocinado) tags.push('<span class="ml-tag ad">patrocinado</span>');
+  const det = [];
+  if (o.vendedor) det.push('Vendedor: ' + esc(o.vendedor));
+  if (o.avaliacao != null) det.push('★ ' + esc(String(o.avaliacao).replace('.', ',')));
+  if (o.vendidos) det.push(esc(o.vendidos));
+  if (o.obs) det.push(esc(o.obs));
+  if (o.parecido != null && o.parecido < 100) det.push('nome ' + o.parecido + '% parecido');
+  const frete = o.frete_gratis === true ? '<span class="ml-gratis">Frete grátis</span>' : (o.frete_gratis === false ? '<span class="ml-pago">frete: ver no carrinho</span>' : '');
+  const escolhida = p.oferta_escolhida === o.id;
+  const podeEscolher = p.status === 'pronto';
+  return '<div class="ml-of' + (o.id === melhorId ? ' melhor' : '') + (escolhida ? ' escolhida' : '') + '">' +
+    (o.imagem && /^https:\/\/([a-z0-9-]+\.)*mlstatic\.com\//.test(o.imagem) ? '<img loading="lazy" alt="" src="' + esc(o.imagem) + '">' : '<div class="semimg"></div>') +
+    '<div><div class="ml-of-tit">' + (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">' + esc(o.titulo) + '</a>' : esc(o.titulo)) + ' ' + tags.join(' ') + '</div>' +
+      '<div class="ml-of-det">' + det.join('<span>·</span>') + '</div>' +
+      (podeEscolher ? '<div class="ml-acoes"><button type="button" class="ml-btn peq" data-acao="comprado" data-id="' + p.id + '" data-oferta="' + o.id + '">Comprei esta</button></div>' : '') +
+      (escolhida ? '<div class="ml-of-det"><b>Esta foi a comprada.</b></div>' : '') +
+    '</div>' +
+    '<div class="ml-of-preco">' + (o.preco_antigo ? '<s>' + brl(o.preco_antigo) + '</s>' : '') + '<span class="p">' + brl(o.preco) + '</span>' +
+      '<div class="f">' + frete + (o.entrega ? '<br>' + esc(o.entrega) : '') + '</div></div>' +
+  '</div>';
+}
+
+function pedido(p) {
+  const ofs = Array.isArray(p.ofertas) ? p.ofertas.slice() : [];
+  ofs.sort((a, b) => Number(a.preco) - Number(b.preco) || a.posicao - b.posicao);
+  const melhor = ofs[0];
+  const gratis = ofs.find((o) => o.frete_gratis === true);
+  const quem = p.origem === 'whatsapp' ? (esc(p.pedido_por || 'alguém') + ' pelo WhatsApp') : esc(String(p.pedido_por || '').split('@')[0] || 'portal');
+  const lp = linkPedido(p.link);
+  let corpo = '';
+  if (p.status === 'novo' || p.status === 'buscando') {
+    const ag = agendaDoRobo();
+    corpo = '<div class="ml-ped-ref">' + (p.status === 'buscando' ? 'O robô está buscando agora…'
+      : 'Na fila. O robô busca na próxima passada' + (ag && !noHorario(ag) ? ' (ele volta às ' + esc(hh(ag.das)) + ')' : '') + '.') + '</div>';
+  } else if (p.status === 'erro') {
+    corpo = '<div class="ml-msg erro">' + esc(p.erro || 'O robô não conseguiu buscar.') + '</div>';
+  }
+  if (ofs.length && p.status !== 'novo' && p.status !== 'buscando') {
+    corpo += '<div class="ml-ofs">' + ofs.map((o) => oferta(o, p, melhor && melhor.id, gratis && gratis.id)).join('') + '</div>';
+  }
+  const acoes = [];
+  if (p.status === 'pronto' || p.status === 'erro' || p.status === 'descartado') acoes.push('<button type="button" class="ml-btn peq" data-acao="buscar" data-id="' + p.id + '">Buscar de novo</button>');
+  if (p.status === 'pronto' || p.status === 'erro' || p.status === 'novo') acoes.push('<button type="button" class="ml-btn peq" data-acao="descartado" data-id="' + p.id + '">Descartar</button>');
+  if (p.status === 'pronto') acoes.push('<button type="button" class="ml-btn peq" data-acao="comprado" data-id="' + p.id + '">Comprei (fora da lista)</button>');
+  if (p.status === 'comprado') acoes.push('<button type="button" class="ml-btn peq" data-acao="buscar" data-id="' + p.id + '">Buscar de novo</button>');
+  return '<div class="ml-ped">' +
+    '<div class="ml-ped-cab"><b>#' + p.id + '</b><span>' + esc(NOME_LOJA[p.loja] || p.loja) + '</span><span>' + quem + '</span><span>' + esc(quando(p.criado_em)) + '</span>' +
+      '<span class="ml-selo ' + esc(p.status) + '">' + esc(STATUS[p.status] || p.status) + '</span></div>' +
+    '<div class="ml-ped-txt">' + esc(p.texto) + '</div>' +
+    (lp ? '<div class="ml-ped-ref"><a href="' + esc(lp) + '" target="_blank" rel="noopener noreferrer">abrir o link do pedido</a>' + (p.ref_preco ? ' · no link: <b>' + brl(p.ref_preco) + '</b>' : '') + '</div>' : '') +
+    (p.busca && p.status !== 'novo' ? '<div class="ml-ped-ref">Buscou por: <i>' + esc(p.busca) + '</i>' + (p.buscado_em ? ' · em ' + esc(quando(p.buscado_em)) : '') + '</div>' : '') +
+    (p.status === 'comprado' ? '<div class="ml-ped-ref">Marcado como comprado por ' + esc(String(p.decidido_por || '').split('@')[0]) + ' em ' + esc(quando(p.decidido_em)) + '.</div>' : '') +
+    corpo +
+    (acoes.length ? '<div class="ml-acoes">' + acoes.join('') + '</div>' : '') +
+  '</div>';
+}
+
+function desenhar() {
+  desenharRobo(DADOS.robo);
+  const lista = filtrar(Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []);
+  document.querySelectorAll('#filtros .ml-btn').forEach((b) => b.classList.toggle('on', b.dataset.f === FILTRO));
+  document.getElementById('conteudo').innerHTML = lista.length
+    ? '<div class="ml-lista">' + lista.map(pedido).join('') + '</div>'
+    : '<div class="ml-vazio">' + (FILTRO === 'abertas' ? 'Nenhum pedido em aberto. Escreva o produto acima para buscar preços.' : 'Nada aqui nos últimos 60 dias.') + '</div>';
+}
+
+async function pedir() {
+  const txt = document.getElementById('fTexto').value.trim();
+  const msg = document.getElementById('msgPedir');
+  const btn = document.getElementById('btnPedir');
+  msg.className = 'ml-msg'; msg.textContent = '';
+  if (txt.length < 3) { msg.className = 'ml-msg erro'; msg.textContent = 'Escreva o produto ou cole o link.'; return; }
+  btn.disabled = true;
+  try {
+    const r = await trRpcSeguro('compra_cotacao_pedir', { p_texto: txt, p_loja: document.getElementById('fLoja').value });
+    if (r.status === 401) { exigirLogin('Entre de novo para pedir a cotação.'); return; }
+    if (!r.ok) { msg.className = 'ml-msg erro'; msg.textContent = 'Não foi: ' + await trErroDe(r); return; }
+    const d = await r.json();
+    document.getElementById('fTexto').value = '';
+    msg.className = 'ml-msg ok';
+    msg.textContent = 'Pedido #' + (d && d.id) + ' na fila. O robô busca na próxima passada; esta tela atualiza sozinha.';
+    FILTRO = 'abertas';
+    carregar();
+  } finally { btn.disabled = false; }
+}
+
+async function decidir(id, acao, oferta) {
+  if (acao === 'descartado' && !confirm('Descartar este pedido?')) return;
+  const r = await trRpcSeguro('compra_cotacao_decidir', { p_id: Number(id), p_acao: acao, p_oferta: oferta ? Number(oferta) : null });
+  if (r.status === 401) { exigirLogin('Entre de novo.'); return; }
+  if (!r.ok) { mostrarErro('Não foi: ' + await trErroDe(r)); return; }
+  carregar();
+}
+
+document.getElementById('btnPedir').addEventListener('click', pedir);
+document.getElementById('fTexto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) pedir(); });
+document.getElementById('filtros').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-f]'); if (!b) return;
+  FILTRO = b.dataset.f; if (DADOS) desenhar();
 });
+document.getElementById('conteudo').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-acao]'); if (!b) return;
+  b.disabled = true;
+  decidir(b.dataset.id, b.dataset.acao, b.dataset.oferta).finally(() => { b.disabled = false; });
+});
+
+if (!rmbSessao()) exigirLogin('Entre para ver as compras.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { await lojasPermitidas(); carregar(); })();
+}
+window.reentrarTela = () => { SEM_MUDAR = 0; carregar(); };
 </script>
 </body>
 </html>
