@@ -399,7 +399,7 @@
       $("rotuloPagamento").textContent = cfg.pagamento.formas.map((f) => NOME_FORMA[f] || f).join(", ");
       $("valorTeste").textContent = "Você escolhe na próxima tela.";
       $("btnEnviar").textContent = "Ir para o pagamento";
-      $("btnEnviar").hidden = !!pedido && pedido.estado === "pagando";
+      $("btnEnviar").hidden = !!pedido && (pedido.estado === "pagando" || !!pedido.pago || TRAVADOS.includes(pedido.estado));
     } else {
       $("valorTeste").textContent = `Valor de teste: ${dinheiro(total)} (igual ao total). Nada é cobrado.`;
     }
