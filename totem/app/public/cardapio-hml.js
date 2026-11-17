@@ -476,7 +476,15 @@
     if (p && p.catch) p.catch(() => { /* sem video: o poster de fundo continua */ });
   }
 
+  function telaCheia() {
+    // Totem: esconde a barra do navegador (precisa de um toque do cliente; o 1o toque em VER CARDAPIO serve)
+    const d = document.documentElement;
+    if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+  }
+  document.addEventListener("pointerdown", telaCheia, { passive: true });
+
   function entrar() {
+    telaCheia();
     document.body.classList.remove("estado-abertura");
     $("aberturaVideo").pause();
     window.scrollTo(0, 0);
