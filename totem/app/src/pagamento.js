@@ -3,6 +3,7 @@
 // Regras:
 //  - so "aprovado" libera o pedido para a cozinha;
 //  - a mesma chave (idempotencyKey) nunca gera duas cobrancas;
+//  - "aguardando" (Pix com QR na tela) nao libera; reconsulta ate o banco confirmar;
 //  - resposta incerta (queda de rede) fica "incerto" e NAO libera nem cobra de novo:
 //    precisa consultar o TEF antes de qualquer nova tentativa.
 
@@ -37,7 +38,7 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
       if (existente.centavos !== pedido.centavos || existente.forma !== pedido.forma) {
         throw new Error("mesma chave com valor ou forma diferente");
       }
-      if (existente.estado === ESTADOS.INCERTO) return reconsultar(pedido.idempotencyKey);
+      if (existente.estado === ESTADOS.INCERTO || existente.estado === ESTADOS.AGUARDANDO) return reconsultar(pedido.idempotencyKey);
       return { ...existente }; // nunca cobra de novo
     }
     const reg = { idempotencyKey: pedido.idempotencyKey, centavos: pedido.centavos, forma: pedido.forma, estado: ESTADOS.AGUARDANDO, criadoEm: agora() };
@@ -71,6 +72,9 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
       if (r.centavos !== reg.centavos) { reg.estado = ESTADOS.INCERTO; reg.motivo = "valor aprovado diferente"; return; }
       reg.estado = ESTADOS.APROVADO;
       reg.autorizacao = typeof r.autorizacao === "string" ? r.autorizacao : null;
+    } else if (estado === ESTADOS.AGUARDANDO) {
+      reg.estado = ESTADOS.AGUARDANDO; // ex.: Pix com QR na tela, esperando o cliente pagar
+      if (typeof r.qr === "string") reg.qr = r.qr;
     } else if (estado === ESTADOS.RECUSADO || estado === ESTADOS.CANCELADO) {
       reg.estado = estado;
       reg.motivo = typeof r.motivo === "string" ? r.motivo : null;
