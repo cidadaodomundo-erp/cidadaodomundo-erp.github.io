@@ -2397,7 +2397,7 @@ function renderModuloEvolucao() {
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Evolução de vendas${ITEM ? ' · ' + ITEM : ''} — ${ddmm(janIni)} a ${ddmm(maxData)}</div>
     <div class="caption-label" style="text-align:center;">
-      A venda registrada no caixa das lojas (Saipos), por canal e por faixa de horário.
+      A venda cheia (caixa das lojas + promoção paga pela loja no iFood), por canal e por faixa de horário.
       ${unsComDado.length ? `<b>${unsComDado.map(u => UN_ROT[u] || u).join(', ')}</b>.` : ''}
       ${temBase ? `Comparando com ${ddmm(antIni)} a ${ddmm(antFim)}, do mesmo tamanho.` : 'Não há período anterior do mesmo tamanho na base para comparar.'}
       ${(() => { const lista = (o, suf) => Object.entries(o).filter(([, v]) => v > 0.005).sort().map(([k, v]) => { const [u, d] = k.split('|'); return (UN_ROT[u] || u) + ' ' + evolRotulo(d, 'dia') + ' R$ ' + fmt(v) + suf; });
