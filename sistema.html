@@ -283,7 +283,8 @@ SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i);
 // Placar — os endereços antigos ainda abrem o lugar novo (gestao/index.html), mas não são mais item de menu
 // 16/11/2026 (Fábio): 'prh' (Gestão do RH) sai da Operação das lojas porque o módulo Pessoas já cobre; 'encomendas' sai (sem uso).
 // O endereço #prh / #encomendas continua abrindo.
-const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas']);
+// 16/11/2026 (Fábio): 'peventos' sai do menu: virou o modo "Todos da loja" da Consulta de ponto.
+const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas', 'peventos']);
 ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
 // MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51: "gostei do menu, pode aplicar"): nomes e telas extras do menu novo vêm de
 // casca/modulos.js (CASCA_MODULOS_CFG). O ?menu=proposta da simulação continua abrindo, com este mesmo menu (alias).

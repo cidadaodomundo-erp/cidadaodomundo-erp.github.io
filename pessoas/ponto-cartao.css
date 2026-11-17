@@ -50,6 +50,8 @@
 /* Histórico da pessoa (pessoas/ponto-historico.js): tudo em uma linha, sem quebrar */
 .phist { background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px; padding: 12px; margin: 0 0 16px; color: var(--tx-1); }
 .phist-topo { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; }
+.phist-modos { display: flex; gap: 6px; margin-left: auto; }
+.phist-sub { margin: -4px 0 12px; color: var(--tx-3); font-size: 13px; }
 .phist-tit { font-size: 18px; font-weight: 800; margin: 0; white-space: nowrap; }
 .phist-sel { background: var(--surface-2); color: var(--tx-1); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px; font: inherit; font-size: 14px; flex: 1 1 320px; max-width: 560px; min-width: 0; }
 .phist-nota { font-size: 12px; color: var(--tx-3); margin: 8px 0 0; line-height: 1.4; }
@@ -65,6 +67,7 @@
 .phist-bt.phist-ruim .phist-n { background: var(--farol-fora); color: #fff; }
 .phist-bt.phist-grave { border-color: var(--farol-fora); }
 .phist-bt.phist-grave .phist-n { background: #b00020; color: #fff; }
+.phist-bt.phist-bom .phist-n { background: var(--farol-ok); color: #fff; }
 .phist-n { background: var(--line-2); color: var(--tx-1); border-radius: 999px; padding: 0 7px; font-size: 12px; }
 .phist-rol { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
 .phist-tab { width: 100%; border-collapse: collapse; font-size: 13px; }

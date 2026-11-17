@@ -24,3 +24,24 @@ test('sem cartão de refeição cadastrado não acusa refeição', () => {
   const r = resumir(base([{ dia: '2026-05-01', horarios: [t('2026-05-01', '11:00'), t('2026-05-01', '15:00'), t('2026-05-01', '16:00'), t('2026-05-01', '20:00')] }], { refeicao: { identificado: false, ate: '2026-11-15', dias: {} } }));
   assert.equal(r.contagem.refeicao, 0); assert.equal(r.total, 0);
 });
+
+test('quadro completo: bônus por fora, falta descontada, vale, aumento e saída entram com contagem', () => {
+  const r = resumir({
+    pessoa: { admissao: '2026-03-01', desligamento: '2026-10-20' },
+    carreira: [{ dia: '2026-07-01', salario: 2000, cargo: 'CHAPEIRO' }, { dia: '2026-09-01', salario: 2200, salario_ant: 2000, cargo: 'CHAPEIRO', cargo_ant: 'CHAPEIRO' }],
+    outros: [
+      { dia: '2026-08-01', tipo: 'BONUS_FORA', valor: 700 },
+      { dia: '2026-08-01', tipo: 'FALTA_FOLHA', horas: 7.33, valor: 80 },
+      { dia: '2026-09-10', tipo: 'VALE', valor: 300, parcelas: 3 },
+      { dia: '2026-09-01', tipo: 'XYZ' },
+    ],
+  });
+  assert.equal(r.contagem.BONUS_FORA, 1);
+  assert.equal(r.contagem.FALTA_FOLHA, 1);
+  assert.equal(r.contagem.VALE, 1);
+  assert.equal(r.contagem.AUMENTO, 1);
+  assert.equal(r.contagem.DESLIGAMENTO, 1);
+  assert.equal(r.total, 1, 'só a falta conta como infração');
+  assert.ok(r.linhas.some((l) => l.textos[0] === 'R$ 300,00 em 3 parcelas'));
+  assert.equal(r.linhas[0].tipos[0], 'DESLIGAMENTO');
+});

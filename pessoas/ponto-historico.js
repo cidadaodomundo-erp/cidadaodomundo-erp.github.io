@@ -15,9 +15,14 @@
     cedo: 'Saiu cedo', extra: 'Hora extra', intervalo: 'Intervalo curto', semintervalo: 'Sem intervalo',
     impar: 'Batida faltando', refeicao: 'Sem refeição', ADVERTENCIA: 'Advertência', SUSPENSAO: 'Suspensão',
     ATESTADO: 'Atestado', DECLARACAO: 'Declaração', FERIAS: 'Férias', EVENTO: 'Ausência (Flash)',
+    BONIF_PERDEU: 'Perdeu bonificação', BONIF_GANHOU: 'Ganhou bonificação', AUMENTO: 'Aumento', CARGO: 'Mudou de cargo', ADMISSAO: 'Entrou na empresa',
+    BONUS_FORA: 'Bônus por fora', HORA_EXTRA_FOLHA: 'Hora extra paga', FALTA_FOLHA: 'Falta descontada', VALE: 'Vale / empréstimo',
+    DESC_EMPRESTIMO: 'Desconto de empréstimo', AFASTAMENTO: 'Afastamento', DESLIGAMENTO: 'Saiu da empresa',
   });
+  const BOM = new Set(['BONIF_GANHOU', 'AUMENTO', 'CARGO', 'ADMISSAO', 'BONUS_FORA']);
   const GRAVE = new Set(['ADVERTENCIA', 'SUSPENSAO']);
-  const NEUTRO = new Set(['ATESTADO', 'DECLARACAO', 'FERIAS', 'EVENTO']);
+  const NEUTRO = new Set(['ATESTADO', 'DECLARACAO', 'FERIAS', 'EVENTO', 'BONIF_GANHOU', 'AUMENTO', 'CARGO', 'ADMISSAO', 'BONUS_FORA', 'HORA_EXTRA_FOLHA', 'VALE', 'DESC_EMPRESTIMO', 'AFASTAMENTO', 'DESLIGAMENTO']);
+  const reais = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmt = (d) => (typeof d === 'string' && d.length >= 10 ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(2, 4) : '—');
 
   // d = resposta de ponto_historico_pessoa. Devolve {linhas, contagem, total}. Cada linha = um dia de ponto ou um registro do RH.
@@ -57,6 +62,33 @@
       const ate = typeof a.fim === 'string' && a.fim !== a.inicio ? ' até ' + fmt(a.fim) : '';
       linhas.push({ tipo: 'rh', dia: a.inicio, loja: '', batidas: [], intervalo: '', refeicao: '', tipos: [a.tipo], textos: [TIPOS[a.tipo] + ate] });
     }
+    const rh = (dia, k, txt) => { contagem[k]++; linhas.push({ tipo: 'rh', dia, loja: '', batidas: [], intervalo: '', refeicao: '', tipos: [k], textos: [txt] }); };
+    for (const b of Array.isArray(d.bonificacao) ? d.bonificacao : []) {
+      if (!b || typeof b.mes !== 'string') continue;
+      const mes = b.mes.slice(5, 7) + '/' + b.mes.slice(0, 4);
+      if (Number(b.perdido) > 0 && !(Number(b.cheio) > 0)) continue; // mês sem direito (férias/afastado): não é perda
+      if (Number(b.perdido) > 0) rh(b.mes, 'BONIF_PERDEU', mes + ': perdeu ' + reais(b.perdido) + (Number(b.cheio) > 0 ? ' de ' + reais(b.cheio) : '') + (b.motivo ? ' (' + String(b.motivo).toLowerCase() + ')' : ''));
+      else if (Number(b.valor) > 0) rh(b.mes, 'BONIF_GANHOU', mes + ': ganhou ' + reais(b.valor));
+    }
+    const car = Array.isArray(d.carreira) ? d.carreira : [];
+    for (const c of car) {
+      if (!c || typeof c.dia !== 'string') continue;
+      if (c.salario_ant == null && c.cargo_ant == null) { rh(c.dia, 'CARGO', 'Primeira folha: ' + (c.cargo || 'cargo não informado') + ', ' + reais(c.salario)); continue; }
+      if (Number(c.salario) > Number(c.salario_ant)) rh(c.dia, 'AUMENTO', reais(c.salario_ant) + ' → ' + reais(c.salario) + ' (+' + Math.round((c.salario / c.salario_ant - 1) * 1000) / 10 + '%)');
+      if ((c.cargo || '') !== (c.cargo_ant || '')) rh(c.dia, 'CARGO', (c.cargo_ant || '?') + ' → ' + (c.cargo || '?'));
+    }
+    const mesDe = (x) => x.slice(5, 7) + '/' + x.slice(0, 4);
+    for (const o of Array.isArray(d.outros) ? d.outros : []) {
+      if (!o || typeof o.dia !== 'string' || !TIPOS[o.tipo]) continue;
+      if (o.tipo === 'BONUS_FORA') rh(o.dia, o.tipo, mesDe(o.dia) + ': ' + reais(o.valor));
+      else if (o.tipo === 'HORA_EXTRA_FOLHA') rh(o.dia, o.tipo, mesDe(o.dia) + ': ' + reais(o.valor) + ' na folha');
+      else if (o.tipo === 'FALTA_FOLHA') rh(o.dia, o.tipo, mesDe(o.dia) + ': ' + String(o.horas).replace('.', ',') + ' h, ' + reais(o.valor));
+      else if (o.tipo === 'DESC_EMPRESTIMO') rh(o.dia, o.tipo, mesDe(o.dia) + ': ' + reais(o.valor));
+      else if (o.tipo === 'VALE') rh(o.dia, o.tipo, reais(o.valor) + (Number(o.parcelas) > 1 ? ' em ' + o.parcelas + ' parcelas' : ''));
+      else rh(o.dia, o.tipo, typeof o.fim === 'string' ? 'até ' + fmt(o.fim) : TIPOS[o.tipo]);
+    }
+    if (d.pessoa && typeof d.pessoa.admissao === 'string') rh(d.pessoa.admissao, 'ADMISSAO', 'Admissão');
+    if (d.pessoa && typeof d.pessoa.desligamento === 'string') rh(d.pessoa.desligamento, 'DESLIGAMENTO', 'Desligamento');
     linhas.sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : (a.tipo === 'rh' ? -1 : 1)));
     return { linhas, contagem, total: linhas.filter((l) => l.tipos.some((t) => !NEUTRO.has(t))).length };
   }
@@ -65,7 +97,7 @@
 
   // ---------- tela (só no navegador) ----------
   const original = window.entrarPesPonto;
-  let pessoas = null, gen = 0, sel = '', filtro = 'inf';
+  let pessoas = null, gen = 0, sel = '', filtro = 'inf', modo = 'pessoa';
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   async function rpc(fn, args) {
     const r = await trRpc(fn, args || {});
@@ -83,15 +115,34 @@
     box.replaceChildren();
     const sec = el('section', 'phist');
     const topo = el('div', 'phist-topo');
-    topo.appendChild(el('h2', 'phist-tit', 'Histórico da pessoa'));
+    topo.appendChild(el('h2', 'phist-tit', 'Quadro completo do funcionário'));
     const s = el('select', 'phist-sel'); s.setAttribute('aria-label', 'Pessoa');
     s.appendChild(new Option('Carregando pessoas…', ''));
     topo.appendChild(s);
+    // 16/11 (Fábio): Eventos e ausências virou o modo "Todos da loja" desta tela
+    const modos = el('div', 'phist-modos');
+    const bPes = el('button', 'phist-bt', 'Uma pessoa (história inteira)'), bLoja = el('button', 'phist-bt', 'Todos da loja (por período)');
+    bPes.type = 'button'; bLoja.type = 'button';
+    modos.appendChild(bPes); modos.appendChild(bLoja); topo.appendChild(modos);
     sec.appendChild(topo);
+    sec.appendChild(el('p', 'phist-sub', 'Tudo o que aconteceu com a pessoa desde que entrou. Só Fábio, Neto e Hellen enxergam este quadro.'));
     const corpo = el('div'); sec.appendChild(corpo);
+    const loja = el('div'); sec.appendChild(loja);
     box.appendChild(sec);
+    const trocar = (m) => {
+      modo = m;
+      bPes.classList.toggle('phist-on', m === 'pessoa'); bLoja.classList.toggle('phist-on', m === 'loja');
+      s.hidden = m !== 'pessoa'; corpo.hidden = m !== 'pessoa'; loja.hidden = m !== 'loja';
+      if (m === 'loja') {
+        const v = document.getElementById('view-peventos');
+        if (v && v.parentNode !== loja) loja.appendChild(v);
+        try { if (window.entrarPesEventos) window.entrarPesEventos(); } catch (e) { loja.replaceChildren(el('p', 'phist-nota', 'Não deu para abrir a lista da loja agora.')); }
+      }
+    };
+    bPes.addEventListener('click', () => trocar('pessoa')); bLoja.addEventListener('click', () => trocar('loja'));
+    trocar(modo);
     try { if (!pessoas) pessoas = await rpc('ponto_historico_pessoas'); }
-    catch (e) { if (g === gen) s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); return; }
+    catch (e) { if (g === gen) { if (/HTTP 4\d\d/.test(e.message)) box.replaceChildren(); else s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); } return; } // 17/11 (Fábio): só Fábio, Neto e Hellen; quem não pode nem vê o quadro
     if (g !== gen) return;
     s.replaceChildren(new Option('Escolha a pessoa: aparecem todas as infrações desde a admissão', ''));
     for (const [nome, lista] of [['Trabalhando', pessoas.filter((p) => !p.desligamento)], ['Já saíram', pessoas.filter((p) => p.desligamento)]]) {
@@ -128,6 +179,11 @@
     card('Dias com infração', String(r.total), r.total ? 'phist-c-ruim' : 'phist-c-ok');
     card('Advertências', String(r.contagem.ADVERTENCIA), r.contagem.ADVERTENCIA ? 'phist-c-ruim' : '');
     card('Suspensões', String(r.contagem.SUSPENSAO), r.contagem.SUSPENSAO ? 'phist-c-ruim' : '');
+    card('Bonificação perdida', r.contagem.BONIF_PERDEU + ' de ' + (r.contagem.BONIF_PERDEU + r.contagem.BONIF_GANHOU) + ' meses', r.contagem.BONIF_PERDEU ? 'phist-c-ruim' : '');
+    card('Aumentos', String(r.contagem.AUMENTO), r.contagem.AUMENTO ? 'phist-c-ok' : '');
+    if (r.contagem.FALTA_FOLHA) card('Meses com falta', String(r.contagem.FALTA_FOLHA), 'phist-c-ruim');
+    if (r.contagem.BONUS_FORA) card('Bônus por fora', String(r.contagem.BONUS_FORA) + ' meses', 'phist-c-ok');
+    if (r.contagem.VALE) card('Vales', String(r.contagem.VALE));
     corpo.appendChild(cards);
     const bar = el('div', 'phist-bar'); corpo.appendChild(bar);
     const lista = el('div'); corpo.appendChild(lista);
@@ -140,7 +196,7 @@
       bar.replaceChildren();
       botao('inf', 'Só infrações', r.total);
       botao('todos', 'Todos os dias', null);
-      Object.keys(TIPOS).forEach((k) => { if (r.contagem[k]) botao(k, TIPOS[k], r.contagem[k], GRAVE.has(k) ? 'phist-grave' : NEUTRO.has(k) ? '' : 'phist-ruim'); });
+      Object.keys(TIPOS).forEach((k) => { if (r.contagem[k]) botao(k, TIPOS[k], r.contagem[k], GRAVE.has(k) ? 'phist-grave' : BOM.has(k) ? 'phist-bom' : NEUTRO.has(k) ? '' : 'phist-ruim'); });
       lista.replaceChildren();
       const ls = r.linhas.filter((l) => filtro === 'todos' ? true : filtro === 'inf' ? l.tipos.some((t) => !NEUTRO.has(t)) : l.tipos.includes(filtro));
       if (!ls.length) { lista.appendChild(el('p', 'phist-nota', r.linhas.length ? 'Nenhuma infração encontrada.' : 'Nenhuma batida desta pessoa no Flash.')); return; }
@@ -161,7 +217,7 @@
         td(tr, l.refeicao, l.refeicaoRuim ? 'phist-tx-ruim' : 'phist-tx-fraco');
         const c = el('td', 'phist-oque');
         if (!l.tipos.length) c.appendChild(el('span', 'phist-tag phist-tag-ok', 'tudo certo'));
-        l.tipos.forEach((k) => c.appendChild(el('span', 'phist-tag ' + (GRAVE.has(k) ? 'phist-tag-grave' : NEUTRO.has(k) ? 'phist-tag-neutro' : 'phist-tag-ruim'), TIPOS[k])));
+        l.tipos.forEach((k) => c.appendChild(el('span', 'phist-tag ' + (GRAVE.has(k) ? 'phist-tag-grave' : BOM.has(k) ? 'phist-tag-ok' : NEUTRO.has(k) ? 'phist-tag-neutro' : 'phist-tag-ruim'), TIPOS[k])));
         const txt = l.textos.filter((x) => !Object.values(TIPOS).includes(x) && x !== 'não pegou refeição')
           .map((x) => x.replace(/^hora extra: /, '').replace(/ \(\d\d:\d\d às \d\d:\d\d\)/, '')).join('; ');
         if (txt) c.appendChild(el('span', 'phist-det', txt));
@@ -173,7 +229,7 @@
     }
     desenhar();
     corpo.appendChild(el('p', 'phist-nota', 'Fontes: batidas do Flash de ' + fmt(f.de) + ' a ' + fmt(f.ate) + ' (o Flash não tem antes disso); refeição do Saipos até ' + fmt((d.refeicao || {}).ate) +
-      '; advertência, suspensão e atestado do cadastro do RH; férias e ausências do Flash. Dias antigos usam o horário cadastrado hoje. O dia de hoje aparece na consulta abaixo.'));
+      '; advertência, suspensão e atestado do cadastro do RH; férias e ausências do Flash; bonificação do cálculo do RH; aumentos, cargos, hora extra paga e faltas descontadas das folhas de pagamento; bônus por fora e desconto de empréstimo do pagamento do mês; vales do financeiro. Dias antigos usam o horário cadastrado hoje. O dia de hoje aparece na consulta abaixo.'));
   }
   window.entrarPesPonto = function () {
     const res = original ? original.apply(this, arguments) : undefined;
