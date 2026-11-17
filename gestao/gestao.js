@@ -2852,21 +2852,8 @@ function renderLucroUni() {
       })()}
     </div>
 
-    <div id="tabelaPonteLucro" style="max-width:640px; margin:14px auto 0;"><table>
-      <thead><tr><th>Do lucro até o caixa (rede)</th><th>Valor</th></tr></thead>
-      <tbody>
-        ${linhaPonte('Lucro do período', lucroRede)}
-        ${linhaPonte('(−) Investimentos', invest, 'obra, máquina, equipamento — vira ativo, não some')}
-        ${linhaPonte('(−) Retiradas dos sócios', retiradas)}
-        ${Math.abs(aporte) > 0.005 ? linhaPonte('(±) Repasse entre as unidades', aporte, 'soma perto de zero na rede — só muda de bolso') : ''}
-        <tr class="sub"><td><b>= deveria ter sobrado</b></td><td><b>${rs(chegou)}</b></td></tr>
-        <tr class="liq"><td>Sobrou de verdade no caixa${xpDentro ? ' + XP' : ''}</td><td>${rs(sobrouCaixa)}</td></tr>
-        ${Math.abs(ajJan) > 0.005 ? linhaPonte('(±) Ajuste da trava do corte (cofres)', ajJan, 'caixa do Saipos regravado antes do corte de 21/10') : ''}
-        <tr><td style="color:var(--tx-5);">Diferença de competência × caixa
-              <div style="color:var(--tx-6); font-size:10.5px;">nota lançada num mês, dinheiro que andou em outro</div></td>
-            <td style="color:var(--tx-5);">${rs(sobrouCaixa - chegou - ajJan)}</td></tr>
-      </tbody>
-    </table></div>
+    <div class="caption-label" style="text-align:center; margin-top:10px;">Do lucro até o que sobrou nos bancos, mês a mês:
+      <a href="javascript:void(0)" onclick="mostrarModulo('placar')" style="color:var(--info);">Placar · O mês em uma página ›</a></div>
 
     <div class="footer" title="Benefício = a comissão de 9,5% que o iFood deixou de cobrar nas lojas isentas (fora o Boqueirão, a Comida Brasileira AV e, desde 06/10/2026, a Marmita da Jane). De 05/10/2026 em diante: 9,5% da venda de cada pedido (itens + entrega − desconto que a loja banca); até 04/10/2026: 9,5% do depositado, não se refaz.">
       Lucro = resultado da DRE, por competência · benefício = a comissão de 9,5% que o iFood deixou de cobrar.
@@ -2875,7 +2862,7 @@ function renderLucroUni() {
   // title das colunas; o rodapé de 5 linhas virou uma, sem nomes de view
   // encaixarTabela recebe o ELEMENTO (nao o id) — mede o fundo atras da tabela
   // e marca .rolavel para a coluna fixa ganhar sombra so quando de fato rola.
-  ['tabelaLucroUni', 'tabelaPonteLucro'].forEach(id => {
+  ['tabelaLucroUni'].forEach(id => {
     const d = document.getElementById(id);
     if (d && typeof encaixarTabela === 'function') encaixarTabela(d);
   });
@@ -6187,27 +6174,6 @@ function renderModuloDRE() {
     (competência já lançada), mas as vendas ainda estão acontecendo — <b>o mês fecha melhor do que aparece aqui</b>.
     Por isso a coluna <b>Total</b> soma só os meses fechados, como o Placar.
     Compromissos já lançados para os próximos meses não entram nesta tabela: estão no <b>Fluxo projetado</b>.</div>` : ''}
-  <details class="detalhes-extra" style="margin-top:12px;">
-    <summary>📖 O que significa cada linha (guia rápido)</summary>
-    <div style="font-size:12.5px; color:var(--tx-2); line-height:1.8; margin-top:10px;">
-      <b>Receita bruta de vendas</b> — tudo que os clientes pagaram nos canais (iFood, salão, balcão, site), antes das taxas. No iFood é a venda cheia: o valor do PDV mais a promoção paga pela loja, que o PDV já registra descontada (com a entrega somada).<br>
-      <b>(+) Outras receitas da operação</b> — o que a loja vende fora do balcão: atacado, vendas para empresas, listas para as filiais e royalties do Boqueirão.<br>
-      <b>(−) Deduções da receita</b> — o que os canais e o fisco levam antes de o dinheiro ser nosso: promoções do iFood, anúncios, taxas do iFood, tarifas de cartão, comissões de vendedores e ICMS. Abra a linha para ver cada cobrança pelo nome. A primeira é a promoção paga pela loja no iFood: a venda entra cheia lá em cima e a promoção sai aqui.<br>
-      <b>(=) Receita líquida</b> — o que sobrou de verdade para pagar a operação.<br>
-      <b>(−) CMV</b> — mercadoria: insumos, embalagens (inclusive as de envio, desde 03/09/2026), descartáveis, gás e uso e consumo.<br>
-      <b>(=) Margem de contribuição</b> — receita líquida menos mercadoria; é o que cada venda deixa para pagar a casa. (Chamava-se lucro bruto até 03/09/2026.)<br>
-      <b>(−) Pessoal</b> — salários, encargos e benefícios da equipe, mais a diretoria (pró-labore).<br>
-      <b>(−) Administrativas e imóvel</b> — o que mantém a casa aberta: aluguel, energia, gás, manutenção, sistemas, honorários.<br>
-      <b>(−) Comerciais</b> — o que gastamos para entregar e vender: motoboys, marketing, fretes.<br>
-      <b>(=) Resultado operacional</b> — o que a operação gera sozinha, antes de banco e imposto sobre o lucro.<br>
-      <b>(+) Rendimento aplicações</b> — o que a XP e as contas correntes renderam; entrada não operacional.<br>
-      <b>(−) Juros e tarifas</b> — juros, tarifas de banco e a antecipação da Rede.<br>
-      <b>(−) Imposto de renda (IRPJ)</b> — imposto sobre o LUCRO (o imposto sobre a venda ficou lá em cima, nas deduções).<br>
-      <b>(=) Resultado líquido</b> — o que sobrou no fim do mês: lucro ou prejuízo.<br>
-      <b>(=) Resultado sem a isenção do iFood</b> — o mesmo mês se o iFood tivesse cobrado os 9,5%. De 05/10/2026 em diante a conta é 9,5% da venda (itens + entrega − desconto que a loja banca); até 04/10 foi sobre o valor depositado e fica como está.<br>
-      <b>Abaixo do resultado</b> — o que não é resultado da operação da loja, mas mexe no dinheiro dela: o lucro que as filiais repassam (total enviado menos a lista do mês, com o bônus do iFood dentro), investimentos, retiradas e aportes. A ordem e os nomes seguem o fechamento da MA Consultoria (03/09/2026); os cálculos são nossos.
-    </div>
-  </details>
   <div id="tabelaDRE">
     <table>
       <tr><th></th>${cols.map(m => {
@@ -6221,6 +6187,34 @@ function renderModuloDRE() {
   <div class="caption-label" title="Investimentos, retiradas e aportes ficam fora do resultado (são o destino do lucro). Meses futuros já lançados ficam no Fluxo projetado. A bolinha âmbar aparece a até 10% da meta e a vermelha além disso. Desde 12/09/2026 as taxas de canais saem cobrança a cobrança da conciliação.">
   Lançamentos e vendas do Saipos desde jan/2026.</div>`;
   encaixarColunaFixa('tabelaDRE');
+  dreGuiaNasLinhas();
+}
+// 17/11/2026 (auditoria resultado-41): o guia "O que significa cada linha" saiu do rodapé recolhido e virou o title de cada linha
+const DRE_GUIA = [
+  ['Receita bruta de vendas', 'tudo que os clientes pagaram nos canais (iFood, salão, balcão, site), antes das taxas. No iFood é a venda cheia: o valor do PDV mais a promoção paga pela loja, que o PDV já registra descontada (com a entrega somada).'],
+  ['(+) Outras receitas da operação', 'o que a loja vende fora do balcão: atacado, vendas para empresas, listas para as filiais e royalties do Boqueirão.'],
+  ['(−) Deduções da receita', 'o que os canais e o fisco levam antes de o dinheiro ser nosso: promoções do iFood, anúncios, taxas do iFood, tarifas de cartão, comissões de vendedores e ICMS. Abra a linha para ver cada cobrança pelo nome. A primeira é a promoção paga pela loja no iFood: a venda entra cheia lá em cima e a promoção sai aqui.'],
+  ['(=) Receita líquida', 'o que sobrou de verdade para pagar a operação.'],
+  ['(−) CMV', 'mercadoria: insumos, embalagens (inclusive as de envio, desde 03/09/2026), descartáveis, gás e uso e consumo.'],
+  ['(=) Margem de contribuição', 'receita líquida menos mercadoria; é o que cada venda deixa para pagar a casa. (Chamava-se lucro bruto até 03/09/2026.)'],
+  ['(−) Pessoal', 'salários, encargos e benefícios da equipe, mais a diretoria (pró-labore).'],
+  ['(−) Administrativas e imóvel', 'o que mantém a casa aberta: aluguel, energia, gás, manutenção, sistemas, honorários.'],
+  ['(−) Comerciais', 'o que gastamos para entregar e vender: motoboys, marketing, fretes.'],
+  ['(=) Resultado operacional', 'o que a operação gera sozinha, antes de banco e imposto sobre o lucro.'],
+  ['(+) Rendimento aplicações', 'o que a XP e as contas correntes renderam; entrada não operacional.'],
+  ['(−) Juros e tarifas', 'juros, tarifas de banco e a antecipação da Rede.'],
+  ['(−) Imposto de renda (IRPJ)', 'imposto sobre o LUCRO (o imposto sobre a venda ficou lá em cima, nas deduções).'],
+  ['(=) Resultado líquido', 'o que sobrou no fim do mês: lucro ou prejuízo.'],
+  ['(=) Resultado sem a isenção do iFood', 'o mesmo mês se o iFood tivesse cobrado os 9,5%. De 05/10/2026 em diante a conta é 9,5% da venda (itens + entrega − desconto que a loja banca); até 04/10 foi sobre o valor depositado e fica como está.'],
+  ['Abaixo do resultado', 'o que não é resultado da operação da loja, mas mexe no dinheiro dela: o lucro que as filiais repassam (total enviado menos a lista do mês, com o bônus do iFood dentro), investimentos, retiradas e aportes. A ordem e os nomes seguem o fechamento da MA Consultoria (03/09/2026); os cálculos são nossos.']];
+function dreGuiaNasLinhas() {
+  const norm = (t) => String(t || '').replace(/[▸▾›]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const G = DRE_GUIA.map(([k, v]) => [norm(k), v]);
+  document.querySelectorAll('#tabelaDRE tr').forEach((tr) => {
+    const td = tr.querySelector('td'); if (!td || td.title) return;
+    const t = norm(td.textContent), g = G.find(([k]) => t === k || t.startsWith(k));
+    if (g) td.title = g[1];
+  });
 }
 
 // ------------------------------------------------------------------
