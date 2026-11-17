@@ -2795,6 +2795,8 @@ async function plpManGravar(k) {
   }
   const r0 = M.cat.find((r) => r.nome_base === k) || {};
   const un = (it && it.un) || r0.un || null;
+  // 17/11/2026 (Ajuda #66: BOLINHO 350 sem unidade virou 350 kg): sem unidade na base não grava; a un vem de est_receita_un (Estoque)
+  if (!un && qtd > 0) { diz('receita sem unidade na base', 'var(--farol-fora)'); avisoAcao('atencao', `! ${k}: receita sem unidade (UN ou KG) na base — não gravei. Peça ao Estoque para fixar a unidade.`); return; }
   diz('salvando…', 'var(--tx-4)');
   avisoAcao('enviando', `Gravando ${k}…`);
   const r = await trRpcSeguro('est_plano_salvar', { p_unidade: PLP.unidade, p_data_para: M.data, p_itens: [{ nome_base: k, qtd, un }],
