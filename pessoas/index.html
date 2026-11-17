@@ -49,7 +49,6 @@
     <div id="modulo-presc" class="modulo" style="display:none;"><div id="view-presc"></div></div>
     <div id="modulo-penvio" class="modulo" style="display:none;"><div id="view-penvio"></div></div>
     <div id="modulo-pconf" class="modulo" style="display:none;"><div id="view-pconf"></div></div>
-    <div id="modulo-pcusto" class="modulo" style="display:none;"><div id="view-pcusto"></div></div>
     <div id="modulo-pacertos" class="modulo" style="display:none;"><div id="view-pacertos"></div></div>
     <div id="modulo-macertos" class="modulo" style="display:none;"><div id="view-macertos"></div></div>
     <div id="modulo-forafolha" class="modulo" style="display:none;"><div id="view-forafolha"></div></div>
@@ -78,7 +77,7 @@
 // O que é desta página: qual das cinco telas abrir, o atalho entre elas e a porta quando a sessão vence.
 // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o endereço antigo cai nela
 if (location.hash === '#forafolha') { try { sessionStorage.setItem('pesAbaPedida', 'fora'); } catch (e) {} history.replaceState(null, '', '#pcalc'); }
-const TELAS = { phoje: entrarPesHoje, pcartao: entrarPesPonto, pao: entrarPesPontoAoVivo, peventos: entrarPesEventos, padm: entrarPesAdm, cargos: entrarPesCargos, pcalc: entrarPesCalc, pferias: entrarPesFerias, presc: entrarPesResc, penvio: entrarPesEnvio, pconf: entrarPesConf, pcusto: entrarPesCusto, pacertos: entrarPesAcertos, macertos: entrarMotoboyAcertos, forafolha: entrarForaFolha, rh: entrarRh, flash: entrarFlashRh, reembolsos: entrarReembolsos, pseguro: entrarPesSeguro };
+const TELAS = { phoje: entrarPesHoje, pcartao: entrarPesPonto, pao: entrarPesPontoAoVivo, peventos: entrarPesEventos, padm: entrarPesAdm, cargos: entrarPesCargos, pcalc: entrarPesCalc, pferias: entrarPesFerias, presc: entrarPesResc, penvio: entrarPesEnvio, pconf: entrarPesConf, pacertos: entrarPesAcertos, macertos: entrarMotoboyAcertos, forafolha: entrarForaFolha, rh: entrarRh, flash: entrarFlashRh, reembolsos: entrarReembolsos, pseguro: entrarPesSeguro };
 const TELA = TELAS[location.hash.slice(1)] ? location.hash.slice(1) : 'cargos';
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');

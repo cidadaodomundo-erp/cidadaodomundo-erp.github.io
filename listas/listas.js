@@ -158,7 +158,7 @@ function renderModuloListasFin() {
     <details style="margin-top:26px;">
       <summary style="cursor:pointer; color:var(--tx-3);" class="section-label">Histórico fechado — abrir para consulta${
         atrasados ? ` <span style="color:var(--farol-fora);">(${atrasados} mês(es) sem fechar)</span>` : ''}</summary>
-      <div class="caption-label" style="text-align:center; margin-top:10px;">Pago lido do Saipos, o mesmo de Contas a pagar.</div>
+      <div class="caption-label" style="text-align:center; margin-top:10px;">O pagamento de cada mês está em <a href="../sistema.html#contaspagar" target="_top" onclick="if (NA_CASCA) { avisarCasca({ tipo: 'casca-modulo', nome: 'contaspagar' }); return false; }" style="color:var(--info);">Contas a pagar</a>.</div>
       <div id="tabelaTrMensal">${trHistTabelaHtml()}</div>
       ${trHistNotas(historico, mesTxt)}
       ${derivas.length ? `<div class="caption-label" style="color:var(--farol-fora);" title="A conta é o custo recalculado hoje menos o valor congelado no fechamento do mês. Diferença positiva quer dizer que a filial foi cobrada a menos do que o custo de hoje; negativa, a mais.">⚠ Custo de ${derivas.length} mês(es) fechado(s) mudou depois (R$ ${fmt(Math.abs(derivaTotal))} ${derivaTotal >= 0 ? 'a menos' : 'a mais'}): vale o congelado.</div>` : ''}
@@ -199,8 +199,6 @@ const TR_HIST_COLS = [
   ['frete', 'Frete', r => Number(r.frete) || 0],
   ['royalty', 'Royalty', r => Number(r.royalty) || 0],
   ['devido', 'Devido', r => trHistDevido(r)],
-  ['pago', 'Pago', r => r.total_pago == null ? -1 : Number(r.total_pago)],
-  ['falta', 'Falta', r => r.falta == null ? -Infinity : Number(r.falta)],
   ['situacao', 'Situação', r => trHistSituacao(r)[0]],
 ];
 function trHistPadrao(a, b) {
@@ -264,9 +262,8 @@ function trHistCelulas(r) {
     ? ` <span class="dre-av">${r.cobranca_vencimento < trHoje() ? 'venceu' : 'vence'} ${dm(r.cobranca_vencimento)}</span>` : '';
   const faltaTxt = falta == null || Math.abs(falta) <= 0.005 ? '—'
     : (falta > 0 ? `<b>R$ ${fmt(falta)}</b>` : `R$ ${fmt(-falta)} a mais`);
-  return `<td>${pago == null ? '—' : 'R$ ' + fmt(pago)}</td>
-          <td${falta > 0.005 ? ' class="negativo"' : ''}>${faltaTxt}</td>
-          <td${cls ? ` class="${cls}"` : ''}>${sit}${venc}</td>`;
+  // 17/11/2026 (auditoria operacao-19): Pago e Falta moram em Contas a pagar; aqui só a situação, com o que falta nela
+  return `<td${cls ? ` class="${cls}"` : ''}>${sit}${aberto ? ` · falta ${faltaTxt}` : ''}${venc}</td>`;
 }
 // embaixo da tabela: por que ainda falta (o texto mora na cobranca; so o primeiro trecho)
 function trHistNotas(historico, mesTxt) {

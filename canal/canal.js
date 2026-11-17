@@ -354,7 +354,7 @@ async function carregarRecuperavelCancel() {
     <b>R$ ${fmt(totalRecup)}</b> em <b>${fila.length}</b> pedido(s) cancelado(s) ainda estão dentro do prazo de contestação.
     O motivo que mais pesa nessa fila é <b>${pior.mt}</b>: custou R$ ${fmt(pior.valor)} em ${pior.n} pedido(s).
     ${curtos.length ? `<b style="color:var(--farol-fora);">${curtos.length} vence(m) em até 2 dias.</b>` : ''}
-    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="A fila de contestação segue a loja escolhida no topo e não o período: é tudo o que ainda está dentro do prazo — o mesmo recorte do módulo Contestações. Por isso ela não bate com a tabela de motivos acima. O motivo aqui é o texto cru do cancelamento, não a categoria do arquivo de classificação. Ficam fora os pedidos que o portal do iFood não deixa contestar.">
+    <div style="font-size:12px; color:var(--tx-3); margin-top:6px;" title="Tudo o que ainda está no prazo, da loja escolhida (não segue o período). Fora: o que o iFood não deixa contestar.">
       ${contestEscopoTxt()}, tudo o que está no prazo — este bloco não segue o período do topo.
     </div>
     <div style="margin-top:8px;"><button class="preset-btn" onclick="mostrarModulo('contestacoes')">Abrir a fila de contestações →</button></div>
@@ -3746,9 +3746,7 @@ function renderModuloSite() {
       <b>O dado de cliente envelheceu.</b>
       Novos, quem voltou e recência vão até <b>${ddmm(corteCliente)}</b> —
       ${clienteAtrasado.map(a => `${a.loja} ${ddmm(a.ate)} (${a.fonte === 'saipos' ? 'Saipos' : 'Accon'})`).join(' · ')}.<br>
-      <span style="font-size:12px; color:var(--tx-3);">${clienteAtrasado.some(a => a.fonte === 'accon')
-        ? 'No Boqueirão o cliente ainda vem do portal da Accon: é o cookie dele, que o dono renova (o login tem CAPTCHA). '
-        : ''}${clienteAtrasado.some(a => a.fonte === 'saipos')
+      <span style="font-size:12px; color:var(--tx-3);">${clienteAtrasado.some(a => a.fonte === 'saipos')
         ? 'Nas lojas do Saipos o cliente chega junto com a venda, pela importação diária das APIs (08:00) — atraso aqui é falha dela.'
         : ''}</span>
     </div>` : '';
