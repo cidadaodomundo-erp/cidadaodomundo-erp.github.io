@@ -109,8 +109,21 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
     ler('vw_rh_pagamento_mes?select=competencia&liquido_folha=not.is.null&order=competencia.desc&limit=1'),
     ler('rh_folha_validada?select=competencia'),
     ler(`dono_pendencia?select=id,frente,o_que,resolvido_em&para=is.null&resolvido_por=like.conferido*&resolvido_em=gte.${ontem}&order=resolvido_em.desc`)]);
+  // 17/11/2026 (Rotinas; dono 11:55 "respostas o mais rápido possível"): tempo de resposta de hoje, por fonte (meta: mediana < 15 min)
+  AG.tempo = await consultarTudo(`vw_resposta_tempo_dia?select=fonte,recados,esperando,mediana_min_comercial,recados_comercial,em_ate_15_min_comercial&dia=eq.${hoje}`).catch(() => null);
   AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf };
   agDesenhar();
+}
+function agTempoHtml() {
+  const T = Array.isArray(AG.tempo) ? AG.tempo.filter((t) => Number(t.recados) > 0) : [];
+  if (!T.length) return '';
+  const nome = { agenda: 'Agenda', ajuda: 'Botão Ajuda', whatsapp: 'WhatsApp' };
+  const cor = (m) => m == null ? 'var(--tx-4)' : m <= 15 ? 'var(--farol-ok)' : m <= 30 ? 'var(--farol-perto)' : 'var(--farol-fora)';
+  const n = (v) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  return `<div class="ag-ctx" style="margin:0 0 10px;" title="Do recado chegar até ser tratado, no horário comercial. Meta: metade em até 15 min.">Tempo de resposta hoje: ${T.map((t) => {
+    const m = t.mediana_min_comercial == null ? null : Number(t.mediana_min_comercial);
+    return `<b>${nome[t.fonte] || agE(t.fonte)}</b> <span style="color:${cor(m)};font-weight:700;">${m == null ? '—' : n(m) + ' min'}</span> (${Number(t.recados)} ${Number(t.recados) === 1 ? 'recado' : 'recados'}${Number(t.esperando) ? `, <span style="color:var(--farol-perto);">${Number(t.esperando)} esperando</span>` : ''})`;
+  }).join(' · ')}</div>`;
 }
 function agDesenhar() {
   const { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf } = AG.dados;
@@ -184,7 +197,7 @@ function agDesenhar() {
   const alvo = document.getElementById('view-agenda');
   const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
   const ordemTipo = { atraso: 0, alerta: 1, '': 2 };
-  let h = '<h2>Minha agenda</h2>' + agOrdemHtml(true);
+  let h = '<h2>Minha agenda</h2>' + agOrdemHtml(true) + agTempoHtml();
   if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
   const linha = (x) => {
     const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
@@ -197,7 +210,9 @@ function agDesenhar() {
         ? `conferindo: o robô fecha ${agE(agConfereTxt(p.confere))}`
         : `sem conferência automática: a frente ${agE(p.frente || '')} confere${p.conferencia_nota ? ' · ' + agE(p.conferencia_nota) : ''}`}
       <a href="javascript:void(0)" onclick="agFeito(${p.id},true)">desfazer</a></div>` : '';
-    const resp = p.resposta ?`<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — respondido, aguardando aplicar: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>` : '';
+    // 17/11/2026 (Rotinas; dono 11:55: "até receber a resposta, o assunto já foi tratado e fica desatualizado"): recebido → tratado
+    const tratado = p.resposta && p.retorno_em && p.respondido_em && p.retorno_em >= p.respondido_em;
+    const resp = p.resposta ?`<div class="ag-ctx" style="color:var(--farol-ok);">${tratado ? `✓ tratado ${agDm(new Date(p.retorno_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.retorno_em)}` : `✓ recebido ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — em análise`}: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>${tratado && p.retorno ? `<div class="ag-ctx" style="color:var(--info);">↩ ${agE(p.retorno)}</div>` : ''}` : '';
     // 12/11/2026 (Organizador): a frente devolve ao dono ("↩ resposta para você"); o fio guarda a conversa
     const fio = Array.isArray(p.fio) ? p.fio : [];
     const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
@@ -559,7 +574,7 @@ async function agPlanoMontar(reler) {
     const fio = Array.isArray(p.fio) ? p.fio : [];
     const atraso = p.prazo && p.prazo < hoje && !p.resposta && !p.feito_em;
     const estado = p.feito_em ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ feito ${quando(p.feito_em)} — conferindo</div>`
-      : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ resposta enviada ${quando(p.respondido_em)}: ${agE(p.resposta)}</div>`
+      : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">${p.retorno_em && p.respondido_em && p.retorno_em >= p.respondido_em ? '✓ tratado ' + quando(p.retorno_em) : '✓ recebido ' + quando(p.respondido_em) + ' — em análise'}: ${agE(p.resposta)}</div>`
       : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
     const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
     const nv = !dono && agRetNovo(p);   // no "Com o Fabio" a resposta é para ele: só ele apaga a bolinha

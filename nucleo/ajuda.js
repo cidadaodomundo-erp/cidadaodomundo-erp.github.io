@@ -145,6 +145,7 @@
       const L = await r.json();
       c.innerHTML = L.length ? L.map((x) => `<div class="aj-item">
           <div class="aj-meta"><span>${quando(x.criado_em)} · ${h(rotuloTela(x.tela))}</span><b style="color:${x.resposta ? 'var(--marca-amarelo,#f6c63e)' : 'var(--tx-2,#c3c2b7)'};">${h(ESTADO[x.estado] || x.estado)}</b></div>
+          <div class="aj-meta" style="margin-top:2px;">${x.respondido_em || x.resolvido_em ? `<span style="color:var(--farol-ok,#5cb85c);">✓ tratado ${quando(x.respondido_em || x.resolvido_em)}</span>` : `<span>recebido ${quando(x.criado_em)} — em análise</span>`}</div>
           <div class="aj-texto">${h(x.texto)}</div>
           ${x.print_url ? `<div style="font-size:12px;margin-top:3px;"><a href="${h(x.print_url)}" target="_blank" rel="noopener">ver print</a></div>` : ''}
           ${x.resposta ? `<div class="aj-resposta">${h(x.resposta)}</div>` : ''}</div>`).join('') : '<div class="aj-meta">Nenhum pedido ainda.</div>';
