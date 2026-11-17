@@ -23,7 +23,7 @@
     const txt = JSON.stringify(conteudo);
     try {
       const p = JSON.parse(localStorage.getItem(PENDENTE) || "null");
-      if (p && p.txt === txt && typeof p.chave === "string") return p.chave;
+      if (p && p.txt === txt && typeof p.chave === "string") { memoria = p; return p.chave; }
     } catch { /* sem storage */ }
     const chave = uuid();
     try { localStorage.setItem(PENDENTE, JSON.stringify({ txt, chave })); } catch { /* sem storage: chave so em memoria */ }
@@ -37,10 +37,22 @@
     return chavePara(conteudo);
   };
   const limpar = () => { memoria = null; try { localStorage.removeItem(PENDENTE); } catch { /* ok */ } };
+  // Envio sem resposta (queda/5xx): o servidor PODE ter recebido. Ate confirmar, o carrinho fica travado
+  // para o reenvio sair igual (mesma chave) e nunca virar uma segunda rodada.
+  const marcarSemResposta = () => {
+    if (memoria) memoria.semResposta = true;
+    try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); if (p) { p.semResposta = true; localStorage.setItem(PENDENTE, JSON.stringify(p)); } } catch { /* ok */ }
+  };
+  const temPendente = () => {
+    if (memoria && memoria.semResposta) return true;
+    try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); return !!(p && p.semResposta); } catch { return false; }
+  };
 
   const chaveOcup = (o) => (o.modalidade === "mesa" ? `mesa:${o.mesa}` : `comanda:${o.comanda}`);
   window.CDMEnvio = {
     modo: cfg.modo,
+    temPendente,
+    limparPendente: limpar,
     mesaFixa: Number.isInteger(cfg.mesaFixa) ? cfg.mesaFixa : null,
     async conferirPin(pin) {
       try {
@@ -54,11 +66,13 @@
         return r.status === 200 && r.json && r.json.ok ? { ok: true } : { ok: false, mensagem: (r.json && r.json.mensagem) || "Não foi possível fechar a conta." };
       } catch { return { ok: false, mensagem: "Sem conexão com o servidor. A conta não foi fechada." }; }
     },
-    async estadoMesa(ocupacao) {
+    // Pergunta pelas rodadas DESTE tablet (ids do servidor); nao depende de relogio.
+    async estadoMesa(ids) {
+      if (!Array.isArray(ids) || !ids.length) return null;
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), 4000);
       try {
-        const r = await fetch(`/api/tablet/estado?ocupacao=${encodeURIComponent(chaveOcup(ocupacao))}`, { cache: "no-store", signal: ctl.signal });
+        const r = await fetch(`/api/tablet/estado?ids=${encodeURIComponent(ids.slice(-60).join(","))}`, { cache: "no-store", signal: ctl.signal });
         return r.ok ? await r.json() : null;
       } catch { return null; } finally { clearTimeout(t); }
     },
@@ -67,12 +81,13 @@
       const idempotencyKey = chave(conteudo);
       let r;
       try { r = await post("/api/rodada", { idempotencyKey, ...conteudo }); }
-      catch { return { ok: false, mensagem: "Sem conexão com a cozinha. O carrinho foi mantido: toque em Confirmar de novo (não duplica)." }; }
+      catch { marcarSemResposta(); return { ok: false, mensagem: "Sem conexão com a cozinha. O carrinho foi mantido: toque em Confirmar de novo (não duplica)." }; }
       if (r.status === 200 && r.json && r.json.ok) {
         limpar();
         return { ok: true, id: r.json.id, status: r.json.status, mensagem: r.json.mensagem, totalCentavos: r.json.totalCentavos };
       }
       if (r.status >= 400 && r.status < 500) limpar(); // recusado de vez: proxima tentativa e outro pedido
+      else marcarSemResposta();
       return { ok: false, mensagem: (r.json && r.json.mensagem) || "A cozinha não confirmou o recebimento. O carrinho foi mantido; tente de novo." };
     },
     async aviso(tipo, ocupacao) {

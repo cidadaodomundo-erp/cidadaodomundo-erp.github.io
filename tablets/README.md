@@ -15,6 +15,20 @@ como ficha para a **loja TESTE do Saipos** ("Cidadão do Mundo - HML" [93936]). 
 O cardápio é a cópia do cadastro do totem (Gama/VNDX, 11/11/2026, 93 produtos com foto) que já está em
 `totem/app/data`. O conector do Saipos é o mesmo do totem (`totem/saipos-teste`), sem mudanças.
 
+Passo a passo simples para a equipe: [COMO-LIGAR-OS-TABLETS.md](COMO-LIGAR-OS-TABLETS.md) (atalhos `LIGAR-SALAO-TESTE.bat` e `LIGAR-SALAO-SAIPOS-TESTE.bat`).
+
+## Recursos de salão
+- `/tablet?mesa=N` prende o tablet na mesa N. Trocar a mesa e fechar a conta no tablet pedem a **senha da equipe** (`SALAO_PIN` ou gerada no 1º uso em `servidor/dados/pin-equipe.txt`; 5 erros bloqueiam 1 minuto).
+- Tablet mostra o andamento de cada rodada (Recebida, Preparando, Pronta, Entregue) e se libera sozinho quando a cozinha fecha a conta.
+- `/cozinha`: só abre com a senha da equipe (vira um token guardado no aparelho). Fila de rodadas, avisos de atendente/conta, contas abertas com "Fechar conta".
+- Senha da equipe gerada com 6 números; erros bloqueiam por aparelho (IP), com espera que dobra a cada bloqueio.
+- Conta fechada por marca na rodada (nunca por relógio). O tablet pergunta pelas suas próprias rodadas (ids) e se libera quando todas foram fechadas.
+- Saipos numa fila própria: o tablet recebe "enviando ao Saipos" na hora e o resultado aparece na cozinha.
+- Resposta perdida (o servidor recebeu, o tablet não viu): o carrinho fica travado até o reenvio, que usa a mesma chave e não duplica.
+- Com o carrinho vazio e sem toque há 2 min, o tablet recarrega a cada 20 min para pegar o cardápio/horário atual.
+- Reiniciar o servidor não obriga recarregar os tablets (token guardado no estado).
+- `--saipos-mesa`: manda para a MESA no Saipos (modo TABLE, `desc_table` = número da mesa, comanda em `desc_order_pad`). **Não homologado**: exige mesas cadastradas na loja TESTE; sem isso use o padrão (ficha).
+
 ## Como ligar (no computador do salão, com Node 18+)
 ```
 node tablets/servidor/bin/start-salao.js --rede
@@ -39,7 +53,7 @@ No Windows (PowerShell): `$env:CONNECTOR_ENV_PATH="C:\...\.env"` antes do comand
 ## Testes (sem rede, Saipos simulado)
 ```
 cd tablets/app && node --test tests/*.mjs        # 50 (núcleo, Goomer, payload mesa/comanda)
-cd tablets/servidor && node --test test/salao.test.js   # 9 (fluxo, segurança, cozinha, Saipos FAKE)
+cd tablets/servidor && node --test test/salao.test.js   # 14 (fluxo, senha, conta, login da cozinha, segurança, Saipos FAKE ficha e mesa)
 ```
 HTML avulso (demonstração sem envio, cardápio inteiro): `node tablets/app/tools/build.mjs --completo`.
 

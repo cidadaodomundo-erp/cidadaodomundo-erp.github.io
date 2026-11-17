@@ -20,6 +20,12 @@
   try { storage = window.localStorage; storage.getItem(C.CHAVE); } catch { storage = null; }
   const estado = storage ? C.lerEstado(ix, storage) : C.novoEstado();
   $("avisoStorage").hidden = !!storage;
+  // Rodada enviada sem resposta: carrinho travado ate reenviar (mesma chave, nao duplica).
+  function travado() {
+    if (!(ENVIO && ENVIO.temPendente())) return false;
+    msg("A cozinha ainda não confirmou a rodada anterior. Toque em Confirmar para reenviar (não duplica) antes de mudar o carrinho.");
+    return true;
+  }
   function salvar() { if (storage && !C.gravarEstado(storage, estado)) $("avisoStorage").hidden = false; }
   const msg = (t) => { $("msg").textContent = t; };
   const hora = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); };
@@ -277,6 +283,7 @@
     if (!atual) return;
     const { p } = atual;
     try {
+      if (travado()) return;
       C.adicionarAoCarrinho(ix, estado, Object.assign({ produto: p.id }, selecao()));
     } catch (e) { $("dpAviso").textContent = e.message; return; }
     salvar();
@@ -325,9 +332,9 @@
       rem.setAttribute("aria-label", `Remover ${p.nome} do carrinho`);
       menos.disabled = p.ocultarQuantidade || l.quantidade <= 1;
       mais.disabled = p.ocultarQuantidade || l.quantidade >= C.LIM.maxQuantidade;
-      menos.addEventListener("click", () => { if (C.alterarQuantidadeLinha(ix, estado, i, -1)) { salvar(); renderComanda(); } });
-      mais.addEventListener("click", () => { if (C.alterarQuantidadeLinha(ix, estado, i, 1)) { salvar(); renderComanda(); } });
-      rem.addEventListener("click", () => { if (C.removerLinha(estado, i)) { salvar(); renderComanda(); } });
+      menos.addEventListener("click", () => { if (!travado() && C.alterarQuantidadeLinha(ix, estado, i, -1)) { salvar(); renderComanda(); } });
+      mais.addEventListener("click", () => { if (!travado() && C.alterarQuantidadeLinha(ix, estado, i, 1)) { salvar(); renderComanda(); } });
+      rem.addEventListener("click", () => { if (!travado() && C.removerLinha(estado, i)) { salvar(); renderComanda(); } });
       ac.append(menos, mais, rem);
       box.appendChild(ac);
       caixa.appendChild(box);
@@ -532,6 +539,7 @@
   function encerrarLocal(texto) {
     C.fecharComanda(estado);
     preparo.clear();
+    if (ENVIO) ENVIO.limparPendente();
     salvar(); renderComanda();
     msg(texto);
   }
@@ -585,12 +593,15 @@
       if (consultando || !C.ocupacaoPronta(estado)) return;
       consultando = true;
       try {
-        const r = await ENVIO.estadoMesa(C.ocupacaoAtual(estado));
-        if (!r) return;
+        const minhas = estado.rodadas.filter((x) => x.idServidor);
+        if (!minhas.length) return;
+        const r = await ENVIO.estadoMesa(minhas.map((x) => x.idServidor));
+        if (!r || !Array.isArray(r.rodadas)) return;
         let mudou = false;
         for (const x of r.rodadas) if (preparo.get(x.id) !== x.preparo) { preparo.set(x.id, x.preparo); mudou = true; }
-        const minhas = estado.rodadas.filter((x) => x.idServidor);
-        if (r.fechadaEm && minhas.length && minhas.every((x) => Date.parse(x.criadoEm) <= Date.parse(r.fechadaEm))) {
+        const fechadas = new Set(r.rodadas.filter((x) => x.fechada).map((x) => x.id));
+        // Libera so quando TODAS as rodadas deste tablet foram fechadas pela equipe e nao ha envio pendente.
+        if (minhas.every((x) => fechadas.has(x.idServidor)) && !ENVIO.temPendente()) {
           encerrarLocal("Conta fechada. Obrigado pela visita!");
           return;
         }
@@ -599,6 +610,17 @@
     };
     setInterval(consultar, 5000);
     consultar();
+    // Cardapio sempre atual (horarios/itens): a cada 20 min, com o carrinho vazio e 2 min sem toque, recarrega a tela.
+    // Carrinho, rodadas e envio pendente ficam guardados no aparelho; nada se perde.
+    const abertoEm = Date.now();
+    let ultimoToque = Date.now();
+    document.addEventListener("pointerdown", () => { ultimoToque = Date.now(); }, { capture: true, passive: true });
+    setInterval(() => {
+      const agora = Date.now();
+      if (agora - abertoEm < 20 * 60000 || agora - ultimoToque < 2 * 60000) return;
+      if (estado.carrinho.length || ENVIO.temPendente() || document.querySelector("dialog[open]") || confirmando) return;
+      location.reload();
+    }, 60000);
     // Tela cheia no primeiro toque (o Android pede um gesto do usuario)
     document.addEventListener("pointerdown", () => {
       const d = document.documentElement;

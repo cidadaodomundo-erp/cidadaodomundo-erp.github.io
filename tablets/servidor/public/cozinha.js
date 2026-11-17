@@ -10,21 +10,49 @@
   const SAIPOS = { aceito: ["Saipos teste: ficha ", "ok"], ambiguo: ["Saipos: conferir na loja TESTE", "atencao"], recusado: ["Saipos recusou", "atencao"], nao_enviado: ["Saipos: não enviado", "atencao"], reservado: ["Saipos: enviando", ""], enviando: ["Saipos: enviando", ""] };
   const ETAPA = { NOVO: "Nova", PREPARANDO: "Preparando", PRONTO: "Pronta" };
   let ocupado = false;
+  // Login da equipe: a senha vira um token guardado neste aparelho; sem ele a tela nao mostra nem mexe em nada.
+  const CHAVE_TOKEN = "cdm-cozinha-token-v1";
+  let token = "";
+  try { token = localStorage.getItem(CHAVE_TOKEN) || ""; } catch { /* sem storage: pede a senha a cada abertura */ }
+  const headers = () => ({ "Content-Type": "application/json", "X-CDM-CSRF": cfg.csrf, "X-CDM-COZINHA": token });
+  function pedirLogin(texto) {
+    token = "";
+    try { localStorage.removeItem(CHAVE_TOKEN); } catch { /* ok */ }
+    $("login").hidden = false;
+    $("pinErro").textContent = texto || "Digite a senha da equipe e toque em Entrar.";
+    for (const id of ["avisos", "lista", "mesas"]) $(id).textContent = "";
+    $("entregues").textContent = "";
+  }
+  async function entrar() {
+    const pin = $("pin").value.trim();
+    if (!pin) { $("pinErro").textContent = "Digite a senha da equipe."; $("pin").focus(); return; }
+    try {
+      const r = await fetch("/api/cozinha/entrar", { method: "POST", headers: headers(), body: JSON.stringify({ pin }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.token) { $("pinErro").textContent = (j && j.mensagem) || "Senha incorreta."; return; }
+      token = j.token;
+      try { localStorage.setItem(CHAVE_TOKEN, token); } catch { /* ok */ }
+      $("pin").value = ""; $("pinErro").textContent = ""; $("login").hidden = true;
+      atualizar();
+    } catch { $("pinErro").textContent = "Sem conexão com o servidor do salão."; }
+  }
+  $("entrar").addEventListener("click", entrar);
+  $("pin").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); entrar(); } });
 
   async function post(caminho, corpo = {}) {
-    const r = await fetch(caminho, { method: "POST", headers: { "Content-Type": "application/json", "X-CDM-CSRF": cfg.csrf }, body: JSON.stringify(corpo) });
+    const r = await fetch(caminho, { method: "POST", headers: headers(), body: JSON.stringify(corpo) });
+    if (r.status === 401) { pedirLogin(); throw new Error("Digite a senha da equipe."); }
     if (!r.ok) { let j = null; try { j = await r.json(); } catch { /* */ } throw new Error((j && j.mensagem) || "Falhou"); }
   }
   async function acao(caminho, corpo) {
     if (ocupado) return;
     ocupado = true;
     $("pinErro").textContent = "";
-    try { await post(caminho, corpo); } catch (e) { (corpo && corpo.pin !== undefined ? $("pinErro") : $("estado")).textContent = e.message; } finally { ocupado = false; atualizar(); }
+    try { await post(caminho, corpo); } catch (e) { $("estado").textContent = e.message; } finally { ocupado = false; atualizar(); }
   }
   function fecharConta(m) {
-    const pin = $("pin").value.trim();
-    if (!pin) { $("pinErro").textContent = "Digite a senha da equipe para fechar a conta."; $("pin").focus(); return; }
-    acao("/api/cozinha/mesa/fechar", { ocupacao: m.chave, pin });
+    if (!confirm(`Fechar a conta de ${m.rotulo} (${reais(m.totalCentavos)})? O tablet da mesa fica livre para o próximo cliente.`)) return;
+    acao("/api/cozinha/mesa/fechar", { ocupacao: m.chave });
   }
 
   function card(r) {
@@ -86,11 +114,14 @@
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 4000);
     try {
-      const r = await fetch("/api/cozinha", { cache: "no-store", signal: ctl.signal });
+      if (!token) { pedirLogin(); return; }
+      const r = await fetch("/api/cozinha", { cache: "no-store", signal: ctl.signal, headers: { "X-CDM-COZINHA": token } });
+      if (r.status === 401) { pedirLogin("Senha da equipe mudou ou expirou. Digite de novo."); return; }
+      $("login").hidden = true;
       pintar(await r.json());
     } catch { $("estado").textContent = "Sem conexão com o servidor do salão"; }
     finally { clearTimeout(t); }
   }
   atualizar();
-  setInterval(() => { if (!ocupado) atualizar(); }, 2000);
+  setInterval(() => { if (!ocupado && token) atualizar(); }, 2000);
 })();

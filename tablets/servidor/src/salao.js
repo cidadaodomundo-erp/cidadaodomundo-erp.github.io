@@ -36,7 +36,7 @@ const PUBLIC = join(AQUI, "..", "public");
 export const COD_STORE_TESTE = "ef2dc467-a4a8-4734-a4d7-eb3442ff3401"; // unica loja permitida (HML 93936)
 export const PAGAMENTO_CODIGO = "DIN"; // metadado de teste conferido no canal HML; nada e cobrado
 export const SENHA_INICIAL = 7001; // faixa propria dos tablets (o totem usa 92xx)
-export const STATUS = { local: "Na cozinha de teste", saipos: "Na cozinha e no Saipos (teste)", conferir: "Na cozinha · Saipos a conferir" };
+export const STATUS = { local: "Na cozinha de teste", saipos: "Na cozinha e no Saipos (teste)", conferir: "Na cozinha · Saipos a conferir", enviando: "Na cozinha · enviando ao Saipos" };
 const LIMITE_CORPO = 48 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PREPARO = ["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE"];
@@ -125,7 +125,10 @@ export function validarRodada(cardapio, corpo, data, permitidos = null) {
   for (const l of corpo.itens) {
     if (!so(l, ["produto", "variacao", "quantidade", "opcoes", "obs", "retiradas"], ["produto", "variacao", "quantidade", "opcoes"])) throw bad("Item com campos não permitidos.");
     const p = ix.produto(l.produto);
-    if (!p) throw new ErroSalao(409, "Um item da rodada não está disponível agora. Remova-o e tente de novo.");
+    if (!p) {
+      const nome = cardapio.dto.produtos.get(l.produto)?.nome;
+      throw new ErroSalao(409, nome ? `"${nome}" não está disponível agora. Remova do carrinho e tente de novo.` : "Um item da rodada não está disponível agora. Remova-o e tente de novo.");
+    }
     if (!Array.isArray(l.opcoes) || l.opcoes.some((o) => !so(o, ["opcao", "quantidade"]))) throw bad("Opções inválidas.");
     if (l.obs !== undefined && typeof l.obs !== "string") throw bad("Observação inválida.");
     if (l.retiradas !== undefined && (!Array.isArray(l.retiradas) || l.retiradas.some((r) => typeof r !== "string"))) throw bad("Retirada inválida.");
@@ -168,6 +171,7 @@ async function carregarEstado(caminho) {
   }
   if (bruto.fechamentos === undefined) bruto.fechamentos = []; // estado de antes de 17/11
   if (!Array.isArray(bruto.fechamentos)) throw new ErroConector("ESTADO_INVALIDO", "Arquivo de estado do salão inválido; não foi sobrescrito.");
+  for (const r of bruto.rodadas) if (r.contaId === undefined) { r.contaId = null; r.fechada = true; } // estado antigo: considera fechado
   // envio interrompido no meio (queda/reinicio) => incerto, NUNCA reenvia sozinho
   for (const r of bruto.rodadas) if (r.saipos && ["reservado", "enviando"].includes(r.saipos.estado)) r.saipos.estado = "ambiguo";
   return bruto;
@@ -255,7 +259,9 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   }
   const caminhoEstado = statePath ?? (saipos ? join(saipos.caminhos.dir, "salao-hml-state.json") : join(AQUI, "..", "dados", "salao-estado.json"));
   const estado = await carregarEstado(caminhoEstado);
-  const salvar = () => gravarJsonAtomico(caminhoEstado, estado);
+  // Gravacoes em fila: a fila do Saipos e a principal nunca gravam ao mesmo tempo (a ultima gravada e sempre a mais nova).
+  let filaGravar = Promise.resolve();
+  const salvar = () => { const p = filaGravar.then(() => gravarJsonAtomico(caminhoEstado, estado)); filaGravar = p.then(() => {}, () => {}); return p; };
 
   // Token por instalacao (guardado no estado): reiniciar o servidor nao obriga a recarregar cada tablet.
   let gravarCsrf = false;
@@ -270,11 +276,15 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
 
   let fila = Promise.resolve();
   const serial = (fn) => { const p = fila.then(fn); fila = p.then(() => {}, () => {}); return p; };
+  let filaS = Promise.resolve();
+  const filaSaipos = (fn) => { const p = filaS.then(() => serial(() => Promise.resolve())).then(fn); filaS = p.then(() => {}, () => {}); return p; };
+  const esperarSaipos = () => filaS;
 
   function respostaRodada(r) {
     let status = STATUS.local;
     let mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}). Nada foi cobrado.`;
-    if (r.saipos) {
+    if (r.saipos && ["reservado", "enviando"].includes(r.saipos.estado)) { status = STATUS.enviando; mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}); enviando ao Saipos de teste. Nada foi cobrado.`; }
+    else if (r.saipos) {
       if (r.saipos.estado === "aceito") { status = STATUS.saipos; mensagem = `na cozinha e na loja TESTE do Saipos, ficha ${r.saipos.senha} (${C.reais(r.totalCentavos)}). Nada foi cobrado.`; }
       else { status = STATUS.conferir; mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}). O Saipos de teste ${r.saipos.estado === "recusado" ? "recusou" : "não confirmou"} — a equipe confere.`; }
     }
@@ -282,9 +292,6 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   }
 
   async function enviarSaipos(r, val) {
-    r.saipos = { estado: "reservado", senha: estado.proximaSenha, orderId: null, modo: modoSaipos };
-    estado.proximaSenha += 1;
-    await salvar();
     if (modoSaipos === "TABLE") return enviarSaiposMesa(r, val);
     const itens = val.itensHml.map((it, i) => ({ ...it, nota: notaSaipos(r.ocupacao, r.numero, val.linhas[i]) }));
     let prep;
@@ -359,6 +366,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     const h = hash({ ocupacao: corpo?.ocupacao, numero: corpo?.numero, itens: corpo?.itens });
     if (existente) {
       if (existente.hash !== h) throw new ErroSalao(409, "Esta rodada já foi enviada com outro conteúdo.");
+      if (existente.fechada) throw new ErroSalao(409, "Esta rodada é de uma conta já fechada. Toque em Confirmar de novo.");
       return respostaRodada(existente); // reenvio do tablet: mesma resposta, nada duplicado
     }
     const data = agora();
@@ -370,14 +378,19 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       if (hml.totalCentavos !== val.totalCentavos) throw new ErroSalao(409, "Preço do cardápio diferente da loja TESTE. Rodada não enviada.");
       hml.linhas = val.linhas;
     }
+    const chave = chaveOcupacao(val.ocupacao);
+    const aberta = estado.rodadas.find((x) => !x.fechada && chaveOcupacao(x.ocupacao) === chave);
     const r = {
       id: randomUUID(), chave: corpo.idempotencyKey, hash: h, criadoEm: data.toISOString(),
       ocupacao: val.ocupacao, numero: val.numero, itens: val.resumo, totalCentavos: val.totalCentavos,
-      preparo: "NOVO", saipos: null,
+      preparo: "NOVO", contaId: aberta ? aberta.contaId : randomUUID(), fechada: false,
+      saipos: saipos ? { estado: "reservado", senha: estado.proximaSenha, orderId: null, modo: modoSaipos } : null,
     };
+    if (saipos) estado.proximaSenha += 1;
     estado.rodadas.push(r);
-    await salvar(); // a cozinha ja ve a rodada mesmo que o Saipos falhe
-    if (saipos) await enviarSaipos(r, hml);
+    await salvar(); // uma gravacao so: rodada + reserva do Saipos. A cozinha ja ve a rodada.
+    // Saipos fora da fila principal: o tablet recebe a resposta na hora; o envio segue numa fila propria.
+    if (saipos) filaSaipos(() => enviarSaipos(r, hml).catch(() => { r.saipos.estado = "ambiguo"; return salvar(); }));
     return respostaRodada(r);
   }
 
@@ -392,16 +405,10 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     return { ok: true, mensagem: corpo.tipo === "conta" ? "Pedido de conta enviado à equipe. Já vamos até a mesa." : "A equipe foi avisada. Já vamos até a mesa." };
   }
 
-  const ultimoFechamento = (chave) => {
-    const f = estado.fechamentos.filter((x) => x.chave === chave);
-    return f.length ? f[f.length - 1].em : null;
-  };
-  const rodadasAbertas = (chave) => {
-    const desde = ultimoFechamento(chave);
-    return estado.rodadas.filter((r) => chaveOcupacao(r.ocupacao) === chave && (!desde || Date.parse(r.criadoEm) > Date.parse(desde)));
-  };
+  // Conta aberta = rodadas ainda nao fechadas da mesa/comanda (por marca na rodada, nunca por relogio).
+  const rodadasAbertas = (chave) => estado.rodadas.filter((r) => !r.fechada && chaveOcupacao(r.ocupacao) === chave);
   function mesasAbertas() {
-    const chaves = [...new Set(estado.rodadas.map((r) => chaveOcupacao(r.ocupacao)))];
+    const chaves = [...new Set(estado.rodadas.filter((r) => !r.fechada).map((r) => chaveOcupacao(r.ocupacao)))];
     return chaves.map((chave) => {
       const rs = rodadasAbertas(chave);
       if (!rs.length) return null;
@@ -411,36 +418,59 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   }
 
   // ---------- senha da equipe (trocar mesa, fechar conta) ----------
-  const tentativas = { falhas: 0, bloqueadoAte: 0 };
-  function conferirPin(valor) {
+  // Tentativas contadas POR APARELHO (IP): um tablet errando nao trava a cozinha. Espera dobra a cada bloqueio.
+  const tentativas = new Map();
+  function conferirPin(valor, ip = "?") {
     const agoraMs = Date.now();
-    if (agoraMs < tentativas.bloqueadoAte) throw new ErroSalao(429, "Muitas tentativas. Espere 1 minuto.");
+    const t = tentativas.get(ip) ?? { falhas: 0, bloqueios: 0, ate: 0 };
+    if (agoraMs < t.ate) throw new ErroSalao(429, `Muitas tentativas neste aparelho. Espere ${Math.ceil((t.ate - agoraMs) / 60000)} min.`);
     const a = Buffer.from(String(valor ?? "")), b = Buffer.from(pin);
-    if (a.length === b.length && timingSafeEqual(a, b)) { tentativas.falhas = 0; return true; }
-    tentativas.falhas += 1;
-    if (tentativas.falhas >= 5) { tentativas.falhas = 0; tentativas.bloqueadoAte = agoraMs + 60_000; }
+    if (a.length === b.length && timingSafeEqual(a, b)) { tentativas.delete(ip); return true; }
+    t.falhas += 1;
+    if (t.falhas >= 5) { t.falhas = 0; t.bloqueios += 1; t.ate = agoraMs + 60_000 * 2 ** Math.min(t.bloqueios - 1, 6); }
+    tentativas.set(ip, t);
+    if (tentativas.size > 500) tentativas.delete(tentativas.keys().next().value);
     throw new ErroSalao(403, "Senha da equipe incorreta.");
   }
+  // Sessao da cozinha: token proprio (diferente do tablet), entregue so com a senha da equipe.
+  if (typeof estado.cozinhaToken !== "string" || !/^[0-9a-f]{48}$/.test(estado.cozinhaToken)) { estado.cozinhaToken = randomBytes(24).toString("hex"); await salvar(); }
+  const ehCozinha = (req) => {
+    const a = Buffer.from(String(req.headers["x-cdm-cozinha"] ?? "")), b = Buffer.from(estado.cozinhaToken);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
 
-  async function fecharMesa(corpo) {
-    if (!so(corpo, ["ocupacao", "pin"])) throw bad("Pedido inválido.");
-    conferirPin(corpo.pin);
+  async function fecharMesa(corpo, ip, cozinha) {
+    if (!so(corpo, ["ocupacao", "pin"], ["ocupacao"])) throw bad("Pedido inválido.");
+    if (!cozinha) conferirPin(corpo.pin, ip);
     const o = lerChaveOcupacao(corpo.ocupacao);
     const chave = chaveOcupacao(o);
     const rs = rodadasAbertas(chave);
     if (!rs.length) return { ok: true, mensagem: "Não havia conta aberta." };
     const em = agora().toISOString();
-    for (const r of rs) if (r.preparo !== "ENTREGUE") { r.preparo = "ENTREGUE"; r.entregueEm = em; }
-    estado.fechamentos.push({ chave, em, rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0) });
-    if (estado.fechamentos.length > 2000) estado.fechamentos.splice(0, estado.fechamentos.length - 2000);
+    for (const r of rs) { r.fechada = true; r.fechadaEm = em; if (r.preparo !== "ENTREGUE") { r.preparo = "ENTREGUE"; r.entregueEm = em; } }
+    estado.fechamentos.push({ chave, contaId: rs[0].contaId, em, rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0) });
+    if (estado.fechamentos.length > 2000) estado.fechamentos.splice(0, estado.fechamentos.length - 2000); // so historico; nada depende dele
+    arquivar();
     await salvar();
     return { ok: true, mensagem: `Conta de ${rotuloOcupacao(o)} fechada.` };
   }
 
-  function estadoTablet(txt) {
-    const chave = chaveOcupacao(lerChaveOcupacao(txt));
-    return { fechadaEm: ultimoFechamento(chave), rodadas: rodadasAbertas(chave).map((r) => ({ id: r.id, preparo: r.preparo })) };
+  // O tablet pergunta pelas SUAS rodadas (ids). Rodada arquivada (conta fechada ha dias) conta como fechada.
+  function estadoTablet(idsTxt) {
+    const ids = String(idsTxt ?? "").split(",").filter((x) => UUID.test(x)).slice(0, 60);
+    return { rodadas: ids.map((id) => {
+      const r = estado.rodadas.find((x) => x.id === id);
+      return r ? { id, preparo: r.preparo, fechada: !!r.fechada } : { id, preparo: "ENTREGUE", fechada: true };
+    }) };
   }
+  // Mantem o arquivo pequeno: rodadas de contas fechadas ha mais de 2 dias saem do estado (o resumo fica em fechamentos).
+  function arquivar() {
+    const limite = agora().getTime() - 2 * 86400e3;
+    const antes = estado.rodadas.length;
+    estado.rodadas = estado.rodadas.filter((r) => !r.fechada || Date.parse(r.fechadaEm ?? r.criadoEm) > limite);
+    return antes !== estado.rodadas.length;
+  }
+  if (arquivar()) await salvar();
 
   function painel() {
     const ativos = estado.rodadas.filter((r) => r.preparo !== "ENTREGUE");
@@ -491,9 +521,9 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
           if (url.searchParams.has("mesa") && mesaFixa === null) return enviar(400, "Mesa inválida no endereço (use /tablet?mesa=1 a 150).", "text/plain; charset=utf-8");
           return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         }
-        if (url.pathname === "/api/tablet/estado") return enviar(200, estadoTablet(url.searchParams.get("ocupacao")));
+        if (url.pathname === "/api/tablet/estado") return enviar(200, estadoTablet(url.searchParams.get("ids")));
         if (url.pathname === "/cozinha") return enviar(200, cozinhaHtml, "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
-        if (url.pathname === "/api/cozinha") return enviar(200, painel());
+        if (url.pathname === "/api/cozinha") return ehCozinha(req) ? enviar(200, painel()) : enviar(401, { ok: false, mensagem: "Digite a senha da equipe." });
         if (url.pathname === "/marca/logo-cdm.png") return enviar(200, readFileSync(join(TOTEM_APP, "public", "marca", "logo-cdm.png")), "image/png");
         const f = FOTO.exec(url.pathname);
         if (f && cardapio.menu.produtos.some((p) => p.id === Number(f[1]))) {
@@ -520,8 +550,11 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       let m;
       if (url.pathname === "/api/rodada") return enviar(200, await serial(() => novaRodada(corpo)));
       if (url.pathname === "/api/aviso") return enviar(200, await serial(() => novoAviso(corpo)));
-      if (url.pathname === "/api/equipe/pin") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin); return enviar(200, { ok: true }); }
-      if (url.pathname === "/api/cozinha/mesa/fechar") return enviar(200, await serial(() => fecharMesa(corpo)));
+      const ip = req.socket.remoteAddress ?? "?";
+      if (url.pathname === "/api/equipe/pin") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin, ip); return enviar(200, { ok: true }); }
+      if (url.pathname === "/api/cozinha/entrar") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin, ip); return enviar(200, { ok: true, token: estado.cozinhaToken }); }
+      if (url.pathname === "/api/cozinha/mesa/fechar") return enviar(200, await serial(() => fecharMesa(corpo, ip, ehCozinha(req))));
+      if (url.pathname.startsWith("/api/cozinha/") && !ehCozinha(req)) return enviar(401, { ok: false, mensagem: "Digite a senha da equipe." });
       if ((m = /^\/api\/cozinha\/rodada\/([0-9a-f-]{36})\/(preparando|pronto|entregue)$/.exec(url.pathname))) return enviar(200, await serial(() => acaoCozinha(m[1], m[2])));
       if ((m = /^\/api\/cozinha\/aviso\/([0-9a-f-]{36})\/visto$/.exec(url.pathname))) return enviar(200, await serial(() => avisoVisto(m[1])));
       return enviar(404, { ok: false, mensagem: "Não encontrado." });
@@ -531,7 +564,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       return enviar(500, { ok: false, mensagem: "Erro interno. A rodada pode não ter sido registrada; confira na cozinha." });
     }
   });
-  server.salao = { estado, caminhoEstado, permitidos, cardapio, modoSaipos };
+  server.salao = { estado, caminhoEstado, permitidos, cardapio, modoSaipos, esperarSaipos, cozinhaToken: estado.cozinhaToken };
   return server;
 }
 

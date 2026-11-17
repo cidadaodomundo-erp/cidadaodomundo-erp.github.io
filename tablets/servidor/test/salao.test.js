@@ -64,7 +64,7 @@ async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos =
   const porta = server.address().port;
   const pagina = await chamar(porta, { caminho: "/tablet" });
   const csrf = JSON.parse(/<script type="application\/json" id="cfgEnvio">([^<]*)<\/script>/.exec(pagina.texto)[1]).csrf;
-  return { dir, f, server, porta, relogio, csrf, pagina };
+  return { dir, f, server, porta, relogio, csrf, pagina, coz: server.salao.cozinhaToken, esperar: () => server.salao.esperarSaipos() };
 }
 
 function chamar(porta, { metodo = "GET", caminho = "/", headers = {}, corpo, host } = {}) {
@@ -82,6 +82,8 @@ function chamar(porta, { metodo = "GET", caminho = "/", headers = {}, corpo, hos
   });
 }
 const post = (s, caminho, corpo, extra = {}) => chamar(s.porta, { metodo: "POST", caminho, corpo, headers: { "content-type": "application/json", "x-cdm-csrf": s.csrf, ...extra } });
+const postC = (s, caminho, corpo, extra = {}) => post(s, caminho, corpo, { "x-cdm-cozinha": s.coz, ...extra });
+const painelDe = (s) => chamar(s.porta, { caminho: "/api/cozinha", headers: { "x-cdm-cozinha": s.coz } });
 const rodada = (n, itens, extra = {}) => ({ idempotencyKey: K(n), ocupacao: MESA, numero: 1, itens, ...extra });
 
 test("tablet: pagina do modo teste com cardapio, fotos por URL e CSP so desta origem", async () => {
@@ -109,7 +111,7 @@ test("local: rodada chega a cozinha com total do SERVIDOR; reenvio com a mesma c
   assert.equal(r2.json.id, r1.json.id);
   const outra = await post(s, "/api/rodada", rodada(1, [itemCerveja()]));
   assert.equal(outra.status, 409);
-  const painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  const painel = (await painelDe(s)).json;
   assert.equal(painel.rodadas.length, 1);
   const r = painel.rodadas[0];
   assert.equal(r.rotulo, "MESA 7");
@@ -128,7 +130,7 @@ test("local: recusa preco/campo do cliente, opcao invalida, minimo nao cumprido 
   assert.equal((await post(s, "/api/rodada", rodada(4, [itemBurger({ opcoes: [{ opcao: 25, quantidade: 1 }, { opcao: 91, quantidade: 1 }] })]))).status, 400, "opcao inativa");
   assert.equal((await post(s, "/api/rodada", rodada(5, [{ produto: 20, variacao: 1, quantidade: 1, opcoes: [] }]))).status, 409, "fora do horario");
   assert.equal((await post(s, "/api/rodada", rodada(6, [itemCerveja()], { ocupacao: { modalidade: "mesa", mesa: 999, comanda: null } }))).status, 400);
-  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.rodadas.length, 0);
+  assert.equal((await painelDe(s)).json.rodadas.length, 0);
 });
 
 test("seguranca: host, origem, csrf e tipo de conteudo", async () => {
@@ -143,20 +145,20 @@ test("cozinha: preparando -> pronta -> entregue; nao volta etapa; avisos de aten
   const s = await subir();
   const r = await post(s, "/api/rodada", rodada(10, [itemCerveja()]));
   const id = r.json.id;
-  assert.equal((await post(s, `/api/cozinha/rodada/${id}/pronto`, {})).json.preparo, "PRONTO");
-  assert.equal((await post(s, `/api/cozinha/rodada/${id}/preparando`, {})).status, 409);
-  assert.equal((await post(s, `/api/cozinha/rodada/${id}/entregue`, {})).json.preparo, "ENTREGUE");
-  const p = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  assert.equal((await postC(s, `/api/cozinha/rodada/${id}/pronto`, {})).json.preparo, "PRONTO");
+  assert.equal((await postC(s, `/api/cozinha/rodada/${id}/preparando`, {})).status, 409);
+  assert.equal((await postC(s, `/api/cozinha/rodada/${id}/entregue`, {})).json.preparo, "ENTREGUE");
+  const p = (await painelDe(s)).json;
   assert.equal(p.rodadas.length, 0);
   assert.equal(p.entregues.length, 1);
   const a = await post(s, "/api/aviso", { tipo: "conta", ocupacao: MESA, idempotencyKey: K(11) });
   assert.equal(a.json.ok, true);
   await post(s, "/api/aviso", { tipo: "conta", ocupacao: MESA, idempotencyKey: K(11) }); // repetido
-  const av = (await chamar(s.porta, { caminho: "/api/cozinha" })).json.avisos;
+  const av = (await painelDe(s)).json.avisos;
   assert.equal(av.length, 1);
   assert.equal(av[0].rotulo, "MESA 7");
-  await post(s, `/api/cozinha/aviso/${av[0].id}/visto`, {});
-  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.avisos.length, 0);
+  await postC(s, `/api/cozinha/aviso/${av[0].id}/visto`, {});
+  assert.equal((await painelDe(s)).json.avisos.length, 0);
   assert.equal((await chamar(s.porta, { caminho: "/cozinha" })).status, 200);
 });
 
@@ -166,8 +168,11 @@ test("saipos (FAKE): rodada vira ficha TICKET na loja TESTE com mesa/rodada na n
   assert.deepEqual(dados.produtos.map((p) => p.id).sort(), [10, 11], "so produtos ligados a loja TESTE");
   const r = await post(s, "/api/rodada", rodada(20, [itemBurger({ obs: "ponto da carne" }), itemCerveja()]));
   assert.equal(r.status, 200, r.texto);
-  assert.equal(r.json.status, STATUS.saipos);
-  assert.match(r.json.mensagem, new RegExp(`ficha ${SENHA_INICIAL}`));
+  assert.equal(r.json.status, STATUS.enviando, "tablet recebe resposta na hora; Saipos segue na fila propria");
+  await s.esperar();
+  const fim = await post(s, "/api/rodada", rodada(20, [itemBurger({ obs: "ponto da carne" }), itemCerveja()]));
+  assert.equal(fim.json.status, STATUS.saipos);
+  assert.match(fim.json.mensagem, new RegExp(`ficha ${SENHA_INICIAL}`));
   const pedidos = s.f.pedidos();
   assert.equal(pedidos.length, 1);
   const body = JSON.parse(pedidos[0].corpo);
@@ -184,7 +189,7 @@ test("saipos (FAKE): rodada vira ficha TICKET na loja TESTE com mesa/rodada na n
   // reenvio da mesma rodada: nenhum POST novo
   await post(s, "/api/rodada", rodada(20, [itemBurger({ obs: "ponto da carne" }), itemCerveja()]));
   assert.equal(s.f.pedidos().length, 1);
-  const painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  const painel = (await painelDe(s)).json;
   assert.deepEqual(painel.rodadas[0].saipos, { estado: "aceito", ficha: SENHA_INICIAL });
   assert.ok(!JSON.stringify(painel).includes("HML-"), "orderId nao vai para a tela");
 });
@@ -193,10 +198,10 @@ test("saipos (FAKE): falha/timeout fica 'a conferir', a rodada continua na cozin
   const s = await subir({ modo: "saipos", ordem: async () => resp(503, {}) });
   const r = await post(s, "/api/rodada", rodada(30, [itemCerveja()]));
   assert.equal(r.json.ok, true);
-  assert.equal(r.json.status, STATUS.conferir);
-  await post(s, "/api/rodada", rodada(30, [itemCerveja()]));
+  await s.esperar();
+  assert.equal((await post(s, "/api/rodada", rodada(30, [itemCerveja()]))).json.status, STATUS.conferir);
   assert.equal(s.f.pedidos().length, 1);
-  const painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  const painel = (await painelDe(s)).json;
   assert.equal(painel.rodadas[0].saipos.estado, "ambiguo");
   // reinicio no meio de um envio => ambiguo, sem novo POST
   const estadoPath = join(s.dir, "priv", "salao-hml-state.json");
@@ -204,7 +209,7 @@ test("saipos (FAKE): falha/timeout fica 'a conferir', a rodada continua na cozin
   est.rodadas[0].saipos.estado = "enviando";
   await writeFile(estadoPath, JSON.stringify(est));
   const s2 = await subir({ modo: "saipos", dir: s.dir });
-  assert.equal((await chamar(s2.porta, { caminho: "/api/cozinha" })).json.rodadas[0].saipos.estado, "ambiguo");
+  assert.equal((await painelDe(s2)).json.rodadas[0].saipos.estado, "ambiguo");
   assert.equal(s2.f.pedidos().length, 0);
 });
 
@@ -233,39 +238,60 @@ test("equipe: senha confere no servidor, bloqueia apos 5 erros; servidor nao sob
   await assert.rejects(criarServidorSalao({ pin: "12", gamaPath: join(s.dir, "gama.json"), fotosDir: join(s.dir, "fotos"), statePath: join(s.dir, "x.json") }));
 });
 
-test("mesa fixa pelo endereco; andamento da rodada e fechamento da conta liberam o tablet", async () => {
+test("mesa fixa pelo endereco; andamento por id; fechar conta libera o tablet e nao reabre", async () => {
   const s = await subir();
   const pg = await chamar(s.porta, { caminho: "/tablet?mesa=7" });
   assert.match(pg.texto, /"mesaFixa":7/);
   assert.equal((await chamar(s.porta, { caminho: "/tablet?mesa=999" })).status, 400);
   const r1 = await post(s, "/api/rodada", rodada(40, [itemCerveja()]));
   const r2 = await post(s, "/api/rodada", rodada(41, [itemCerveja()], { numero: 2 }));
-  await post(s, `/api/cozinha/rodada/${r1.json.id}/pronto`, {});
-  let est = (await chamar(s.porta, { caminho: "/api/tablet/estado?ocupacao=mesa:7" })).json;
-  assert.equal(est.fechadaEm, null);
-  assert.deepEqual(est.rodadas.map((x) => x.preparo), ["PRONTO", "NOVO"]);
-  let painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  await postC(s, `/api/cozinha/rodada/${r1.json.id}/pronto`, {});
+  const ids = `${r1.json.id},${r2.json.id}`;
+  let est = (await chamar(s.porta, { caminho: `/api/tablet/estado?ids=${ids}` })).json;
+  assert.deepEqual(est.rodadas.map((x) => [x.preparo, x.fechada]), [["PRONTO", false], ["NOVO", false]]);
+  let painel = (await painelDe(s)).json;
   assert.deepEqual(painel.mesas.map((m) => [m.rotulo, m.rodadas, m.totalCentavos]), [["MESA 7", 2, 4200]]);
-  assert.equal((await post(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7", pin: "9999" })).status, 403);
-  s.relogio.t = new Date(s.relogio.t.getTime() + 60_000);
+  // tablet sem token da cozinha precisa da senha certa
+  assert.equal((await post(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7", pin: "999999" })).status, 403);
   assert.equal((await post(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7", pin: PIN })).json.ok, true);
-  est = (await chamar(s.porta, { caminho: "/api/tablet/estado?ocupacao=mesa:7" })).json;
-  assert.ok(est.fechadaEm);
-  assert.deepEqual(est.rodadas, []);
-  painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  est = (await chamar(s.porta, { caminho: `/api/tablet/estado?ids=${ids}` })).json;
+  assert.ok(est.rodadas.every((x) => x.fechada));
+  painel = (await painelDe(s)).json;
   assert.equal(painel.mesas.length, 0);
   assert.equal(painel.rodadas.length, 0, "rodadas da conta fechada saem da fila da cozinha");
-  // nova ocupacao da mesma mesa comeca do zero
-  s.relogio.t = new Date(s.relogio.t.getTime() + 60_000);
-  await post(s, "/api/rodada", rodada(42, [itemCerveja()]));
-  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.mesas[0].rodadas, 1);
-  assert.equal(r2.json.ok, true);
+  // reenvio de chave antiga (de conta fechada) nao reabre a conta
+  assert.equal((await post(s, "/api/rodada", rodada(40, [itemCerveja()]))).status, 409);
+  assert.equal((await painelDe(s)).json.mesas.length, 0);
+  // relogio do servidor voltando para tras nao reabre nada; nova rodada abre conta nova
+  s.relogio.t = new Date(s.relogio.t.getTime() - 3_600_000);
+  const r3 = await post(s, "/api/rodada", rodada(42, [itemCerveja()]));
+  painel = (await painelDe(s)).json;
+  assert.deepEqual(painel.mesas.map((m) => m.rodadas), [1]);
+  // cozinha com token fecha sem senha
+  assert.equal((await postC(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7" })).json.ok, true);
+  assert.equal((await chamar(s.porta, { caminho: `/api/tablet/estado?ids=${r3.json.id},bbbbbbbb-0000-4000-8000-000000000000` })).json.rodadas.every((x) => x.fechada), true, "id desconhecido conta como fechado");
+});
+
+test("cozinha: sem token da equipe nao ve nem mexe; entrar com a senha devolve o token", async () => {
+  const s = await subir();
+  const r = await post(s, "/api/rodada", rodada(70, [itemCerveja()]));
+  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).status, 401);
+  assert.equal((await post(s, `/api/cozinha/rodada/${r.json.id}/pronto`, {})).status, 401);
+  assert.equal((await post(s, "/api/cozinha/entrar", { pin: "000000" })).status, 403);
+  const e = await post(s, "/api/cozinha/entrar", { pin: PIN });
+  assert.equal(e.json.token, s.coz);
+  assert.equal((await post(s, `/api/cozinha/rodada/${r.json.id}/pronto`, {}, { "x-cdm-cozinha": e.json.token })).json.preparo, "PRONTO");
+  // o token sobrevive ao reinicio (cozinha nao precisa digitar de novo)
+  const s2 = await subir({ dir: s.dir });
+  assert.equal(s2.coz, s.coz);
 });
 
 test("saipos TABLE (FAKE, nao homologado): rodada vai para a MESA (desc_table) com notas e sem pagamento", async () => {
   const s = await subir({ modo: "saipos", modoSaipos: "TABLE" });
   const r = await post(s, "/api/rodada", rodada(50, [itemBurger({ obs: "bem passado" }), itemCerveja()]));
-  assert.equal(r.json.status, STATUS.saipos, r.texto);
+  assert.equal(r.json.ok, true, r.texto);
+  await s.esperar();
+  assert.equal((await post(s, "/api/rodada", rodada(50, [itemBurger({ obs: "bem passado" }), itemCerveja()]))).json.status, STATUS.saipos);
   const body = JSON.parse(s.f.pedidos()[0].corpo);
   assert.equal(body.order_method.mode, "TABLE");
   assert.deepEqual(body.table, { desc_table: "7" });
@@ -281,14 +307,15 @@ test("saipos TABLE (FAKE, nao homologado): rodada vai para a MESA (desc_table) c
   assert.equal(ledger.length, 1);
   // comanda vai em desc_order_pad
   await post(s, "/api/rodada", { idempotencyKey: K(51), ocupacao: { modalidade: "comanda", mesa: null, comanda: "A7" }, numero: 1, itens: [itemCerveja()] });
+  await s.esperar();
   assert.deepEqual(JSON.parse(s.f.pedidos()[1].corpo).table, { desc_order_pad: "A7" });
 });
 
 test("saipos TABLE (FAKE): recusa 4xx fica 'a conferir' e nao reenvia", async () => {
   const s = await subir({ modo: "saipos", modoSaipos: "TABLE", ordem: async () => resp(400, { errorCode: 908 }) });
-  const r = await post(s, "/api/rodada", rodada(60, [itemCerveja()]));
-  assert.equal(r.json.status, STATUS.conferir);
   await post(s, "/api/rodada", rodada(60, [itemCerveja()]));
+  await s.esperar();
+  assert.equal((await post(s, "/api/rodada", rodada(60, [itemCerveja()]))).json.status, STATUS.conferir);
   assert.equal(s.f.pedidos().length, 1);
-  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.rodadas[0].saipos.estado, "recusado");
+  assert.equal((await painelDe(s)).json.rodadas[0].saipos.estado, "recusado");
 });

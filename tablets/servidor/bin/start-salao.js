@@ -5,7 +5,7 @@
 //   CONNECTOR_ENV_PATH=<abs> node tablets/servidor/bin/start-salao.js --sandbox [--rede]
 //                                                            -> tambem envia para a loja TESTE do Saipos (HML 93936)
 // Opcional: --porta 4662 · --saipos-mesa (manda para a MESA no Saipos, modo TABLE; exige mesas cadastradas na loja TESTE)
-// Senha da equipe (trocar mesa / fechar conta): SALAO_PIN=1234 ou a gerada no 1o uso e guardada em servidor/dados/pin-equipe.txt
+// Senha da equipe (trocar mesa / fechar conta): SALAO_PIN=246810 ou a gerada no 1o uso e guardada em servidor/dados/pin-equipe.txt
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ function lerPin() {
   if (process.env.SALAO_PIN) return process.env.SALAO_PIN.trim();
   const arq = join(DADOS, "pin-equipe.txt");
   if (existsSync(arq)) return readFileSync(arq, "utf8").trim();
-  const novo = String(randomInt(0, 10000)).padStart(4, "0");
+  const novo = String(randomInt(0, 1000000)).padStart(6, "0");
   mkdirSync(DADOS, { recursive: true });
   writeFileSync(arq, novo + "\n", { mode: 0o600 });
   return novo;
@@ -41,7 +41,7 @@ try {
 }
 server.listen(porta, rede ? "0.0.0.0" : "127.0.0.1", () => {
   console.log(`Servidor do salão (TESTE${sandbox ? ` + Saipos loja TESTE, ${server.salao.modoSaipos === "TABLE" ? "na MESA" : "como ficha"}` : ", sem Saipos"}) ligado.`);
-  console.log(`  Senha da equipe: ${lerPin()}  (para trocar a mesa e fechar a conta)`);
+  console.log(`  Senha da equipe: ${lerPin()}  (6 números: entrar na cozinha, trocar a mesa e fechar a conta)`);
   console.log(`  Tablet:  http://127.0.0.1:${porta}/tablet`);
   console.log(`  Cozinha: http://127.0.0.1:${porta}/cozinha`);
   for (const ip of ips) console.log(`  Nos tablets do Wi-Fi: http://${ip}:${porta}/tablet?mesa=1  (troque 1 pelo número da mesa) · cozinha: http://${ip}:${porta}/cozinha`);
