@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Ponto · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111111">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- PONTO DAS TAXAS PELO QR (17/11/2026, portal novo). Página pública: a taxa lê o QR da loja, digita o nome e bate
+     Chegada / Início do intervalo / Fim do intervalo / Saída. Grava só pela função erp_taxa_bater do ERP, que confere o
+     código da semana no servidor (muda toda quarta; até 02:00 de quarta o da semana anterior ainda vale). Mesma cara da
+     página do portal antigo. Não usa o login do portal. -->
+<style>
+:root{--preto:#111111;--carvao:#1b1b1b;--linha:#2e2e2e;--branco:#ffffff;--cinza:#a9a9a9;--ouro:#E0A81C;--ok:#3fbf75;--erro:#ff7b6b}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; padding: 22px 16px 40px; background: radial-gradient(circle at 50% -10%, rgba(194,118,42,.22), transparent 55%), var(--preto); color: var(--branco); font-family: 'Barlow', Arial, sans-serif; }
+.container { max-width: 440px; margin: 0 auto; }
+.topo { text-align: center; margin-bottom: 18px; }
+.topo img { width: 68px; height: 68px; border-radius: 50%; border: 2px solid #e8e8e8; background: #000; object-fit: cover; }
+.topo .marca { font-family: 'Anton', Impact, sans-serif; text-transform: uppercase; letter-spacing: .5px; color: var(--cinza); font-size: 13px; margin-top: 8px; }
+.loja { font-family: 'Anton', Impact, sans-serif; text-transform: uppercase; letter-spacing: .5px; text-align: center; font-size: clamp(30px, 9vw, 42px); line-height: 1.05; margin: 4px 0 2px; font-weight: 400; }
+.titulo { text-align: center; color: #d8d8d8; font-size: 15px; margin-bottom: 18px; }
+.cartao { background: var(--carvao); border: 1px solid var(--linha); border-radius: 18px; padding: 20px 18px; }
+label { display: block; margin: 0 0 8px; font-weight: 700; font-size: 14px; color: #e6e6e6; text-transform: uppercase; letter-spacing: .4px; }
+label.l2 { margin-top: 20px; }
+input[type=text] { width: 100%; padding: 14px; font-size: 17px; border-radius: 12px; border: 1px solid var(--linha); background: #0d0d0d; color: var(--branco); font-family: inherit; }
+.tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tipo-btn { padding: 18px 8px; font-size: 16px; font-weight: 700; border-radius: 14px; border: 1px solid var(--linha); background: #0d0d0d; color: var(--branco); cursor: pointer; font-family: inherit; line-height: 1.2; }
+.tipo-btn span { display: block; font-size: 22px; margin-bottom: 4px; }
+.tipo-btn.selecionado { background: var(--branco); color: var(--preto); border-color: var(--branco); }
+.registrar-btn { width: 100%; margin-top: 22px; padding: 18px; font-size: 20px; border-radius: 14px; border: none; background: var(--ouro); color: var(--preto); cursor: pointer; font-family: 'Anton', Impact, sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+.registrar-btn:disabled { background: #3a3a3a; color: #8a8a8a; cursor: default; }
+.mensagem { margin-top: 16px; padding: 16px; border-radius: 14px; text-align: center; font-weight: 700; font-size: 16px; line-height: 1.4; background: var(--carvao); border: 1px solid var(--linha); }
+.mensagem.ok { border-color: var(--ok); color: #bff0d2; }
+.mensagem.ok .grande { display: block; font-family: 'Anton', Impact, sans-serif; text-transform: uppercase; font-weight: 400; font-size: 26px; color: var(--branco); margin-bottom: 6px; }
+.mensagem.erro { border-color: var(--erro); color: #ffd2cc; }
+.rodape { text-align: center; color: #777; font-size: 12px; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="topo"><img src="../icon-192.png" alt="Cidadão do Mundo"><div class="marca">Cidadão do Mundo · Burgers &amp; Arts</div></div>
+  <h1 class="loja" id="nomeLoja">-</h1>
+  <div class="titulo">Ponto das taxas</div>
+  <div id="mensagem"></div>
+  <div id="formulario" class="cartao">
+    <label for="nome">Seu nome</label>
+    <input type="text" id="nome" placeholder="Digite seu nome completo" autocomplete="name" maxlength="60">
+    <label class="l2">O que você está registrando?</label>
+    <div class="tipos">
+      <button class="tipo-btn" type="button" data-tipo="chegada"><span>👋</span>Chegada</button>
+      <button class="tipo-btn" type="button" data-tipo="inicio_intervalo"><span>☕</span>Início do intervalo</button>
+      <button class="tipo-btn" type="button" data-tipo="fim_intervalo"><span>↩️</span>Fim do intervalo</button>
+      <button class="tipo-btn" type="button" data-tipo="saida"><span>🏁</span>Saída</button>
+    </div>
+    <button class="registrar-btn" id="btnRegistrar" type="button" disabled>Registrar</button>
+  </div>
+  <div class="rodape">Use sempre o mesmo nome. O QR troca toda quarta-feira.</div>
+</div>
+<script>
+const URL_ERP = 'https://rtmgzsikwglsvpopbfbw.supabase.co/rest/v1/rpc/erp_taxa_bater';
+const CHAVE_PUBLICA = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4';
+const LOJAS = { aguaverde: 'Água Verde', ahu: 'Ahú', saobraz: 'São Braz' };
+const TIPO_TXT = { chegada: 'Chegada', inicio_intervalo: 'Início do intervalo', fim_intervalo: 'Fim do intervalo', saida: 'Saída' };
+const q = new URLSearchParams(location.search);
+const loja = q.get('loja'), codigo = (q.get('codigo') || '').toLowerCase();
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function hhmm(ts) { return new Date(ts).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }); }
+const ESPERA_MS = 2 * 60 * 1000, CHAVE_LOCAL = 'pontoTaxaUltimo_' + (loja || 'x');
+function recente() { try { const d = JSON.parse(localStorage.getItem(CHAVE_LOCAL) || 'null'); return d && Date.now() - d.agora < ESPERA_MS ? d : null; } catch (e) { return null; } }
+function confirmar(d) {
+  $('formulario').style.display = 'none';
+  $('mensagem').innerHTML = "<div class='mensagem ok'><span class='grande'>✓ Registrado às " + esc(hhmm(d.quando)) + '</span>' + esc(TIPO_TXT[d.tipo] || '') +
+    '<br><br>Para registrar de novo, leia o QR code outra vez.</div>';
+}
+function erro(t) { $('mensagem').innerHTML = "<div class='mensagem erro'>" + esc(t) + '</div>'; }
+
+if (!LOJAS[loja]) { $('nomeLoja').textContent = 'Link inválido'; $('formulario').style.display = 'none'; erro('Este link não tem uma loja válida. Peça o QR code correto da sua loja.'); }
+else if (!/^[0-9a-f]{8}$/.test(codigo)) { $('nomeLoja').textContent = LOJAS[loja]; $('formulario').style.display = 'none'; erro('Este QR code está incompleto. Peça o QR code desta semana.'); }
+else { $('nomeLoja').textContent = LOJAS[loja]; const r = recente(); if (r) confirmar(r); }
+
+let tipo = null;
+document.querySelectorAll('.tipo-btn').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('.tipo-btn').forEach((x) => x.classList.remove('selecionado'));
+  b.classList.add('selecionado'); tipo = b.dataset.tipo; $('btnRegistrar').disabled = false;
+}));
+$('btnRegistrar').addEventListener('click', async () => {
+  const nome = $('nome').value.trim();
+  if (nome.length < 3) { erro('Digite seu nome completo.'); return; }
+  if (!tipo) { erro('Escolha o que está registrando.'); return; }
+  $('btnRegistrar').disabled = true;
+  $('mensagem').innerHTML = "<div class='mensagem'>Registrando…</div>";
+  let r, j = null;
+  try {
+    r = await fetch(URL_ERP, { method: 'POST', headers: { apikey: CHAVE_PUBLICA, Authorization: 'Bearer ' + CHAVE_PUBLICA, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_loja: loja, p_codigo: codigo, p_nome: nome, p_tipo: tipo }) });
+    try { j = await r.json(); } catch (e) {}
+  } catch (e) { erro('Sem internet agora. Tente de novo.'); $('btnRegistrar').disabled = false; return; }
+  if (!r.ok) {
+    const m = String((j && j.message) || '');
+    if (/vencido/.test(m)) { $('formulario').style.display = 'none'; erro('Este QR code está desatualizado (o código muda toda quarta-feira, por segurança). Peça o QR code novo desta semana.'); return; }
+    erro(/nome/.test(m) ? 'Confira o seu nome.' : 'Não foi possível registrar. Tente de novo.'); $('btnRegistrar').disabled = false; return;
+  }
+  const d = { agora: Date.now(), quando: (j && j.quando) || new Date().toISOString(), tipo };
+  try { localStorage.setItem(CHAVE_LOCAL, JSON.stringify(d)); } catch (e) {}
+  confirmar(d);
+});
+</script>
+</body>
+</html>

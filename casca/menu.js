@@ -387,6 +387,12 @@ window.CASCA_MENU = [
     "rotulo": "Taxas e Freelas",
     "icone": "🤝",
     "origem": "fabio"
+   },
+   {
+    "chave": "taxaponto",
+    "rotulo": "Ponto dos taxas (QR)",
+    "icone": "🔳",
+    "origem": "fabio"
    }
   ]
  },
