@@ -3483,7 +3483,9 @@ function renderHoje() {
       '<div id="tabelaHojeRumoFechado" class="cel-cartao"><table><tr><th>Loja</th>' +
       cabM('CMV', 'CUSTO', 'compras e fichas') + cabM('CMO', 'PESSOAL', 'escala') + cabM('Despesas de venda', 'VENDA', 'entrega e anúncios') +
       cabM('Administrativas', 'ADMIN', 'contratos da casa') + cabM('Resultado final', 'RESULTADO', 'o que sobrou') + '</tr>' +
-      cols.map(c => tr(c, [celM(c.cmv, 'CUSTO'), celM(c.cmo, 'PESSOAL'), celM(c.venda, 'VENDA'), celM(c.admin, 'ADMIN'), celM(c.res, 'RESULTADO')])).join('') +
+      // 17/11/2026 (auditoria resultado-34/38): CMV e resultado do mês moram no Placar e na DRE; aqui a linha leva até lá
+      cols.map(c => tr(c, [celM(c.cmv, 'CUSTO'), celM(c.cmo, 'PESSOAL'), celM(c.venda, 'VENDA'), celM(c.admin, 'ADMIN'), celM(c.res, 'RESULTADO')])
+        .replace('<tr', '<tr style="cursor:pointer;" title="abre o Placar do mês" onclick="mostrarModulo(\'placar\')"')).join('') +
       '</table></div>' +
       '<div style="text-align:center; margin-top:8px;">' + botao('placar', 'O Placar') + ' ' + botao('dre', 'DRE') + '</div>';
     b4s = t1 + t2;
@@ -4893,7 +4895,8 @@ function renderSemana() {
     // 07/11/2026 (auditoria resultado-15): com a Água Verde na conta, a compra do atacado está no numerador e
     // a venda dele não está no divisor — a régua da DRE (que divide por tudo que entrou) não vale aqui.
     + fxTile('Média das últimas 4 semanas', 'R$ ' + Math.round(p4), fxLojas().includes('AGUA VERDE') ? 'sem farol: a compra do atacado está dentro e a venda dele não' : fxPill(fC) + ` · até R$ ${metaTxt}`, 'é este número que diz se a mercadoria está no lugar', fxSpark(SEM.map(w => cmv4(w)), rots, v => 'R$ ' + v.toFixed(0)))
-    + (pv > 0.5 ? fxTile(`CMV parcial do mês (até ${fxDM(parcial[0].vendas_ate)})`, pc > 0 ? 'R$ ' + Math.round(pc / pv * 100) : '—', pc > 0 ? `compras ${fxMil(pc)} ÷ vendas ${fxMil(pv)}` : '', pc > 0 ? 'de cada R$ 100 vendidos no mês até agora; muda todo dia conforme as notas entram' : 'ainda sem nota de mercadoria lançada neste mês') : '')
+    // 17/11/2026 (auditoria resultado-38): o CMV do mês mora no Placar; o cartão leva até lá
+    + (pv > 0.5 ? fxTile(`CMV parcial do mês (até ${fxDM(parcial[0].vendas_ate)}) ›`, pc > 0 ? 'R$ ' + Math.round(pc / pv * 100) : '—', pc > 0 ? `compras ${fxMil(pc)} ÷ vendas ${fxMil(pv)}` : '', pc > 0 ? 'de cada R$ 100 vendidos no mês até agora; muda todo dia conforme as notas entram' : 'ainda sem nota de mercadoria lançada neste mês').replace('<div class="fx-tile"', '<div class="fx-tile" style="cursor:pointer;" title="abre o Placar do mês" onclick="mostrarModulo(\'placar\')"') : '')
     + '</div><div class="fx-nota" title="Uma compra grande pesa na semana em que a nota entra. A mercadoria mandada às filiais sai da Água Verde e entra na filial que recebeu. O CMV pela ficha técnica fica fora até ser auditado.">Mercadoria = o que foi comprado (notas), não o consumido: a régua é a média de 4 semanas.</div>';
   // 4
   const cemM = a.fat ? a.margem / a.fat * 100 : 0, serieM = SEM.map(w => S[w].margem);
