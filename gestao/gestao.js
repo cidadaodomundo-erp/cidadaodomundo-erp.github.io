@@ -6726,7 +6726,7 @@ const cpFiltroVazio = () => ({ situacao: '', origem: '', unidade: '', faixa: nul
 async function cpCarregar() {
   await carregarApelidos();
   try { await trRpc('rh_ff_baixa_automatica', {}); } catch (e) {}   // sem acesso a pessoal: ignora
-  const [linhas, venc, imp, motor, robo, partida] = await Promise.all([
+  const [linhas, venc, imp, motor, robo, partida, cobertura] = await Promise.all([
     consultarTudo('vw_fin_contas_pagar?select=vencimento,dia_pagamento,conta_exibida,unidade,situacao,dias_vencida,subtipo,tipo,descricao,credito,debito,origem,id_titulo,titulo,fornecedor&order=dia_pagamento,vencimento'),
     consultarTudo('vw_fin_vencidas_status?select=vencimento,descricao,debito,data_debito_banco,achou_no_banco,aguarda_extrato').catch(() => []),
     consultarTudo('vw_fin_ultima_importacao?select=fonte,importado_em').catch(() => []),
@@ -6737,6 +6737,8 @@ async function cpCarregar() {
     consultarTudo('vw_fin_robo_baixando?select=id_titulo,data_banco,estado').catch(() => []),
     // 12/11/2026 (dono, Organizador 02:28): o último saldo conciliado do banco ao lado da previsão do fim de hoje
     consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,data_partida,saldo_partida,conciliado_ate,ultimo_dia_extrato&fonte_partida=eq.EXTRATO').catch(() => []),
+    // 17/11/2026 (Financeiro; dono 26/10, 03/11, 16/11): conta que não movimenta todo dia não é "sem extrato" — a régua é a cobertura
+    consultarTudo('vw_fin_conta_cobertura?select=conta,situacao').catch(() => null),
   ]);
   const roboTit = {};
   (robo || []).forEach(r => { if (r.id_titulo != null) roboTit[String(r.id_titulo)] = r; });
@@ -6757,7 +6759,7 @@ async function cpCarregar() {
     if (t.situacao === 'VENCIDA') t.situacao = 'AGUARDANDO EXTRATO';
   });
   CP = { itens,
-         partida: partida || [],
+         partida: partida || [], cobertura,
          filtros: CP ? CP.filtros : { PAGAR: cpFiltroVazio(), RECEBER: cpFiltroVazio() },
          tudo: CP ? CP.tudo : false,
          ordem: CP ? CP.ordem : { col: 'conta', dir: 1 },   // dono, 16/10/2026: por banco e, no banco, do menor valor para o maior
@@ -7146,7 +7148,8 @@ function cpHojeLimpo() {
   const dataBanco = part.map(p => p.data_partida).filter(Boolean).sort().pop();
   const nomeCt = (c) => (typeof nomeConta === 'function' ? nomeConta(c) : c);
   // 17/11/2026: a partida recua ao último dia conciliado; "sem extrato" só quando o extrato da conta parou mesmo
-  const atras = dataBanco ? part.filter(p => p.data_partida && p.data_partida < dataBanco && (!p.ultimo_dia_extrato || p.ultimo_dia_extrato <= p.data_partida)) : [];
+  const emDia = new Set((CP.cobertura || []).filter(c => c.situacao === 'EM DIA').map(c => c.conta));
+  const atras = dataBanco ? part.filter(p => p.data_partida && p.data_partida < dataBanco && !emDia.has(p.conta) && (!p.ultimo_dia_extrato || p.ultimo_dia_extrato <= p.data_partida)) : [];
   const linhaAtras = atras.map(p => `<span style="color:var(--farol-perto);font-weight:700;">${trEscH(nomeCt(p.conta))} sem extrato desde ${ffDdmm(p.data_partida)}</span>`).join(' · ');
   const linhaBanco = banco != null && dataBanco
     ? ` · <span style="color:var(--tx-3);">banco conciliado em ${ffDdmm(dataBanco)}: ${banco < 0 ? '' : '+'}${mil(banco)}</span>${linhaAtras ? ' · ' + linhaAtras : ''}` : '';
@@ -8593,6 +8596,9 @@ async function fxlMarcas(par) {
     FXL.parcial = (m || []).filter((p) => !fxlConta(p.conta) && p.fonte_partida !== 'SAIPOS' && (p.partida_parcial || p.extrato_atrasado));
   } catch (e) { FXL.parcial = null; }
   FXL.conc = await consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,conciliado_ate,ultimo_dia_extrato').catch(() => null);
+  // 17/11/2026 (Financeiro; dono 26/10, 03/11, 16/11): conta EM DIA na cobertura (sem movimento é normal nela) não leva "Extrato atrasado"
+  const cob = await consultarTudo('vw_fin_conta_cobertura?select=conta,situacao').catch(() => null);
+  if (cob && FXL.parcial) { const emDia = new Set(cob.filter((c) => c.situacao === 'EM DIA').map((c) => c.conta)); FXL.parcial = FXL.parcial.filter((p) => !(p.extrato_atrasado && emDia.has(p.conta))); }
 }
 
 // 17/11/2026 (dono 14:40: "o projetado parte do saldo conciliado"; Financeiro 8c4b438): por conta, até quando o saldo bateu
