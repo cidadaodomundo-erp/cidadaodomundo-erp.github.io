@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Ponto dos taxas · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- PONTO DOS TAXAS PELO QR (17/11/2026). Trazido do portal antigo (hellen/index.html). Banco do ERP:
+       - erp_taxa_ponto_ler(ini, fim): batidas da tabela erp_taxa_batida (gravadas pela página pública taxa/index.html)
+         e o valor por hora de cada loja (freela_valor_hora);
+       - taxa_qr_codigo_da_semana(): código do QR da semana (segredo só no servidor; muda toda quarta).
+     Ainda não trazido do antigo: marcar "pago", VT, refeições do Saipos e as batidas antigas (ficam no banco da Hellen). -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .tp-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .tp-topo h1 { font-size:22px; margin:0; }
+  .tp-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
+  .tp-topo .acoes { margin-left:auto; display:flex; gap:6px; }
+  .tp-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; text-decoration:none; display:inline-block; }
+  .tp-btn:hover { border-color:var(--brand); }
+  .tp-abas { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .tp-abas button { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .tp-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .tp-aviso { border-left:4px solid var(--farol-atencao, #d29922); background:var(--surface); border-radius:10px; padding:9px 14px; margin:0 0 10px; font-size:13px; line-height:1.45; }
+  .tp-caixa { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  .tp-caixa h2 { font-size:16px; margin:0 0 6px; }
+  .tp-tab { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .tp-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:6px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .tp-tab td { padding:6px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tp-tab th:first-child, .tp-tab td:first-child { text-align:left; white-space:normal; }
+  .tp-tab td.e { text-align:left; }
+  .tp-wrap { overflow-x:auto; }
+  .tp-na { color:var(--farol-ok, #3fb950); font-weight:700; }
+  .tp-at { color:var(--farol-atencao, #d29922); font-weight:700; }
+  .tp-sem { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 10px; font-size:13px; }
+  .tp-qr-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; }
+  .tp-qr { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; }
+  .tp-qr .nm { font-weight:800; font-size:16px; }
+  .tp-qr .img { width:190px; height:190px; background:#fff; border-radius:8px; padding:8px; }
+  .tp-qr .img svg { width:100%; height:100%; display:block; }
+  .tp-qr .lk { font-size:10.5px; color:var(--tx-3); overflow-wrap:anywhere; }
+  .tp-nota { font-size:12px; color:var(--tx-3); margin:12px 0 0; line-height:1.5; }
+  .tp-erro { color:var(--farol-fora, #e5534b); font-size:13px; margin:0 0 10px; }
+  .tp-vazio { padding:14px; opacity:.75; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="tp-topo">
+      <div><h1>Ponto dos taxas (QR)</h1><div class="sub" id="sub">Carregando…</div></div>
+      <div class="acoes"><button class="tp-btn" id="btnAtualizar" type="button">Atualizar</button></div>
+    </div>
+    <div class="tp-abas" id="abas">
+      <button type="button" data-v="vivo" class="on">🔴 Ponto de hoje</button>
+      <button type="button" data-v="semana">📊 Semana (quarta a terça)</button>
+      <button type="button" data-v="qr">🔳 QR da semana</button>
+    </div>
+    <div id="erro" class="tp-erro" style="display:none;"></div>
+    <div id="conteudo"><div class="tp-vazio">Carregando…</div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../assets/qrcode.js?v=1"></script>
+<script>
+const TELA = 'taxaponto';
+const esc = trEscH;
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú' };
+const CHAVE_URL = { 'AGUA VERDE': 'aguaverde', 'SÃO BRAZ': 'saobraz', 'AHU': 'ahu' };
+const TIPO = { chegada: '👋 Chegada', inicio_intervalo: '☕ Início do intervalo', fim_intervalo: '↩️ Fim do intervalo', saida: '🏁 Saída' };
+const PAGINA_PONTO = new URL('index.html', location.href).href.split('?')[0];
+let VISTA = 'vivo', D = null, QR = null, SEMANA_OFF = 0;
+
+function exigirLogin(r) { localStorage.removeItem('rmbSessao'); if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: r || '' }); return; } location.href = '../sistema.html'; }
+function hojeBR() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
+function somaDia(s, n) { const [a, m, d] = s.split('-').map(Number); const t = new Date(Date.UTC(a, m - 1, d)); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function br(s) { const [a, m, d] = String(s).slice(0, 10).split('-'); return d + '/' + m; }
+function hhmm(ts) { return ts ? new Date(ts).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '—'; }
+function quando(ts) { return ts ? new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'; }
+// dia de trabalho: batida até 06:00 conta no dia anterior (turno que passa da meia-noite)
+function diaOp(ts) { const d = new Date(new Date(ts).getTime() - 6 * 3600000); return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d); }
+function lojaSel() { const l = typeof lojaAtual === 'function' ? lojaAtual() : null; return (!l || l === 'REDE') ? null : l; }
+function brl(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+function horasTxt(min) { if (min == null) return '—'; const h = Math.floor(min / 60), m = Math.round(min % 60); return h + 'h' + String(m).padStart(2, '0'); }
+
+function semanaAtual() {
+  // ciclo da semana: quarta a terça, contado a partir do ref_dia (uma quarta) — a mesma conta do código do QR
+  if (!D) return null;
+  const ini = somaDia(D.ref_dia, (D.ciclo + SEMANA_OFF) * 7);
+  return { ini, fim: somaDia(ini, 6) };
+}
+
+async function carregar() {
+  document.getElementById('erro').style.display = 'none';
+  // primeiro só para saber o ciclo; depois o período certo
+  const hoje = hojeBR();
+  let ini = somaDia(hoje, -1), fim = hoje;
+  if (D && VISTA === 'semana') { const s = semanaAtual(); ini = s.ini; fim = s.fim; }
+  const r = await trRpcSeguro('erp_taxa_ponto_ler', { p_ini: ini, p_fim: fim });
+  if (r.status === 401) { exigirLogin('Entre de novo para ver o ponto dos taxas.'); return; }
+  if (!r.ok) { mostrarErro(r.status === 0 ? 'Sem conexão com o servidor.' : 'Esta tela é para o dono, o financeiro, as lojas e quem cuida do pessoal.'); return; }
+  try { D = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (VISTA === 'semana') {
+    // primeira abertura direto na Semana: só agora o ciclo é conhecido
+    const s = semanaAtual();
+    if (s.ini !== ini) { const r2 = await trRpcSeguro('erp_taxa_ponto_ler', { p_ini: s.ini, p_fim: s.fim }); if (r2.ok) { try { D = await r2.json(); } catch (e) {} } }
+  }
+  if (!QR) {
+    const q = await trRpcSeguro('taxa_qr_codigo_da_semana', {});
+    if (q.ok) { try { const j = await q.json(); QR = Array.isArray(j) ? j[0] : j; } catch (e) {} }
+  }
+  desenhar();
+}
+function mostrarErro(t) { const e = document.getElementById('erro'); e.textContent = t; e.style.display = 'block'; document.getElementById('conteudo').innerHTML = ''; }
+
+// junta as batidas por pessoa/loja/dia: primeira chegada, última saída e o intervalo
+function jornadas(batidas) {
+  const m = {};
+  batidas.forEach((b) => {
+    const k = b.chave + '|' + b.loja + '|' + diaOp(b.quando);
+    const j = m[k] || (m[k] = { nome: b.nome, chave: b.chave, loja: b.loja, dia: diaOp(b.quando), b: [] });
+    j.b.push(b);
+  });
+  return Object.values(m).map((j) => {
+    const t = (tp, ult) => { const l = j.b.filter((x) => x.tipo === tp).map((x) => x.quando).sort(); return ult ? l[l.length - 1] : l[0]; };
+    j.chegada = t('chegada'); j.saida = t('saida', true); j.ii = t('inicio_intervalo'); j.fi = t('fim_intervalo', true);
+    const ms = (a, b) => (a && b) ? (new Date(b) - new Date(a)) / 60000 : null;
+    const bruto = ms(j.chegada, j.saida), intervalo = ms(j.ii, j.fi);
+    j.intervalo = intervalo != null && intervalo > 0 ? intervalo : null;
+    j.minutos = bruto != null && bruto > 0 ? bruto - (j.intervalo || 0) : null;
+    j.ultima = j.b.map((x) => x.quando).sort().slice(-1)[0];
+    j.ultimoTipo = j.b.slice().sort((a, b) => a.quando < b.quando ? -1 : 1).slice(-1)[0].tipo;
+    return j;
+  });
+}
+
+function vistaVivo() {
+  const loja = lojaSel(), hoje = diaOp(new Date().toISOString());
+  const js = jornadas((D.batidas || []).filter((b) => !loja || b.loja === loja)).filter((j) => j.dia === hoje);
+  let h = '<div class="tp-caixa"><h2>Dia de trabalho ' + br(hoje) + ' <span style="font-weight:400;font-size:12px;opacity:.7">(o dia vira às 6h)</span></h2>';
+  if (!js.length) return h + '<div class="tp-vazio">Ninguém bateu ponto pelo QR hoje' + (D.ultima ? ' · última batida em ' + esc(quando(D.ultima)) : ' · ainda não há nenhuma batida no portal novo') + '.</div></div>';
+  h += '<div class="tp-wrap"><table class="tp-tab"><thead><tr><th>Taxa</th><th>Loja</th><th>Chegada</th><th>Intervalo</th><th>Saída</th><th>Horas</th><th>Agora</th></tr></thead><tbody>';
+  js.sort((a, b) => a.loja.localeCompare(b.loja) || (a.chegada || '').localeCompare(b.chegada || '')).forEach((j) => {
+    const naLoja = j.ultimoTipo !== 'saida';
+    h += '<tr><td>' + esc(j.nome) + '</td><td class="e">' + esc(NOME_UN[j.loja] || j.loja) + '</td><td>' + hhmm(j.chegada) + '</td><td>' +
+      (j.ii ? hhmm(j.ii) + '–' + (j.fi ? hhmm(j.fi) : '…') : '—') + '</td><td>' + hhmm(j.saida) + '</td><td>' + horasTxt(j.minutos) + '</td><td class="e">' +
+      (naLoja ? '<span class="tp-na">na loja</span> · ' + esc(TIPO[j.ultimoTipo] || j.ultimoTipo) + ' ' + hhmm(j.ultima) : 'saiu') + '</td></tr>';
+  });
+  return h + '</tbody></table></div></div>';
+}
+
+function vistaSemana() {
+  const loja = lojaSel(), s = semanaAtual();
+  const js = jornadas((D.batidas || []).filter((b) => !loja || b.loja === loja)).filter((j) => j.dia >= s.ini && j.dia <= s.fim);
+  let h = '<div class="tp-sem"><button class="tp-btn" data-sem="-1" type="button">← semana anterior</button><b>Quarta ' + br(s.ini) + ' a terça ' + br(s.fim) + '</b>' +
+    (SEMANA_OFF < 0 ? '<button class="tp-btn" data-sem="1" type="button">próxima →</button>' : '') + '</div>';
+  if (!js.length) return h + '<div class="tp-caixa"><div class="tp-vazio">Nenhuma batida pelo QR nesta semana no portal novo.</div></div>';
+  const pess = {};
+  js.forEach((j) => { const k = j.chave + '|' + j.loja; const p = pess[k] || (pess[k] = { nome: j.nome, loja: j.loja, dias: [], min: 0, inc: 0 }); p.dias.push(j); if (j.minutos != null) p.min += j.minutos; else p.inc++; });
+  const lista = Object.values(pess).sort((a, b) => a.loja.localeCompare(b.loja) || a.nome.localeCompare(b.nome));
+  let tot = 0;
+  h += '<div class="tp-caixa"><div class="tp-wrap"><table class="tp-tab"><thead><tr><th>Taxa</th><th>Loja</th><th>Dias</th><th>Horas</th><th>Valor/hora</th><th>Valor das horas</th><th>Atenção</th></tr></thead><tbody>';
+  lista.forEach((p) => {
+    const vh = Number((D.valor_hora || {})[p.loja]) || 0;
+    const v = p.min / 60 * vh; tot += v;
+    h += '<tr><td>' + esc(p.nome) + '</td><td class="e">' + esc(NOME_UN[p.loja] || p.loja) + '</td><td>' + p.dias.length + '</td><td>' + horasTxt(p.min) + '</td><td>' +
+      (vh ? brl(vh) : '—') + '</td><td><b>' + (vh ? brl(v) : '—') + '</b></td><td class="e">' + (p.inc ? '<span class="tp-at">' + p.inc + ' dia(s) sem chegada ou saída</span>' : '') + '</td></tr>';
+  });
+  h += '<tr><td><b>Total</b></td><td></td><td></td><td></td><td></td><td><b>' + brl(tot) + '</b></td><td></td></tr></tbody></table></div>' +
+    '<p class="tp-nota">Valor das horas = horas batidas (chegada até a saída, menos o intervalo) × valor por hora da loja (cadastro do ERP, ' +
+    'Água Verde e Ahú R$ 16,66, São Braz R$ 14,66). Ainda não entram aqui: VT, refeições e o "pago". Dia sem chegada ou sem saída não soma horas.</p></div>';
+  return h;
+}
+
+function desenhoQR(texto) {
+  try { const q = qrcode(0, 'M'); q.addData(texto); q.make(); return q.createSvgTag({ cellSize: 8, margin: 0, scalable: true }); }
+  catch (e) { return '<div class="tp-vazio">não deu para desenhar o QR</div>'; }
+}
+function linkLoja(u) { return PAGINA_PONTO + '?loja=' + CHAVE_URL[u] + '&codigo=' + QR.codigo; }
+function vistaQR() {
+  if (!QR) return '<div class="tp-aviso">O código do QR só aparece para o dono, o financeiro e as lojas.</div>';
+  const lojas = (D.lojas || []).filter((u) => !lojaSel() || u === lojaSel());
+  let h = '<div class="tp-aviso"><b>Atenção:</b> hoje as lojas ainda usam o QR do portal antigo (o ponto vai para o banco da Hellen). ' +
+    'Só troque o QR das lojas por estes quando o Fábio decidir a data da troca — senão a semana fica dividida em dois lugares.</div>';
+  h += '<div class="tp-caixa"><h2>QR da semana · vale de ' + br(QR.vale_de) + ' a ' + br(QR.vale_ate) + '</h2><div class="tp-sem"><button class="tp-btn" id="btnImprimir" type="button">🖨 Imprimir</button></div><div class="tp-qr-grade">';
+  lojas.forEach((u) => {
+    const l = linkLoja(u);
+    h += '<div class="tp-qr"><div class="nm">' + esc(NOME_UN[u] || u) + '</div><div class="img">' + desenhoQR(l) + '</div>' +
+      '<button class="tp-btn" type="button" data-copiar="' + esc(l) + '">Copiar link de bater ponto</button><div class="lk">' + esc(l) + '</div></div>';
+  });
+  return h + '</div><p class="tp-nota">O código muda sozinho toda quarta-feira (o segredo fica só no servidor). Até 02:00 de quarta o QR da semana anterior ainda vale.</p></div>';
+}
+function imprimir() {
+  const lojas = (D.lojas || []).filter((u) => !lojaSel() || u === lojaSel());
+  const w = window.open('', '_blank'); if (!w) return;
+  w.document.write('<html><head><title>QR do ponto</title><style>body{font-family:Arial;text-align:center}.p{page-break-after:always;padding:30px}svg{width:420px;height:420px}</style></head><body>' +
+    lojas.map((u) => '<div class="p"><h1>' + esc(NOME_UN[u] || u) + '</h1><p>Ponto das taxas · vale de ' + br(QR.vale_de) + ' a ' + br(QR.vale_ate) + ' — aponte a câmera do celular</p>' + desenhoQR(linkLoja(u)) + '</div>').join('') +
+    '</body></html>');
+  w.document.close(); setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+}
+
+function desenhar() {
+  if (!D) return;
+  document.getElementById('sub').textContent = (lojaSel() ? NOME_UN[lojaSel()] : 'Todas as lojas') + ' · última batida no portal novo: ' + quando(D.ultima) + ' · consultado em ' + quando(D.gerado_em);
+  document.querySelectorAll('#abas button').forEach((b) => b.classList.toggle('on', b.dataset.v === VISTA));
+  document.getElementById('conteudo').innerHTML = VISTA === 'vivo' ? vistaVivo() : VISTA === 'semana' ? vistaSemana() : vistaQR();
+}
+document.getElementById('abas').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (!b) return; VISTA = b.dataset.v; SEMANA_OFF = 0; VISTA === 'qr' ? desenhar() : carregar(); });
+document.getElementById('conteudo').addEventListener('click', async (e) => {
+  const s = e.target.closest('[data-sem]'); if (s) { SEMANA_OFF = Math.min(0, SEMANA_OFF + Number(s.dataset.sem)); carregar(); return; }
+  const c = e.target.closest('[data-copiar]'); if (c) { try { await navigator.clipboard.writeText(c.dataset.copiar); c.textContent = '✓ Copiado'; } catch (er) { window.prompt('Copie:', c.dataset.copiar); } return; }
+  if (e.target.closest('#btnImprimir')) imprimir();
+});
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => desenhar());
+
+if (!rmbSessao()) exigirLogin('Entre para ver o ponto dos taxas.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { try { await lojaCarregar(); } catch (e) {} carregar(); })();
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>
