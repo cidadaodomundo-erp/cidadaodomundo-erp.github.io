@@ -1,7 +1,8 @@
 // Gera UMA ficha TICKET de homologacao a partir de codigos do catalogo TESTE.
 // Contrato: criar-pedido + estrutura-campos-endpoints (ver docs/pesquisa-conexao.md).
 // Dinheiro: calculado em centavos inteiros; enviado em reais (mesma unidade de unit_price).
-// Item e cada complemento: quantidade 1 (a semantica de multiplicacao nao e documentada).
+// Este ensaio legado mantem item e complemento com quantidade 1. O carrinho separado
+// em carrinho.js usa a formula de multiplicacao documentada em criar-pedido, Calculo dos Itens.
 
 import { randomBytes, randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
