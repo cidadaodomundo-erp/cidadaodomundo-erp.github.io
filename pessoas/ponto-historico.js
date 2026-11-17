@@ -125,6 +125,7 @@
     bPes.type = 'button'; bLoja.type = 'button';
     modos.appendChild(bPes); modos.appendChild(bLoja); topo.appendChild(modos);
     sec.appendChild(topo);
+    sec.appendChild(el('p', 'phist-sub', 'Tudo o que aconteceu com a pessoa desde que entrou. Só Fábio, Neto e Hellen enxergam este quadro.'));
     const corpo = el('div'); sec.appendChild(corpo);
     const loja = el('div'); sec.appendChild(loja);
     box.appendChild(sec);
@@ -141,7 +142,7 @@
     bPes.addEventListener('click', () => trocar('pessoa')); bLoja.addEventListener('click', () => trocar('loja'));
     trocar(modo);
     try { if (!pessoas) pessoas = await rpc('ponto_historico_pessoas'); }
-    catch (e) { if (g === gen) s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); return; }
+    catch (e) { if (g === gen) { if (/HTTP 4\d\d/.test(e.message)) box.replaceChildren(); else s.replaceChildren(new Option('Não deu para carregar as pessoas agora', '')); } return; } // 17/11 (Fábio): só Fábio, Neto e Hellen; quem não pode nem vê o quadro
     if (g !== gen) return;
     s.replaceChildren(new Option('Escolha a pessoa: aparecem todas as infrações desde a admissão', ''));
     for (const [nome, lista] of [['Trabalhando', pessoas.filter((p) => !p.desligamento)], ['Já saíram', pessoas.filter((p) => p.desligamento)]]) {
