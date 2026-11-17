@@ -20,6 +20,7 @@ window.CASCA_MODULOS_CFG = {
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
     notasfaltam: { rotulo: 'Notas sem conta / sem entrada', icone: '🧾' },
+    notaschegou: { rotulo: 'Notas que chegaram', icone: '📬' },   // 17/11: conferir a chegada da nota de compra e ensinar o item novo (Estoque)
     cartao: { rotulo: 'Compra no cartão', icone: '💳' },
     compliance: { rotulo: 'Documentos e renovações', icone: '📑' },   // 13/11: alvarás, licenças, limpezas, extintores (Compliance)   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     saiposcod: { rotulo: 'Código que falhou no Saipos', icone: '⚠️' },   // 16/11: item que cai no Diversos (Cardápio)
@@ -46,7 +47,7 @@ window.CASCA_MODULOS = [
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete', 'motoboys'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notasfaltam'], acompanhar: ['comprateto'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },

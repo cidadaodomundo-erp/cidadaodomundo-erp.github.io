@@ -72,6 +72,7 @@ window.CASCA_BUSCA = {
   reqseparar: ['separar requisicao', 'atender pedido de material'],
   controle: ['estoque', 'estoque de carne', 'saldo de estoque', 'quanto tem', 'ruptura', 'falta de produto'],
   posicao: ['posicao', 'estoque por loja', 'onde esta'],
+  notaschegou: ['nota que chegou', 'notas que chegaram', 'chegou a nota', 'conferir nota', 'nota de compra', 'nf de compra', 'mercadoria chegou', 'item novo', 'ensinar item', 'fornecedor'],
   comprateto: ['compras', 'teto', 'quanto comprar', 'limite de compra'],
   listas: ['lista', 'transferencia', 'pedido da filial', 'lista de pedidos'],
   listasfin: ['lista financeiro', 'cobranca entre lojas', 'acerto entre lojas'],
