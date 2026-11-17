@@ -335,6 +335,8 @@ function engcardPeriodo(d) { ENGCARD_DIAS = d; renderModuloEngcard(); }
 function engcardGrupo(g) { ENGCARD_GRUPO = (ENGCARD_GRUPO === g) ? null : g; renderModuloEngcard(); }
 
 function renderModuloEngcard() {
+  // 17/11/2026 (auditoria operacao-18, Painel em módulos): aqui é "margem sobre ingredientes" (preço − ingrediente),
+  // para não competir com a margem final do Preço alvo (vw_margem_produto, que segue fechada — dono 23/10)
   const alvo = document.getElementById('view-engcard');
   if (!alvo || ENGCARD === null) return;
   const nu = (v) => Number(v) || 0;
@@ -390,7 +392,7 @@ function renderModuloEngcard() {
         sel ? 'box-shadow:0 0 0 2px ' + GRUPOS[g].cor + ';' : ''}" onclick="engcardGrupo('${g}')">
       <div class="card-lbl">${GRUPOS[g].nome}${sel ? ' ·' : ''}</div>
       <div class="card-val">${doGrupo.length}</div>
-      <div class="card-pct">${GRUPOS[g].o}<br><b>${GRUPOS[g].faz}</b><br>R$ ${fmt(mg)} de margem${
+      <div class="card-pct">${GRUPOS[g].o}<br><b>${GRUPOS[g].faz}</b><br>R$ ${fmt(mg)} de margem sobre ingredientes${
         totMg ? ' · ' + (mg / totMg * 100).toFixed(0) + '% do total' : ''}</div></div>`;
   }).join('');
 
@@ -453,7 +455,7 @@ function renderModuloEngcard() {
         tem que dar dois obrigatórios por venda, e é essa conta que autoriza a linha a aparecer.${ENGCARD_GRUPO ? '<br><b>Este bloco é do cardápio inteiro</b> — o filtro de ' + GRUPOS[ENGCARD_GRUPO].nome + ' vale só para a tabela de itens lá em cima.' : ''}</div>
       <div id="tabelaEngcardCombo"><table>
         <thead><tr><th>Combo</th><th>Vendas</th><th>Preço médio</th><th>Custo médio</th>
-          <th>Faixa de custo</th><th>Margem média</th><th>%</th></tr></thead>
+          <th>Faixa de custo</th><th>Margem sobre ingredientes (média)</th><th>%</th></tr></thead>
         <tbody>${linhas}</tbody></table></div>`;
   }
 
@@ -486,14 +488,14 @@ function renderModuloEngcard() {
       <div class="section-label">Venda de adicional</div>
       <div class="caption-label" style="text-align:center;">
         O que o cliente acrescenta por vontade — <b>faturamento que se soma ao combo</b>, não
-        parte dele. Em ${ENGCARD_DIAS} dias foram <b>R$ ${fmt(totRec)}</b>, com margem de
+        parte dele. Em ${ENGCARD_DIAS} dias foram <b>R$ ${fmt(totRec)}</b>, com margem sobre ingredientes de
         <b>${recOk ? ((1 - cusOk / recOk) * 100).toFixed(0) : 0}%</b> na parte que tem custo apurado
         (R$ ${fmt(recOk)} de R$ ${fmt(totRec)}).
         A coluna <b>produtos</b> diz em quantos itens do cardápio cada adicional é oferecido —
         adicional que vende bem e está em poucos produtos é oferta a ampliar.${ENGCARD_GRUPO ? '<br><b>Este bloco é do cardápio inteiro</b> — o filtro de ' + GRUPOS[ENGCARD_GRUPO].nome + ' vale só para a tabela de itens lá em cima.' : ''}</div>
       <div id="tabelaEngcardAdic"><table>
         <thead><tr><th>Adicional</th><th>Vezes</th><th>Receita</th><th>Preço médio</th>
-          <th>Custo</th><th>Margem</th><th>Produtos</th></tr></thead>
+          <th>Custo</th><th>Margem sobre ingredientes</th><th>Produtos</th></tr></thead>
         <tbody>${linhas}</tbody></table></div>`;
   }
 
@@ -532,9 +534,9 @@ function renderModuloEngcard() {
       <div class="section-label">Onde ampliar a oferta de adicional</div>
       <div class="caption-label" style="text-align:center;">
         Adicional que <b>rende bem</b> mas está oferecido em <b>poucos produtos</b> é venda deixada
-        na mesa — basta acrescentar o grupo em mais itens. Ordenado por margem, 90 dias.</div>
+        na mesa — basta acrescentar o grupo em mais itens. Ordenado pela margem sobre ingredientes, 90 dias.</div>
       <div id="tabelaEngcardAlc"><table>
-        <thead><tr><th>Adicional</th><th>Receita 90d</th><th>Margem</th><th>Em quantos produtos</th></tr></thead>
+        <thead><tr><th>Adicional</th><th>Receita 90d</th><th>Margem sobre ingredientes</th><th>Em quantos produtos</th></tr></thead>
         <tbody>${linhasAlc}</tbody></table></div>` : ''}`;
   }
 
@@ -557,7 +559,7 @@ function renderModuloEngcard() {
                       : 'Clique num grupo para filtrar a tabela.'}</div>
     <div id="tabelaEngcard"><table>
       <thead><tr><th>Item</th><th>Grupo</th><th>Unidades</th><th>Preço médio</th>
-        <th>Receita</th><th title="preço menos o custo dos ingredientes; não é lucro">Sobra sobre ingrediente (un.)</th><th>Sobra sobre ingrediente (total)</th><th>% da receita</th></tr></thead>
+        <th>Receita</th><th title="preço menos o custo dos ingredientes; não é lucro">Margem sobre ingredientes (un.)</th><th>Margem sobre ingredientes (total)</th><th>% da receita</th></tr></thead>
       <tbody>${linhas}</tbody></table></div>
     ${lista.length > 200 ? '<div class="caption-label">Mostrando os 200 maiores de ' + lista.length + '.</div>' : ''}
     ${foraBase.length ? `<div class="section-label">Fora da base · ${foraBase.length} nomes do caixa · R$ ${fmt(foraBase.reduce((s,a) => s + a.rec, 0))}</div>
