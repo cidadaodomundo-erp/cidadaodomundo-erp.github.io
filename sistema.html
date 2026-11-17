@@ -255,10 +255,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261117m"></script>
-<script src="casca/paginas.js?v=20261117m"></script>
+<script src="casca/menu.js?v=20261117n"></script>
+<script src="casca/paginas.js?v=20261117n"></script>
 <script src="casca/modulos.js?v=20261116rgv"></script>
-<script src="casca/setores-fabio.js?v=20261117m"></script>
+<script src="casca/setores-fabio.js?v=20261117n"></script>
 <script src="casca/busca.js?v=20261116rgv"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -489,6 +489,8 @@ function visivel(chave) {
   if (chave === 'pausadosdel') return visivel('pausados');
   // 16/11/2026: Avaliações do dia usam a permissão da tela do setor (Delivery do dia / Salão); o banco filtra as lojas (painel_minhas_lojas)
   if (chave === 'avaldel') return visivel('delivery');
+  // 17/11/2026: Escala e Clima usa a permissão do Delivery do dia; o banco filtra as lojas (painel_minhas_lojas)
+  if (chave === 'escalaclima') return visivel('delivery');
   if (chave === 'avalsalao') return visivel('salao');
   // 13/11/2026: o Seguro de vida (RH) abre para quem vê Cargos e salários e vê pessoal (sem chave nova no painel_acesso)
   if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');

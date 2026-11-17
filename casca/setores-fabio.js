@@ -12,7 +12,7 @@
 // Nenhum timer, nenhuma leitura de rede, nenhuma escrita neste arquivo.
 window.CASCA_SETORES_FABIO = {
   setores: [
-    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto', 'motodocs', 'pausadosdel', 'avaldel'],
+    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto', 'motodocs', 'escalaclima', 'pausadosdel', 'avaldel'],
       aviso: 'Ainda sem tela: Fila de pedidos e edição da Escala.' },
     { id: 'salao', nome: 'Salão', icone: '🍽️', chaves: ['salao', 'reservas', 'pausados', 'avalsalao'] },
     { id: 'rh', nome: 'RH', icone: '👥', chaves: ['pao', 'pcartao', 'peventos', 'freelas'] },
@@ -28,6 +28,7 @@ window.CASCA_SETORES_FABIO = {
     delivery: ['delivery do dia', 'placar do delivery', 'tempo de entrega', 'cancelamentos do dia', 'avaliacoes do dia', 'entregas'],
     salao: ['salao', 'mesas', 'comandas'],
     motodocs: ['documentos dos motoboys', 'cnh', 'mei', 'contrato motoboy', 'bag termica', 'bau', 'placa da moto'],
+    escalaclima: ['escala', 'clima', 'chuva', 'previsao do tempo', 'quantos motoboys'],
     avaldel: ['avaliacoes do dia', 'avaliacoes ifood', 'notas do ifood', 'sem resposta'],
     avalsalao: ['avaliacoes do google', 'google', 'notas do google', 'avaliacoes do salao'],
     pcartao: ['consulta de ponto', 'batidas', 'cartao de ponto', 'entrada e saida'],

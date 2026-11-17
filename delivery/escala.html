@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Escala e Clima · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- ESCALA E CLIMA (17/11/2026). Trazida do portal antigo (delivery/escala.html), só leitura.
+     Banco do ERP: erp_escala_clima_ler() = entregas do TrackEat (70 dias), escala combinada (motoboy_escala, lida da
+     mensagem do Jaison no grupo) e horas médias por motoboy. Clima: Open-Meteo, chamado direto pelo navegador (sem robô,
+     sem gravar nada). Conta de motoboys igual à do antigo (foody_sugere_escala): mediana de entregas em dias SECOS do mesmo
+     dia da semana e turno, × fator de chuva, ÷ 4 entregas por motoboy-hora, piso de 2 motoboys a partir de 12 entregas.
+     Ainda não trazido: montar/editar a escala, "Chegou no horário?" (a chegada já aparece no Pagar motoboys) e o que o Jaison mudou. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ec-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .ec-topo h1 { font-size:22px; margin:0; }
+  .ec-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; line-height:1.5; }
+  .ec-topo .acoes { margin-left:auto; }
+  .ec-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .ec-abas { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+  .ec-abas button { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .ec-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .ec-aviso { border-left:4px solid var(--farol-atencao, #d29922); background:var(--surface); border-radius:10px; padding:9px 14px; margin:0 0 10px; font-size:13px; line-height:1.45; }
+  .ec-dia { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  .ec-dia h2 { font-size:16px; margin:0 0 6px; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+  .ec-pill { font-size:12px; font-weight:600; padding:2px 9px; border-radius:999px; border:1px solid var(--line-2); white-space:nowrap; }
+  .ec-pill.c0 { background:rgba(63,185,80,.12); border-color:rgba(63,185,80,.45); }
+  .ec-pill.c1 { background:rgba(88,166,255,.12); border-color:rgba(88,166,255,.45); }
+  .ec-pill.c2 { background:rgba(210,153,34,.16); border-color:rgba(210,153,34,.55); }
+  .ec-pill.c3 { background:rgba(229,83,75,.16); border-color:rgba(229,83,75,.6); }
+  .ec-tab { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .ec-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:6px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .ec-tab td { padding:6px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .ec-tab th:nth-child(-n+2), .ec-tab td:nth-child(-n+2) { text-align:left; }
+  .ec-tab td.motivo { text-align:left; white-space:normal; font-size:12px; color:var(--tx-3); }
+  .ec-falta { color:var(--farol-fora, #e5534b); font-weight:800; }
+  .ec-sobra { color:var(--farol-atencao, #d29922); font-weight:700; }
+  .ec-okk { color:var(--farol-ok, #3fb950); font-weight:700; }
+  .ec-wrap { overflow-x:auto; }
+  .ec-nomes { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+  .ec-bloco { border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+  .ec-bloco h3 { font-size:13px; margin:0 0 4px; }
+  .ec-bloco div { font-size:13px; line-height:1.55; }
+  .ec-bloco .h { color:var(--tx-3); font-size:12px; }
+  .ec-nota { font-size:12px; color:var(--tx-3); margin:12px 0 0; line-height:1.5; }
+  .ec-vazio { padding:18px; opacity:.75; }
+  .ec-erro { color:var(--farol-fora, #e5534b); margin:0 0 10px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="ec-topo">
+      <div><h1>Escala e Clima</h1><div class="sub" id="sub">Carregando…</div></div>
+      <div class="acoes"><button class="ec-btn" id="btnAtualizar" type="button">Atualizar</button></div>
+    </div>
+    <div class="ec-abas" id="abas">
+      <button type="button" data-v="prev" class="on">🌧 Previsão da semana</button>
+      <button type="button" data-v="esc">🗓 Escala combinada</button>
+      <button type="button" data-v="como">❓ Como a conta é feita</button>
+    </div>
+    <div id="erro" class="ec-erro" style="display:none;"></div>
+    <div id="conteudo"><div class="ec-vazio">Carregando…</div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261105g"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script>
+const TELA = 'escalaclima';
+const esc = trEscH;
+// parâmetros do portal antigo (tabela escala_param, conferidos em 17/11/2026)
+const P = { alvo: 4, gar: 20, dem: [1, 1.09, 1.12, 1.14], cap: [1, 1.06, 1.08, 1.11] };
+const CLIMA = ['Seco', 'Garoa', 'Chuva', 'Chuva forte'];
+const ICONE = ['☀️', '🌦', '🌧', '⛈'];
+const TURNOS = [ { k: 'almoco', nome: 'Almoço', te: 'ALMOÇO', horas: [11, 12, 13, 14] },
+                 { k: 'jantar', nome: 'Jantar', te: 'JANTAR', horas: [18, 19, 20, 21, 22] } ];
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú' };
+const DOW = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+// Curitiba (centro). Clima igual para as 3 lojas.
+const METEO = 'https://api.open-meteo.com/v1/forecast?latitude=-25.43&longitude=-49.27' +
+  '&hourly=precipitation,precipitation_probability,temperature_2m&past_days=75&forecast_days=9&timezone=America%2FSao_Paulo';
+let D = null, CLI = null, CLI_ERRO = false, VISTA = 'prev';
+
+function exigirLogin(r) { localStorage.removeItem('rmbSessao'); if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: r || '' }); return; } location.href = '../sistema.html'; }
+function somaDia(s, n) { const [a, m, d] = s.split('-').map(Number); const t = new Date(Date.UTC(a, m - 1, d)); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function dow(s) { const [a, m, d] = s.split('-').map(Number); return new Date(Date.UTC(a, m - 1, d)).getUTCDay(); }
+function br(s) { if (!s) return '—'; const [a, m, d] = String(s).slice(0, 10).split('-'); return d + '/' + m; }
+function quando(ts) { return ts ? new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'; }
+function mediana(v) { if (!v.length) return null; const s = [...v].sort((a, b) => a - b); const h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; }
+function classe(mm) { return mm >= 5 ? 3 : mm >= 1 ? 2 : mm >= 0.1 ? 1 : 0; }
+function lojasVer() {
+  const l = typeof lojaAtual === 'function' ? lojaAtual() : null;
+  const todas = (D && D.lojas) || [];
+  return (!l || l === 'REDE') ? todas : todas.filter((x) => x === l);
+}
+
+async function lerClima() {
+  CLI = null; CLI_ERRO = false;
+  try {
+    const r = await fetch(METEO);
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const h = j.hourly || {}, mapa = {};
+    (h.time || []).forEach((t, i) => {
+      const dia = t.slice(0, 10), hr = Number(t.slice(11, 13));
+      TURNOS.forEach((tu) => {
+        if (!tu.horas.includes(hr)) return;
+        const k = dia + '|' + tu.k;
+        const o = mapa[k] || (mapa[k] = { mm: 0, prob: 0, tmin: 99, tmax: -99 });
+        o.mm += Number(h.precipitation[i]) || 0;
+        o.prob = Math.max(o.prob, Number(h.precipitation_probability[i]) || 0);
+        const tc = Number(h.temperature_2m[i]); if (!isNaN(tc)) { o.tmin = Math.min(o.tmin, tc); o.tmax = Math.max(o.tmax, tc); }
+      });
+    });
+    Object.values(mapa).forEach((o) => { o.mm = Math.round(o.mm * 10) / 10; o.c = classe(o.mm); });
+    CLI = mapa;
+  } catch (e) { CLI_ERRO = true; }
+}
+
+async function carregar() {
+  document.getElementById('erro').style.display = 'none';
+  const [r] = await Promise.all([trRpcSeguro('erp_escala_clima_ler', {}), lerClima()]);
+  if (r.status === 401) { exigirLogin('Entre de novo para ver a escala.'); return; }
+  if (!r.ok) { mostrarErro(r.status === 0 ? 'Sem conexão com o servidor.' : (r.status === 403 || r.status === 400) ? 'Você ainda não tem acesso a esta consulta.' : 'Não foi possível consultar agora.'); return; }
+  try { D = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  desenhar();
+}
+function mostrarErro(t) { const e = document.getElementById('erro'); e.textContent = t; e.style.display = 'block'; document.getElementById('conteudo').innerHTML = ''; }
+
+// previsão por loja/turno/dia (mesma conta do foody_sugere_escala do portal antigo)
+function prever(u, tu, dia) {
+  const c = CLI && CLI[dia + '|' + tu.k];
+  const cn = c ? c.c : 0;
+  const hist = (D.hist || []).filter((x) => x.u === u && x.t === tu.te);
+  const seco = hist.filter((x) => { const cc = CLI && CLI[x.d + '|' + tu.k]; return !CLI || (cc && cc.c === 0); });
+  const mesmo = seco.filter((x) => dow(x.d) === dow(dia));
+  const base = mesmo.length >= 2 ? mediana(mesmo.map((x) => x.n)) : mediana(seco.map((x) => x.n));
+  const motoHist = mesmo.length ? mesmo.reduce((s, x) => s + x.m, 0) / mesmo.length : null;
+  const hm = (D.horas_med || []).find((x) => x.u === u && x.t === tu.k);
+  const hpm = hm && hm.h > 0 ? Number(hm.h) : 4;
+  if (base == null) return { semHist: true, c, cn };
+  const ent = Math.round(base * P.dem[cn] * 10) / 10;
+  const alvo = P.alvo / P.cap[cn];
+  const horas = Math.round(ent / alvo * 10) / 10;
+  const piso = ent >= 12 ? 2 : ent >= 2 ? 1 : 0;
+  const sug = Math.max(piso, Math.round(horas / hpm));
+  const escalados = (D.escala || []).filter((x) => x.d === dia && x.u === u && x.t === tu.k).length;
+  let motivo;
+  if (motoHist != null && sug > motoHist + 0.4 && cn > 0) motivo = 'reforço por chuva';
+  else if (motoHist != null && sug > motoHist + 0.4) motivo = 'demanda acima da média';
+  else if (motoHist != null && sug < motoHist - 0.4) motivo = 'no histórico sobrou gente (complemento)';
+  else motivo = 'igual ao histórico';
+  return { c, cn, ent, horas, sug, motoHist, escalados, motivo, amostra: mesmo.length, hpm,
+           complemento: Math.max(0, Math.round(horas * P.gar - ent * 6.5)) };
+}
+
+function pillClima(c, nome) {
+  if (!c) return '<span class="ec-pill">' + esc(nome) + ': sem previsão</span>';
+  return '<span class="ec-pill c' + c.c + '">' + ICONE[c.c] + ' ' + esc(nome) + ': ' + CLIMA[c.c] +
+    (c.mm > 0 ? ' · ' + String(c.mm).replace('.', ',') + ' mm' : '') + ' · ' + c.prob + '% · ' +
+    Math.round(c.tmin) + '–' + Math.round(c.tmax) + '°</span>';
+}
+
+function vistaPrev() {
+  const lojas = lojasVer();
+  let h = '';
+  if (CLI_ERRO) h += '<div class="ec-aviso">Não consegui ler a previsão do tempo agora (Open-Meteo). A conta abaixo usa tempo seco e todos os dias do histórico.</div>';
+  for (let i = 0; i < 8; i++) {
+    const dia = somaDia(D.hoje, i);
+    h += '<div class="ec-dia"><h2>' + (i === 0 ? 'Hoje, ' : '') + DOW[dow(dia)] + ' ' + br(dia) + ' ' +
+      TURNOS.map((tu) => pillClima(CLI && CLI[dia + '|' + tu.k], tu.nome)).join(' ') + '</h2>' +
+      '<div class="ec-wrap"><table class="ec-tab"><thead><tr><th>Loja</th><th>Turno</th><th>Entregas previstas</th><th>Motoboys sugeridos</th><th>Na escala</th><th>Diferença</th><th>Média histórica</th><th>Motivo</th></tr></thead><tbody>';
+    lojas.forEach((u) => TURNOS.forEach((tu) => {
+      const p = prever(u, tu, dia);
+      if (p.semHist) { h += '<tr><td>' + esc(NOME_UN[u] || u) + '</td><td>' + tu.nome + '</td><td colspan="6" class="motivo">sem histórico de entregas no TrackEat</td></tr>'; return; }
+      const temEscala = (D.escala || []).some((x) => x.d === dia && x.u === u);
+      const dif = temEscala ? p.escalados - p.sug : null;
+      const difTxt = dif == null ? '<span style="opacity:.6">sem escala</span>'
+        : dif < 0 ? '<span class="ec-falta">faltam ' + (-dif) + '</span>'
+        : dif > 0 ? '<span class="ec-sobra">' + dif + ' a mais</span>' : '<span class="ec-okk">certo</span>';
+      h += '<tr><td>' + esc(NOME_UN[u] || u) + '</td><td>' + tu.nome + '</td><td>' + String(p.ent).replace('.', ',') + '</td><td><b>' + p.sug + '</b></td><td>' +
+        (temEscala ? p.escalados : '—') + '</td><td>' + difTxt + '</td><td>' + (p.motoHist == null ? '—' : String(Math.round(p.motoHist * 10) / 10).replace('.', ',')) +
+        '</td><td class="motivo">' + esc(p.motivo) + (p.amostra < 3 ? ' · poucos dias secos para comparar (' + p.amostra + ')' : '') + '</td></tr>';
+    }));
+    h += '</tbody></table></div></div>';
+  }
+  return h;
+}
+
+function vistaEsc() {
+  const lojas = lojasVer();
+  let h = '';
+  const semEscala = lojas.filter((u) => !(D.escala || []).some((x) => x.u === u));
+  if (semEscala.length) h += '<div class="ec-aviso">Sem escala gravada no ERP para os próximos dias: ' + semEscala.map((u) => esc(NOME_UN[u] || u)).join(', ') +
+    '. Hoje o robô só lê a escala da Água Verde que o Jaison manda no grupo.</div>';
+  for (let i = 0; i < 8; i++) {
+    const dia = somaDia(D.hoje, i);
+    const linhas = (D.escala || []).filter((x) => x.d === dia && lojas.includes(x.u));
+    if (!linhas.length) continue;
+    h += '<div class="ec-dia"><h2>' + DOW[dow(dia)] + ' ' + br(dia) + '</h2><div class="ec-nomes">';
+    lojas.forEach((u) => TURNOS.forEach((tu) => {
+      const l = linhas.filter((x) => x.u === u && x.t === tu.k);
+      if (!l.length) return;
+      h += '<div class="ec-bloco"><h3>' + esc(NOME_UN[u] || u) + ' · ' + tu.nome + ' (' + l.length + ')</h3>' +
+        l.map((x) => '<div>' + esc(x.nome) + ' <span class="h">' + esc(x.ini || '') + '–' + esc(x.fim || '') + '</span></div>').join('') + '</div>';
+    }));
+    h += '</div></div>';
+  }
+  return h || '<div class="ec-vazio">Nenhuma escala gravada para os próximos 8 dias.</div>';
+}
+
+function vistaComo() {
+  return '<div class="ec-dia" style="font-size:14px;line-height:1.6">' +
+    '<p><b>1. Quantas entregas vêm?</b> Pego as entregas do TrackEat dos últimos 70 dias, só dos turnos que foram <b>secos</b>, no mesmo dia da semana e turno, e uso o valor do meio (mediana).</p>' +
+    '<p><b>2. Chuva aumenta o pedido.</b> Garoa ×1,09 · Chuva ×1,12 · Chuva forte ×1,14 (Garoa a partir de 0,1 mm no turno, Chuva de 1 mm, Chuva forte de 5 mm).</p>' +
+    '<p><b>3. Chuva deixa o motoboy mais lento.</b> A meta é 4 entregas por motoboy por hora; com chuva cai para 3,8 / 3,7 / 3,6.</p>' +
+    '<p><b>4. Motoboys = horas necessárias ÷ horas que cada um faz no turno</b> (média da escala). Com 12 entregas ou mais, nunca menos de 2 motoboys.</p>' +
+    '<p><b>Na escala</b> = quantos nomes o Jaison mandou no grupo para aquele turno. <b>Faltam</b> em vermelho = a escala tem menos gente que a conta.</p>' +
+    '<p>É a mesma conta do portal antigo. A previsão do tempo é do Open-Meteo, para Curitiba (centro), lida na hora em que a tela abre.</p>' +
+    '<p class="ec-nota">Ainda não veio do portal antigo: montar/editar a escala, a aba "Chegou no horário?" (a chegada já aparece no Pagar motoboys) e "O que o Jaison mudou".</p></div>';
+}
+
+function desenhar() {
+  if (!D) return;
+  const ult = D.escala_lida_em;
+  document.getElementById('sub').innerHTML = 'Entregas do TrackEat até ' + esc(br(D.entregas_ate)) +
+    ' · escala lida do grupo em ' + esc(quando(ult)) + ' · clima: ' + (CLI ? 'Open-Meteo, lido agora' : 'sem leitura') +
+    ' · consultado em ' + esc(quando(D.gerado_em));
+  document.querySelectorAll('#abas button').forEach((b) => b.classList.toggle('on', b.dataset.v === VISTA));
+  document.getElementById('conteudo').innerHTML = VISTA === 'prev' ? vistaPrev() : VISTA === 'esc' ? vistaEsc() : vistaComo();
+}
+
+document.getElementById('abas').addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (!b) return; VISTA = b.dataset.v; desenhar(); });
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => desenhar());
+
+if (!rmbSessao()) exigirLogin('Entre para ver a escala.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { try { await lojaCarregar(); } catch (e) {} carregar(); })();
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>
