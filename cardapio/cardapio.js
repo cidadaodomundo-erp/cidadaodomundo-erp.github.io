@@ -545,7 +545,7 @@ function renderModuloEngcard() {
 
   alvo.innerHTML = `
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Engenharia de cardápio — Água Verde</div>
-    <div class="caption-label" style="text-align:center;">Corte pela média: <b>${Math.round(unMedio).toLocaleString('pt-BR')} un.</b> por item e <b>R$ ${fmt(mgUnMedio)}</b> de sobra sobre ingrediente por unidade.</div>
+    <div class="caption-label" style="text-align:center;">Corte pela média: <b>${Math.round(unMedio).toLocaleString('pt-BR')} un.</b> por item e <b>R$ ${fmt(mgUnMedio)}</b> de margem sobre ingredientes por unidade.</div>
     <div style="text-align:center; margin:10px 0;">
       ${[30, 60, 90].map(d => `<button class="preset-btn ${ENGCARD_DIAS === d ? 'active' : ''}"
         onclick="engcardPeriodo(${d})">${d} dias</button>`).join(' ')}
