@@ -1,0 +1,47 @@
+{
+  "projeto": "tablet-mesas (demo Redmi Pad SE 11)",
+  "data": "2026-11-12",
+  "arquivos": [
+    "amostra-produtos.json",
+    "README.md",
+    "STATUS.json",
+    "tablet-mesas-cdm.html",
+    "docs/CONTINUIDADE-REDMI11.md",
+    "docs/GOOMER-EVIDENCIA-12-11.md",
+    "docs/INTEGRACAO-SALAO.md",
+    "docs/REVISAO-PAYLOAD.md",
+    "docs/SAIPOS-CONFERENCIA-ATUAL.md",
+    "src/app.js",
+    "src/core.js",
+    "src/index.template.html",
+    "src/saipos-payload.cjs",
+    "src/style.css",
+    "tests/core.test.mjs",
+    "tests/import-goomer.test.mjs",
+    "tests/saipos-payload.test.mjs",
+    "tests/fixtures/catalogo-sintetico.json",
+    "tools/build.mjs",
+    "tools/import-goomer.mjs",
+    "tools/inspecionar.mjs"
+  ],
+  "alteracoes": [
+    "Layout horizontal: categorias verticais a esquerda, cards compactos 4:3, comanda a direita; vertical: fita de categorias + painel de comanda",
+    "Confirmacao explicita antes de registrar rodada (cancelar preserva carrinho)",
+    "build.mjs: recusa saida dentro da base; escreve apenas na pasta tablet-mesas"
+  ],
+  "testes_executados": [
+    "Coordenador: node --test tests/; 50 aprovados, 0 falhas, 0 ignorados",
+    "Coordenador: node --check src/app.js; aprovado"
+  ],
+  "build_executado": true,
+  "html_gerado": true,
+  "motivo": "Claude implementou; coordenador gerou HTML, copiou sem alteracao os adaptadores e documentos restantes, executou suite completa. Sessao Claude fdcf72fd-947e-41d4-a275-23ae493cbcbc, PID 43280.",
+  "nao_copiados_da_origem": [],
+  "pendencias_reais": [
+    "Verificacao visual bloqueada: navegador recusou file:// e acesso HTTP local nao disponivel; nenhum contorno usado",
+    "Cardapio completo e precos/codigos do salao ainda nao importados",
+    "Sem envio real, homologacao Saipos, impressao ou pagamento",
+    "Dialogo de confirmacao revisado no codigo, nao testado em navegador"
+  ],
+  "homologacao": "nenhuma"
+}

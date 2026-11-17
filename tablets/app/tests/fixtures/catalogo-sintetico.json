@@ -1,0 +1,34 @@
+{
+  "formato": "goomer-salao-catalogo/2",
+  "origem": { "sistema": "SINTETICO-TESTE", "lojaId": "269560", "coletadoEm": "2026-01-01T00:00:00Z", "metodo": "fixture-sintetica-nao-real" },
+  "categorias": [
+    { "id": 9001, "nome": "CATEGORIA SINTETICA A", "visivel": true, "disponivel": true,
+      "restricoes": { "horarios": { "estado": "sem-restricao" }, "menus": { "estado": "sem-restricao" }, "pracas": { "estado": "sem-restricao" } } },
+    { "id": 9002, "nome": "CATEGORIA SINTETICA B", "visivel": false, "disponivel": true,
+      "restricoes": { "horarios": { "estado": "sem-restricao" }, "menus": { "estado": "sem-restricao" }, "pracas": { "estado": "sem-restricao" } } }
+  ],
+  "produtos": [
+    { "id": 9101, "nome": "Produto Sintetico 1", "descricao": "FIXTURE SINTETICA - nao e produto real", "categoriaId": 9001, "visivel": true, "disponivel": false, "fotoArquivo": null, "grupoIds": [9301],
+      "restricoes": { "horarios": { "estado": "sem-restricao" }, "menus": { "estado": "sem-restricao" }, "pracas": { "estado": "sem-restricao" } },
+      "variacoes": [ { "id": 9201, "nome": "Sintetica Unica", "codigoPdv": "SINT-0001", "centavos": 1000 } ] },
+    { "id": 9102, "nome": "Produto Sintetico 2", "descricao": "", "categoriaId": 9002, "visivel": false, "disponivel": true, "fotoArquivo": null, "grupoIds": [9301, 9302],
+      "restricoes": { "horarios": { "estado": "sem-restricao" }, "menus": { "estado": "sem-restricao" }, "pracas": { "estado": "sem-restricao" } },
+      "variacoes": [ { "id": 9202, "nome": "P", "codigoPdv": "SINT-0002", "centavos": 500 }, { "id": 9203, "nome": "G", "codigoPdv": "SINT-0003", "centavos": 900 } ] },
+    { "id": 9103, "nome": "Produto Sintetico 3", "descricao": "FIXTURE SINTETICA", "categoriaId": 9001, "visivel": true, "disponivel": true, "fotoArquivo": null, "grupoIds": [9301, 9302],
+      "restricoes": { "horarios": { "estado": "sem-restricao" }, "menus": { "estado": "sem-restricao" }, "pracas": { "estado": "sem-restricao" } },
+      "variacoes": [ { "id": 9204, "nome": "Unica", "codigoPdv": "SINT-0004", "centavos": 1500 } ] }
+  ],
+  "grupos": [
+    { "id": 9301, "nome": "Grupo sintetico obrigatorio", "minimo": 1, "maximo": 1, "obrigatorio": true, "permitirQuantidade": false,
+      "formaPreco": "individual", "selecaoPadrao": false, "tipo": "SINT", "produtoComoOpcao": false, "opcaoDetalhada": false },
+    { "id": 9302, "nome": "Grupo sintetico minimo 1 mas NAO obrigatorio", "minimo": 1, "maximo": 3, "obrigatorio": false, "permitirQuantidade": false,
+      "formaPreco": "individual", "selecaoPadrao": false, "tipo": "SINT", "produtoComoOpcao": false, "opcaoDetalhada": false }
+  ],
+  "opcoes": [
+    { "id": 9401, "nome": "Opcao sintetica 1", "grupoId": 9301, "codigoPdv": "SINT-0101", "centavos": 0, "visivel": true, "disponivel": true },
+    { "id": 9402, "nome": "Opcao sintetica 2", "grupoId": 9301, "codigoPdv": "SINT-0102", "centavos": 100, "visivel": true, "disponivel": false },
+    { "id": 9403, "nome": "Opcao sintetica 3", "grupoId": 9302, "codigoPdv": "SINT-0103", "centavos": 250, "visivel": false, "disponivel": true },
+    { "id": 9404, "nome": "Opcao sintetica 4", "grupoId": 9302, "codigoPdv": "SINT-0104", "centavos": 300, "visivel": true, "disponivel": true },
+    { "id": 9405, "nome": "Opcao sintetica 5", "grupoId": 9302, "codigoPdv": "SINT-0105", "centavos": 400, "visivel": true, "disponivel": true }
+  ]
+}

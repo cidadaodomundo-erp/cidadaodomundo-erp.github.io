@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cozinha — pedidos das mesas (TESTE)</title>
+<style>
+{{FONTES}}
+:root{--preto:#111;--creme:#F4EBDD;--amarelo:#E0A81C;--verde:#2f7d4a;--vermelho:#b3261e;--cinza:#6b6257}
+*{box-sizing:border-box}
+body{margin:0;background:var(--creme);color:var(--preto);font:16px/1.35 Barlow,system-ui,sans-serif}
+.cubano{font-family:Cubano,Barlow,sans-serif;letter-spacing:.02em}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--preto);color:var(--creme)}
+header img{width:40px;height:40px}
+header h1{margin:0;font-size:22px;font-weight:400}
+.faixa{background:var(--amarelo);color:var(--preto);text-align:center;font-weight:600;padding:4px 8px;font-size:14px}
+#estado{margin-left:auto;font-size:14px}
+#avisos{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px}
+.aviso{display:flex;align-items:center;gap:10px;background:var(--vermelho);color:#fff;border-radius:10px;padding:8px 12px;font-weight:600;animation:pisca 1s infinite alternate}
+@keyframes pisca{from{opacity:1}to{opacity:.65}}
+main{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;padding:12px 16px}
+.card{background:#fff;border-radius:12px;padding:12px;border-top:8px solid var(--amarelo);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.card.PREPARANDO{border-top-color:#2a6bd1}.card.PRONTO{border-top-color:var(--verde)}
+.card h2{margin:0 0 2px;font-size:24px;font-weight:400}
+.meta{color:var(--cinza);font-size:14px;margin-bottom:8px}
+.item{font-weight:600;font-size:18px;margin-top:6px}
+.sub{padding-left:14px;font-size:15px}
+.obs{padding-left:14px;font-size:15px;background:#fff3c4;border-radius:6px;padding:2px 6px;margin-left:10px;display:inline-block}
+.selo{display:inline-block;font-size:12px;border-radius:999px;padding:2px 8px;background:#eee;margin-left:6px}
+.selo.ok{background:#d9f2df}.selo.atencao{background:#ffe1dc}
+.botoes{display:flex;gap:8px;margin-top:12px}
+button{font:600 16px Barlow,sans-serif;min-height:48px;padding:0 16px;border-radius:10px;border:0;cursor:pointer;background:var(--preto);color:var(--creme)}
+button.sec{background:#e7dfd2;color:var(--preto)}
+.vazio{padding:40px 16px;text-align:center;color:var(--cinza);font-size:18px}
+h3{margin:16px 16px 0;font-weight:400}
+#entregues{padding:0 16px 24px;color:var(--cinza);font-size:14px}
+</style>
+</head>
+<body>
+<div class="faixa">MODO TESTE — nada é cobrado</div>
+<header>
+  <img src="/marca/logo-cdm.png" alt="">
+  <h1 class="cubano">COZINHA · PEDIDOS DAS MESAS</h1>
+  <span id="estado">Conectando…</span>
+</header>
+<div id="avisos" aria-live="assertive"></div>
+<main id="lista"></main>
+<h3 class="cubano">ULTIMAS ENTREGUES</h3>
+<div id="entregues"></div>
+<script type="application/json" id="cfg">{{CFG}}</script>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
