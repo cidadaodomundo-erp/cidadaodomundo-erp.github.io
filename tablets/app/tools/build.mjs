@@ -61,7 +61,7 @@ const trocas = { "{{CSS}}": css, "{{CORE}}": lerSrc("core.js"), "{{APP}}": lerSr
 for (const [k, v] of Object.entries(trocas)) html = html.split(k).join(v);
 
 // ---------- verificacoes de seguranca do artefato ----------
-const proibidos = [/https?:\/\//i, /\bfetch\s*\(/, /XMLHttpRequest/, /WebSocket/, /sendBeacon/, /EventSource/, /innerHTML/, /outerHTML/, /insertAdjacentHTML/, /document\.write/, /\beval\s*\(/, /new Function/, /\bimport\s*\(/, /<script[^>]+src=/i, /<link\b/i, /\.env/];
+const proibidos = [/https?:\/\//i, /\bfetch\s*\(/, /XMLHttpRequest/, /WebSocket/, /sendBeacon/, /EventSource/, /innerHTML/, /outerHTML/, /insertAdjacentHTML/, /document\.write/, /\beval\s*\(/, /new Function/, /\bimport\s*\(/, /<script[^>]+src=/i, /<link\b/i, /\.env\b/];
 const semDados = html.replace(/data:[^"')\s]+/g, "DATA");
 for (const re of proibidos) if (re.test(semDados)) throw new Error("Padrao proibido no artefato: " + re);
 // Cubano nao tem cedilha/acentos garantidos: titulos Cubano estaticos devem ser ASCII
