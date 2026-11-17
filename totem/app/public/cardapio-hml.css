@@ -366,3 +366,4 @@ textarea:focus{outline:none;border-color:var(--preto)}
 @keyframes pulso{50%{transform:scale(1.08)}}
 @media (prefers-reduced-motion:reduce){.maquininha,.esperando::before{animation:none}}
 .vence{font-weight:700;color:var(--preto);margin:0 0 6px}
+.abertura-credito{margin:6px 0 0;font-size:.95rem;letter-spacing:.06em;color:rgba(255,255,255,.75)}
