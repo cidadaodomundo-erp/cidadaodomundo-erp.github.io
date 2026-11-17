@@ -176,7 +176,7 @@ language sql stable security definer set search_path to 'public','pg_temp' as $$
     'consultado_em', now(),
     'robo', (select to_jsonb(e) - 'id' from public.compra_robo_estado e where id = 1),
     'pedidos', coalesce((
-      select jsonb_agg(to_jsonb(c) || jsonb_build_object('ofertas', coalesce((
+      select jsonb_agg((to_jsonb(c) - 'wa_id') || jsonb_build_object('ofertas', coalesce((
           select jsonb_agg(to_jsonb(o) order by o.preco, o.posicao) from public.compra_cotacao_oferta o where o.cotacao_id = c.id), '[]'::jsonb))
         order by c.criado_em desc)
       from public.compra_cotacao c
@@ -232,12 +232,12 @@ begin
   end loop;
   delete from public.compra_cotacao_oferta where cotacao_id = p_id;
   insert into public.compra_cotacao_oferta (cotacao_id, posicao, item_id, catalogo_id, titulo, preco, preco_antigo, frete_gratis, entrega, vendedor, loja_oficial, avaliacao, vendidos, patrocinado, mesmo_produto, parecido, obs, link, imagem)
-  select p_id, (x->>'posicao')::int, nullif(x->>'item_id',''), nullif(x->>'catalogo_id',''), left(btrim(x->>'titulo'),300), (x->>'preco')::numeric,
-         nullif(x->>'preco_antigo','')::numeric, (x->>'frete_gratis')::boolean, left(nullif(btrim(x->>'entrega'),''),120), left(nullif(btrim(x->>'vendedor'),''),120),
-         coalesce((x->>'loja_oficial')::boolean,false), nullif(x->>'avaliacao','')::numeric, left(nullif(btrim(x->>'vendidos'),''),60),
-         coalesce((x->>'patrocinado')::boolean,false), coalesce((x->>'mesmo_produto')::boolean,false), nullif(x->>'parecido','')::int,
-         left(nullif(btrim(x->>'obs'),''),160), x->>'link', nullif(x->>'imagem','')
-    from jsonb_array_elements(p_ofertas) x;
+  select p_id, (e->>'posicao')::int, nullif(e->>'item_id',''), nullif(e->>'catalogo_id',''), left(btrim(e->>'titulo'),300), (e->>'preco')::numeric,
+         nullif(e->>'preco_antigo','')::numeric, (e->>'frete_gratis')::boolean, left(nullif(btrim(e->>'entrega'),''),120), left(nullif(btrim(e->>'vendedor'),''),120),
+         coalesce((e->>'loja_oficial')::boolean,false), nullif(e->>'avaliacao','')::numeric, left(nullif(btrim(e->>'vendidos'),''),60),
+         coalesce((e->>'patrocinado')::boolean,false), coalesce((e->>'mesmo_produto')::boolean,false), nullif(e->>'parecido','')::int,
+         left(nullif(btrim(e->>'obs'),''),160), e->>'link', nullif(e->>'imagem','')
+    from jsonb_array_elements(p_ofertas) e;
   get diagnostics n = row_count;
   v_busca := nullif(left(btrim(p_ref->>'busca'),200),'');
   update public.compra_cotacao set status = 'pronto', erro = null, buscado_em = now(),
@@ -255,16 +255,18 @@ grant execute on function public.compra_robo_gravar(text, bigint, jsonb, jsonb, 
 -- WHATSAPP 1602: pedido que chega por mensagem (só daqui pra frente; só mensagem que começa com "compra" ou traz link do ML)
 create or replace function public.compra_wa_receber(p_segredo text, p_wa_id text, p_nome text, p_texto text) returns jsonb
 language plpgsql security definer set search_path to 'public','pg_temp' as $$
-declare v_t text := btrim(coalesce(p_texto,'')); v_id bigint;
+declare v_t text := btrim(coalesce(p_texto,'')); v_id bigint; v_wa text;
 begin
   if not public.compra_robo_segredo_ok(p_segredo) then return jsonb_build_object('erro','segredo invalido'); end if;
   if coalesce(p_wa_id,'') = '' or char_length(p_wa_id) > 200 then raise exception 'wa_id invalido'; end if;
+  -- o id da mensagem do WhatsApp carrega o telefone de quem mandou: o banco guarda só um resumo dele (serve para não repetir)
+  v_wa := 'wa:' || encode(sha256(convert_to(p_wa_id, 'UTF8')), 'hex');
   if char_length(v_t) < 3 then return jsonb_build_object('ok', true, 'ignorada', true); end if;
   v_t := left(v_t, 600);
   if public.compra_link_do_texto(v_t) is null and v_t !~* '^\s*(compras?|comprar|cotar)\M' then return jsonb_build_object('ok', true, 'ignorada', true); end if;
   insert into public.compra_cotacao (origem, pedido_por, texto, link, busca, loja, wa_id)
   values ('whatsapp', left(nullif(btrim(regexp_replace(coalesce(p_nome,''), '[[:cntrl:]]', ' ', 'g')),''), 60), v_t,
-          public.compra_link_do_texto(v_t), public.compra_busca_do_texto(v_t), public.compra_loja_do_texto(v_t), p_wa_id)
+          public.compra_link_do_texto(v_t), public.compra_busca_do_texto(v_t), public.compra_loja_do_texto(v_t), v_wa)
   on conflict (wa_id) do nothing
   returning id into v_id;
   return jsonb_build_object('ok', true, 'id', v_id, 'repetida', v_id is null);
