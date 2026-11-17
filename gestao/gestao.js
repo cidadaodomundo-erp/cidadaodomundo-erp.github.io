@@ -6736,7 +6736,7 @@ async function cpCarregar() {
     // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): título na fila do robô não é vencida
     consultarTudo('vw_fin_robo_baixando?select=id_titulo,data_banco,estado').catch(() => []),
     // 12/11/2026 (dono, Organizador 02:28): o último saldo conciliado do banco ao lado da previsão do fim de hoje
-    consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,data_partida,saldo_partida&fonte_partida=eq.EXTRATO').catch(() => []),
+    consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,data_partida,saldo_partida,conciliado_ate,ultimo_dia_extrato&fonte_partida=eq.EXTRATO').catch(() => []),
   ]);
   const roboTit = {};
   (robo || []).forEach(r => { if (r.id_titulo != null) roboTit[String(r.id_titulo)] = r; });
@@ -7145,12 +7145,14 @@ function cpHojeLimpo() {
   // parte, em alerta ("Santander sem extrato desde 03/11") — a mais antiga dava a impressão de a Rede toda estar parada
   const dataBanco = part.map(p => p.data_partida).filter(Boolean).sort().pop();
   const nomeCt = (c) => (typeof nomeConta === 'function' ? nomeConta(c) : c);
-  const atras = dataBanco ? part.filter(p => p.data_partida && p.data_partida < dataBanco) : [];
+  // 17/11/2026: a partida recua ao último dia conciliado; "sem extrato" só quando o extrato da conta parou mesmo
+  const atras = dataBanco ? part.filter(p => p.data_partida && p.data_partida < dataBanco && (!p.ultimo_dia_extrato || p.ultimo_dia_extrato <= p.data_partida)) : [];
   const linhaAtras = atras.map(p => `<span style="color:var(--farol-perto);font-weight:700;">${trEscH(nomeCt(p.conta))} sem extrato desde ${ffDdmm(p.data_partida)}</span>`).join(' · ');
   const linhaBanco = banco != null && dataBanco
     ? ` · <span style="color:var(--tx-3);">banco conciliado em ${ffDdmm(dataBanco)}: ${banco < 0 ? '' : '+'}${mil(banco)}</span>${linhaAtras ? ' · ' + linhaAtras : ''}` : '';
   return `<div class="contexto" style="border-color:${v < 0 ? 'var(--farol-fora)' : 'var(--farol-ok)'}; cursor:pointer;" onclick="mostrarModulo('projecao')" title="abrir o Fluxo projetado">
-    Previsão para o fim de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b>${linhaBanco} · <b>ver no Fluxo projetado →</b></div>`;
+    Previsão para o fim de hoje (${String(d0.dia).slice(8, 10)}/${String(d0.dia).slice(5, 7)}) · ${lojaNome(cpFxlLoja())}: <b style="color:${v < 0 ? 'var(--farol-fora)' : 'inherit'};">${mil(v)}</b>${linhaBanco} · <b>ver no Fluxo projetado →</b></div>`
+    + finConciliadoAteHtml(CP.partida, CP.loja);
 }
 
 function cpHojeAbrir(k) { CP.fxlAberto = CP.fxlAberto === k ? null : k; const a = document.getElementById('cpHojeWrap'); if (a) a.innerHTML = cpHojeLimpo(); }
@@ -8590,8 +8592,24 @@ async function fxlMarcas(par) {
       : await consultarTudo('vw_fin_saldo_partida?select=conta,unidade,data_partida,partida_parcial,extrato_atrasado,fonte_partida,hora_extrato,ultimo_extrato_parcial_dia');
     FXL.parcial = (m || []).filter((p) => !fxlConta(p.conta) && p.fonte_partida !== 'SAIPOS' && (p.partida_parcial || p.extrato_atrasado));
   } catch (e) { FXL.parcial = null; }
+  FXL.conc = await consultarTudo('vw_fin_saldo_partida?select=conta,unidade,fonte_partida,conciliado_ate,ultimo_dia_extrato').catch(() => null);
 }
 
+// 17/11/2026 (dono 14:40: "o projetado parte do saldo conciliado"; Financeiro 8c4b438): por conta, até quando o saldo bateu
+// (vw_fin_saldo_partida.conciliado_ate). Conciliado antes do último extrato = a partida recuou ao último saldo bom.
+function finConciliadoAteHtml(rows, loja) {
+  const L = (rows || []).filter((p) => p.fonte_partida === 'EXTRATO' && !fxlConta(p.conta) && (!loja || loja === 'REDE' || p.unidade === loja));
+  if (!L.length) return '';
+  const dd = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+  const nomeCt = (c) => (typeof nomeConta === 'function' ? nomeConta(c) : c);
+  const g = {}; L.forEach((p) => { const k = p.conciliado_ate || ''; (g[k] = g[k] || []).push(p); });
+  const partes = Object.keys(g).sort().reverse().map((k) => `${k ? 'até ' + dd(k) : 'nenhum dia'}: ${g[k].map((p) => trEscH(nomeCt(p.conta))).join(', ')}`);
+  const atr = L.filter((p) => p.ultimo_dia_extrato && (!p.conciliado_ate || p.conciliado_ate < p.ultimo_dia_extrato));
+  return `<div class="caption-label" style="text-align:left;">Conciliado ${partes.join(' · ')}.</div>`
+    + (atr.length ? `<div class="contexto" style="text-align:left; border-color:var(--amber-2);"><b style="color:var(--amber-2);">Conciliação atrasada — partindo do último saldo bom:</b> `
+      + atr.map((p) => `${trEscH(nomeCt(p.conta))} (bateu até ${p.conciliado_ate ? dd(p.conciliado_ate) : 'nenhum dia'}; extrato até ${dd(p.ultimo_dia_extrato)})`).join(' · ')
+      + `. O que o Saipos mostra depois disso entra no número.</div>` : '');
+}
 function fxlConta(c) { return c && (String(c).startsWith('CREDITO') || PROJ_FORA_CAIXA.includes(c)); }
 
 // 07/11/2026 (auditoria dos numeros, lote 1 — resultado-17, dinheiro-0, dinheiro-4): o "caixa de hoje" e o
@@ -8753,6 +8771,7 @@ function blocoFluxoLimpo() {
         + (atr.length ? `<div class="contexto" style="text-align:left; border-color:var(--amber-2);"><b style="color:var(--amber-2);">Extrato atrasado:</b>
           ${atr.map((p) => `${trEscH(p.conta)} — o último é de ${dm(p.data_partida)}`).join(' · ')}. O que entrou e saiu depois disso ainda não está no número.</div>` : '');
     })()}
+    ${finConciliadoAteHtml(FXL.conc, typeof lojaFin === 'function' ? lojaFin() : null)}
     <div class="caption-label" style="text-align:left;">Em R$ · clique num valor para ver o que o compõe.</div>`;
   const ab = FXL.aberto && FXL.aberto.startsWith('Q|') && FXL.aberto.split('|');
   if (ab) {
