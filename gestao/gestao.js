@@ -4817,7 +4817,7 @@ async function entrarSemana() {
     alvo.innerHTML = '<div class="contexto">Carregando a semana...</div>';
     const hoje = fxHojeSP(), segAtual = fxSegunda(hoje);
     const desde = fxSomaDias(segAtual, -7 * 12);
-    const [vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras] = await Promise.all([
+    const [vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras, custoSem] = await Promise.all([
       consultarTudo(`vw_sem_vendas?select=*&semana=gte.${desde}`), consultarTudo(`vw_sem_itens?select=*&semana=gte.${desde}`),
       consultarTudo(`mv_sem_ifood?select=*&semana=gte.${desde}`), consultarTudo(`mv_sem_anuncios?select=*&semana=gte.${desde}`),
       consultarTudo(`vw_sem_funil?select=*&semana=gte.${desde}`), consultarTudo(`vw_sem_compras?select=*&semana=gte.${desde}`),
@@ -4827,6 +4827,8 @@ async function entrarSemana() {
       consultarTudo('vw_mes_cmv_parcial?select=*'),
       // 17/11/2026 (auditoria resultado-15; Financeiro a08f123): atacado (ePadoca), royalties do Boqueirão e outras receitas por semana
       consultarTudo(`vw_fin_outras_receitas_semana?select=*&semana=gte.${desde}`).catch(() => null),
+      // 17/11/2026 (auditoria resultado-19; Financeiro f80226d): o custo do iFood da semana pela mesma regra da vw_canal_custo_mes
+      consultarTudo(`vw_canal_custo_semana?select=semana,unidade,promo_loja,taxas,anuncios,fretes&semana=gte.${desde}`).catch(() => null),
     ]);
     // Meta de mercadoria: DADO, nao constante. Ate 12/09/2026 esta tela tinha
     // META_CMV = 35 escrito no codigo enquanto fin_metas_dre ja dizia 34,5 e
@@ -4836,7 +4838,7 @@ async function entrarSemana() {
       consultarTudo('fin_metas_dre?select=chave,sentido,pct_meta'),
       consultarTudo('fin_metas_dre_mes?select=chave,mes,pct_meta').catch(() => []),
     ]);
-    FX_S = { hoje, segAtual, vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras,
+    FX_S = { hoje, segAtual, vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras, custoSem,
              metasGerais, metasMes: metasMes || [] };
     // 07/11/2026 (auditoria resultado-17, dinheiro-0): o saldo de hoje vem do Fluxo projetado (fxlResumo)
     if (!FXL) await fxlCarregar();
@@ -4853,7 +4855,13 @@ function fxSemCalc(w) {
   // VENDA CHEIA (dono, 15/10/2026; aplicada aqui em 17/10): o PDV ja vem com a promocao paga
   // pela loja descontada e o custo iFood abaixo a desconta de novo — a margem saia ~R$ 17 mil
   // por semana menor na Rede. Venda = PDV + promocao da loja, a mesma regra de fxVendaCheia.
-  const promoLojaSem = fxSoma(ifd, 'promo_loja');
+  // 17/11/2026 (resultado-19): uma fonte só para o custo do iFood — vw_canal_custo_semana (a regra das linhas do iFood da
+  // vw_canal_custo_mes, a do Placar e da DRE): promoção da loja, taxas, anúncios e entregas sob demanda. A promoção da
+  // venda cheia sai da mesma linha. Semana que a conciliação ainda não trouxe: a conta de antes (export + extrato).
+  const cs = FX_S.custoSem ? f(FX_S.custoSem) : [];
+  const doCanal = cs.some(r => fxN(r.promo_loja) + fxN(r.taxas) + fxN(r.anuncios) > 0.5);
+  const promoLojaSem = doCanal ? fxSoma(cs, 'promo_loja') : fxSoma(ifd, 'promo_loja');
+  const taxasSem = doCanal ? fxSoma(cs, 'taxas') : fxSoma(ifd, 'taxas'), anSem = doCanal ? fxSoma(cs, 'anuncios') : an, fretesSD = doCanal ? fxSoma(cs, 'fretes') : 0;
   if (promoLojaSem) canais.IFOOD = (canais.IFOOD || 0) + promoLojaSem;
   const fat = fxSoma(v, 'faturamento') + promoLojaSem, ped = fxSoma(v, 'pedidos'), it = fxSoma(f(FX_S.itens), 'itens');
   const pedCanal = {}; v.forEach(r => { pedCanal[r.canal] = (pedCanal[r.canal] || 0) + fxN(r.pedidos); });
@@ -4861,14 +4869,14 @@ function fxSemCalc(w) {
   const listas = FX_S.listas.filter(r => r.semana === w);
   const enviadas = L.includes('AGUA VERDE') ? fxSoma(listas, 'valor') : 0;
   const recebidas = fxSoma(listas.filter(r => L.includes(r.unidade) && r.unidade !== 'AGUA VERDE'), 'valor');
-  const custoIfood = fxSoma(ifd, 'promo_loja') + fxSoma(ifd, 'taxas') + an;
+  const custoIfood = promoLojaSem + taxasSem + anSem + fretesSD;
   const compras = compMP + compUC - enviadas + recebidas;
   // 17/11/2026 (resultado-15): o que entrou além da venda (atacado, royalties, outras). A compra do atacado está nas
   // notas da Água Verde: o divisor do CMV e a sobra levam a venda dele, como na DRE.
   const ou = FX_S.outras ? f(FX_S.outras) : [];
   const outras = fxSoma(ou, 'total_outras'), atacado = fxSoma(ou, 'atacado_venda'), royalties = fxSoma(ou, 'royalties_boqueirao'), outrasRec = fxSoma(ou, 'outras_receitas');
-  return { outras, atacado, royalties, outrasRec, entrou: fat + outras, ifVenda: canais.IFOOD || 0, w, fat, ped, it, ticket: ped ? fat / ped : 0, canais, pedCanal, ifPed: fxSoma(ifd, 'pedidos'), ifItens: fxSoma(ifd, 'itens'), promoLoja: fxSoma(ifd, 'promo_loja'), promoIfood: fxSoma(ifd, 'promo_ifood'),
-    taxas: fxSoma(ifd, 'taxas'), frete: fxSoma(ifd, 'frete'), anuncios: an, custoIfood, visitas: fxSoma(fu, 'visitas'), concluidos: fxSoma(fu, 'concluidos'),
+  return { outras, atacado, royalties, outrasRec, entrou: fat + outras, ifVenda: canais.IFOOD || 0, w, fat, ped, it, ticket: ped ? fat / ped : 0, canais, pedCanal, ifPed: fxSoma(ifd, 'pedidos'), ifItens: fxSoma(ifd, 'itens'), promoLoja: promoLojaSem, promoIfood: fxSoma(ifd, 'promo_ifood'),
+    taxas: taxasSem, frete: fxSoma(ifd, 'frete'), anuncios: anSem, fretesSD, doCanal, custoIfood, visitas: fxSoma(fu, 'visitas'), concluidos: fxSoma(fu, 'concluidos'),
     compras, compMP, compUC, enviadas, recebidas, margem: fat + outras - compras - custoIfood };
 }
 
@@ -4933,9 +4941,9 @@ function renderSemana() {
   // 17/11/2026 (auditoria resultado-19): "de cada R$ 100" divide pela venda do iFood COM a entrega (a do Canal e da DRE),
   // não pelos itens do export — eram dois valores de venda iFood na mesma tela
   const cemIf = a.ifVenda ? a.custoIfood / a.ifVenda * 100 : 0, cemIfJ = j && j.ifVenda ? j.custoIfood / j.ifVenda * 100 : null;
-  h += `<div class="fx-secao"><h3>2. O que o iFood custou</h3><span>pedido a pedido, pelo export do iFood + anúncios do extrato</span></div><div class="fx-tiles">`
+  h += `<div class="fx-secao"><h3>2. O que o iFood custou</h3><span>${a.doCanal ? 'pela conciliação do iFood, a mesma conta do Placar e da DRE' : 'pelo export do iFood + anúncios do extrato (a conciliação desta semana ainda não chegou)'}</span></div><div class="fx-tiles">`
     + fxTile('Custo iFood da semana', a.custoIfood, j ? fxVar(a.custoIfood, j.custoIfood, ra) : '', `de cada R$ 100 vendidos no iFood, <b>R$ ${Math.round(cemIf)}</b> ficaram com o iFood${cemIfJ !== null ? ` (anterior: R$ ${Math.round(cemIfJ)})` : ''}`, fxSpark(SEM.map(w => S[w].ifVenda ? S[w].custoIfood / S[w].ifVenda * 100 : 0), rots, v => 'R$ ' + v.toFixed(0)),
-      `<ul class="fx-lista"><li><span>promoções pagas pela loja</span><b>${fxMil(a.promoLoja)}</b></li><li><span>comissão e taxas</span><b>${fxMil(a.taxas)}</b></li><li><span>anúncios</span><b>${fxMil(a.anuncios)}</b></li></ul>`)
+      `<ul class="fx-lista"><li><span>promoções pagas pela loja</span><b>${fxMil(a.promoLoja)}</b></li><li><span>comissão e taxas</span><b>${fxMil(a.taxas)}</b></li><li><span>anúncios</span><b>${fxMil(a.anuncios)}</b></li>${a.fretesSD > 0.5 ? `<li><span>entregas sob demanda</span><b>${fxMil(a.fretesSD)}</b></li>` : ''}</ul>`)
     + fxTile('Venda no iFood', a.ifVenda, j ? fxVar(a.ifVenda, j.ifVenda, ra) : '', `${fxInt(a.ifPed)} pedidos entregues`, fxSpark(SEM.map(w => S[w].ifVenda), rots, fxMil))
     + fxTile('Entrega paga pelos clientes', a.frete, j ? fxVar(a.frete, j.frete, ra) : '', 'taxa de entrega cobrada no iFood — ajuda a pagar os motoboys; já está dentro das vendas', fxSpark(SEM.map(w => S[w].frete), rots, fxMil))
     + fxTile('Promoção paga pelo iFood', a.promoIfood, j ? fxVar(a.promoIfood, j.promoIfood, ra) : '', 'desconto que o iFood banca, não nós', fxSpark(SEM.map(w => S[w].promoIfood), rots, fxMil))
