@@ -93,7 +93,7 @@ async function nfcAbrir(chave) {
   nfcDesenhar();
   if (!NFC.aberta || NFC.itens[chave]) return;
   try {
-    NFC.itens[chave] = await consultarTudo(`vw_compra_nf_pre_entrada?select=n_item,c_prod,x_prod,u_com,q_com,v_prod,nome_base,nome_saipos,fator,qtd_estoque,un_estoque,traducao&chave=eq.${encodeURIComponent(chave)}&order=n_item`);
+    NFC.itens[chave] = await consultarTudo(`vw_compra_nf_pre_entrada?select=n_item,cnpj_emit,c_prod,x_prod,u_com,q_com,v_prod,nome_base,nome_saipos,fator,qtd_estoque,un_estoque,traducao&chave=eq.${encodeURIComponent(chave)}&order=n_item`);
   } catch (e) { NFC.itens[chave] = { erro: e.message }; }
   if (nfcPodeEnsinar() && NFC.itens[chave] && !NFC.itens[chave].erro && NFC.itens[chave].some((i) => nfcTom(i.traducao)[0] === 'vermelho') && !NFC.base) {
     try { NFC.base = await consultarTudo('ft_item_base?select=nome_saipos,nome_base,nao_usa&order=nome_saipos'); } catch (e) { NFC.base = []; }
@@ -170,7 +170,7 @@ async function nfcEnsinar(chave, nItem) {
   if (NFC.base && !NFC.base.some((b) => b.nome_saipos === nome)) return avisoAcao('atencao', '! Esse nome não está na base: escolha um da lista (item novo de verdade vai ao Neto antes).');
   if (!(fator > 0)) return avisoAcao('atencao', '! Diga quanto 1 unidade da nota vale no estoque (maior que zero).');
   avisoAcao('enviando', 'Ensinando…');
-  const r = await trRpcSeguro('compra_item_ensinar', { p_cnpj_emit: nfcCnpj(chave), p_c_prod: i.c_prod, p_nome_saipos: nome, p_fator: fator });
+  const r = await trRpcSeguro('compra_item_ensinar', { p_cnpj_emit: i.cnpj_emit || nfcCnpj(chave), p_c_prod: i.c_prod, p_nome_saipos: nome, p_fator: fator });
   if (!r.ok) return avisoAcao('erro', '✗ Não ensinou: ' + await trErroDe(r) + ' — tente de novo.', () => nfcEnsinar(chave, nItem));
   avisoAcao('ok', `✓ Aprendido: ${i.x_prod} = ${nome} — às ${avisoHora()}. Vale para as próximas notas deste fornecedor.`);
   NFC.itens = {}; NFC.aberta = null;
@@ -182,7 +182,7 @@ async function nfcForaEstoque(chave, nItem) {
   const todos = !!(document.getElementById('nfcT_' + id) || {}).checked;
   if (!motivo) return avisoAcao('atencao', '! Diga por que não é de estoque.');
   avisoAcao('enviando', 'Gravando…');
-  const r = await trRpcSeguro('compra_item_fora_do_estoque', { p_cnpj_emit: nfcCnpj(chave), p_c_prod: i.c_prod, p_todos_do_fornecedor: todos, p_motivo: motivo });
+  const r = await trRpcSeguro('compra_item_fora_do_estoque', { p_cnpj_emit: i.cnpj_emit || nfcCnpj(chave), p_c_prod: i.c_prod, p_todos_do_fornecedor: todos, p_motivo: motivo });
   if (!r.ok) return avisoAcao('erro', '✗ Não gravou: ' + await trErroDe(r) + ' — tente de novo.', () => nfcForaEstoque(chave, nItem));
   avisoAcao('ok', `✓ ${todos ? 'O fornecedor todo' : i.x_prod} fica fora do estoque — às ${avisoHora()}.`);
   NFC.itens = {}; NFC.aberta = null;
