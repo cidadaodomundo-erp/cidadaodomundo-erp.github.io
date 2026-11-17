@@ -365,3 +365,4 @@ textarea:focus{outline:none;border-color:var(--preto)}
 @keyframes gira{to{transform:rotate(360deg)}}
 @keyframes pulso{50%{transform:scale(1.08)}}
 @media (prefers-reduced-motion:reduce){.maquininha,.esperando::before{animation:none}}
+.vence{font-weight:700;color:var(--preto);margin:0 0 6px}

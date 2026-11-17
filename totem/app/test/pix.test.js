@@ -54,3 +54,25 @@ test("txid segue a regra do Banco Central (26 a 35 letras/numeros)", () => {
   assert.match(txidDoPedido("a-b"), /^[a-zA-Z0-9]{26,35}$/);
   assert.match(txidDoPedido("x".repeat(80)), /^[a-zA-Z0-9]{26,35}$/);
 });
+
+test("QR vencido vira cancelado e o banco nao aceita mais pagamento", async () => {
+  const { adaptadorPix, bancoPixSimulado, txidDoPedido, VALIDADE_SEGUNDOS, FOLGA_VENCIMENTO_MS } = await import("../src/pix.js");
+  let t = Date.parse("2026-11-17T12:00:00Z");
+  const banco = bancoPixSimulado({ agora: () => t });
+  const a = adaptadorPix({ banco, chavePix: "chave-teste", agora: () => t });
+  const r = await a.cobrar({ idempotencyKey: "pedido-venc1", centavos: 1000, forma: "pix" });
+  assert.equal(r.estado, "aguardando");
+  assert.ok(r.expiraEm);
+  t += VALIDADE_SEGUNDOS * 1000 + FOLGA_VENCIMENTO_MS + 1;
+  assert.equal((await a.consultar({ idempotencyKey: "pedido-venc1" })).estado, "cancelado");
+});
+
+test("cancelar Pix remove a cobranca no banco", async () => {
+  const { adaptadorPix, bancoPixSimulado, txidDoPedido } = await import("../src/pix.js");
+  const banco = bancoPixSimulado();
+  const a = adaptadorPix({ banco, chavePix: "chave-teste" });
+  await a.cobrar({ idempotencyKey: "pedido-canc1", centavos: 1000, forma: "pix" });
+  await a.cancelar({ idempotencyKey: "pedido-canc1" });
+  assert.equal(banco.pagar(txidDoPedido("pedido-canc1")), false);
+  assert.equal((await a.consultar({ idempotencyKey: "pedido-canc1" })).estado, "cancelado");
+});

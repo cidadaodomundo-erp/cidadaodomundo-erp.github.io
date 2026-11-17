@@ -4,7 +4,7 @@
 //   -> pedido para uma "loja Saipos" FALSA (nada sai deste computador) -> cozinha -> TV.
 // Nenhuma cobranca real, nenhuma chamada ao Saipos, nenhuma senha. Pode rodar em qualquer PC:
 //   node bin/start-demo.js            (abre em http://127.0.0.1:4660)
-// Opcoes: --porta 4660  --pix-segundos 8  --cartao-segundos 5
+// Opcoes: --porta 4660  --pix-segundos 8  --cartao-segundos 5  --recusar-primeiro-cartao
 
 import { mkdtemp, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -27,6 +27,7 @@ function opcao(nome, padrao) {
 const PORTA = opcao("--porta", 4660);
 const PIX_S = opcao("--pix-segundos", 8);
 const CARTAO_S = opcao("--cartao-segundos", 5);
+const RECUSA_1 = process.argv.includes("--recusar-primeiro-cartao"); // para treinar/mostrar o fluxo de recusa
 
 // Catalogo e mapa FALSOS gerados a partir do cardapio real: cada variacao vira um item da "loja demo".
 export function gerarCatalogoDemo(dto) {
@@ -60,13 +61,17 @@ export function gerarCatalogoDemo(dto) {
 }
 
 // "Saipos" de mentira: responde como a loja de teste, sem rede.
-export function fetchDemo(catalogo, aoPedido = () => {}) {
+export function fetchDemo(catalogo, aoPedido = () => {}, ordem) {
   const resp = (status, obj) => ({ status, text: async () => JSON.stringify(obj) });
   return async (url, init = {}) => {
     if (url.endsWith("/auth")) return resp(200, { token: "DEMO.SEM.TOKEN" });
     if (url.endsWith("/v2/catalog")) return resp(200, { url: LINK });
     if (url === LINK) return resp(200, { data: catalogo });
-    if (url.endsWith("/order")) { aoPedido(init.body); return resp(200, {}); }
+    if (url.endsWith("/order")) {
+      if (ordem) return ordem(init, resp);
+      aoPedido(init.body);
+      return resp(200, {});
+    }
     throw new Error("demo: endereco inesperado");
   };
 }
@@ -84,24 +89,26 @@ function bancoQuePagaSozinho(segundos) {
   return banco;
 }
 
-export async function subirDemo({ porta = PORTA, pixSegundos = PIX_S, cartaoSegundos = CARTAO_S, log = console.log } = {}) {
+// Opcoes extras (testes): dir (reaproveita a pasta = "reiniciar o PC"), ordem (resposta falsa do /order), codigosSaipos.
+export async function subirDemo({ porta = PORTA, pixSegundos = PIX_S, cartaoSegundos = CARTAO_S, log = console.log, dir, ordem, aoPedido, codigosSaipos, pagamento: pagExtra, recusarPrimeiroCartao = RECUSA_1 } = {}) {
   const dto = JSON.parse(await readFile(DTO, "utf8"));
   const { catalogo, mapa } = gerarCatalogoDemo(dto);
-  const dir = await mkdtemp(join(tmpdir(), "totem-demo-"));
-  await writeFile(join(dir, ".env"), "SAIPOS_SECRET=DEMO-SEM-SEGREDO\n");
-  await writeFile(join(dir, "test-store.json"), JSON.stringify({
+  const reaproveita = !!dir;
+  dir = dir ?? await mkdtemp(join(tmpdir(), "totem-demo-"));
+  if (!reaproveita) await writeFile(join(dir, ".env"), "SAIPOS_SECRET=DEMO-SEM-SEGREDO\n");
+  if (!reaproveita) await writeFile(join(dir, "test-store.json"), JSON.stringify({
     storeId: "93936", environment: "desenvolvimento", testStoreVerified: true,
     expectedName: "Cidadão do Mundo - HML", codStore: COD_STORE_TESTE, idPartner: "DEMO-PARCEIRO",
   }));
-  await writeFile(join(dir, "gama-hml-map.json"), JSON.stringify(mapa));
+  if (!reaproveita) await writeFile(join(dir, "gama-hml-map.json"), JSON.stringify(mapa));
 
-  const tef = adaptadorTef({ provedor: tefSimulado({ aprovarDepoisMs: cartaoSegundos * 1000 }) });
+  const tef = adaptadorTef({ provedor: tefSimulado({ aprovarDepoisMs: cartaoSegundos * 1000, decidir: (c, n) => (recusarPrimeiroCartao && n === 1 ? "recusado" : "aprovado") }) });
   const pix = adaptadorPix({ banco: bancoQuePagaSozinho(pixSegundos), chavePix: "chave-pix-demo" });
-  const pagamento = { adaptador: adaptadorPorForma({ pix, debito: tef, credito: tef }) };
+  const pagamento = pagExtra ?? { adaptador: adaptadorPorForma({ pix, debito: tef, credito: tef }), ...(codigosSaipos ? { codigosSaipos } : {}) };
 
   const server = await criarServidorHml({
     envPath: join(dir, ".env"), gamaPath: DTO, timeoutMs: 2000, pagamento,
-    fetchImpl: fetchDemo(catalogo, () => log("  -> pedido chegou na loja DEMO (simulada)")),
+    fetchImpl: fetchDemo(catalogo, (corpo) => { log("  -> pedido chegou na loja DEMO (simulada)"); aoPedido?.(corpo); }, ordem),
   });
   await new Promise((ok, falha) => { server.once("error", falha); server.listen(porta, ok); });
   const p = server.address().port;

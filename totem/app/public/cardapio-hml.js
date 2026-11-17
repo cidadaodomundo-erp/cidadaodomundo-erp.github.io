@@ -494,6 +494,32 @@
     $("btnEntrar").focus();
   }
 
+  // ---------- quiosque: volta sozinho para a abertura ----------
+  const OCIOSO_MS = 90000;      // cliente abandonou o cardapio/carrinho
+  const DEPOIS_SENHA_MS = 30000; // pedido concluido: libera para o proximo cliente
+  let ultimoToque = Date.now();
+  for (const ev of ["pointerdown", "keydown", "input", "wheel", "touchstart"]) document.addEventListener(ev, () => { ultimoToque = Date.now(); }, { passive: true });
+  function reiniciarTotem() {
+    clearTimeout(timerPagamento);
+    assinaturaPagamento = "";
+    pedido = null; localStorage.removeItem(CHAVE_PEDIDO);
+    carrinho = []; gravar(CHAVE_CARRINHO, carrinho);
+    mostrarResultado(null);
+    renderCarrinho();
+    if ($("dialogo").open) $("dialogo").close();
+    voltarInicio();
+  }
+  setInterval(() => {
+    if (document.body.classList.contains("estado-abertura") || emVoo) return;
+    const parado = Date.now() - ultimoToque;
+    const pg = pedido && pedido.pagamento;
+    if (pedido && pedido.estado === "aceito") { if (parado > DEPOIS_SENHA_MS) reiniciarTotem(); return; }
+    if (pedido && pedido.pago) return; // pago: so atendente/fluxo encerram
+    if (pedido && ["enviando", "ambiguo", "bloqueado"].includes(pedido.estado)) return;
+    if (pg && (pg.estado === "aguardando" || pg.estado === "incerto")) return; // cliente pode estar pagando
+    if (parado > OCIOSO_MS) reiniciarTotem();
+  }, 5000);
+
   $("btnEntrar").addEventListener("click", entrar);
   $("btnInicio").addEventListener("click", voltarInicio);
   $("aberturaVideo").addEventListener("error", () => { $("aberturaVideo").hidden = true; });
@@ -507,8 +533,18 @@
     const alvo = $("resultado");
     alvo.textContent = "";
     if (!r) { $("btnNovo").hidden = true; return; }
-    const p = el("p", r.estado === "aceito" || r.estado === "enviando" ? "" : "erro", r.mensagem || "");
+    const pago = !!(pedido && pedido.pago);
+    let msg = r.mensagem || "";
+    if (pago && r.estado === "nao_enviado") msg = "Pagamento aprovado. Tentando enviar para a cozinha de novo…";
+    if (pago && ["recusado", "ambiguo", "bloqueado"].includes(r.estado)) msg = "Seu pagamento foi aprovado. Chame um atendente e mostre esta tela.";
+    const p = el("p", r.estado === "aceito" || r.estado === "enviando" ? "" : "erro", msg);
     alvo.appendChild(p);
+    if (pago && r.estado === "nao_enviado") {
+      pedido.tentativas = (pedido.tentativas || 0) + 1;
+      gravar(CHAVE_PEDIDO, pedido);
+      if (pedido.tentativas <= 5) setTimeout(enviar, 3000); // mesma chave: nunca paga de novo
+      else alvo.firstChild.textContent = "Seu pagamento foi aprovado, mas o pedido não chegou à cozinha. Chame um atendente e mostre esta tela.";
+    }
     if (r.senha && r.estado !== "nao_enviado") alvo.appendChild(el("div", "senha", "Senha " + r.senha));
     if (r.totalCentavos !== undefined && r.estado === "aceito") alvo.appendChild(el("p", "detalhe", `Total do pedido de teste: ${dinheiro(r.totalCentavos)}`));
     if (r.estado === "aceito" && pedido && pedido.pagamento && pedido.pagamento.estado === "aprovado") {
@@ -520,7 +556,7 @@
       recibo.appendChild(el("p", "", "Acompanhe sua senha na TV."));
       alvo.appendChild(recibo);
     }
-    $("btnNovo").hidden = !(r.estado === "aceito" || r.estado === "ambiguo" || r.podeTentarNovamente);
+    $("btnNovo").hidden = !(r.estado === "aceito" || r.estado === "ambiguo" || r.podeTentarNovamente) || (pago && r.estado === "nao_enviado" && pedido.tentativas <= 5);
     $("btnNovo").textContent = r.estado === "ambiguo" ? "Já conferi na loja de teste; começar novo pedido" : r.estado === "aceito" ? "Começar novo pedido de teste" : "Tentar de novo com um novo pedido";
     if (carrinhoAberto && alvo.scrollIntoView) alvo.scrollIntoView({ block: "nearest", behavior: reduzir() ? "auto" : "smooth" });
   }
@@ -545,6 +581,33 @@
 
   // ---------- pagamento (so quando o servidor liga a etapa) ----------
   let timerPagamento = null;
+  let assinaturaPagamento = "";
+  let fimQr = null;
+
+  function textoVence() {
+    if (!fimQr) return "";
+    const s = Math.max(0, Math.round((fimQr - Date.now()) / 1000));
+    return s > 0 ? `O QR Code vence em ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "QR Code vencido. Conferindo…";
+  }
+  setInterval(() => { const v = document.querySelector(".vence"); if (v) v.textContent = textoVence(); }, 1000);
+
+  async function cancelarPagamento() {
+    if (!pedido || emVoo) return;
+    emVoo = true;
+    clearTimeout(timerPagamento);
+    try {
+      const resp = await fetch("/api/hml/pagamento/cancelar", {
+        method: "POST", cache: "no-store",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": cfg.csrf },
+        body: JSON.stringify({ idempotencyKey: pedido.key }),
+      });
+      emVoo = false;
+      await tratarPagamento(await resp.json()); // se pagou no ultimo segundo, vale o aprovado
+    } catch {
+      emVoo = false;
+      await consultarPagamento();
+    }
+  }
 
   function desenharQr(texto) {
     if (typeof window.qrcode !== "function") return null;
@@ -599,6 +662,10 @@
 
   function mostrarPagamento(r) {
     const alvo = $("resultado");
+    const assinatura = [r.estado, r.forma, r.qr, r.mensagem, r.totalCentavos].join("|");
+    if (assinatura === assinaturaPagamento && alvo.querySelector(".pagar")) return; // nada mudou: nao redesenha o QR
+    assinaturaPagamento = assinatura;
+    fimQr = r.expiraEm ? Date.parse(r.expiraEm) : null;
     alvo.textContent = "";
     const caixa = el("div", "pagar");
     caixa.appendChild(el("h3", "pagar-titulo", `${NOME_FORMA[r.forma] || "Pagamento"} · ${dinheiro(r.totalCentavos || 0)}`));
@@ -608,13 +675,23 @@
       if (svg) caixa.appendChild(svg);
       caixa.appendChild(el("p", "detalhe", "Ou use o Pix copia e cola:"));
       caixa.appendChild(el("p", "copia", r.qr));
+      if (fimQr) caixa.appendChild(el("p", "vence", textoVence()));
     }
     if (r.estado === "aguardando" && r.forma !== "pix") caixa.appendChild(el("div", "maquininha", "💳"));
-    if (r.estado === "aguardando" || r.estado === "incerto") caixa.appendChild(el("div", "esperando", "Aguardando confirmação…"));
+    if (r.estado === "aguardando" || r.estado === "incerto") {
+      caixa.appendChild(el("div", "esperando", "Aguardando confirmação…"));
+      if (r.estado === "aguardando") {
+        const c = el("button", "secundario", "Cancelar pagamento");
+        c.type = "button";
+        c.addEventListener("click", cancelarPagamento);
+        caixa.appendChild(c);
+      }
+    }
     if (r.estado === "recusado" || r.estado === "cancelado") {
       const de = el("button", "cta", "Escolher outra forma de pagamento");
       de.type = "button";
       de.addEventListener("click", () => {
+        assinaturaPagamento = "";
         // nova chave: a tentativa recusada fica registrada e nunca vira cobranca
         pedido = { key: crypto.randomUUID(), itens: pedido.itens, estado: "pagando" };
         gravar(CHAVE_PEDIDO, pedido);
@@ -766,7 +843,9 @@
     renderCategorias();
     renderLista();
     renderCarrinho();
-    if (cfg.pagamento && pedido && pedido.estado === "pagando") { abrirCarrinho(); await consultarPagamento(); }
+    // Pedido em andamento (tela recarregada / totem reiniciado): pula a abertura e mostra o pedido.
+    if (pedido && (pedido.estado === "pagando" || pedido.pago || TRAVADOS.includes(pedido.estado))) { entrar(); abrirCarrinho(); }
+    if (cfg.pagamento && pedido && pedido.estado === "pagando") await consultarPagamento();
     else await aplicarStatus();
     setTimeout(atualizarPeriodicamente, 60000);
   }

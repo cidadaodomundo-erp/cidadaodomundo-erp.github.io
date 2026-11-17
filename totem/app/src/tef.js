@@ -5,6 +5,7 @@
 //
 //   provedor.solicitar({ referencia, centavos, tipo }) -> resposta
 //   provedor.consultar({ referencia })                 -> resposta
+//   provedor.cancelar({ referencia })                  -> (opcional) pede para a maquininha desistir
 //
 //   tipo: "debito" | "credito"
 //   referencia: chave unica do pedido. Repetir a mesma referencia NUNCA pode gerar outra cobranca
@@ -44,19 +45,23 @@ export function adaptadorTef({ provedor }) {
     async consultar({ idempotencyKey }) {
       return traduzir(await provedor.consultar({ referencia: idempotencyKey }));
     },
+    async cancelar({ idempotencyKey }) {
+      if (typeof provedor.cancelar === "function") await provedor.cancelar({ referencia: idempotencyKey });
+    },
   };
 }
 
 // Maquininha de mentira (teste e demonstracao). Fica "pendente" e, depois de aprovarDepoisMs,
 // aplica o roteiro da referencia ("aprovado" por padrao, ou "recusado" / "cancelado").
-export function tefSimulado({ aprovarDepoisMs = 5000, roteiro = {}, agora = () => Date.now() } = {}) {
+// decidir(cobranca, numero) opcional: devolve "aprovado" | "recusado" | "cancelado" (ex.: demo que recusa o 1o cartao).
+export function tefSimulado({ aprovarDepoisMs = 5000, roteiro = {}, agora = () => Date.now(), decidir } = {}) {
   const cobrancas = new Map();
   let solicitadas = 0;
   let nsu = 100000;
 
   function avancar(c) {
     if (c.status !== "pendente" || agora() - c.inicio < aprovarDepoisMs) return;
-    const fim = roteiro[c.referencia] || "aprovado";
+    const fim = roteiro[c.referencia] || (decidir && decidir(c, c.numero)) || "aprovado";
     c.status = fim;
     if (fim === "aprovado") c.autorizacao = "SIM" + String(++nsu);
     else c.motivo = "simulado";
@@ -68,7 +73,7 @@ export function tefSimulado({ aprovarDepoisMs = 5000, roteiro = {}, agora = () =
     async solicitar({ referencia, centavos, tipo }) {
       if (!cobrancas.has(referencia)) {
         solicitadas += 1;
-        cobrancas.set(referencia, { referencia, centavos, tipo, status: "pendente", inicio: agora() });
+        cobrancas.set(referencia, { referencia, centavos, tipo, status: "pendente", inicio: agora(), numero: solicitadas });
       }
       const c = cobrancas.get(referencia);
       avancar(c);
@@ -79,6 +84,10 @@ export function tefSimulado({ aprovarDepoisMs = 5000, roteiro = {}, agora = () =
       if (!c) return { status: "desconhecido" };
       avancar(c);
       return ver(c);
+    },
+    async cancelar({ referencia }) {
+      const c = cobrancas.get(referencia);
+      if (c) { avancar(c); if (c.status === "pendente") { c.status = "cancelado"; c.motivo = "cliente desistiu"; } }
     },
   };
 }

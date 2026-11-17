@@ -68,3 +68,41 @@ test("entradas invalidas sao recusadas", async () => {
   await assert.rejects(p.pagar({ ...base, centavos: 0, idempotencyKey: "pedido-inv1" }));
   await assert.rejects(p.pagar({ ...base, forma: "cheque", idempotencyKey: "pedido-inv2" }));
 });
+
+test("registro e gravado ANTES de cobrar; falha ao gravar = nada cobrado", async () => {
+  const a = adaptadorSimulado();
+  const gravados = [];
+  const ok = criarPagamentos({ adaptador: { ...a, cobrar: async (x) => { assert.equal(gravados.length, 1); return a.cobrar(x); } }, aoMudar: async (l) => { gravados.push(l); } });
+  await ok.pagar({ ...base, idempotencyKey: "pedido-grv1" });
+  assert.ok(gravados.length >= 2);
+  const ruim = criarPagamentos({ adaptador: a, aoMudar: async () => { throw new Error("disco cheio"); } });
+  await assert.rejects(() => ruim.pagar({ ...base, idempotencyKey: "pedido-grv2" }));
+  assert.equal(a.cobrancas.filter((c) => c.idempotencyKey === "pedido-grv2").length, 0);
+});
+
+test("depois de reiniciar, pagamento pendente so e consultado (nunca cobrado de novo)", async () => {
+  const a = adaptadorSimulado({ "pedido-rei1": "erro-depois-aprovado" });
+  let salvo = [];
+  const p1 = criarPagamentos({ adaptador: a, aoMudar: async (l) => { salvo = l; } });
+  assert.equal((await p1.pagar({ ...base, idempotencyKey: "pedido-rei1" })).estado, ESTADOS.INCERTO);
+  const p2 = criarPagamentos({ adaptador: a, registros: salvo });
+  assert.equal((await p2.pagar({ ...base, idempotencyKey: "pedido-rei1" })).estado, ESTADOS.APROVADO);
+  assert.equal(a.cobrancas.length, 1);
+  assert.throws(() => criarPagamentos({ adaptador: a, registros: [{ idempotencyKey: "x" }] }));
+});
+
+test("cancelar consulta o banco: se o cliente ja pagou, vale o aprovado", async () => {
+  let pago = false;
+  const ad = {
+    cobrar: async ({ centavos }) => ({ estado: "aguardando", centavos }),
+    consultar: async () => (pago ? { estado: "aprovado", centavos: base.centavos } : { estado: "cancelado" }),
+    cancelar: async () => {},
+  };
+  const p = criarPagamentos({ adaptador: ad });
+  await p.pagar({ ...base, idempotencyKey: "pedido-can9" });
+  pago = true;
+  assert.equal((await p.cancelar("pedido-can9")).estado, ESTADOS.APROVADO);
+  await p.pagar({ ...base, idempotencyKey: "pedido-can8" });
+  pago = false;
+  assert.equal((await p.cancelar("pedido-can8")).estado, ESTADOS.CANCELADO);
+});

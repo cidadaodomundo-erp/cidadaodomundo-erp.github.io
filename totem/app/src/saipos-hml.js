@@ -116,6 +116,7 @@ function visaoPagamento(reg) {
     mensagem: (reg.estado === "aguardando" && reg.forma !== "pix" && reg.mensagem) || MSG_PAGAMENTO[chaveMsg] || MSG_PAGAMENTO.incerto,
   };
   if (reg.estado === "aguardando" && reg.qr) v.qr = reg.qr;
+  if (reg.estado === "aguardando" && reg.expiraEm) v.expiraEm = reg.expiraEm;
   if (reg.estado === "aprovado") v.autorizacao = reg.autorizacao ?? null;
   return v;
 }
@@ -228,7 +229,9 @@ const ROTA_ACAO = /^\/api\/hml\/preparo\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 // gamaPath: DTO do cardapio (padrao data/gama-cardapio.json); mapPath: mapa Gama->HML ao lado do .env
 // (padrao gama-hml-map.json); agora: relogio injetavel (testes).
 // pagamento (opt-in, padrao null = sem etapa de pagamento, comportamento legado):
-//   { adaptador } com cobrar()/consultar() e .formas (ver adaptadorPorForma em pagamento.js).
+//   { adaptador, codigosSaipos? } adaptador com cobrar()/consultar() e .formas (ver adaptadorPorForma em pagamento.js);
+//   codigosSaipos: { pix, debito, credito } -> codigo da forma de pagamento no canal Saipos (padrao: PAGAMENTO_CODIGO).
+//   Pagamentos sao gravados em pagamentos-state.json ao lado do .env (antes de cobrar).
 //   Ligado: o carrinho SO vai para a loja depois de pagamento aprovado do MESMO carrinho e valor.
 // tvAutomatica (opt-in, padrao null = comportamento legado TICKET + botoes locais):
 //   { webhook: { segredo: <64hex privado>, porta?: 4656 (0 = efemera, testes) } }
@@ -237,8 +240,13 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
   if (pagamento !== null && (!pagamento?.adaptador || !Array.isArray(pagamento.adaptador.formas) || !pagamento.adaptador.formas.length)) {
     throw new ErroConector("PAGAMENTO_CONFIG_INVALIDA", "Configuração de pagamento inválida.");
   }
-  const pagamentos = pagamento ? criarPagamentos({ adaptador: pagamento.adaptador }) : null;
   const formasAceitas = pagamento ? pagamento.adaptador.formas.filter((f) => FORMAS.includes(f)) : [];
+  const codigosSaipos = pagamento?.codigosSaipos ?? {};
+  if (pagamento && (typeof codigosSaipos !== "object" || Object.entries(codigosSaipos).some(([f, c]) => !FORMAS.includes(f) || typeof c !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(c)))) {
+    throw new ErroConector("PAGAMENTO_CONFIG_INVALIDA", "Configuração de pagamento inválida.");
+  }
+  const codigoPagamento = (forma) => codigosSaipos[forma] ?? PAGAMENTO_CODIGO;
+  let pagamentos = null;
   const carrinhoPago = new Map(); // chave do pedido -> hash do carrinho cobrado
   if (tvAutomatica !== null && !segredoValido(tvAutomatica?.webhook?.segredo)) {
     throw new ErroConector("WEBHOOK_CONFIG_INVALIDA", "Configuração do webhook inválida.");
@@ -258,6 +266,25 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
     const mapa = await carregarMapa(mapPath ?? join(caminhos.dir, "gama-hml-map.json"), meta.codStore, dto);
     cardapio = { ctx: { dto, mapa, catalogo } };
   } catch { /* cardapio indisponivel */ }
+  if (pagamento) {
+    // Registro de pagamentos em disco: corrompido => erro (nunca recomeca do zero e cobra de novo).
+    const pagPath = join(caminhos.dir, "pagamentos-state.json");
+    const bruto = await lerJsonOpcional(pagPath);
+    if (bruto !== null && (!bruto || bruto.v !== 1 || !Array.isArray(bruto.registros) || typeof bruto.carrinhos !== "object" || bruto.carrinhos === null ||
+        Object.entries(bruto.carrinhos).some(([k, h]) => !UUID.test(k) || !/^[a-f0-9]{64}$/.test(String(h))))) {
+      throw new ErroConector("ESTADO_INVALIDO", "Arquivo de pagamentos inválido; não foi sobrescrito.");
+    }
+    for (const [k, h] of Object.entries(bruto?.carrinhos ?? {})) carrinhoPago.set(k, h);
+    try {
+      pagamentos = criarPagamentos({
+        adaptador: pagamento.adaptador,
+        registros: bruto?.registros ?? [],
+        aoMudar: (lista) => gravarJsonAtomico(pagPath, { v: 1, registros: lista, carrinhos: Object.fromEntries(carrinhoPago) }),
+      });
+    } catch {
+      throw new ErroConector("ESTADO_INVALIDO", "Arquivo de pagamentos inválido; não foi sobrescrito.");
+    }
+  }
   const statePath = join(caminhos.dir, "ui-hml-state.json");
   const { estado, alterado } = await carregarEstado(statePath);
   const salvar = () => gravarJsonAtomico(statePath, estado);
@@ -339,7 +366,13 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
   // mapa ausente/invalido, item nao pronto, horario, limites => resposta sem auth/prepare/ledger/contador.
   async function executarCarrinho(chave, corpo) {
     const hash = hashCarrinho(corpo);
-    const existente = estado.chaves[chave];
+    let existente = estado.chaves[chave];
+    // Pedido JA PAGO que comprovadamente nao saiu (nao_enviado): pode tentar de novo com a mesma chave,
+    // para o cliente nunca precisar pagar outra vez. Recusado/ambiguo nao repete (atendente confere).
+    if (existente && existente.estado === "nao_enviado" && existente.hash === hash && pagamentos?.liberaCozinha(chave)) {
+      delete estado.chaves[chave];
+      existente = undefined;
+    }
     if (existente) {
       return existente.hash === hash
         ? { status: 200, corpo: resumir(existente) }
@@ -375,7 +408,8 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
 
     let prep;
     try {
-      prep = await prepararCarrinho({ caminhos, meta, itens: val.itensHml, paymentCode: PAGAMENTO_CODIGO, senha, agora: agora(), mode: tvAutomatica ? MODO_AUTOMATICO : "TICKET" });
+      const forma = pagamentos?.obter(chave)?.forma;
+      prep = await prepararCarrinho({ caminhos, meta, itens: val.itensHml, paymentCode: forma ? codigoPagamento(forma) : PAGAMENTO_CODIGO, senha, agora: agora(), mode: tvAutomatica ? MODO_AUTOMATICO : "TICKET" });
       if (prep.totalCentavos !== val.totalCentavos) throw new ErroConector("RESUMO_DIVERGENTE", "Resumo divergente.");
     } catch {
       await mudar(e, { estado: "nao_enviado" });
@@ -419,11 +453,15 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
       if (err instanceof ErroCardapio) return { status: err.status, corpo: { erro: err.codigo, mensagem: err.message, motivo: err.motivo ?? null } };
       throw err;
     }
-    carrinhoPago.set(chave, hash);
+    const existente = pagamentos.obter(chave);
+    if (existente && (existente.centavos !== val.totalCentavos || existente.forma !== forma)) return { status: 409, corpo: erro("pagamento_divergente") };
+    const novo = !carrinhoPago.has(chave);
+    carrinhoPago.set(chave, hash); // gravado junto com o registro, antes de cobrar
     try {
       return { status: 200, corpo: visaoPagamento(await pagamentos.pagar({ idempotencyKey: chave, centavos: val.totalCentavos, forma })) };
     } catch {
-      return { status: 409, corpo: erro("pagamento_divergente") };
+      if (novo && !pagamentos.obter(chave)) carrinhoPago.delete(chave);
+      return { status: 503, corpo: erro("interno") };
     }
   }
 
@@ -643,6 +681,19 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
       lido.valor.idempotencyKey = lido.valor.idempotencyKey.toLowerCase();
       const r = await serial(() => executarCarrinho(lido.valor.idempotencyKey, lido.valor));
       return responder(res, r.status, r.corpo);
+    }
+
+    if (req.method === "POST" && caminho === "/api/hml/pagamento/cancelar") {
+      if (!pagamentos) return responder(res, 404, erro("pagamento_desligado"));
+      if (h.origin !== `http://127.0.0.1:${porta}`) return responder(res, 403, erro("origem_invalida"));
+      if (String(h["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") return responder(res, 415, erro("tipo_invalido"));
+      if (!csrfOk(h["x-csrf-token"])) return responder(res, 403, erro("protecao_invalida"));
+      const lido = await lerCorpo(req);
+      if (lido.grande) return responder(res, 413, erro("corpo_grande"));
+      if (lido.invalido || Object.keys(lido.valor).join() !== "idempotencyKey" || !UUID.test(String(lido.valor.idempotencyKey))) return responder(res, 400, erro("chave_invalida"));
+      const chave = lido.valor.idempotencyKey.toLowerCase();
+      if (!pagamentos.obter(chave)) return responder(res, 200, visaoPagamento(null));
+      return responder(res, 200, visaoPagamento(await pagamentos.cancelar(chave)));
     }
 
     if (req.method === "POST" && caminho === "/api/hml/pagamento") {

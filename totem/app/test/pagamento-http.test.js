@@ -50,3 +50,76 @@ test("pagar um carrinho e mandar outro (mais caro) com a mesma chave e bloqueado
 test("forma desconhecida e recusada", async () => {
   assert.equal((await post("/api/hml/pagamento", { idempotencyKey: K(4), forma: "fiado", itens })).status, 400);
 });
+
+// ---------- rodada 2: reinicio, cancelar, codigo Saipos por forma, reenvio de pedido pago ----------
+async function subir(opts = {}) {
+  const d = await subirDemo({ porta: 0, pixSegundos: 30, cartaoSegundos: 0, log: () => {}, ...opts });
+  const base = `http://127.0.0.1:${d.porta}`;
+  const c = await (await fetch(base + "/api/hml/config")).json();
+  const enviar = (caminho, corpo) => fetch(base + caminho, { method: "POST", headers: { "content-type": "application/json", origin: base, "x-csrf-token": c.csrf }, body: JSON.stringify(corpo) });
+  const fechar = () => new Promise((r) => { d.server.closeAllConnections?.(); d.server.close(r); });
+  return { ...d, base, enviar, fechar };
+}
+
+test("PC reinicia no meio do pagamento: o pagamento continua registrado e nao e cobrado de novo", async () => {
+  const a = await subir();
+  const r = await (await a.enviar("/api/hml/pagamento", { idempotencyKey: K(10), forma: "pix", itens })).json();
+  assert.equal(r.estado, "aguardando");
+  await a.fechar();
+  const b = await subir({ dir: a.dir });
+  const depois = await (await fetch(`${b.base}/api/hml/pagamento?chave=${K(10)}`)).json();
+  assert.notEqual(depois.estado, "inexistente");
+  assert.equal(depois.totalCentavos, r.totalCentavos);
+  await b.fechar();
+  await rm(a.dir, { recursive: true, force: true });
+});
+
+test("cancelar o Pix: fica cancelado e o pedido nao vai para a loja", async () => {
+  const a = await subir();
+  await a.enviar("/api/hml/pagamento", { idempotencyKey: K(11), forma: "pix", itens });
+  const c = await (await a.enviar("/api/hml/pagamento/cancelar", { idempotencyKey: K(11) })).json();
+  assert.equal(c.estado, "cancelado");
+  assert.equal((await a.enviar("/api/hml/carrinho", { idempotencyKey: K(11), itens })).status, 402);
+  await a.fechar();
+  await rm(a.dir, { recursive: true, force: true });
+});
+
+test("o pedido vai ao Saipos com o codigo da forma paga", async () => {
+  const corpos = [];
+  const a = await subir({ codigosSaipos: { pix: "PIX", debito: "DEB", credito: "CRE" }, aoPedido: (c) => corpos.push(JSON.parse(c)) });
+  await a.enviar("/api/hml/pagamento", { idempotencyKey: K(12), forma: "credito", itens });
+  await fetch(`${a.base}/api/hml/pagamento?chave=${K(12)}`);
+  const r = await (await a.enviar("/api/hml/carrinho", { idempotencyKey: K(12), itens })).json();
+  assert.equal(r.estado, "aceito");
+  assert.equal(corpos.at(-1).payment_types[0].code, "CRE");
+  await a.fechar();
+  await rm(a.dir, { recursive: true, force: true });
+});
+
+test("pedido PAGO que nao saiu (falha antes da rede) e reenviado com a mesma chave; cliente nao paga de novo", async () => {
+  const { rename } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const a = await subir();
+  await a.enviar("/api/hml/pagamento", { idempotencyKey: K(13), forma: "debito", itens });
+  assert.equal((await (await fetch(`${a.base}/api/hml/pagamento?chave=${K(13)}`)).json()).estado, "aprovado");
+  await rename(join(a.dir, ".env"), join(a.dir, ".env.fora")); // credencial some: falha ANTES de enviar
+  const r1 = await (await a.enviar("/api/hml/carrinho", { idempotencyKey: K(13), itens })).json();
+  assert.equal(r1.estado, "nao_enviado");
+  await rename(join(a.dir, ".env.fora"), join(a.dir, ".env"));
+  const r2 = await (await a.enviar("/api/hml/carrinho", { idempotencyKey: K(13), itens })).json();
+  assert.equal(r2.estado, "aceito");
+  await a.fechar();
+  await rm(a.dir, { recursive: true, force: true });
+});
+
+test("pedido pago com resposta incerta do Saipos NAO e repetido (pode ter chegado)", async () => {
+  const a = await subir({ ordem: async () => { throw Object.assign(new Error("x"), { name: "TypeError" }); } });
+  await a.enviar("/api/hml/pagamento", { idempotencyKey: K(14), forma: "debito", itens });
+  await fetch(`${a.base}/api/hml/pagamento?chave=${K(14)}`);
+  const r1 = await (await a.enviar("/api/hml/carrinho", { idempotencyKey: K(14), itens })).json();
+  assert.equal(r1.estado, "ambiguo");
+  const r2 = await (await a.enviar("/api/hml/carrinho", { idempotencyKey: K(14), itens })).json();
+  assert.equal(r2.estado, "ambiguo");
+  await a.fechar();
+  await rm(a.dir, { recursive: true, force: true });
+});
