@@ -4042,7 +4042,7 @@ const PLC_GRAOS = [['mes', 'Mês'], ['tri', 'Trimestre'], ['ano', 'Ano até aqui
 // que ja existem e detalham ele. E' assim que o painel vira arvore em vez de lista —
 // era a decisao da revisao ("clique num numero abre a quebra; a quebra abre a tela").
 const PLC_TILES = [
-  { id: 'fat',   rot: 'Faturamento',            un: 'R$', meta: null,          v: a => a.recBruta,
+  { id: 'fat',   rot: 'Receita bruta de vendas', un: 'R$', meta: null,          v: a => a.recBruta,
     telas: [['evolucao', 'Evolução de vendas'], ['resumo', 'Resumo do canal iFood']] },
   { id: 'ped',   rot: 'Pedidos',                un: 'n',  meta: null,          v: a => a.pedidos,
     telas: [['evolucao', 'Evolução de vendas'], ['cancelamentos', 'Cancelamentos']] },
@@ -5447,7 +5447,7 @@ let DRE_METAS_MES = null; // fin_metas_dre_mes: 'chave|mes' -> % (01/10/2026: a 
 
 let DRE_FIN = null;      // vw_fin_dre_mensal: financeiro Saipos por COMPETENCIA (desde jan/26)
 
-let DRE_VENDAS = null;   // vw_vendas_canal_mensal: receita bruta por canal (PDV Saipos)
+let DRE_VENDAS = null;   // vw_mes_vendas (desde 17/11): receita bruta por canal, a mesma do Placar
 
 let DRE_CANAL = null;    // vw_canal_custo_mes (3 lojas): custo dos canais por FATO, cada cobranca com nome
 
@@ -5594,7 +5594,8 @@ async function entrarDre() {
     let metas, benefMes, metasMes;
     [DRE_RAW, DRE_VENDAS_RAW, metas, BENEF_FAROL, benefMes, DRE_CANAL, metasMes] = await Promise.all([
       consultarTudo('vw_fin_dre_mensal?select=unidade,mes,natureza,tipo,subtipo,ordem,credito,debito&order=mes,ordem'),
-      consultarTudo('vw_vendas_canal_mensal?select=unidade,mes,canal,vendas,receita&order=mes'),
+      // 17/11/2026 (auditoria resultado-12): a venda do mês vem de vw_mes_vendas, a mesma do Placar (receita igual; pedidos sem os de R$ 0)
+      consultarTudo('vw_mes_vendas?select=unidade,mes,canal,vendas:pedidos,receita:faturamento&order=mes'),
       consultarTudo('fin_metas_dre?select=chave,sentido,pct_meta&order=ordem'),
       carregarBeneficioIfood(),
       // com unidade: a view tem UMA LINHA POR MES E UNIDADE, e sem ela o
