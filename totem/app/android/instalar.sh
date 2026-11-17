@@ -7,8 +7,11 @@ mkdir -p "$PASTA_TROCA"
 exec > >(tee "$LOG") 2>&1
 echo "== inicio $(date)"
 export DEBIAN_FRONTEND=noninteractive
-yes | pkg update -y -o Dpkg::Options::=--force-confnew || echo "aviso: pkg update"
-pkg install -y -o Dpkg::Options::=--force-confnew nodejs-lts git termux-api || { echo "== ERRO ao instalar node"; exit 1; }
+apt-get update || echo "aviso: apt update"
+# atualiza TUDO antes (node novo precisa da libc++ nova; sem isso: "CANNOT LINK EXECUTABLE node")
+yes | apt-get -y -o Dpkg::Options::=--force-confnew full-upgrade || echo "aviso: upgrade"
+apt-get install -y -o Dpkg::Options::=--force-confnew nodejs-lts git libc++ || { echo "== ERRO ao instalar node"; exit 1; }
+node -v || { echo "== ERRO: node nao roda"; exit 1; }
 DIR=$HOME/cdm-totem
 REPO=https://github.com/cidadaodomundo-erp/cidadaodomundo-erp.github.io.git
 if [ -d "$DIR/.git" ]; then
