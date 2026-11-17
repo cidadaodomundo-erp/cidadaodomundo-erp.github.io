@@ -2786,6 +2786,13 @@ async function plpManGravar(k) {
   if (v === '') { diz('para tirar, digite 0', 'var(--farol-perto)'); return; }
   const qtd = Number(v.replace(',', '.'));
   if (!isFinite(qtd) || qtd < 0) { diz('não é número', 'var(--farol-fora)'); avisoAcao('atencao', `! ${k}: a quantidade não é número. Corrija.`); return; }
+  // 17/11/2026 (Ajuda #67, proposta 2026-11-17-planejamento-unidade-obrigatoria): abaixo de 0,01 quase sempre é digitação
+  // (PASTEL DE QUEIJO 0,002) — só grava depois de "gravar mesmo assim"
+  if (qtd > 0 && qtd < 0.01 && (M.pouco || {})[k] !== v) {
+    if (st) { st.style.color = 'var(--farol-perto)'; st.innerHTML = `${trEscH(plpQtd(qtd))} é muito pouco — confira <button type="button" class="preset-btn" style="font-size:11px;padding:1px 6px;" onclick="plpManPouco(${trEscH(JSON.stringify(k))})">gravar mesmo assim</button>`; }
+    avisoAcao('atencao', `! ${k}: ${plpQtd(qtd)} é muito pouco. Confira o número; se estiver certo, clique em "gravar mesmo assim".`);
+    return;
+  }
   const r0 = M.cat.find((r) => r.nome_base === k) || {};
   const un = (it && it.un) || r0.un || null;
   diz('salvando…', 'var(--tx-4)');
@@ -2808,6 +2815,7 @@ async function plpManGravar(k) {
   avisoAcao('ok', `✓ ${k}: ${qtd > 0 ? plpQtd(qtd) + ' ' + (un || '') + ' no' : 'tirado do'} plano de ${plpDm(M.data).slice(0, 5)} — às ${avisoHora()}.`);
   plpManPintar();
 }
+function plpManPouco(k) { const M = PLP.man; M.pouco = M.pouco || {}; M.pouco[k] = String(M.dig[k]).trim(); plpManSalvarUm(k); }
 async function plpManFechar() {
   if (EST_OCUPADO) return;
   const M = PLP.man;
