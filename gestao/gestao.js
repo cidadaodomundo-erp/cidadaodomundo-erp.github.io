@@ -6208,7 +6208,7 @@ const DRE_GUIA = [
   ['(=) Resultado sem a isenção do iFood', 'o mesmo mês se o iFood tivesse cobrado os 9,5%. De 05/10/2026 em diante a conta é 9,5% da venda (itens + entrega − desconto que a loja banca); até 04/10 foi sobre o valor depositado e fica como está.'],
   ['Abaixo do resultado', 'o que não é resultado da operação da loja, mas mexe no dinheiro dela: o lucro que as filiais repassam (total enviado menos a lista do mês, com o bônus do iFood dentro), investimentos, retiradas e aportes. A ordem e os nomes seguem o fechamento da MA Consultoria (03/09/2026); os cálculos são nossos.']];
 function dreGuiaNasLinhas() {
-  const norm = (t) => String(t || '').replace(/[▸▾›]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const norm = (t) => String(t || '').replace(/[▸▾›▶▼🎯]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   const G = DRE_GUIA.map(([k, v]) => [norm(k), v]);
   document.querySelectorAll('#tabelaDRE tr').forEach((tr) => {
     const td = tr.querySelector('td'); if (!td || td.title) return;
