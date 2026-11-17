@@ -2404,6 +2404,7 @@ function plpBlocoPlano() {
       <button class="preset-btn" onclick="plpUsarSugerido()" title="Põe e grava a sugestão no que é do dia, no que não tem dia na grade e no que é de outro dia mas acaba antes dele">Preencher os vazios com o sugerido</button>
       <button class="preset-btn active est-ciclo" onclick="plpFecharEGerar()" ${dec.length || plpMudancas().length ? '' : 'disabled title="Decida ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
       <span id="plpMsg" style="align-self:center; font-size:12.5px;"></span>
+      ${(() => { const um = linhas.find((d) => d.id_plano); return um ? plpDesfBotoes(um.id_plano) : ''; })()}
     </div>`;
   return h;
 }
@@ -2759,7 +2760,8 @@ function plpManRender() {
   } else {
     h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;">
       <button id="plpManFecharBtn" class="preset-btn active est-ciclo" onclick="plpManFechar()" ${plpManNoPlano().length || Object.keys(M.dig).length ? '' : 'disabled title="Digite a quantidade de ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
-      <span class="caption-label" style="text-align:left;">Digite a quantidade: grava ao sair do campo · 0 tira do plano.</span></div>`;
+      <span class="caption-label" style="text-align:left;">Digite a quantidade: grava ao sair do campo · 0 tira do plano.</span>
+      ${M.idPlano ? plpDesfBotoes(M.idPlano) : ''}</div>`;
   }
   // filtros: categoria, família (da categoria escolhida), só o que está no plano, busca
   h += `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0;">
