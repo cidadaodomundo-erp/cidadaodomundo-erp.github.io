@@ -4,7 +4,8 @@
 (() => {
   const CHAVE_CARRINHO = "hml.carrinho.v1";
   const CHAVE_PEDIDO = "hml.pedido.v1";
-  const TRAVADOS = ["enviando", "aceito", "ambiguo", "bloqueado"];
+  const TRAVADOS = ["pagando", "enviando", "aceito", "ambiguo", "bloqueado"];
+  const NOME_FORMA = { pix: "Pix", debito: "Débito", credito: "Crédito" };
   const $ = (id) => document.getElementById(id);
   let cfg = null;
   let menu = null;
@@ -394,7 +395,14 @@
       caixa.appendChild(linha);
     });
     $("total").textContent = dinheiro(total);
-    $("valorTeste").textContent = `Valor de teste: ${dinheiro(total)} (igual ao total). Nada é cobrado.`;
+    if (cfg && cfg.pagamento) {
+      $("rotuloPagamento").textContent = cfg.pagamento.formas.map((f) => NOME_FORMA[f] || f).join(", ");
+      $("valorTeste").textContent = "Você escolhe na próxima tela.";
+      $("btnEnviar").textContent = "Ir para o pagamento";
+      $("btnEnviar").hidden = !!pedido && pedido.estado === "pagando";
+    } else {
+      $("valorTeste").textContent = `Valor de teste: ${dinheiro(total)} (igual ao total). Nada é cobrado.`;
+    }
     const explic = $("explicacao");
     explic.hidden = !bloqueado;
     explic.textContent = bloqueado || "";
@@ -503,6 +511,15 @@
     alvo.appendChild(p);
     if (r.senha && r.estado !== "nao_enviado") alvo.appendChild(el("div", "senha", "Senha " + r.senha));
     if (r.totalCentavos !== undefined && r.estado === "aceito") alvo.appendChild(el("p", "detalhe", `Total do pedido de teste: ${dinheiro(r.totalCentavos)}`));
+    if (r.estado === "aceito" && pedido && pedido.pagamento && pedido.pagamento.estado === "aprovado") {
+      const pg = pedido.pagamento;
+      const recibo = el("div", "recibo");
+      recibo.appendChild(el("p", "recibo-titulo", "Comprovante (teste)"));
+      recibo.appendChild(el("p", "", `Pago com ${NOME_FORMA[pg.forma] || pg.forma}: ${dinheiro(pg.totalCentavos)}`));
+      if (pg.autorizacao) recibo.appendChild(el("p", "", `Autorização: ${pg.autorizacao}`));
+      recibo.appendChild(el("p", "", "Acompanhe sua senha na TV."));
+      alvo.appendChild(recibo);
+    }
     $("btnNovo").hidden = !(r.estado === "aceito" || r.estado === "ambiguo" || r.podeTentarNovamente);
     $("btnNovo").textContent = r.estado === "ambiguo" ? "Já conferi na loja de teste; começar novo pedido" : r.estado === "aceito" ? "Começar novo pedido de teste" : "Tentar de novo com um novo pedido";
     if (carrinhoAberto && alvo.scrollIntoView) alvo.scrollIntoView({ block: "nearest", behavior: reduzir() ? "auto" : "smooth" });
@@ -526,7 +543,145 @@
     renderCarrinho();
   }
 
+  // ---------- pagamento (so quando o servidor liga a etapa) ----------
+  let timerPagamento = null;
+
+  function desenharQr(texto) {
+    if (typeof window.qrcode !== "function") return null;
+    const qr = window.qrcode(0, "M");
+    qr.addData(texto);
+    qr.make();
+    const n = qr.getModuleCount();
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `-4 -4 ${n + 8} ${n + 8}`);
+    svg.setAttribute("class", "qr");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "QR Code do Pix");
+    const fundo = document.createElementNS(NS, "rect");
+    fundo.setAttribute("x", "-4"); fundo.setAttribute("y", "-4");
+    fundo.setAttribute("width", String(n + 8)); fundo.setAttribute("height", String(n + 8)); fundo.setAttribute("fill", "#fff");
+    svg.appendChild(fundo);
+    let d = "";
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d); path.setAttribute("fill", "#111");
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function mostrarEscolha(aviso) {
+    const alvo = $("resultado");
+    alvo.textContent = "";
+    $("btnNovo").hidden = true;
+    const caixa = el("div", "pagar");
+    caixa.appendChild(el("h3", "pagar-titulo", "Como você quer pagar?"));
+    if (aviso) caixa.appendChild(el("p", "erro", aviso));
+    const grade = el("div", "formas");
+    for (const f of cfg.pagamento.formas) {
+      const b = el("button", "forma forma-" + f, NOME_FORMA[f] || f);
+      b.type = "button";
+      b.addEventListener("click", () => escolherForma(f));
+      grade.appendChild(b);
+    }
+    caixa.appendChild(grade);
+    const voltar = el("button", "secundario", "Voltar e mudar o pedido");
+    voltar.type = "button";
+    voltar.addEventListener("click", () => {
+      clearTimeout(timerPagamento);
+      pedido = null; localStorage.removeItem(CHAVE_PEDIDO);
+      mostrarResultado(null); renderCarrinho();
+    });
+    caixa.appendChild(voltar);
+    alvo.appendChild(caixa);
+    if (alvo.scrollIntoView) alvo.scrollIntoView({ block: "nearest" });
+  }
+
+  function mostrarPagamento(r) {
+    const alvo = $("resultado");
+    alvo.textContent = "";
+    const caixa = el("div", "pagar");
+    caixa.appendChild(el("h3", "pagar-titulo", `${NOME_FORMA[r.forma] || "Pagamento"} · ${dinheiro(r.totalCentavos || 0)}`));
+    caixa.appendChild(el("p", r.estado === "recusado" || r.estado === "cancelado" ? "erro" : "pagar-msg", r.mensagem || ""));
+    if (r.estado === "aguardando" && r.forma === "pix" && r.qr) {
+      const svg = desenharQr(r.qr);
+      if (svg) caixa.appendChild(svg);
+      caixa.appendChild(el("p", "detalhe", "Ou use o Pix copia e cola:"));
+      caixa.appendChild(el("p", "copia", r.qr));
+    }
+    if (r.estado === "aguardando" && r.forma !== "pix") caixa.appendChild(el("div", "maquininha", "💳"));
+    if (r.estado === "aguardando" || r.estado === "incerto") caixa.appendChild(el("div", "esperando", "Aguardando confirmação…"));
+    if (r.estado === "recusado" || r.estado === "cancelado") {
+      const de = el("button", "cta", "Escolher outra forma de pagamento");
+      de.type = "button";
+      de.addEventListener("click", () => {
+        // nova chave: a tentativa recusada fica registrada e nunca vira cobranca
+        pedido = { key: crypto.randomUUID(), itens: pedido.itens, estado: "pagando" };
+        gravar(CHAVE_PEDIDO, pedido);
+        mostrarEscolha();
+      });
+      caixa.appendChild(de);
+    }
+    alvo.appendChild(caixa);
+  }
+
+  async function tratarPagamento(r) {
+    clearTimeout(timerPagamento);
+    if (!pedido) return;
+    if (r.estado === "inexistente") { mostrarEscolha(); return; }
+    if (!r.estado) { mostrarEscolha(r.mensagem || "Não foi possível iniciar o pagamento."); return; }
+    pedido.pagamento = { forma: r.forma, estado: r.estado, totalCentavos: r.totalCentavos, autorizacao: r.autorizacao ?? null };
+    gravar(CHAVE_PEDIDO, pedido);
+    mostrarPagamento(r);
+    if (r.estado === "aprovado") {
+      pedido.pago = true;
+      pedido.estado = undefined; // libera o envio para a cozinha
+      gravar(CHAVE_PEDIDO, pedido);
+      setTimeout(enviar, 900);
+    } else if (r.estado === "aguardando" || r.estado === "incerto") {
+      timerPagamento = setTimeout(consultarPagamento, 1500);
+    }
+  }
+
+  async function consultarPagamento() {
+    if (!pedido) return;
+    try {
+      const resp = await fetch("/api/hml/pagamento?chave=" + encodeURIComponent(pedido.key), { cache: "no-store" });
+      await tratarPagamento(await resp.json());
+    } catch {
+      timerPagamento = setTimeout(consultarPagamento, 3000); // sem rede: so reconsulta, nunca cobra de novo
+    }
+  }
+
+  async function escolherForma(forma) {
+    if (!pedido || emVoo) return;
+    emVoo = true;
+    mostrarPagamento({ estado: "incerto", forma, totalCentavos: 0, mensagem: "Iniciando o pagamento…" });
+    try {
+      const resp = await fetch("/api/hml/pagamento", {
+        method: "POST", cache: "no-store",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": cfg.csrf },
+        body: JSON.stringify({ idempotencyKey: pedido.key, forma, itens: pedido.itens }),
+      });
+      emVoo = false;
+      await tratarPagamento(await resp.json());
+    } catch {
+      emVoo = false;
+      await consultarPagamento(); // mesma chave: pergunta o que aconteceu
+    }
+  }
+
+  function irParaPagamento() {
+    abrirCarrinho();
+    if (!pedido) pedido = { key: crypto.randomUUID(), itens: JSON.parse(JSON.stringify(carrinho)) };
+    pedido.estado = "pagando";
+    gravar(CHAVE_PEDIDO, pedido);
+    renderCarrinho();
+    mostrarEscolha();
+  }
+
   async function enviar() {
+    if (cfg && cfg.pagamento && !(pedido && pedido.pago)) { if (!emVoo && !travado() && carrinho.length) irParaPagamento(); return; }
     if (emVoo || travado() || !carrinho.length) return;
     emVoo = true;
     abrirCarrinho(); // o resultado do envio fica sempre visivel
@@ -611,7 +766,8 @@
     renderCategorias();
     renderLista();
     renderCarrinho();
-    await aplicarStatus();
+    if (cfg.pagamento && pedido && pedido.estado === "pagando") { abrirCarrinho(); await consultarPagamento(); }
+    else await aplicarStatus();
     setTimeout(atualizarPeriodicamente, 60000);
   }
   tocarAbertura();

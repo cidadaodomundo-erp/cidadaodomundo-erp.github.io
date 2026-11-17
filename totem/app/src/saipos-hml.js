@@ -17,6 +17,7 @@ import { ErroConector } from "../../saipos-teste/src/erros.js";
 import { lerJsonOpcional, gravarJsonAtomico, sha256Json } from "../../saipos-teste/src/arquivos.js";
 import { prepararCarrinho, enviarCarrinho } from "../../saipos-teste/src/carrinho.js";
 import { carregarDto, carregarMapa, montarVisao, validarCarrinho, hashCarrinho, ErroCardapio } from "./cardapio-hml.js";
+import { criarPagamentos, FORMAS } from "./pagamento.js";
 import { criarReceptorWebhook, aplicarAviso, avisosValidos, segredoValido, FONTE_WEBHOOK, MODO_AUTOMATICO, PORTA_PADRAO } from "./webhook-tv.js";
 
 const AQUI = fileURLToPath(new URL(".", import.meta.url));
@@ -46,6 +47,7 @@ const ESTATICOS = {
   "/tv-hml.html": ["tv-hml.html", "text/html; charset=utf-8"],
   "/tv-hml.js": ["tv-hml.js", "text/javascript; charset=utf-8"],
   "/tv-hml.css": ["tv-hml.css", "text/css; charset=utf-8"],
+  "/vendor/qrcode.js": ["vendor/qrcode.js", "text/javascript; charset=utf-8"],
   // Assets fixos da marca (allowlist explicita; nada de servidor de diretorio generico).
   "/marca/Cubano-Regular.otf": ["marca/Cubano-Regular.otf", "font/otf"],
   "/marca/Barlow-Regular.ttf": ["marca/Barlow-Regular.ttf", "font/ttf"],
@@ -91,7 +93,32 @@ const ERROS = {
   transicao_invalida: "Esta ação não é possível no estado atual do pedido.",
   pronto_automatico: "Neste pedido o PRONTO vem do Saipos; aguarde o aviso.",
   interno: "Algo deu errado. Confira o pedido na loja de teste.",
+  pagamento_pendente: "O pagamento deste pedido ainda não foi aprovado.",
+  pagamento_desligado: "Pagamento não está ligado neste servidor.",
+  forma_invalida: "Forma de pagamento não aceita.",
+  pagamento_divergente: "Este pagamento pertence a outro pedido.",
 };
+
+const MSG_PAGAMENTO = {
+  aguardando_pix: "Abra o app do seu banco e pague com o QR Code (Pix).",
+  aguardando: "Siga as instruções na maquininha.",
+  aprovado: "Pagamento aprovado!",
+  recusado: "Pagamento recusado. Nada foi cobrado.",
+  cancelado: "Pagamento cancelado. Nada foi cobrado.",
+  incerto: "Conferindo o pagamento…",
+};
+
+function visaoPagamento(reg) {
+  if (!reg) return { estado: "inexistente" };
+  const chaveMsg = reg.estado === "aguardando" && reg.forma === "pix" ? "aguardando_pix" : reg.estado;
+  const v = {
+    estado: reg.estado, forma: reg.forma, totalCentavos: reg.centavos,
+    mensagem: (reg.estado === "aguardando" && reg.forma !== "pix" && reg.mensagem) || MSG_PAGAMENTO[chaveMsg] || MSG_PAGAMENTO.incerto,
+  };
+  if (reg.estado === "aguardando" && reg.qr) v.qr = reg.qr;
+  if (reg.estado === "aprovado") v.autorizacao = reg.autorizacao ?? null;
+  return v;
+}
 
 export function hashPedido(corpo) {
   const extras = Object.keys(corpo).filter((k) => !["idempotencyKey", "code", "quantity"].includes(k)).sort();
@@ -200,10 +227,19 @@ const ROTA_ACAO = /^\/api\/hml\/preparo\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 
 // gamaPath: DTO do cardapio (padrao data/gama-cardapio.json); mapPath: mapa Gama->HML ao lado do .env
 // (padrao gama-hml-map.json); agora: relogio injetavel (testes).
+// pagamento (opt-in, padrao null = sem etapa de pagamento, comportamento legado):
+//   { adaptador } com cobrar()/consultar() e .formas (ver adaptadorPorForma em pagamento.js).
+//   Ligado: o carrinho SO vai para a loja depois de pagamento aprovado do MESMO carrinho e valor.
 // tvAutomatica (opt-in, padrao null = comportamento legado TICKET + botoes locais):
 //   { webhook: { segredo: <64hex privado>, porta?: 4656 (0 = efemera, testes) } }
 // Liga pedidos de carrinho em TAKEOUT e o receptor 127.0.0.1 separado; fecha junto com o servidor.
-export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath = DTO_PADRAO, mapPath, agora = () => new Date(), tvAutomatica = null } = {}) {
+export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath = DTO_PADRAO, mapPath, agora = () => new Date(), tvAutomatica = null, pagamento = null } = {}) {
+  if (pagamento !== null && (!pagamento?.adaptador || !Array.isArray(pagamento.adaptador.formas) || !pagamento.adaptador.formas.length)) {
+    throw new ErroConector("PAGAMENTO_CONFIG_INVALIDA", "Configuração de pagamento inválida.");
+  }
+  const pagamentos = pagamento ? criarPagamentos({ adaptador: pagamento.adaptador }) : null;
+  const formasAceitas = pagamento ? pagamento.adaptador.formas.filter((f) => FORMAS.includes(f)) : [];
+  const carrinhoPago = new Map(); // chave do pedido -> hash do carrinho cobrado
   if (tvAutomatica !== null && !segredoValido(tvAutomatica?.webhook?.segredo)) {
     throw new ErroConector("WEBHOOK_CONFIG_INVALIDA", "Configuração do webhook inválida.");
   }
@@ -309,6 +345,9 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
         ? { status: 200, corpo: resumir(existente) }
         : { status: 409, corpo: erro("chave_reutilizada") };
     }
+    if (pagamentos && !(pagamentos.liberaCozinha(chave) && carrinhoPago.get(chave) === hash)) {
+      return { status: 402, corpo: erro("pagamento_pendente") };
+    }
     if (!cardapio) return { status: 503, corpo: erro("cardapio_indisponivel") };
     let val;
     try {
@@ -363,6 +402,29 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
       await mudar(e, { estado: antesDaRede ? "nao_enviado" : "ambiguo" });
     }
     return { status: 200, corpo: resumir(e) };
+  }
+
+  // Pagamento do carrinho: valor calculado AQUI (nunca vem da tela). Mesma chave = mesma cobranca.
+  async function pagarCarrinho(chave, corpo) {
+    const { forma, ...carrinhoCorpo } = corpo;
+    if (!formasAceitas.includes(forma)) return { status: 400, corpo: erro("forma_invalida") };
+    const hash = hashCarrinho(carrinhoCorpo);
+    const jaPago = carrinhoPago.get(chave);
+    if (jaPago !== undefined && jaPago !== hash) return { status: 409, corpo: erro("pagamento_divergente") };
+    if (!cardapio) return { status: 503, corpo: erro("cardapio_indisponivel") };
+    let val;
+    try {
+      val = validarCarrinho(cardapio.ctx, carrinhoCorpo, agora());
+    } catch (err) {
+      if (err instanceof ErroCardapio) return { status: err.status, corpo: { erro: err.codigo, mensagem: err.message, motivo: err.motivo ?? null } };
+      throw err;
+    }
+    carrinhoPago.set(chave, hash);
+    try {
+      return { status: 200, corpo: visaoPagamento(await pagamentos.pagar({ idempotencyKey: chave, centavos: val.totalCentavos, forma })) };
+    } catch {
+      return { status: 409, corpo: erro("pagamento_divergente") };
+    }
   }
 
   // Preparo e estado LOCAL da nossa cozinha/TV; nunca vai ao Saipos.
@@ -512,6 +574,7 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
           csrf,
           loja: meta.expectedName,
           produto: { codigo: item.codigo, nome: item.nome, precoCentavos: item.centavos, preco: reais(item.centavos) },
+          ...(pagamentos ? { pagamento: { formas: formasAceitas } } : {}),
         });
       }
       const foto = caminho.match(FOTO);
@@ -529,6 +592,13 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
         return responder(res, 200, montarVisao(cardapio.ctx, agora()));
       }
       if (caminho === "/api/hml/preparo") return responder(res, 200, receptor ? { ...listarPreparo(), webhook: statusWebhook() } : listarPreparo());
+      if (caminho === "/api/hml/pagamento") {
+        if (!pagamentos) return responder(res, 404, erro("pagamento_desligado"));
+        const chave = String(url.searchParams.get("chave") ?? "").toLowerCase();
+        if (!UUID.test(chave)) return responder(res, 400, erro("chave_invalida"));
+        if (!pagamentos.obter(chave)) return responder(res, 200, visaoPagamento(null));
+        return responder(res, 200, visaoPagamento(await pagamentos.reconsultar(chave)));
+      }
       if (caminho === "/api/hml/webhook-status") return responder(res, 200, statusWebhook());
       if (caminho === "/api/hml/status") {
         const chave = url.searchParams.get("chave");
@@ -572,6 +642,24 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
       if (typeof lido.valor.idempotencyKey !== "string" || !UUID.test(lido.valor.idempotencyKey)) return responder(res, 400, erro("chave_invalida"));
       lido.valor.idempotencyKey = lido.valor.idempotencyKey.toLowerCase();
       const r = await serial(() => executarCarrinho(lido.valor.idempotencyKey, lido.valor));
+      return responder(res, r.status, r.corpo);
+    }
+
+    if (req.method === "POST" && caminho === "/api/hml/pagamento") {
+      if (!pagamentos) return responder(res, 404, erro("pagamento_desligado"));
+      if (h.origin !== `http://127.0.0.1:${porta}`) return responder(res, 403, erro("origem_invalida"));
+      if (String(h["content-type"] ?? "").split(";")[0].trim().toLowerCase() !== "application/json") return responder(res, 415, erro("tipo_invalido"));
+      if (!csrfOk(h["x-csrf-token"])) return responder(res, 403, erro("protecao_invalida"));
+      if (Number(h["content-length"] ?? 0) > LIMITE_CORPO) {
+        req.resume();
+        return responder(res, 413, erro("corpo_grande"));
+      }
+      const lido = await lerCorpo(req);
+      if (lido.grande) return responder(res, 413, erro("corpo_grande"));
+      if (lido.invalido) return responder(res, 400, erro("pedido_invalido"));
+      if (typeof lido.valor.idempotencyKey !== "string" || !UUID.test(lido.valor.idempotencyKey)) return responder(res, 400, erro("chave_invalida"));
+      lido.valor.idempotencyKey = lido.valor.idempotencyKey.toLowerCase();
+      const r = await pagarCarrinho(lido.valor.idempotencyKey, lido.valor);
       return responder(res, r.status, r.corpo);
     }
 

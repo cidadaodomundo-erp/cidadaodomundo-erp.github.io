@@ -75,6 +75,7 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
     } else if (estado === ESTADOS.AGUARDANDO) {
       reg.estado = ESTADOS.AGUARDANDO; // ex.: Pix com QR na tela, esperando o cliente pagar
       if (typeof r.qr === "string") reg.qr = r.qr;
+      if (typeof r.mensagem === "string") reg.mensagem = r.mensagem; // ex.: "siga as instrucoes na maquininha"
     } else if (estado === ESTADOS.RECUSADO || estado === ESTADOS.CANCELADO) {
       reg.estado = estado;
       reg.motivo = typeof r.motivo === "string" ? r.motivo : null;
@@ -88,7 +89,35 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
     return !!reg && reg.estado === ESTADOS.APROVADO;
   }
 
-  return { pagar, reconsultar, liberaCozinha };
+  function obter(idempotencyKey) {
+    const reg = registros.get(idempotencyKey);
+    return reg ? { ...reg } : null;
+  }
+
+  return { pagar, reconsultar, liberaCozinha, obter };
+}
+
+// Junta varios adaptadores num so, escolhendo pela forma de pagamento.
+// Ex.: { pix: adaptadorPix(...), debito: tef, credito: tef }.
+export function adaptadorPorForma(porForma) {
+  const formaDaChave = new Map();
+  const escolher = (forma) => {
+    const a = porForma[forma];
+    if (!a) throw new Error("forma de pagamento nao configurada");
+    return a;
+  };
+  return {
+    formas: Object.keys(porForma).filter((f) => FORMAS.includes(f)),
+    async cobrar(pedido) {
+      formaDaChave.set(pedido.idempotencyKey, pedido.forma);
+      return escolher(pedido.forma).cobrar(pedido);
+    },
+    async consultar({ idempotencyKey }) {
+      const forma = formaDaChave.get(idempotencyKey);
+      if (!forma) return { estado: "incerto" };
+      return escolher(forma).consultar({ idempotencyKey });
+    },
+  };
 }
 
 // Adaptador de teste. Roteiro por chave: "aprovado" | "recusado" | "cancelado" | "erro" | "erro-depois-aprovado".
