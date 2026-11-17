@@ -14,6 +14,7 @@
 //     status "pendente"  -> maquininha esperando o cliente (aproximar/inserir cartao, senha)
 //     status "aprovado"  -> pago; centavos = valor aprovado; autorizacao = codigo/NSU
 //     status "recusado" | "cancelado" -> nada cobrado
+//     status "desconhecido" -> essa referencia nunca chegou a maquininha (o totem pede de novo, mesma referencia)
 //     qualquer outra coisa -> incerto (o totem NAO libera e NAO cobra de novo; so reconsulta)
 //
 // Encaixa no src/pagamento.js como adaptador (cobrar/consultar).
@@ -27,6 +28,7 @@ function traduzir(r, centavos) {
     return { estado: "aprovado", centavos: r.centavos, autorizacao: typeof r.autorizacao === "string" ? r.autorizacao : null };
   }
   if (status === "pendente") return { estado: "aguardando", centavos, mensagem: MENSAGEM_MAQUININHA };
+  if (status === "desconhecido" || status === "inexistente") return { estado: "inexistente" }; // nunca chegou a maquininha
   if (status === "recusado" || status === "cancelado") {
     return { estado: status, motivo: typeof r.motivo === "string" ? r.motivo : null };
   }

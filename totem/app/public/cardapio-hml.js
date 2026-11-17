@@ -557,7 +557,7 @@
       alvo.appendChild(recibo);
     }
     $("btnNovo").hidden = !(r.estado === "aceito" || r.estado === "ambiguo" || r.podeTentarNovamente) || (pago && r.estado === "nao_enviado" && pedido.tentativas <= 5);
-    $("btnNovo").textContent = r.estado === "ambiguo" ? "Já conferi na loja de teste; começar novo pedido" : r.estado === "aceito" ? "Começar novo pedido de teste" : "Tentar de novo com um novo pedido";
+    $("btnNovo").textContent = r.estado === "ambiguo" ? "Já conferi na loja de teste; começar novo pedido" : r.estado === "aceito" ? "Começar novo pedido de teste" : pago ? "Atendente: encerrar este pedido" : "Tentar de novo com um novo pedido";
     if (carrinhoAberto && alvo.scrollIntoView) alvo.scrollIntoView({ block: "nearest", behavior: reduzir() ? "auto" : "smooth" });
   }
 
@@ -570,7 +570,8 @@
     if (!pedido) return;
     try {
       const r = await status(pedido.key);
-      if (r.estado === "inexistente") { pedido.estado = undefined; mostrarResultado(null); }
+      if (r.estado === "inexistente" && pedido.pago) { pedido.estado = undefined; setTimeout(enviar, 300); } // pago e nao enviado: retoma
+      else if (r.estado === "inexistente") { pedido.estado = undefined; mostrarResultado(null); }
       else { pedido.estado = r.estado; gravar(CHAVE_PEDIDO, pedido); mostrarResultado(r); if (r.estado === "enviando") setTimeout(aplicarStatus, 1500); }
     } catch {
       pedido.estado = "ambiguo";
@@ -662,14 +663,14 @@
 
   function mostrarPagamento(r) {
     const alvo = $("resultado");
-    const assinatura = [r.estado, r.forma, r.qr, r.mensagem, r.totalCentavos].join("|");
+    const assinatura = [r.estado, r.forma, r.qr, r.mensagem, r.totalCentavos, r.atendente].join("|");
     if (assinatura === assinaturaPagamento && alvo.querySelector(".pagar")) return; // nada mudou: nao redesenha o QR
     assinaturaPagamento = assinatura;
     fimQr = r.expiraEm ? Date.parse(r.expiraEm) : null;
     alvo.textContent = "";
     const caixa = el("div", "pagar");
     caixa.appendChild(el("h3", "pagar-titulo", `${NOME_FORMA[r.forma] || "Pagamento"} · ${dinheiro(r.totalCentavos || 0)}`));
-    caixa.appendChild(el("p", r.estado === "recusado" || r.estado === "cancelado" ? "erro" : "pagar-msg", r.mensagem || ""));
+    caixa.appendChild(el("p", r.estado === "recusado" || r.estado === "cancelado" || r.atendente ? "erro" : "pagar-msg", r.mensagem || ""));
     if (r.estado === "aguardando" && r.forma === "pix" && r.qr) {
       const svg = desenharQr(r.qr);
       if (svg) caixa.appendChild(svg);
@@ -680,7 +681,7 @@
     if (r.estado === "aguardando" && r.forma !== "pix") caixa.appendChild(el("div", "maquininha", "💳"));
     if (r.estado === "aguardando" || r.estado === "incerto") {
       caixa.appendChild(el("div", "esperando", "Aguardando confirmação…"));
-      if (r.estado === "aguardando") {
+      if (r.estado === "aguardando" || (r.estado === "incerto" && r.atendente)) {
         const c = el("button", "secundario", "Cancelar pagamento");
         c.type = "button";
         c.addEventListener("click", cancelarPagamento);
@@ -693,7 +694,7 @@
       de.addEventListener("click", () => {
         assinaturaPagamento = "";
         // nova chave: a tentativa recusada fica registrada e nunca vira cobranca
-        pedido = { key: crypto.randomUUID(), itens: pedido.itens, estado: "pagando" };
+        pedido = { key: crypto.randomUUID(), itens: pedido.itens, estado: "pagando" }; // sem formaEscolhida
         gravar(CHAVE_PEDIDO, pedido);
         mostrarEscolha();
       });
@@ -704,8 +705,16 @@
 
   async function tratarPagamento(r) {
     clearTimeout(timerPagamento);
-    if (!pedido) return;
-    if (r.estado === "inexistente") { mostrarEscolha(); return; }
+    if (!pedido || pedido.pago) return; // resposta atrasada depois de pago: ignora
+    if (r.estado === "inexistente") {
+      // recarregou durante o pedido de pagamento: repete a MESMA forma (mesma chave = mesma cobranca)
+      if (pedido.formaEscolhida && Date.now() - (pedido.escolhidaEm || 0) < 15 * 60000) { escolherForma(pedido.formaEscolhida); return; }
+      mostrarEscolha(); return;
+    }
+    if (r.estado === "incerto") {
+      pedido.incertoDesde = pedido.incertoDesde || Date.now();
+      if (Date.now() - pedido.incertoDesde > 120000) r = { ...r, mensagem: "Não conseguimos confirmar o pagamento. Chame um atendente.", atendente: true };
+    } else delete pedido.incertoDesde;
     if (!r.estado) { mostrarEscolha(r.mensagem || "Não foi possível iniciar o pagamento."); return; }
     pedido.pagamento = { forma: r.forma, estado: r.estado, totalCentavos: r.totalCentavos, autorizacao: r.autorizacao ?? null };
     gravar(CHAVE_PEDIDO, pedido);
@@ -731,8 +740,10 @@
   }
 
   async function escolherForma(forma) {
-    if (!pedido || emVoo) return;
+    if (!pedido || emVoo || pedido.pago) return;
     emVoo = true;
+    if (pedido.formaEscolhida !== forma) { pedido.formaEscolhida = forma; pedido.escolhidaEm = Date.now(); }
+    gravar(CHAVE_PEDIDO, pedido);
     mostrarPagamento({ estado: "incerto", forma, totalCentavos: 0, mensagem: "Iniciando o pagamento…" });
     try {
       const resp = await fetch("/api/hml/pagamento", {
@@ -777,7 +788,19 @@
       const r = await resp.json();
       emVoo = false;
       if (r.estado) { pedido.estado = r.estado; gravar(CHAVE_PEDIDO, pedido); mostrarResultado(r); }
-      else {
+      else if (pedido.pago) {
+        // PAGO: nunca descarta a chave (descartar = cobrar de novo). Tenta de novo ou chama atendente.
+        pedido.tentativas = (pedido.tentativas || 0) + 1;
+        gravar(CHAVE_PEDIDO, pedido);
+        const passageiro = ["cardapio_indisponivel", "interno", "pagamento_pendente"].includes(r.erro);
+        if (passageiro && pedido.tentativas <= 5) {
+          mostrarResultado({ estado: "enviando", mensagem: "Pagamento aprovado. Enviando para a cozinha…" });
+          setTimeout(enviar, 3000);
+        } else {
+          pedido.estado = "bloqueado"; gravar(CHAVE_PEDIDO, pedido);
+          mostrarResultado({ estado: "bloqueado", mensagem: "", podeTentarNovamente: true });
+        }
+      } else {
         // recusado antes de qualquer reserva (validacao): nada foi enviado; libera a chave
         if (r.erro !== "chave_reutilizada") { pedido = null; localStorage.removeItem(CHAVE_PEDIDO); }
         mostrarResultado({ estado: "nao_enviado", mensagem: r.mensagem || "Não foi possível enviar.", podeTentarNovamente: false });
@@ -792,6 +815,7 @@
   $("btnEnviar").addEventListener("click", enviar);
   $("btnNovo").addEventListener("click", () => {
     if (pedido && pedido.estado === "ambiguo" && !window.confirm("Você já conferiu na loja de teste se este pedido chegou?")) return;
+    if (pedido && pedido.pago && pedido.estado !== "aceito" && !window.confirm("ATENDENTE: este cliente JÁ PAGOU. Você já resolveu o pedido dele?")) return;
     const aceito = pedido && pedido.estado === "aceito";
     pedido = null;
     localStorage.removeItem(CHAVE_PEDIDO);

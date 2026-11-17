@@ -118,6 +118,7 @@ function visaoPagamento(reg) {
   if (reg.estado === "aguardando" && reg.qr) v.qr = reg.qr;
   if (reg.estado === "aguardando" && reg.expiraEm) v.expiraEm = reg.expiraEm;
   if (reg.estado === "aprovado") v.autorizacao = reg.autorizacao ?? null;
+  if (reg.atendente) { v.atendente = true; v.mensagem = "Houve uma diferença no pagamento. Chame um atendente."; }
   return v;
 }
 
@@ -278,6 +279,7 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
     try {
       pagamentos = criarPagamentos({
         adaptador: pagamento.adaptador,
+        agora: () => agora().toISOString(),
         registros: bruto?.registros ?? [],
         aoMudar: (lista) => gravarJsonAtomico(pagPath, { v: 1, registros: lista, carrinhos: Object.fromEntries(carrinhoPago) }),
       });
@@ -383,11 +385,16 @@ export async function criarServidorHml({ envPath, fetchImpl = globalThis.fetch, 
     }
     if (!cardapio) return { status: 503, corpo: erro("cardapio_indisponivel") };
     let val;
+    const pagoReg = pagamentos?.obter(chave);
     try {
-      val = validarCarrinho(cardapio.ctx, corpo, agora());
+      // Pedido pago: vale o horario do PAGAMENTO (um Pix demorado nao pode perder o pedido por virar a hora).
+      val = validarCarrinho(cardapio.ctx, corpo, pagoReg ? new Date(pagoReg.criadoEm) : agora());
     } catch (err) {
       if (err instanceof ErroCardapio) return { status: err.status, corpo: { erro: err.codigo, mensagem: err.message, motivo: err.motivo ?? null } };
       throw err;
+    }
+    if (pagoReg && val.totalCentavos !== pagoReg.centavos) {
+      return { status: 409, corpo: { erro: "pagamento_divergente", mensagem: "O valor pago não confere com o pedido. Chame um atendente." } };
     }
 
     const senha = Math.max(estado.proximaSenha, SENHA_INICIAL);

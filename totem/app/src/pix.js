@@ -41,12 +41,10 @@ export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - 
     if (status === "REMOVIDA_PELO_USUARIO_RECEBEDOR" || status === "REMOVIDA_PELO_PSP") {
       return { estado: "cancelado", motivo: status };
     }
+    if (status === "DESCONHECIDA" || status === "INEXISTENTE") return { estado: "inexistente" };
     if (status === "ATIVA") {
       const criacao = Date.parse(cob.calendario?.criacao ?? "");
       const exp = Number(cob.calendario?.expiracao ?? VALIDADE_SEGUNDOS);
-      if (Number.isFinite(criacao) && agora() > criacao + exp * 1000 + FOLGA_VENCIMENTO_MS) {
-        return { estado: "cancelado", motivo: "QR_VENCIDO" };
-      }
       const r = { estado: "aguardando", qr: cob.pixCopiaECola || null, centavos };
       if (Number.isFinite(criacao)) r.expiraEm = new Date(criacao + exp * 1000).toISOString();
       return r;
@@ -67,7 +65,16 @@ export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - 
       return traduzir(cob, centavos);
     },
     async consultar({ idempotencyKey }) {
-      const cob = await banco.consultarCobranca(txidDoPedido(idempotencyKey));
+      const txid = txidDoPedido(idempotencyKey);
+      let cob = await banco.consultarCobranca(txid);
+      const criacao = Date.parse(cob?.calendario?.criacao ?? "");
+      const exp = Number(cob?.calendario?.expiracao ?? VALIDADE_SEGUNDOS);
+      // QR vencido: so o BANCO decide. Pede a remocao e consulta de novo; CONCLUIDA sempre vence.
+      if (cob?.status === "ATIVA" && Number.isFinite(criacao) && agora() > criacao + exp * 1000 + FOLGA_VENCIMENTO_MS &&
+          typeof banco.removerCobranca === "function") {
+        await banco.removerCobranca(txid);
+        cob = await banco.consultarCobranca(txid);
+      }
       return traduzir(cob);
     },
     async cancelar({ idempotencyKey }) {

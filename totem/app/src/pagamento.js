@@ -9,7 +9,10 @@
 //  - o registro e gravado (aoMudar) ANTES de pedir a cobranca: se o PC cair no meio,
 //    ao voltar o totem sabe que existe uma cobranca e so consulta, nunca cobra de novo;
 //  - cancelar so pede ao banco/maquininha para cancelar e depois CONSULTA: se o cliente
-//    pagou no ultimo segundo, vale o "aprovado".
+//    pagou no ultimo segundo, vale o "aprovado";
+//  - uma operacao por chave de cada vez (fila por chave): resposta atrasada nunca desfaz "aprovado";
+//  - se o banco/maquininha responde "inexistente" (a cobranca nunca foi criada, ex.: queda antes
+//    de chegar), cobra de novo com a MESMA chave (txid/referencia iguais = mesma cobranca).
 
 export const ESTADOS = Object.freeze({
   AGUARDANDO: "aguardando",
@@ -23,7 +26,7 @@ export const FORMAS = Object.freeze(["debito", "credito", "pix"]);
 
 const FINAIS = new Set([ESTADOS.APROVADO, ESTADOS.RECUSADO, ESTADOS.CANCELADO]);
 const TODOS = new Set(Object.values(ESTADOS));
-const CAMPOS = ["idempotencyKey", "centavos", "forma", "estado", "criadoEm", "atualizadoEm", "autorizacao", "motivo", "qr", "mensagem", "expiraEm"];
+const CAMPOS = ["idempotencyKey", "centavos", "forma", "estado", "criadoEm", "atualizadoEm", "autorizacao", "motivo", "qr", "mensagem", "expiraEm", "atendente"];
 
 function registroValido(r) {
   return !!r && typeof r === "object" && !Array.isArray(r) &&
@@ -44,6 +47,15 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
     registros.set(reg.idempotencyKey, reg);
   }
   const lista = () => [...registros.values()].map((r) => ({ ...r }));
+  const filas = new Map(); // idempotencyKey -> Promise (uma operacao por vez)
+  function naFila(chave, fn) {
+    const antes = filas.get(chave) ?? Promise.resolve();
+    const p = antes.then(fn, fn);
+    const fim = p.then(() => {}, () => {});
+    filas.set(chave, fim);
+    fim.then(() => { if (filas.get(chave) === fim) filas.delete(chave); });
+    return p;
+  }
   const gravar = async () => { try { await aoMudar(lista()); } catch { /* memoria vale; proxima gravacao tenta de novo */ } };
 
   function validar({ idempotencyKey, centavos, forma }) {
@@ -54,12 +66,18 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
 
   async function pagar(pedido) {
     validar(pedido);
+    return naFila(pedido.idempotencyKey, () => pagarAgora(pedido));
+  }
+  function reconsultar(idempotencyKey) { return naFila(idempotencyKey, () => reconsultarAgora(idempotencyKey)); }
+  function cancelar(idempotencyKey) { return naFila(idempotencyKey, () => cancelarAgora(idempotencyKey)); }
+
+  async function pagarAgora(pedido) {
     const existente = registros.get(pedido.idempotencyKey);
     if (existente) {
       if (existente.centavos !== pedido.centavos || existente.forma !== pedido.forma) {
         throw new Error("mesma chave com valor ou forma diferente");
       }
-      if (existente.estado === ESTADOS.INCERTO || existente.estado === ESTADOS.AGUARDANDO) return reconsultar(pedido.idempotencyKey);
+      if (existente.estado === ESTADOS.INCERTO || existente.estado === ESTADOS.AGUARDANDO) return reconsultarAgora(pedido.idempotencyKey);
       return { ...existente }; // nunca cobra de novo
     }
     const reg = { idempotencyKey: pedido.idempotencyKey, centavos: pedido.centavos, forma: pedido.forma, estado: ESTADOS.INCERTO, criadoEm: agora() };
@@ -81,13 +99,21 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
     return { ...reg };
   }
 
-  async function reconsultar(idempotencyKey) {
+  async function reconsultarAgora(idempotencyKey, { recobrar = true } = {}) {
     const reg = registros.get(idempotencyKey);
     if (!reg) throw new Error("pagamento desconhecido");
     if (FINAIS.has(reg.estado)) return { ...reg };
     const antes = reg.estado;
     try {
-      aplicar(reg, await adaptador.consultar({ idempotencyKey, forma: reg.forma }));
+      const r = await adaptador.consultar({ idempotencyKey, forma: reg.forma });
+      if (r && r.estado === "inexistente" && recobrar) {
+        // a cobranca nunca chegou ao banco/maquininha: pede de novo com a MESMA chave
+        aplicar(reg, await adaptador.cobrar({ idempotencyKey, centavos: reg.centavos, forma: reg.forma }));
+      } else if (r && r.estado === "inexistente") {
+        reg.estado = ESTADOS.CANCELADO; reg.motivo = "nao_criada"; delete reg.qr;
+      } else {
+        aplicar(reg, r);
+      }
     } catch {
       reg.estado = ESTADOS.INCERTO;
     }
@@ -96,21 +122,22 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
     return { ...reg };
   }
 
-  async function cancelar(idempotencyKey) {
+  async function cancelarAgora(idempotencyKey) {
     const reg = registros.get(idempotencyKey);
     if (!reg) throw new Error("pagamento desconhecido");
     if (FINAIS.has(reg.estado)) return { ...reg };
     if (typeof adaptador.cancelar === "function") {
       try { await adaptador.cancelar({ idempotencyKey, forma: reg.forma }); } catch { /* a consulta abaixo decide */ }
     }
-    return reconsultar(idempotencyKey); // o banco/maquininha tem a ultima palavra
+    return reconsultarAgora(idempotencyKey, { recobrar: false }); // o banco/maquininha tem a ultima palavra
   }
 
   function aplicar(reg, r) {
     const estado = r && r.estado;
     delete reg.mensagem;
+    if (reg.estado === ESTADOS.APROVADO) return; // nunca desfaz aprovado
     if (estado === ESTADOS.APROVADO) {
-      if (r.centavos !== reg.centavos) { reg.estado = ESTADOS.INCERTO; reg.motivo = "valor aprovado diferente"; return; }
+      if (r.centavos !== reg.centavos) { reg.estado = ESTADOS.INCERTO; reg.motivo = "valor aprovado diferente"; reg.atendente = true; return; }
       reg.estado = ESTADOS.APROVADO;
       reg.autorizacao = typeof r.autorizacao === "string" ? r.autorizacao : null;
       delete reg.qr;
@@ -119,6 +146,8 @@ export function criarPagamentos({ adaptador, agora = () => new Date().toISOStrin
       if (typeof r.qr === "string") reg.qr = r.qr;
       if (typeof r.mensagem === "string") reg.mensagem = r.mensagem; // ex.: "siga as instrucoes na maquininha"
       if (typeof r.expiraEm === "string") reg.expiraEm = r.expiraEm;
+    } else if (reg.atendente) {
+      reg.estado = ESTADOS.INCERTO; // valor diferente ja aprovado: so atendente resolve
     } else if (estado === ESTADOS.RECUSADO || estado === ESTADOS.CANCELADO) {
       reg.estado = estado;
       reg.motivo = typeof r.motivo === "string" ? r.motivo : null;
