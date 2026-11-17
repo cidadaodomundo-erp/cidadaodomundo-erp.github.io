@@ -4,48 +4,191 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<title>Salão · Cidadão do Mundo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Central do Salão · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
+<!-- CENTRAL DO SALÃO (17/11/2026). Trazida do portal antigo (salao/index.html): uma capa com os quadros do salão.
+     Só leitura, tudo do banco do ERP:
+       - Próximos dias na cidade: erp_salao_central_ler() (tabela erp_evento_cidade, lista pública com fonte em cada linha);
+       - Reservas: erp_reservas_ler (GetIn) · Cardápio no tablet: erp_pausados_ler (Goomer) · Google: erp_avaliacoes_dia('salao').
+     Cada quadro abre a tela completa que já existe no portal novo. A equipe do salão abre o Ponto ao vivo.
+     Ainda não trazido do antigo: escala do salão × mínimo por turno e vendas de balcão do Saipos. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .cs-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .cs-topo h1 { font-size:22px; margin:0; }
+  .cs-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
+  .cs-topo .acoes { margin-left:auto; }
+  .cs-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .cs-ev { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 12px; }
+  .cs-ev .tt { font-weight:800; font-size:15px; }
+  .cs-ev .ctx { font-size:12px; color:var(--tx-3); margin:2px 0 8px; }
+  .cs-evl { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; padding:6px 0; border-top:1px solid var(--line); font-size:13.5px; }
+  .cs-evl .qd { font-weight:700; min-width:110px; }
+  .cs-evl .fa { font-size:12px; color:var(--tx-3); }
+  .cs-evl a { color:inherit; }
+  .cs-pill { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; border:1px solid var(--line-2); }
+  .cs-pill.warn { background:rgba(210,153,34,.16); border-color:rgba(210,153,34,.55); }
+  .cs-pill.off { opacity:.7; border-style:dashed; }
+  .cs-tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
+  .cs-tile { text-align:left; font:inherit; color:inherit; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+  .cs-tile:hover { border-color:var(--brand); }
+  .cs-tile.atencao { border-left:4px solid var(--farol-atencao, #d29922); }
+  .cs-tile .ic { font-size:22px; }
+  .cs-tile .t { font-weight:800; font-size:15px; }
+  .cs-tile .big { font-size:26px; font-weight:800; }
+  .cs-tile .s { font-size:12.5px; color:var(--tx-3); line-height:1.45; }
+  .cs-tile .go { font-size:12px; font-weight:700; color:var(--brand); margin-top:auto; padding-top:6px; }
+  .cs-nota { font-size:12px; color:var(--tx-3); margin:14px 0 0; line-height:1.5; }
+  .cs-erro { color:var(--farol-fora, #e5534b); font-size:13px; margin:0 0 10px; }
+</style>
 </head>
 <body>
 <div class="main-content">
-  <div class="wrap oc">
-    <h1>Salão <span class="oc-obras">Em construção</span></h1>
-    <div id="bloqueio" hidden role="alert"></div>
-    <div id="statusGeral" role="status" aria-live="polite"></div>
-    <div id="app" hidden></div>
+  <div class="wrap">
+    <div class="cs-topo">
+      <div><h1>🍽 Central do Salão</h1><div class="sub" id="sub">Carregando…</div></div>
+      <div class="acoes"><button class="cs-btn" id="btnAtualizar" type="button">Atualizar</button></div>
+    </div>
+    <div id="erro" class="cs-erro" style="display:none;"></div>
+    <div id="eventos"></div>
+    <div class="cs-tiles" id="tiles"></div>
+    <p class="cs-nota">Cada quadro abre a tela completa. Ainda não veio do portal antigo: escala do salão comparada com o mínimo de gente por turno e as vendas de balcão do Saipos.</p>
   </div>
 </div>
+
 <script src="../nucleo/nucleo.js?v=20261105g"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
 <script>
-OperacaoConstrucao.iniciar({
-  titulo: 'Salão',
-  aviso: 'O acompanhamento de mesas e comandas ainda está em construção. Reservas já funciona na própria tela e não é substituída por esta.',
-  legenda: 'Mesa ou comanda (preparado)',
-  campos: [
-    { r: 'Loja', t: 'loja' },
-    { r: 'Data/Turno', t: 'text' },
-    { r: 'Mesa/comanda', t: 'text' },
-    { r: 'Pessoas', t: 'number', m: 'numeric' },
-    { r: 'Situação', t: 'select' },
-    { r: 'Responsável', t: 'select' }
-  ],
-  atalhos: [
-    { r: 'Ver Reservas', chave: 'reservas' },
-    { r: 'Ver Produtos pausados', chave: 'pausados' },
-    { r: 'Ver Taxas e Freelas', chave: 'freelas' }
-  ]
+const TELA = 'salao';
+const esc = trEscH;
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú' };
+const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const EV_IC = { jogo_casa: '⚽', jogo_fora: '📺', selecao: '🇧🇷', show: '🎤', outro: '📌', feriado: '🗓️' };
+const EV_TP = { jogo_casa: 'jogo em Curitiba', jogo_fora: 'jogo fora (TV)', selecao: 'Seleção (TV)', show: 'show', outro: 'evento', feriado: 'feriado' };
+
+function exigirLogin(r) { localStorage.removeItem('rmbSessao'); if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: r || '' }); return; } location.href = '../sistema.html'; }
+function hojeBR() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
+function somaDia(s, n) { const [a, m, d] = s.split('-').map(Number); const t = new Date(Date.UTC(a, m - 1, d)); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function diasEntre(a, b) { const p = (s) => { const [x, y, z] = s.split('-').map(Number); return Date.UTC(x, y - 1, z); }; return Math.round((p(b) - p(a)) / 86400000); }
+function br(s) { if (!s) return '—'; const [a, m, d] = String(s).slice(0, 10).split('-'); return d + '/' + m; }
+function dowTxt(s) { const [a, m, d] = s.split('-').map(Number); return DIAS[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]; }
+function quando(ts) { return ts ? new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'; }
+function lojaSel() { const l = typeof lojaAtual === 'function' ? lojaAtual() : null; return (!l || l === 'REDE') ? null : l; }
+async function ler(fn, args) {
+  const r = await trRpcSeguro(fn, args || {});
+  if (r.status === 401) { exigirLogin('Entre de novo para ver o salão.'); throw new Error('login'); }
+  if (!r.ok) return null;
+  try { return await r.json(); } catch (e) { return null; }
+}
+
+let D = {};
+async function carregar() {
+  document.getElementById('erro').style.display = 'none';
+  const hoje = hojeBR();
+  try {
+    const [central, reservas, pausados, google] = await Promise.all([
+      ler('erp_salao_central_ler'),
+      ler('erp_reservas_ler', { p_unidade: null, p_inicio: hoje, p_fim: somaDia(hoje, 6) }),
+      ler('erp_pausados_ler', { p_unidade: null, p_canal: 'Tablet (Goomer)' }),
+      ler('erp_avaliacoes_dia', { p_modo: 'salao' }),
+    ]);
+    D = { hoje, central, reservas, pausados, google };
+  } catch (e) { return; }
+  if (!D.central && !D.reservas && !D.pausados && !D.google) {
+    const el = document.getElementById('erro'); el.textContent = 'Não foi possível consultar agora, ou você ainda não tem acesso a estes quadros.'; el.style.display = 'block';
+  }
+  desenhar();
+}
+
+function blocoEventos() {
+  const c = D.central;
+  if (!c) return '';
+  const lista = c.eventos || [];
+  let h = '<div class="cs-ev"><div class="tt">📅 Próximos dias na cidade · até ' + br(somaDia(D.hoje, 7)) + ' · feriados até ' + br(somaDia(D.hoje, 21)) + '</div>' +
+    '<div class="ctx">jogos, shows e eventos grandes de Curitiba · lista conferida em ' + br(c.lista_conferida) +
+    (c.lista_ate ? ' · jogos e shows até ' + br(c.lista_ate) : '') + '</div>';
+  if (!lista.length) h += '<div class="cs-evl">Nenhum jogo, show ou feriado na lista para estes dias.</div>';
+  lista.forEach((e) => {
+    const falta = diasEntre(D.hoje, e.data);
+    const hora = e.tipo === 'feriado' ? 'dia todo' : e.hora || 'hora ?';
+    h += '<div class="cs-evl"><span class="qd">' + dowTxt(e.data) + ' ' + br(e.data) + ' · ' + esc(hora) + '</span>' +
+      '<span>' + (EV_IC[e.tipo] || '📌') + ' <b>' + esc(e.titulo) + '</b>' + (e.local ? ' · ' + esc(e.local) : '') + '</span>' +
+      (e.perto_av ? '<span class="cs-pill warn">perto da Água Verde</span>' : '') +
+      (e.a_confirmar ? '<span class="cs-pill off">a confirmar</span>' : '') +
+      (e.tipo === 'feriado' ? '<span class="cs-pill warn">feriado · reforçar a escala?</span>' : '') +
+      '<span class="fa">' + esc(EV_TP[e.tipo] || 'evento') + ' · ' + (falta <= 0 ? 'hoje' : falta === 1 ? 'amanhã' : 'faltam ' + falta + ' dias') +
+      (e.fonte_url && /^https:\/\//.test(e.fonte_url) ? ' · <a href="' + esc(e.fonte_url) + '" target="_blank" rel="noopener">fonte ↗</a>' : '') + '</span></div>';
+  });
+  return h + '</div>';
+}
+
+function tile(chave, ic, t, big, s, atencao) {
+  return '<button type="button" class="cs-tile' + (atencao ? ' atencao' : '') + '" data-abrir="' + chave + '"><div class="ic">' + ic + '</div><div class="t">' + esc(t) +
+    '</div><div class="big">' + esc(big) + '</div><div class="s">' + s + '</div><div class="go">abrir →</div></button>';
+}
+
+function desenhar() {
+  const loja = lojaSel();
+  const daLoja = (l) => (l || []).filter((x) => !loja || x.unidade === loja);
+  document.getElementById('sub').textContent = (loja ? NOME_UN[loja] || loja : 'Todas as lojas') + ' · consultado em ' + quando(new Date().toISOString());
+  document.getElementById('eventos').innerHTML = blocoEventos();
+  let h = '';
+  // Reservas
+  if (D.reservas) {
+    const rs = daLoja(D.reservas.reservas);
+    const hoje = rs.filter((x) => x.data === D.hoje);
+    const pes = (l) => l.reduce((t, x) => t + (Number(x.pessoas) || 0), 0);
+    h += tile('reservas', '🪑', 'Reservas', hoje.length + ' hoje', esc(pes(hoje)) + ' pessoas hoje · ' + rs.length + ' reservas nos próximos 7 dias (' + pes(rs) + ' pessoas) · GetIn', false);
+  } else h += tile('reservas', '🪑', 'Reservas', '—', 'sem acesso ou sem leitura agora', true);
+  // Cardápio no tablet
+  if (D.pausados) {
+    const it = daLoja(D.pausados.itens).filter((x) => x.canal === 'Tablet (Goomer)');
+    const f = (D.pausados.fonte && D.pausados.fonte.fontes || []).filter((x) => x.suportado !== false && (!loja || x.unidade === loja));
+    const ult = f.map((x) => x.ultimo_ok).filter(Boolean).sort().slice(-1)[0];
+    const semLeitura = f.filter((x) => !x.ultimo_ok).map((x) => NOME_UN[x.unidade] || x.unidade);
+    h += tile('pausados', '📵', 'Cardápio no tablet', it.length + ' fora do ar', 'itens pausados no Goomer · lido em ' + esc(quando(ult)) +
+      (semLeitura.length ? ' · sem leitura: ' + esc(semLeitura.join(', ')) : ''), it.length > 0);
+  } else h += tile('pausados', '📵', 'Cardápio no tablet', '—', 'sem acesso ou sem leitura agora', true);
+  // Google
+  if (D.google) {
+    const ls = daLoja(D.google.lojas);
+    const sem = ls.reduce((t, x) => t + (Number(x.sem_resposta) || 0), 0);
+    const notas = ls.filter((x) => x.nota_google != null).map((x) => (NOME_UN[x.unidade] || x.unidade) + ' ' + String(x.nota_google).replace('.', ',')).join(' · ');
+    const ruins = daLoja(D.google.pendentes).filter((x) => Number(x.nota) <= 3).length;
+    const lido = (D.google.fontes || [])[0];
+    h += tile('avalsalao', '⭐', 'Nota no Google', sem + ' sem resposta', esc(notas || 'sem nota') + (ruins ? ' · <b>' + ruins + ' nota baixa sem resposta</b>' : '') +
+      ' · lido em ' + esc(quando(lido && lido.lido_em)), ruins > 0);
+  } else h += tile('avalsalao', '⭐', 'Nota no Google', '—', 'sem acesso ou sem leitura agora', true);
+  // Equipe
+  h += tile('pao', '👥', 'Equipe do salão', 'Ponto ao vivo', 'quem já bateu ponto agora, por loja (Flash)', false);
+  document.getElementById('tiles').innerHTML = h;
+}
+
+document.getElementById('tiles').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-abrir]'); if (!b) return;
+  if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome: b.dataset.abrir });
+  else location.href = '../sistema.html#' + b.dataset.abrir;
 });
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => desenhar());
+
+if (!rmbSessao()) exigirLogin('Entre para ver o salão.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { try { await lojaCarregar(); } catch (e) {} carregar(); })();
+}
+window.reentrarTela = carregar;
 </script>
 </body>
 </html>

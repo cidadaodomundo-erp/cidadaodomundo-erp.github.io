@@ -118,7 +118,7 @@ window.CASCA_PAGINAS = {
   prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
-  salao: 'salao/index.html',         // Salão: em construção (a própria página diz)
+  salao: 'salao/index.html',         // 17/11/2026: Central do Salão (eventos da cidade, reservas, tablet, Google, equipe)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
   pausados: 'pausados/index.html?modo=salao&v=20261116a',   // 16/11/2026: Itens pausados do Salão = só Goomer (tablet)
   pausadosdel: 'pausados/index.html?modo=delivery&v=20261116a',   // 16/11/2026: Itens pausados do Delivery = iFood x Site (Accon), iFood é a referência
