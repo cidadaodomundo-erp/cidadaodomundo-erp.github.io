@@ -1665,10 +1665,21 @@ function sepSaldoTd(l) {
   if (PLP.sepSaldo === 'erro' && l.situacao_do_saldo == null) return `<td id="sepSd_${l.id_item}" style="font-size:12px; color:var(--tx-5);" title="o saldo não respondeu agora; a lista vale assim mesmo">—</td>`;
   return `<td id="sepSd_${l.id_item}" style="font-size:12px; color:${/NEGATIV|FALTA/.test(l.situacao_do_saldo || '') ? 'var(--farol-perto)' : 'var(--tx-4)'};">${l.saldo == null ? '' : fmt(Number(l.saldo))} ${trEscH(String(l.situacao_do_saldo || '').toLowerCase())}</td>`;
 }
+// 17/11/2026 (dono 13:36, agenda #871: "rever as telas do estoque conferindo se os avisos pros usuários no passo a passo estão
+// claros pra eles saberem exatamente o que podem ou não fazer dentro do fluxo de produção"): uma linha por passo, do que o banco deixa
+const EST_PASSO = {
+  plano: ['Até fechar, pode pôr, mudar e tirar receitas (0 tira).', 'Fechado, as listas da Separação saem dele: com a separação gerada, o plano não reabre — corrija a quantidade na Separação.'],
+  separacao: ['Pode escrever quanto saiu de cada item (0 se não saiu) e conferir.', 'Não pode incluir item (isso é no plano). Conferida, a lista vira a ordem e não muda mais.'],
+  ordem: ['Pode iniciar, anotar o que a cozinha produziu e encerrar. Cancelar, só antes de começar.', 'Não pode mudar o plano por baixo de uma ordem viva: cancele a ordem antes.'],
+};
+function estPassoHtml(p) {
+  const x = EST_PASSO[p];
+  return x ? `<div class="caption-label" style="text-align:left; margin:4px 0 8px;"><span style="color:var(--farol-ok);">✓</span> ${x[0]} <span style="color:var(--farol-perto);">✗</span> ${x[1]}</div>` : '';
+}
 function sepRender() {
   const alvo = document.getElementById('view-separacao');
   if (!alvo) return;
-  let h = `<h2>Separação</h2>` + estFilaHtml() + `<span id="plpMsg" style="font-size:12.5px;"></span>`;
+  let h = `<h2>Separação</h2>` + estFilaHtml() + estPassoHtml('separacao') + `<span id="plpMsg" style="font-size:12.5px;"></span>`;
   h += plpSepsHtml(null);
   alvo.innerHTML = h;
 }
@@ -2126,7 +2137,7 @@ function plpRender() {
   }
 
   let h = `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"><h2>Planejar produção</h2>
-      <button class="preset-btn active" onclick="plpManual(true)" title="Escolher as receitas e digitar a quantidade, sem a sugestão">✎ Plano manual</button></div>` + estFilaHtml();
+      <button class="preset-btn active" onclick="plpManual(true)" title="Escolher as receitas e digitar a quantidade, sem a sugestão">✎ Plano manual</button></div>` + estFilaHtml() + estPassoHtml('plano');
 
   // aviso CONDICIONAL: retrato velho faz a tela mentir sem avisar
   if (PLP.idade && PLP.idade.retrato_atrasado) {
@@ -2377,7 +2388,7 @@ function plpBlocoPlano() {
   if (fech) {
     h += `<div class="contexto" style="border-color:var(--farol-ok);"><b>Plano de ${plpDm(fech.data_para || amanha)} fechado</b> com
       ${dec.length} ${dec.length === 1 ? 'receita' : 'receitas'}. Agora: separar e conferir cada lista; a ordem de produção nasce da lista conferida.
-      <button class="preset-btn" onclick="plpReabrir(${fech.id_plano})" title="Volta o plano para edição. Se já existe lista separada ou ordem dele, desfaça antes.">Reabrir o plano</button>
+      <button class="preset-btn" onclick="plpReabrir(${fech.id_plano}, '${String(fech.data_para || plpAmanha()).slice(0, 10)}')" title="Volta o plano para edição — só enquanto a separação dele não foi gerada.">Reabrir o plano</button>
       <span id="plpMsg" style="font-size:12.5px;"></span></div>`;
     const f = EST_FILA || {};
     const nL = (Number(f.listas_a_separar) || 0) + (Number(f.listas_a_conferir) || 0) + (Number(f.listas_a_virar_ordem) || 0);
@@ -2623,7 +2634,18 @@ async function plpGerarOrdem(id) {
   avisoAcao('ok', `✓ Ordem gerada — abra em Apontar produção. Às ${avisoHora()}.`);
   await plpCarregar();
 }
-async function plpReabrir(id) {
+async function plpReabrir(id, dataPara) {
+  // 17/11/2026 (dono 13:36, agenda #871: "essa exclusão vai estar amarrada ao ciclo todo?"): reabrir NÃO desfaz a separação, e
+  // com separação viva o banco não gera outra — o plano mudaria e as listas ficariam velhas. Até o Estoque ligar o "desfazer
+  // o ciclo" (plano + separação + ordem juntos), com separação viva a tela não reabre.
+  let seps = null;
+  // o plano é único por loja e data (est_plano.data_para): a separação dele é a da mesma loja e data
+  if (dataPara && PLP && PLP.unidade) { try { seps = await consultarTudo(`vw_est_separacao_lista?select=numero,situacao&unidade=eq.${encodeURIComponent(PLP.unidade)}&data_para=eq.${String(dataPara).slice(0, 10)}&situacao=neq.CANCELADA`); } catch (e) { seps = null; } }
+  const nums = [...new Set((seps || []).map((x) => x.numero))];
+  if (nums.length) {
+    avisoAcao('atencao', `! Este plano já gerou a separação (${nums.join(', ')}). Mudar o plano agora deixaria as listas velhas: ainda não dá para reabrir. Para corrigir uma quantidade, ajuste na Separação ou fale com o Neto.`);
+    return;
+  }
   const motivo = (prompt('Por que reabrir o plano? (fica registrado)') || '').trim();
   if (!motivo) return;
   avisoAcao('enviando', 'Reabrindo o plano…');
@@ -2706,7 +2728,7 @@ function plpManRender() {
   const js = (v) => trEscH(JSON.stringify(v));
 
   let h = `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;"><h2>Planejar produção — plano manual</h2>
-      <button class="preset-btn" onclick="plpManual(false)" title="A tela com a sugestão do que falta até a quarta">‹ Voltar à sugestão</button></div>` + estFilaHtml();
+      <button class="preset-btn" onclick="plpManual(false)" title="A tela com a sugestão do que falta até a quarta">‹ Voltar à sugestão</button></div>` + estFilaHtml() + estPassoHtml('plano');
   h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0 10px;">
       <span style="color:var(--tx-3); font-weight:700;">Plano para</span>
       ${chip(M.data === hoje, `plpManData('${hoje}')`, `Hoje · ${plpDm(hoje).slice(0, 5)}`)}
@@ -2718,7 +2740,7 @@ function plpManRender() {
     h += `<div class="contexto" style="border-color:var(--farol-ok); text-align:left;"><b>Plano de ${plpDm(M.data)} fechado.</b>
       ${nL ? `${nL} ${nL === 1 ? 'lista espera' : 'listas esperam'} na Separação.` : 'As listas dele estão na Separação e nas Ordens.'}
       <button class="preset-btn active" onclick="mostrarModulo('separacao')">Abrir a Separação ›</button>
-      <button class="preset-btn" onclick="plpReabrir(${M.idPlano})" title="Volta o plano para edição. Se já existe lista separada ou ordem dele, desfaça antes.">Reabrir o plano</button></div>`;
+      <button class="preset-btn" onclick="plpReabrir(${M.idPlano}, '${String(M.data).slice(0, 10)}')" title="Volta o plano para edição — só enquanto a separação dele não foi gerada.">Reabrir o plano</button></div>`;
   } else {
     h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;">
       <button id="plpManFecharBtn" class="preset-btn active est-ciclo" onclick="plpManFechar()" ${plpManNoPlano().length || Object.keys(M.dig).length ? '' : 'disabled title="Digite a quantidade de ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
@@ -3445,7 +3467,7 @@ async function prdCarregar() {
 
 function prdOrdensTela() {
   const alvo = prdAlvo();
-  let h = `<h2>Ordens de produção</h2>` + estFilaHtml();
+  let h = `<h2>Ordens de produção</h2>` + estFilaHtml() + estPassoHtml('ordem');
   h += prdOrdensHtml();
   alvo.innerHTML = h;
 }
