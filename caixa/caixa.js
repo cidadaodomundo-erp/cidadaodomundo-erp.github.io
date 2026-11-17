@@ -1625,7 +1625,8 @@ function caixaHellenItens() {
     // cofre: contado diferente do Saipos, e hoje sem contagem
     const cof = (COFRE_DIA || []).filter(r => r.unidade === u && r.dia >= corte);
     cof.filter(r => r.contagem_cobre_cofre === true && r.diferenca != null && Math.abs(+r.diferenca) >= 0.01).forEach(r => add({ u, dia: r.dia, ordem: 3, valor: +r.diferenca,
-      oque: `gaveta + cofre contados ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, acao: 'abrir', botao: 'abrir o dia', bloco: 'cofre', venda: `contado ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, forma: 'Dinheiro' }));
+      // 17/11/2026 (Ajuda #64; livro caixa-sobra-receita-falta-quebra): sobra vira receita e falta é quebra — nenhuma das duas trava o dia
+      oque: +r.diferenca > 0 ? `sobra de R$ ${fmt(+r.diferenca)} no dinheiro contado (gaveta + cofre) — registrada, vira receita` : `falta de R$ ${fmt(-r.diferenca)} no dinheiro contado (gaveta + cofre) — quebra a confirmar (dono ou Hellen)`, acao: 'cofre', botao: 'ver o cofre', bloco: 'cofre', venda: `contado ${+r.diferenca < 0 ? 'abaixo' : 'acima'} do Saipos`, forma: 'Dinheiro' }));
     const ult = cof[cof.length - 1];
     if (ult && ult.contado == null) {
       const ultC = [...cof].reverse().find(r => r.contado != null);
