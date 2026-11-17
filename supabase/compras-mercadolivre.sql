@@ -84,18 +84,20 @@ create policy compra_cotacao_oferta_le on public.compra_cotacao_oferta for selec
   using (exists (select 1 from public.compra_cotacao c where c.id = cotacao_id and public.compra_minha_loja(c.loja)));
 grant select on public.compra_cotacao, public.compra_cotacao_oferta to authenticated;
 
--- chave do robô de Compras (porta estreita: só as funções compra_robo_* e compra_wa_receber)
+-- chave do robô de Compras (porta estreita: só as funções compra_robo_* e compra_wa_receber).
+-- A chave é criada SÓ no Escritório 2 (compras-ml\gerar-chave.js) e nunca sai de lá: o vault guarda apenas o
+-- resumo sha256 dela (gravado com vault.update_secret em 17/11/2026, depois deste arquivo).
 do $$ begin
   if not exists (select 1 from vault.secrets where name = 'compras_robo_segredo') then
-    perform vault.create_secret(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 'compras_robo_segredo',
-      'Robo de Compras (Mercado Livre), Escritorio 2. Criada 17/11/2026.');
+    perform vault.create_secret('trocar-pelo-resumo-sha256-da-chave', 'compras_robo_segredo',
+      'Resumo sha256 da chave do robo de Compras (a chave fica so no Escritorio 2).');
   end if;
 end $$;
 
 create or replace function public.compra_robo_segredo_ok(p_segredo text) returns boolean
 language sql stable security definer set search_path to 'public','pg_temp' as $$
   select p_segredo is not null and char_length(p_segredo) >= 32
-     and p_segredo = (select decrypted_secret from vault.decrypted_secrets where name = 'compras_robo_segredo')
+     and encode(sha256(convert_to(p_segredo, 'UTF8')), 'hex') = (select decrypted_secret from vault.decrypted_secrets where name = 'compras_robo_segredo')
 $$;
 revoke all on function public.compra_robo_segredo_ok(text) from public, anon, authenticated;
 
@@ -124,6 +126,8 @@ language sql immutable set search_path to 'public' as $$
     '\m(pra|para|p/)?\s*(a\s+|o\s+)?(loja\s+)?(agua verde|água verde|sao braz|são braz|sao bras|são brás|ahu|ahú)\M', ' ', 'gi'),
     '\s+', ' ', 'g')), 200), '')
 $$;
+-- as três de texto só são chamadas de dentro das funções abaixo (que rodam como dono): ninguém de fora executa
+revoke all on function public.compra_loja_do_texto(text), public.compra_link_do_texto(text), public.compra_busca_do_texto(text) from public, anon, authenticated;
 
 -- PORTAL: pedir cotação
 create or replace function public.compra_cotacao_pedir(p_texto text, p_loja text default null) returns jsonb

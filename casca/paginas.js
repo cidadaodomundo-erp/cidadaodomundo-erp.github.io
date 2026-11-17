@@ -127,12 +127,14 @@ window.CASCA_PAGINAS = {
   taxaponto: 'taxa/painel.html?v=20261117a',   // 17/11/2026: Ponto dos taxas pelo QR (erp_taxa_ponto_ler, taxa_qr_codigo_da_semana)
   avaldel: 'avaliacoes/index.html?modo=delivery&v=20261116a',     // 16/11/2026: Avaliações do dia do Delivery (iFood; Accon sem avaliações no sistema)
   avalsalao: 'avaliacoes/index.html?modo=salao&v=20261116a',      // 16/11/2026: Avaliações do dia do Salão (Google, API oficial)
+  mercadolivre: 'mercadolivre/index.html?v=20261117a',            // 17/11/2026: Compras · Mercado Livre (cotação; robô de Compras no Escritório 2; nada é comprado sozinho)
 };
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
 window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras',
-  'prestadores'];   // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
+  'prestadores',    // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
+  'mercadolivre'];  // 17/11/2026: cada pedido de compra escolhe a loja de entrega na própria tela (o banco filtra pelas lojas do login)
 
 // 28/10/2026 (seletor de loja único): telas que já seguem a loja escolhida no topo da casca. As outras mostram a faixa
 // "esta tela ainda não separa pela loja". Entra uma chave por tela migrada (proposta 2026-10-28-seletor-loja-unico.md).
