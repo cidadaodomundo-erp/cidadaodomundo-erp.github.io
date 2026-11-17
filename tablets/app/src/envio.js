@@ -38,8 +38,30 @@
   };
   const limpar = () => { memoria = null; try { localStorage.removeItem(PENDENTE); } catch { /* ok */ } };
 
+  const chaveOcup = (o) => (o.modalidade === "mesa" ? `mesa:${o.mesa}` : `comanda:${o.comanda}`);
   window.CDMEnvio = {
     modo: cfg.modo,
+    mesaFixa: Number.isInteger(cfg.mesaFixa) ? cfg.mesaFixa : null,
+    async conferirPin(pin) {
+      try {
+        const r = await post("/api/equipe/pin", { pin: String(pin || "") });
+        return r.status === 200 && r.json && r.json.ok ? { ok: true } : { ok: false, mensagem: (r.json && r.json.mensagem) || "Senha incorreta." };
+      } catch { return { ok: false, mensagem: "Sem conexão com o servidor." }; }
+    },
+    async fecharMesa(ocupacao, pin) {
+      try {
+        const r = await post("/api/cozinha/mesa/fechar", { ocupacao: chaveOcup(ocupacao), pin: String(pin) });
+        return r.status === 200 && r.json && r.json.ok ? { ok: true } : { ok: false, mensagem: (r.json && r.json.mensagem) || "Não foi possível fechar a conta." };
+      } catch { return { ok: false, mensagem: "Sem conexão com o servidor. A conta não foi fechada." }; }
+    },
+    async estadoMesa(ocupacao) {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 4000);
+      try {
+        const r = await fetch(`/api/tablet/estado?ocupacao=${encodeURIComponent(chaveOcup(ocupacao))}`, { cache: "no-store", signal: ctl.signal });
+        return r.ok ? await r.json() : null;
+      } catch { return null; } finally { clearTimeout(t); }
+    },
     async enviarRodada({ ocupacao, numero, itens }) {
       const conteudo = { ocupacao, numero, itens };
       const idempotencyKey = chave(conteudo);
@@ -48,7 +70,7 @@
       catch { return { ok: false, mensagem: "Sem conexão com a cozinha. O carrinho foi mantido: toque em Confirmar de novo (não duplica)." }; }
       if (r.status === 200 && r.json && r.json.ok) {
         limpar();
-        return { ok: true, status: r.json.status, mensagem: r.json.mensagem, totalCentavos: r.json.totalCentavos };
+        return { ok: true, id: r.json.id, status: r.json.status, mensagem: r.json.mensagem, totalCentavos: r.json.totalCentavos };
       }
       if (r.status >= 400 && r.status < 500) limpar(); // recusado de vez: proxima tentativa e outro pedido
       return { ok: false, mensagem: (r.json && r.json.mensagem) || "A cozinha não confirmou o recebimento. O carrinho foi mantido; tente de novo." };

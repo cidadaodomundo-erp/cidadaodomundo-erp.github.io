@@ -276,7 +276,9 @@
         if (!occ || (r.ocupacao === undefined && !ocupacaoPronta(e))) continue;
         if (!e.rodadas.length) { e.modalidade = occ.modalidade; if (occ.modalidade === "mesa") e.mesa = occ.mesa; else e.comanda = occ.comanda; }
         else if (!mesmaOcupacao(occ, ocupacaoAtual(e))) continue;
-        e.rodadas.push({ numero: e.rodadas.length + 1, ocupacao: occ, criadoEm: r.criadoEm, status: STATUS_VALIDOS.includes(r.status) ? r.status : STATUS_RODADA, itens, totalCentavos: itens.reduce((s, i) => s + i.totalCentavos, 0) });
+        const rod = { numero: e.rodadas.length + 1, ocupacao: occ, criadoEm: r.criadoEm, status: STATUS_VALIDOS.includes(r.status) ? r.status : STATUS_RODADA, itens, totalCentavos: itens.reduce((s, i) => s + i.totalCentavos, 0) };
+        if (typeof r.idServidor === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(r.idServidor)) rod.idServidor = r.idServidor; // so modo servidor
+        e.rodadas.push(rod);
       }
     }
     if (Array.isArray(bruto.simulacoes)) {

@@ -38,7 +38,8 @@ function criarFetch({ ordem } = {}) {
   return f;
 }
 
-async function subir({ modo = "local", inicio = AS_12H, ordem, dir } = {}) {
+const PIN = "4321";
+async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos = "TICKET" } = {}) {
   if (!dir) {
     dir = await mkdtemp(join(tmpdir(), "salao-test-"));
     dirs.push(dir);
@@ -55,7 +56,7 @@ async function subir({ modo = "local", inicio = AS_12H, ordem, dir } = {}) {
   const relogio = { t: inicio };
   const f = criarFetch({ ordem });
   const server = await criarServidorSalao({
-    modo, envPath: modo === "saipos" ? join(dir, "priv", ".env") : undefined, fetchImpl: f, timeoutMs: 300,
+    modo, modoSaipos, pin: PIN, envPath: modo === "saipos" ? join(dir, "priv", ".env") : undefined, fetchImpl: f, timeoutMs: 300,
     gamaPath: join(dir, "gama.json"), fotosDir: join(dir, "fotos"), statePath: modo === "local" ? join(dir, "estado.json") : undefined, agora: () => relogio.t,
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -215,11 +216,79 @@ test("saipos: recusa subir com loja que nao e a TESTE", async () => {
   await writeFile(join(dir, "priv", ".env"), `SAIPOS_SECRET=${SEGREDO}\n`);
   await writeFile(join(dir, "priv", "test-store.json"), JSON.stringify({ storeId: "93936", environment: "desenvolvimento", testStoreVerified: true, expectedName: "Cidadão do Mundo - HML", codStore: "00000000-0000-4000-8000-000000000000", idPartner: PARCEIRO }));
   const f = criarFetch();
-  await assert.rejects(criarServidorSalao({ modo: "saipos", envPath: join(dir, "priv", ".env"), fetchImpl: f, gamaPath: join(dir, "gama.json"), fotosDir: dir }));
+  await assert.rejects(criarServidorSalao({ modo: "saipos", pin: PIN, envPath: join(dir, "priv", ".env"), fetchImpl: f, gamaPath: join(dir, "gama.json"), fotosDir: dir }));
   assert.equal(f.pedidos().length, 0);
 });
 
 test("nota da ficha: mesa/comanda + rodada + observacao, ate 110 caracteres", () => {
   assert.equal(notaSaipos({ modalidade: "comanda", comanda: "A12" }, 3, { obs: "x".repeat(200) }).length, 110);
   assert.equal(notaSaipos({ modalidade: "mesa", mesa: 4 }, 2, { obs: "" }), "MESA 4 R2");
+});
+
+test("equipe: senha confere no servidor, bloqueia apos 5 erros; servidor nao sobe sem senha valida", async () => {
+  const s = await subir();
+  assert.equal((await post(s, "/api/equipe/pin", { pin: PIN })).status, 200);
+  for (let i = 0; i < 5; i++) assert.equal((await post(s, "/api/equipe/pin", { pin: "0000" })).status, 403);
+  assert.equal((await post(s, "/api/equipe/pin", { pin: PIN })).status, 429, "bloqueado mesmo com a senha certa");
+  await assert.rejects(criarServidorSalao({ pin: "12", gamaPath: join(s.dir, "gama.json"), fotosDir: join(s.dir, "fotos"), statePath: join(s.dir, "x.json") }));
+});
+
+test("mesa fixa pelo endereco; andamento da rodada e fechamento da conta liberam o tablet", async () => {
+  const s = await subir();
+  const pg = await chamar(s.porta, { caminho: "/tablet?mesa=7" });
+  assert.match(pg.texto, /"mesaFixa":7/);
+  assert.equal((await chamar(s.porta, { caminho: "/tablet?mesa=999" })).status, 400);
+  const r1 = await post(s, "/api/rodada", rodada(40, [itemCerveja()]));
+  const r2 = await post(s, "/api/rodada", rodada(41, [itemCerveja()], { numero: 2 }));
+  await post(s, `/api/cozinha/rodada/${r1.json.id}/pronto`, {});
+  let est = (await chamar(s.porta, { caminho: "/api/tablet/estado?ocupacao=mesa:7" })).json;
+  assert.equal(est.fechadaEm, null);
+  assert.deepEqual(est.rodadas.map((x) => x.preparo), ["PRONTO", "NOVO"]);
+  let painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  assert.deepEqual(painel.mesas.map((m) => [m.rotulo, m.rodadas, m.totalCentavos]), [["MESA 7", 2, 4200]]);
+  assert.equal((await post(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7", pin: "9999" })).status, 403);
+  s.relogio.t = new Date(s.relogio.t.getTime() + 60_000);
+  assert.equal((await post(s, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7", pin: PIN })).json.ok, true);
+  est = (await chamar(s.porta, { caminho: "/api/tablet/estado?ocupacao=mesa:7" })).json;
+  assert.ok(est.fechadaEm);
+  assert.deepEqual(est.rodadas, []);
+  painel = (await chamar(s.porta, { caminho: "/api/cozinha" })).json;
+  assert.equal(painel.mesas.length, 0);
+  assert.equal(painel.rodadas.length, 0, "rodadas da conta fechada saem da fila da cozinha");
+  // nova ocupacao da mesma mesa comeca do zero
+  s.relogio.t = new Date(s.relogio.t.getTime() + 60_000);
+  await post(s, "/api/rodada", rodada(42, [itemCerveja()]));
+  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.mesas[0].rodadas, 1);
+  assert.equal(r2.json.ok, true);
+});
+
+test("saipos TABLE (FAKE, nao homologado): rodada vai para a MESA (desc_table) com notas e sem pagamento", async () => {
+  const s = await subir({ modo: "saipos", modoSaipos: "TABLE" });
+  const r = await post(s, "/api/rodada", rodada(50, [itemBurger({ obs: "bem passado" }), itemCerveja()]));
+  assert.equal(r.json.status, STATUS.saipos, r.texto);
+  const body = JSON.parse(s.f.pedidos()[0].corpo);
+  assert.equal(body.order_method.mode, "TABLE");
+  assert.deepEqual(body.table, { desc_table: "7" });
+  assert.match(body.order_id, /^MESA-\d{14}-[0-9a-f]{8}$/);
+  assert.ok(body.order_id.length <= 40);
+  assert.equal(body.notes, "TESTE-NAO PRODUZIR | MESA 7 R1");
+  assert.equal(body.items[0].notes, "bem passado");
+  assert.equal(body.items[1].notes, undefined);
+  assert.equal("payment_types" in body, false);
+  const total = body.items.reduce((t, it) => t + Math.round(it.unit_price * 100 + (it.choice_items || []).reduce((a, c) => a + Math.round(c.aditional_price * 100) * c.quantity, 0)) * it.quantity, 0);
+  assert.equal(total, TOTAL_REFERENCIA);
+  const ledger = await readdir(join(s.dir, "priv", "ledger"));
+  assert.equal(ledger.length, 1);
+  // comanda vai em desc_order_pad
+  await post(s, "/api/rodada", { idempotencyKey: K(51), ocupacao: { modalidade: "comanda", mesa: null, comanda: "A7" }, numero: 1, itens: [itemCerveja()] });
+  assert.deepEqual(JSON.parse(s.f.pedidos()[1].corpo).table, { desc_order_pad: "A7" });
+});
+
+test("saipos TABLE (FAKE): recusa 4xx fica 'a conferir' e nao reenvia", async () => {
+  const s = await subir({ modo: "saipos", modoSaipos: "TABLE", ordem: async () => resp(400, { errorCode: 908 }) });
+  const r = await post(s, "/api/rodada", rodada(60, [itemCerveja()]));
+  assert.equal(r.json.status, STATUS.conferir);
+  await post(s, "/api/rodada", rodada(60, [itemCerveja()]));
+  assert.equal(s.f.pedidos().length, 1);
+  assert.equal((await chamar(s.porta, { caminho: "/api/cozinha" })).json.rodadas[0].saipos.estado, "recusado");
 });

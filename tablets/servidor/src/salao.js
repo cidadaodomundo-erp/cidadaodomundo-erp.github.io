@@ -5,12 +5,12 @@
 
 import http from "node:http";
 import os from "node:os";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { randomBytes, randomUUID, createHash, timingSafeEqual } from "node:crypto";
 
 import { montarMenu } from "../../app/tools/menu.mjs";
 import { carregarDto, carregarMapa, montarVisao, validarCarrinho, motivoIndisponivel } from "../../../totem/app/src/cardapio-hml.js";
@@ -20,11 +20,12 @@ import { obterToken } from "../../../totem/saipos-teste/src/auth.js";
 import { pedirLinkCatalogo, baixarCatalogo } from "../../../totem/saipos-teste/src/catalogo.js";
 import { carregarCatalogo } from "../../../totem/saipos-teste/src/payload.js";
 import { prepararCarrinho, enviarCarrinho, MAX_ITENS as MAX_ITENS_SAIPOS } from "../../../totem/saipos-teste/src/carrinho.js";
-import { ErroConector } from "../../../totem/saipos-teste/src/erros.js";
+import { ErroConector, resumirErroApi } from "../../../totem/saipos-teste/src/erros.js";
 import { lerJsonOpcional, gravarJsonAtomico } from "../../../totem/saipos-teste/src/arquivos.js";
 
 const require = createRequire(import.meta.url);
 const C = require("../../app/src/core.js");
+const SaiposMesa = require("../../app/src/saipos-payload.cjs");
 
 const AQUI = fileURLToPath(new URL(".", import.meta.url));
 const APP = join(AQUI, "..", "..", "app");
@@ -54,6 +55,13 @@ function ordenar(v) {
   return v;
 }
 const hash = (v) => createHash("sha256").update(JSON.stringify(ordenar(v))).digest("hex");
+
+export const chaveOcupacao = (o) => (o.modalidade === "mesa" ? `mesa:${o.mesa}` : `comanda:${o.comanda}`);
+export function lerChaveOcupacao(txt) {
+  const m = /^(mesa|comanda):(.{1,12})$/.exec(String(txt ?? ""));
+  if (!m) throw bad("Mesa/comanda inválida.");
+  return lerOcupacao(m[1] === "mesa" ? { modalidade: "mesa", mesa: m[2], comanda: null } : { modalidade: "comanda", mesa: null, comanda: m[2] });
+}
 
 export function rotuloOcupacao(o) {
   return o.modalidade === "mesa" ? `MESA ${o.mesa}` : `COMANDA ${o.comanda}`;
@@ -150,7 +158,7 @@ export function notaSaipos(ocupacao, numero, linha) {
 
 // ---------- estado (arquivo JSON local, gravacao atomica) ----------
 
-function estadoVazio() { return { v: 1, proximaSenha: SENHA_INICIAL, rodadas: [], avisos: [] }; }
+function estadoVazio() { return { v: 1, proximaSenha: SENHA_INICIAL, rodadas: [], avisos: [], fechamentos: [] }; }
 
 async function carregarEstado(caminho) {
   const bruto = await lerJsonOpcional(caminho); // corrompido => erro (nunca recomeca do zero apagando)
@@ -158,6 +166,8 @@ async function carregarEstado(caminho) {
   if (!objeto(bruto) || bruto.v !== 1 || !Array.isArray(bruto.rodadas) || !Array.isArray(bruto.avisos) || !Number.isSafeInteger(bruto.proximaSenha)) {
     throw new ErroConector("ESTADO_INVALIDO", "Arquivo de estado do salão inválido; não foi sobrescrito.");
   }
+  if (bruto.fechamentos === undefined) bruto.fechamentos = []; // estado de antes de 17/11
+  if (!Array.isArray(bruto.fechamentos)) throw new ErroConector("ESTADO_INVALIDO", "Arquivo de estado do salão inválido; não foi sobrescrito.");
   // envio interrompido no meio (queda/reinicio) => incerto, NUNCA reenvia sozinho
   for (const r of bruto.rodadas) if (r.saipos && ["reservado", "enviando"].includes(r.saipos.estado)) r.saipos.estado = "ambiguo";
   return bruto;
@@ -180,7 +190,7 @@ async function iniciarSaipos({ envPath, fetchImpl, timeoutMs }) {
 
 // ---------- paginas ----------
 
-function tabletHtml({ menu, modo, csrf, base }) {
+function tabletHtml({ menu, modo, csrf, base, mesaFixa = null }) {
   let html = readFileSync(join(APP, "src", "index.template.html"), "utf8");
   const dados = { ...menu, fotos: Object.fromEntries(menu.produtos.map((p) => [p.id, `/fotos/p${p.id}.webp`])) };
   const seguro = (s) => s.replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
@@ -195,7 +205,7 @@ function tabletHtml({ menu, modo, csrf, base }) {
     ["Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.", "Pede confirmação e envia a rodada para a cozinha de teste. Nada é cobrado."],
   ];
   for (const [a, b] of trocas) html = html.replace(a, b);
-  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf }))}</script>\n<script type="application/json" id="dados">`;
+  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa }))}</script>\n<script type="application/json" id="dados">`;
   html = html.replace('<script type="application/json" id="dados">', cfg);
   const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
   for (const [k, v] of Object.entries(subst)) html = html.split(k).join(v);
@@ -227,8 +237,10 @@ const CSP = "default-src 'none'; img-src 'self' data:; font-src data:; style-src
 // modo: "local" (cozinha de teste apenas) | "saipos" (cozinha + loja TESTE do Saipos; exige envPath).
 // statePath: arquivo de estado (padrao: tablets/servidor/dados/salao-estado.json no local; ao lado do .env privado no saipos).
 // hosts: lista de "ip:porta" aceitos no cabecalho Host (padrao: 127.0.0.1/localhost na porta).
-export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [] } = {}) {
+export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET", pin, envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [] } = {}) {
   if (!["local", "saipos"].includes(modo)) throw new ErroConector("MODO_INVALIDO", "Modo inválido.");
+  if (!["TICKET", "TABLE"].includes(modoSaipos)) throw new ErroConector("MODO_INVALIDO", "Modo do Saipos inválido.");
+  if (typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) throw new ErroConector("PIN_INVALIDO", "Senha da equipe deve ter de 4 a 8 números.");
   const cardapio = await carregarCardapio({ gamaPath, fotosDir });
   let saipos = null;
   let permitidos = null;
@@ -244,7 +256,12 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
   const caminhoEstado = statePath ?? (saipos ? join(saipos.caminhos.dir, "salao-hml-state.json") : join(AQUI, "..", "dados", "salao-estado.json"));
   const estado = await carregarEstado(caminhoEstado);
   const salvar = () => gravarJsonAtomico(caminhoEstado, estado);
-  const csrf = randomBytes(24).toString("hex");
+
+  // Token por instalacao (guardado no estado): reiniciar o servidor nao obriga a recarregar cada tablet.
+  let gravarCsrf = false;
+  if (typeof estado.csrf !== "string" || !/^[0-9a-f]{48}$/.test(estado.csrf)) { estado.csrf = randomBytes(24).toString("hex"); gravarCsrf = true; }
+  const csrf = estado.csrf;
+  if (gravarCsrf) await salvar();
   const base = baseEstatica();
   const cozinhaHtml = readFileSync(join(PUBLIC, "cozinha.html"), "utf8")
     .replace("{{FONTES}}", base.fontesCss)
@@ -265,9 +282,10 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
   }
 
   async function enviarSaipos(r, val) {
-    r.saipos = { estado: "reservado", senha: estado.proximaSenha, orderId: null };
+    r.saipos = { estado: "reservado", senha: estado.proximaSenha, orderId: null, modo: modoSaipos };
     estado.proximaSenha += 1;
     await salvar();
+    if (modoSaipos === "TABLE") return enviarSaiposMesa(r, val);
     const itens = val.itensHml.map((it, i) => ({ ...it, nota: notaSaipos(r.ocupacao, r.numero, val.linhas[i]) }));
     let prep;
     try {
@@ -287,6 +305,51 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
       r.saipos.httpStatus = res.httpStatus ?? null;
     } catch (err) {
       r.saipos.estado = err instanceof ErroConector && err.codigo !== "JA_TENTADO" ? "nao_enviado" : "ambiguo";
+    }
+    await salvar();
+  }
+
+  // Modo mesa/comanda (TABLE) — NAO HOMOLOGADO: cada rodada e um POST /order novo para a mesa (desc_table = numero
+  // da mesa) ou comanda (desc_order_pad). Exige mesas/comandas cadastradas na loja TESTE. Uma tentativa por rodada
+  // (ledger exclusivo antes do POST), sem reenvio automatico; falha/sem resposta => "a conferir".
+  async function enviarSaiposMesa(r, val) {
+    const orderId = `MESA-${r.criadoEm.replace(/\D/g, "").slice(0, 14)}-${randomBytes(4).toString("hex")}`;
+    let env;
+    try {
+      env = SaiposMesa.criarPedidoMesaComanda({
+        pedidoId: orderId, displayId: String(r.saipos.senha), lojaCodigo: saipos.meta.codStore, criadoEm: r.criadoEm,
+        destino: r.ocupacao.modalidade === "mesa" ? { tipo: "mesa", descTable: String(r.ocupacao.mesa) } : { tipo: "comanda", descOrderPad: r.ocupacao.comanda },
+        observacao: `TESTE-NAO PRODUZIR | ${rotuloOcupacao(r.ocupacao)} R${r.numero}`,
+        itens: val.itensHml.map((it, i) => {
+          const item = { codigo: it.codigo, descricao: it.descricao, quantidade: it.quantidade, precoCentavos: it.centavos,
+            complementos: it.complementos.map((c) => ({ codigo: c.codigo, descricao: c.descricao, quantidade: c.quantidade, precoAdicionalCentavos: c.centavos })) };
+          const nota = notaSaipos(r.ocupacao, r.numero, val.linhas[i]).replace(/^(MESA|COMANDA) \S+ R\d+( \| )?/, "").trim();
+          if (nota) item.observacao = nota;
+          if (!item.complementos.length) delete item.complementos;
+          return item;
+        }),
+      });
+      if (env.conferencia.totalItensCentavos !== r.totalCentavos) throw new Error("total divergente");
+    } catch {
+      r.saipos.estado = "nao_enviado";
+      await salvar();
+      return;
+    }
+    r.saipos.orderId = orderId;
+    r.saipos.estado = "enviando";
+    await salvar();
+    try {
+      const secret = await lerSegredo(saipos.caminhos.envPath);
+      const { token } = await obterToken({ http: saipos.cliente, caminhos: saipos.caminhos, meta: saipos.meta, secret });
+      await mkdir(saipos.caminhos.ledgerDir, { recursive: true });
+      await writeFile(join(saipos.caminhos.ledgerDir, `${orderId}.json`), JSON.stringify({ orderId, modo: "TABLE", estado: "tentando", em: new Date().toISOString() }), { encoding: "utf8", mode: 0o600, flag: "wx" });
+      const resp = await saipos.cliente.requisitar({ metodo: "POST", caminho: "/order", headers: { Authorization: token }, corpo: env.corpo });
+      r.saipos.estado = resp.falha || resp.status >= 500 ? "ambiguo" : resp.status === 200 ? "aceito" : "recusado";
+      r.saipos.httpStatus = resp.status ?? null;
+      r.saipos.api = resp.falha ? null : resumirErroApi(resp.json, [secret, token, saipos.meta.idPartner]);
+      await gravarJsonAtomico(join(saipos.caminhos.ledgerDir, `${orderId}.json`), { orderId, modo: "TABLE", estado: r.saipos.estado, httpStatus: r.saipos.httpStatus, api: r.saipos.api, em: new Date().toISOString() });
+    } catch (err) {
+      r.saipos.estado = err instanceof ErroConector ? "nao_enviado" : "ambiguo";
     }
     await salvar();
   }
@@ -329,6 +392,56 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
     return { ok: true, mensagem: corpo.tipo === "conta" ? "Pedido de conta enviado à equipe. Já vamos até a mesa." : "A equipe foi avisada. Já vamos até a mesa." };
   }
 
+  const ultimoFechamento = (chave) => {
+    const f = estado.fechamentos.filter((x) => x.chave === chave);
+    return f.length ? f[f.length - 1].em : null;
+  };
+  const rodadasAbertas = (chave) => {
+    const desde = ultimoFechamento(chave);
+    return estado.rodadas.filter((r) => chaveOcupacao(r.ocupacao) === chave && (!desde || Date.parse(r.criadoEm) > Date.parse(desde)));
+  };
+  function mesasAbertas() {
+    const chaves = [...new Set(estado.rodadas.map((r) => chaveOcupacao(r.ocupacao)))];
+    return chaves.map((chave) => {
+      const rs = rodadasAbertas(chave);
+      if (!rs.length) return null;
+      return { chave, rotulo: rotuloOcupacao(rs[0].ocupacao), rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0), desde: rs[0].criadoEm,
+        pendentes: rs.filter((r) => r.preparo !== "ENTREGUE").length };
+    }).filter(Boolean).sort((a, b) => a.desde.localeCompare(b.desde));
+  }
+
+  // ---------- senha da equipe (trocar mesa, fechar conta) ----------
+  const tentativas = { falhas: 0, bloqueadoAte: 0 };
+  function conferirPin(valor) {
+    const agoraMs = Date.now();
+    if (agoraMs < tentativas.bloqueadoAte) throw new ErroSalao(429, "Muitas tentativas. Espere 1 minuto.");
+    const a = Buffer.from(String(valor ?? "")), b = Buffer.from(pin);
+    if (a.length === b.length && timingSafeEqual(a, b)) { tentativas.falhas = 0; return true; }
+    tentativas.falhas += 1;
+    if (tentativas.falhas >= 5) { tentativas.falhas = 0; tentativas.bloqueadoAte = agoraMs + 60_000; }
+    throw new ErroSalao(403, "Senha da equipe incorreta.");
+  }
+
+  async function fecharMesa(corpo) {
+    if (!so(corpo, ["ocupacao", "pin"])) throw bad("Pedido inválido.");
+    conferirPin(corpo.pin);
+    const o = lerChaveOcupacao(corpo.ocupacao);
+    const chave = chaveOcupacao(o);
+    const rs = rodadasAbertas(chave);
+    if (!rs.length) return { ok: true, mensagem: "Não havia conta aberta." };
+    const em = agora().toISOString();
+    for (const r of rs) if (r.preparo !== "ENTREGUE") { r.preparo = "ENTREGUE"; r.entregueEm = em; }
+    estado.fechamentos.push({ chave, em, rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0) });
+    if (estado.fechamentos.length > 2000) estado.fechamentos.splice(0, estado.fechamentos.length - 2000);
+    await salvar();
+    return { ok: true, mensagem: `Conta de ${rotuloOcupacao(o)} fechada.` };
+  }
+
+  function estadoTablet(txt) {
+    const chave = chaveOcupacao(lerChaveOcupacao(txt));
+    return { fechadaEm: ultimoFechamento(chave), rodadas: rodadasAbertas(chave).map((r) => ({ id: r.id, preparo: r.preparo })) };
+  }
+
   function painel() {
     const ativos = estado.rodadas.filter((r) => r.preparo !== "ENTREGUE");
     const entregues = estado.rodadas.filter((r) => r.preparo === "ENTREGUE").slice(-10);
@@ -339,6 +452,7 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
     return {
       modo, agora: agora().toISOString(),
       rodadas: ativos.map(pub), entregues: entregues.map(pub).reverse(),
+      mesas: mesasAbertas(),
       avisos: estado.avisos.filter((a) => !a.visto).map((a) => ({ id: a.id, tipo: a.tipo, rotulo: rotuloOcupacao(a.ocupacao), em: a.em })),
     };
   }
@@ -373,8 +487,11 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
       const url = new URL(req.url, `http://${host}`);
       if (req.method === "GET") {
         if (url.pathname === "/" || url.pathname === "/tablet") {
-          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
+          const mesaFixa = url.searchParams.has("mesa") ? C.normalizarMesa(url.searchParams.get("mesa")) : null;
+          if (url.searchParams.has("mesa") && mesaFixa === null) return enviar(400, "Mesa inválida no endereço (use /tablet?mesa=1 a 150).", "text/plain; charset=utf-8");
+          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         }
+        if (url.pathname === "/api/tablet/estado") return enviar(200, estadoTablet(url.searchParams.get("ocupacao")));
         if (url.pathname === "/cozinha") return enviar(200, cozinhaHtml, "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         if (url.pathname === "/api/cozinha") return enviar(200, painel());
         if (url.pathname === "/marca/logo-cdm.png") return enviar(200, readFileSync(join(TOTEM_APP, "public", "marca", "logo-cdm.png")), "image/png");
@@ -403,6 +520,8 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
       let m;
       if (url.pathname === "/api/rodada") return enviar(200, await serial(() => novaRodada(corpo)));
       if (url.pathname === "/api/aviso") return enviar(200, await serial(() => novoAviso(corpo)));
+      if (url.pathname === "/api/equipe/pin") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin); return enviar(200, { ok: true }); }
+      if (url.pathname === "/api/cozinha/mesa/fechar") return enviar(200, await serial(() => fecharMesa(corpo)));
       if ((m = /^\/api\/cozinha\/rodada\/([0-9a-f-]{36})\/(preparando|pronto|entregue)$/.exec(url.pathname))) return enviar(200, await serial(() => acaoCozinha(m[1], m[2])));
       if ((m = /^\/api\/cozinha\/aviso\/([0-9a-f-]{36})\/visto$/.exec(url.pathname))) return enviar(200, await serial(() => avisoVisto(m[1])));
       return enviar(404, { ok: false, mensagem: "Não encontrado." });
@@ -412,7 +531,7 @@ export async function criarServidorSalao({ modo = "local", envPath, fetchImpl = 
       return enviar(500, { ok: false, mensagem: "Erro interno. A rodada pode não ter sido registrada; confira na cozinha." });
     }
   });
-  server.salao = { estado, caminhoEstado, permitidos, cardapio };
+  server.salao = { estado, caminhoEstado, permitidos, cardapio, modoSaipos };
   return server;
 }
 

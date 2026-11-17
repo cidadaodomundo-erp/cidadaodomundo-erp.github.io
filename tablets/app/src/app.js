@@ -343,7 +343,7 @@
     for (const r of estado.rodadas) {
       const box = el("div", "rodada");
       const h = el("h4", "", `Rodada ${r.numero} · ${hora(r.criadoEm)}`);
-      h.appendChild(el("span", "selo", r.status));
+      h.appendChild(el("span", "selo", (r.idServidor && ETAPA[preparo.get(r.idServidor)]) || r.status));
       box.appendChild(h);
       for (const i of r.itens) {
         box.appendChild(el("div", "", descLinha(i.nome, i.variacaoNome, i.quantidade)));
@@ -389,6 +389,7 @@
         const r = C.confirmarRodada(ix, estado);
         if (r) {
           if (C.STATUS_VALIDOS.includes(res.status)) r.status = res.status;
+          if (typeof res.id === "string") r.idServidor = res.id;
           if (res.totalCentavos !== r.totalCentavos) console.warn("total do servidor difere do tablet");
           salvar();
           msg(`Rodada ${r.numero} — ${res.mensagem}`);
@@ -428,6 +429,14 @@
 
   $("btnFechar").addEventListener("click", async () => {
     if (C.comandaVazia(estado)) return;
+    if (ENVIO) {
+      const pin = await pedirPin("Fechar a conta desta mesa (equipe)");
+      if (!pin) return;
+      const r = await ENVIO.fecharMesa(C.ocupacaoAtual(estado), pin);
+      if (!r.ok) { msg(r.mensagem); return; }
+      encerrarLocal("Conta fechada pela equipe. Tablet liberado para o próximo cliente.");
+      return;
+    }
     const ok = await confirmar("FECHAR COMANDA",
       `Fechar a comanda de teste (${C.rotuloOcupacao(estado).toLowerCase()})? Serão apagados o carrinho e ${estado.rodadas.length} rodada(s) registrada(s) (${reais(C.totalComanda(estado))}). ${estado.modalidade === "mesa" ? "A mesa é mantida." : "Um novo cartão/comanda exigirá novo identificador."} Nada foi enviado ou cobrado.`,
       "Fechar e limpar");
@@ -453,7 +462,8 @@
   function escolherModalidade(m) { if ($("dmModMesa").disabled) return; modEscolhida = m; pintarModalidade(); $("dmNumero").focus(); }
   $("dmModMesa").addEventListener("click", () => escolherModalidade("mesa"));
   $("dmModCartao").addEventListener("click", () => escolherModalidade("comanda"));
-  $("btnMesa").addEventListener("click", () => {
+  $("btnMesa").addEventListener("click", async () => {
+    if (ENVIO && !(await pedirPin("Trocar a mesa deste tablet (equipe)"))) return;
     const vazia = C.podeAlterarOcupacao(estado);
     modEscolhida = estado.modalidade;
     pintarModalidade();
@@ -515,6 +525,86 @@
     if (ev.key === "Escape" && sheet && !document.querySelector("dialog[open]")) { ev.preventDefault(); fecharSheet(); }
   });
   mq.addEventListener("change", () => { if (!mq.matches) fecharSheet(); });
+
+  // ---------- modo servidor: senha da equipe, mesa fixa, andamento e fechamento pela equipe ----------
+  const ETAPA = { NOVO: "Recebida na cozinha", PREPARANDO: "Preparando", PRONTO: "Pronta", ENTREGUE: "Entregue" };
+  const preparo = new Map(); // idServidor -> etapa (so memoria; vem do servidor)
+  function encerrarLocal(texto) {
+    C.fecharComanda(estado);
+    preparo.clear();
+    salvar(); renderComanda();
+    msg(texto);
+  }
+  // Pede a senha da equipe e confere no servidor. Retorna a senha ou null.
+  let dlgPin = null;
+  function pedirPin(titulo) {
+    if (!dlgPin) {
+      dlgPin = el("dialog");
+      dlgPin.id = "dlgPin";
+      const box = el("div", "dlg-simples");
+      box.append(el("h2", "cubano", "SO PARA A EQUIPE"), el("p", "pequeno"));
+      const inp = el("input"); inp.type = "password"; inp.inputMode = "numeric"; inp.maxLength = 8; inp.autocomplete = "off"; inp.id = "pinNumero";
+      const lab = el("label", "", "Senha da equipe"); lab.htmlFor = "pinNumero";
+      const erro = el("p", "aviso"); erro.setAttribute("role", "alert");
+      const linha = el("div", "acoes-linha");
+      const nao = el("button", "btn sec", "Cancelar"); nao.type = "button";
+      const sim = el("button", "btn prim", "Confirmar"); sim.type = "button";
+      linha.append(nao, sim);
+      box.append(lab, inp, erro, linha);
+      dlgPin.appendChild(box);
+      document.body.appendChild(dlgPin);
+    }
+    const [, info, , inp, erro, linha] = dlgPin.firstChild.children;
+    const [nao, sim] = linha.children;
+    info.textContent = titulo;
+    inp.value = ""; erro.textContent = "";
+    return new Promise((ok) => {
+      const sair = (v) => { sim.onclick = nao.onclick = inp.onkeydown = null; fechar(dlgPin); ok(v); };
+      nao.onclick = () => sair(null);
+      const tentar = async () => {
+        sim.disabled = true;
+        const r = await ENVIO.conferirPin(inp.value);
+        sim.disabled = false;
+        if (r.ok) sair(inp.value); else { erro.textContent = r.mensagem; inp.select(); }
+      };
+      sim.onclick = tentar;
+      inp.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); tentar(); } };
+      abrir(dlgPin);
+      inp.focus();
+    });
+  }
+  if (ENVIO) {
+    // Tablet preso a uma mesa pelo endereco (/tablet?mesa=5): so vale com a comanda vazia.
+    if (ENVIO.mesaFixa && C.comandaVazia(estado) && !(estado.modalidade === "mesa" && estado.mesa === ENVIO.mesaFixa)) {
+      try { C.definirOcupacao(estado, "mesa", ENVIO.mesaFixa); salvar(); } catch { /* mantem */ }
+    }
+    $("btnFechar").textContent = "Fechar conta (equipe)";
+    // Andamento das rodadas e fechamento feito pela equipe (tela da cozinha/caixa)
+    let consultando = false;
+    const consultar = async () => {
+      if (consultando || !C.ocupacaoPronta(estado)) return;
+      consultando = true;
+      try {
+        const r = await ENVIO.estadoMesa(C.ocupacaoAtual(estado));
+        if (!r) return;
+        let mudou = false;
+        for (const x of r.rodadas) if (preparo.get(x.id) !== x.preparo) { preparo.set(x.id, x.preparo); mudou = true; }
+        const minhas = estado.rodadas.filter((x) => x.idServidor);
+        if (r.fechadaEm && minhas.length && minhas.every((x) => Date.parse(x.criadoEm) <= Date.parse(r.fechadaEm))) {
+          encerrarLocal("Conta fechada. Obrigado pela visita!");
+          return;
+        }
+        if (mudou) renderComanda();
+      } finally { consultando = false; }
+    };
+    setInterval(consultar, 5000);
+    consultar();
+    // Tela cheia no primeiro toque (o Android pede um gesto do usuario)
+    document.addEventListener("pointerdown", () => {
+      const d = document.documentElement;
+      if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen().catch(() => {});
+    }, { once: true });
+  }
 
   renderCategorias();
   renderLista();

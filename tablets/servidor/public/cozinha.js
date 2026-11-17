@@ -11,14 +11,20 @@
   const ETAPA = { NOVO: "Nova", PREPARANDO: "Preparando", PRONTO: "Pronta" };
   let ocupado = false;
 
-  async function post(caminho) {
-    const r = await fetch(caminho, { method: "POST", headers: { "Content-Type": "application/json", "X-CDM-CSRF": cfg.csrf }, body: "{}" });
+  async function post(caminho, corpo = {}) {
+    const r = await fetch(caminho, { method: "POST", headers: { "Content-Type": "application/json", "X-CDM-CSRF": cfg.csrf }, body: JSON.stringify(corpo) });
     if (!r.ok) { let j = null; try { j = await r.json(); } catch { /* */ } throw new Error((j && j.mensagem) || "Falhou"); }
   }
-  async function acao(caminho) {
+  async function acao(caminho, corpo) {
     if (ocupado) return;
     ocupado = true;
-    try { await post(caminho); } catch (e) { $("estado").textContent = e.message; } finally { ocupado = false; atualizar(); }
+    $("pinErro").textContent = "";
+    try { await post(caminho, corpo); } catch (e) { (corpo && corpo.pin !== undefined ? $("pinErro") : $("estado")).textContent = e.message; } finally { ocupado = false; atualizar(); }
+  }
+  function fecharConta(m) {
+    const pin = $("pin").value.trim();
+    if (!pin) { $("pinErro").textContent = "Digite a senha da equipe para fechar a conta."; $("pin").focus(); return; }
+    acao("/api/cozinha/mesa/fechar", { ocupacao: m.chave, pin });
   }
 
   function card(r) {
@@ -60,6 +66,17 @@
     l.textContent = "";
     if (!d.rodadas.length) l.appendChild(el("p", "vazio", "Nenhuma rodada esperando. Os pedidos dos tablets aparecem aqui sozinhos."));
     for (const r of d.rodadas) l.appendChild(card(r));
+    const ms = $("mesas");
+    ms.textContent = "";
+    if (!d.mesas.length) ms.appendChild(el("p", "meta", "Nenhuma conta aberta."));
+    for (const m of d.mesas) {
+      const x = el("div", "mesa");
+      const t = el("div");
+      t.append(el("strong", "", m.rotulo), el("div", "meta", `${m.rodadas} rodada(s) · ${reais(m.totalCentavos)} · desde ${hora(m.desde)}${m.pendentes ? ` · ${m.pendentes} na cozinha` : ""}`));
+      const b = el("button", "sec", "Fechar conta"); b.type = "button";
+      b.addEventListener("click", () => fecharConta(m));
+      x.append(t, b); ms.appendChild(x);
+    }
     const e = $("entregues");
     e.textContent = d.entregues.length ? d.entregues.map((r) => `${r.rotulo} R${r.numero} (${hora(r.criadoEm)})`).join(" · ") : "Nenhuma ainda.";
     $("estado").textContent = `${cfg.modo === "saipos" ? "Ligado à loja TESTE do Saipos" : "Cozinha de teste (sem Saipos)"} · atualizado ${hora(d.agora)}`;

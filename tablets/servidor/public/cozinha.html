@@ -34,6 +34,11 @@ button.sec{background:#e7dfd2;color:var(--preto)}
 .vazio{padding:40px 16px;text-align:center;color:var(--cinza);font-size:18px}
 h3{margin:16px 16px 0;font-weight:400}
 #entregues{padding:0 16px 24px;color:var(--cinza);font-size:14px}
+#mesas{display:flex;flex-wrap:wrap;gap:10px;padding:8px 16px}
+.mesa{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.mesa strong{font-size:18px}
+#pin{width:110px;min-height:40px;border-radius:8px;border:1px solid #bbb;padding:0 8px;font:16px Barlow,sans-serif}
+#pinErro{color:#ffb4a8;font-size:14px}
 </style>
 </head>
 <body>
@@ -42,9 +47,13 @@ h3{margin:16px 16px 0;font-weight:400}
   <img src="/marca/logo-cdm.png" alt="">
   <h1 class="cubano">COZINHA · PEDIDOS DAS MESAS</h1>
   <span id="estado">Conectando…</span>
+  <label style="font-size:14px">Senha da equipe <input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+  <span id="pinErro" role="alert"></span>
 </header>
 <div id="avisos" aria-live="assertive"></div>
 <main id="lista"></main>
+<h3 class="cubano">CONTAS ABERTAS</h3>
+<div id="mesas"></div>
 <h3 class="cubano">ULTIMAS ENTREGUES</h3>
 <div id="entregues"></div>
 <script type="application/json" id="cfg">{{CFG}}</script>
