@@ -19,8 +19,8 @@ O cardápio é a cópia do cadastro do totem (Gama/VNDX, 11/11/2026, 93 produtos
 ```
 node tablets/servidor/bin/start-salao.js --rede
 ```
-Mostra os endereços. No tablet, abrir `http://<ip-do-computador>:4660/tablet`; na cozinha, `http://<ip>:4660/cozinha`.
-Sem `--rede` só abre no próprio computador (`http://127.0.0.1:4660/tablet`).
+Mostra os endereços. No tablet, abrir `http://<ip-do-computador>:4662/tablet`; na cozinha, `http://<ip>:4662/cozinha`.
+Sem `--rede` só abre no próprio computador (`http://127.0.0.1:4662/tablet`).
 
 Com a loja TESTE do Saipos (usa a mesma configuração privada do totem — `.env`, `test-store.json`, `gama-hml-map.json`, fora do repositório):
 ```

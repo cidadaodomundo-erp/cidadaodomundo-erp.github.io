@@ -4,14 +4,14 @@
 //   node tablets/servidor/bin/start-salao.js --rede          -> idem, aberto para os tablets do Wi-Fi do salao
 //   CONNECTOR_ENV_PATH=<abs> node tablets/servidor/bin/start-salao.js --sandbox [--rede]
 //                                                            -> tambem envia para a loja TESTE do Saipos (HML 93936)
-// Opcional: --porta 4660
+// Opcional: --porta 4662
 import { criarServidorSalao, ipsDaRede } from "../src/salao.js";
 
 const args = process.argv.slice(2);
 const sandbox = args.includes("--sandbox");
 const rede = args.includes("--rede");
 const iPorta = args.indexOf("--porta");
-const porta = iPorta >= 0 ? Number(args[iPorta + 1]) : 4660;
+const porta = iPorta >= 0 ? Number(args[iPorta + 1]) : 4662;
 if (!Number.isInteger(porta) || porta < 1024 || porta > 65535) { console.error("Porta inválida."); process.exit(2); }
 if (sandbox && !process.env.CONNECTOR_ENV_PATH) { console.error("Para --sandbox defina CONNECTOR_ENV_PATH (configuração privada da loja TESTE). Nada foi iniciado."); process.exit(2); }
 
