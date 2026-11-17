@@ -9,6 +9,7 @@ begin;
 
 drop function if exists public.compra_wa_receber(text, text, text, text);
 drop function if exists public.compra_robo_gravar(text, bigint, jsonb, jsonb, text);
+drop function if exists public.compra_robo_pegar(text, int, jsonb);
 drop function if exists public.compra_robo_pegar(text, int);
 drop function if exists public.compra_cotacao_listar(int);
 drop function if exists public.compra_cotacao_decidir(bigint, text, bigint);
@@ -26,12 +27,14 @@ drop function if exists public.compra_minha_loja(text);
 
 delete from vault.secrets where name = 'compras_robo_segredo';
 
+-- a Rita não tinha a tela antes de 17/11/2026 (a liberação só acontecia se faltasse); se a observação dela era vazia,
+-- a marca não ficou gravada — por isso confere a marca OU a observação vazia
 update public.painel_acesso
    set modulos = array_remove(modulos, 'mercadolivre'),
-       observacao = observacao || ' | Mercado Livre desfeito',
+       observacao = coalesce(observacao, '') || ' | Mercado Livre desfeito',
        atualizado_em = now()
  where email = 'rita@cidadaodomundo.com.br'
    and 'mercadolivre' = any(modulos)
-   and observacao like '%17/11/2026: + Mercado Livre%';
+   and (observacao is null or observacao like '%17/11/2026: + Mercado Livre%');
 
 commit;

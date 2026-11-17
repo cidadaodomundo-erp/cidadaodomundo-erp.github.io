@@ -51,7 +51,7 @@ create table if not exists public.compra_cotacao_oferta (
   parecido int check (parecido is null or (parecido between 0 and 100)),
   obs text check (obs is null or char_length(obs) <= 160),
   link text not null check (link ~ '^https://(www\.|produto\.)?mercadolivre\.com\.br/' and char_length(link) <= 300),
-  imagem text check (imagem is null or (imagem ~ '^https://[a-z0-9.-]*mlstatic\.com/' and char_length(imagem) <= 400)),
+  imagem text check (imagem is null or (imagem ~ '^https://([a-z0-9-]+\.)*mlstatic\.com/' and char_length(imagem) <= 400)),
   lido_em timestamptz not null default now()
 );
 create index if not exists compra_cotacao_oferta_cot_idx on public.compra_cotacao_oferta (cotacao_id, posicao);
@@ -60,9 +60,15 @@ create table if not exists public.compra_robo_estado (
   id int primary key check (id = 1),
   ultima_volta timestamptz,
   ultimo_status text,
-  ultima_busca timestamptz
+  ultima_busca timestamptz,
+  agenda jsonb   -- o próprio robô informa: {"a_cada_min":5,"das":"07:00","ate":"23:00"}
 );
 insert into public.compra_robo_estado (id) values (1) on conflict do nothing;
+-- 17/11/2026 (revisão antes de publicar): ajustes nas tabelas que já existiam no ERP
+alter table public.compra_robo_estado add column if not exists agenda jsonb;
+alter table public.compra_cotacao_oferta drop constraint if exists compra_cotacao_oferta_imagem_check;
+alter table public.compra_cotacao_oferta add constraint compra_cotacao_oferta_imagem_check
+  check (imagem is null or (imagem ~ '^https://([a-z0-9-]+\.)*mlstatic\.com/' and char_length(imagem) <= 400));
 
 alter table public.compra_cotacao enable row level security;
 alter table public.compra_cotacao_oferta enable row level security;
@@ -113,7 +119,7 @@ $$;
 -- link do ML dentro do texto
 create or replace function public.compra_link_do_texto(t text) returns text
 language sql immutable set search_path to 'public' as $$
-  select left(substring(coalesce(t,'') from '(https?://[^\s<>"]*(mercadolivre\.com\.br|mercadolibre\.com|meli\.la)[^\s<>"]*)'), 600)
+  select left(substring(coalesce(t,'') from '(https?://([a-z0-9-]+\.)*(mercadolivre\.com\.br|mercadolibre\.com|meli\.la)(/[^\s<>"]*)?)'), 600)
 $$;
 
 -- termo de busca a partir do texto (tira link, a palavra "compra" e o nome da loja)
@@ -172,12 +178,25 @@ grant execute on function public.compra_cotacao_decidir(bigint, text, bigint) to
 -- PORTAL: listar (últimos N dias) com ofertas e o estado do robô
 create or replace function public.compra_cotacao_listar(p_dias int default 30) returns jsonb
 language sql stable security definer set search_path to 'public','pg_temp' as $$
+  -- só as colunas que a tela usa; pedido comprado/descartado leva só a oferta escolhida (menos dado na rede)
   select jsonb_build_object(
     'consultado_em', now(),
-    'robo', (select to_jsonb(e) - 'id' from public.compra_robo_estado e where id = 1),
+    'robo', (select jsonb_build_object('ultima_volta', e.ultima_volta, 'ultima_busca', e.ultima_busca, 'ultimo_status', e.ultimo_status, 'agenda', e.agenda)
+               from public.compra_robo_estado e where e.id = 1),
     'pedidos', coalesce((
-      select jsonb_agg((to_jsonb(c) - 'wa_id') || jsonb_build_object('ofertas', coalesce((
-          select jsonb_agg(to_jsonb(o) order by o.preco, o.posicao) from public.compra_cotacao_oferta o where o.cotacao_id = c.id), '[]'::jsonb))
+      select jsonb_agg(jsonb_build_object(
+          'id', c.id, 'criado_em', c.criado_em, 'origem', c.origem, 'pedido_por', c.pedido_por, 'texto', c.texto, 'link', c.link,
+          'busca', c.busca, 'loja', c.loja, 'status', c.status, 'buscado_em', c.buscado_em, 'erro', c.erro, 'ref_preco', c.ref_preco,
+          'decidido_por', c.decidido_por, 'decidido_em', c.decidido_em, 'oferta_escolhida', c.oferta_escolhida,
+          'ofertas', coalesce((
+            select jsonb_agg(jsonb_build_object(
+                'id', o.id, 'posicao', o.posicao, 'titulo', o.titulo, 'preco', o.preco, 'preco_antigo', o.preco_antigo,
+                'frete_gratis', o.frete_gratis, 'entrega', o.entrega, 'vendedor', o.vendedor, 'loja_oficial', o.loja_oficial,
+                'avaliacao', o.avaliacao, 'vendidos', o.vendidos, 'patrocinado', o.patrocinado, 'mesmo_produto', o.mesmo_produto,
+                'parecido', o.parecido, 'obs', o.obs, 'link', o.link, 'imagem', o.imagem) order by o.preco, o.posicao)
+              from public.compra_cotacao_oferta o
+             where o.cotacao_id = c.id
+               and (c.status not in ('comprado','descartado') or o.id = c.oferta_escolhida)), '[]'::jsonb))
         order by c.criado_em desc)
       from public.compra_cotacao c
       where c.criado_em >= now() - make_interval(days => least(greatest(coalesce(p_dias,30),1),180))
@@ -187,12 +206,21 @@ revoke all on function public.compra_cotacao_listar(int) from public, anon;
 grant execute on function public.compra_cotacao_listar(int) to authenticated;
 
 -- ROBÔ: sinal de vida + pegar pedidos (até p_max). Sem DDL. Pedido preso em "buscando" há 20 min volta (até 3 tentativas).
-create or replace function public.compra_robo_pegar(p_segredo text, p_max int default 3) returns jsonb
+drop function if exists public.compra_robo_pegar(text, int);
+create or replace function public.compra_robo_pegar(p_segredo text, p_max int default 3, p_agenda jsonb default null) returns jsonb
 language plpgsql security definer set search_path to 'public','pg_temp' as $$
 declare r jsonb;
 begin
   if not public.compra_robo_segredo_ok(p_segredo) then return jsonb_build_object('erro','segredo invalido'); end if;
-  update public.compra_robo_estado set ultima_volta = now() where id = 1;
+  update public.compra_robo_estado set ultima_volta = now(),
+         agenda = case when jsonb_typeof(p_agenda) = 'object'
+                        and coalesce(p_agenda->>'a_cada_min','') ~ '^\d{1,3}$'
+                        and coalesce(p_agenda->>'das','') ~ '^\d{2}:\d{2}$' and coalesce(p_agenda->>'ate','') ~ '^\d{2}:\d{2}$'
+                       then case when (p_agenda->>'a_cada_min')::int between 1 and 240
+                                 then jsonb_build_object('a_cada_min', (p_agenda->>'a_cada_min')::int, 'das', p_agenda->>'das', 'ate', p_agenda->>'ate')
+                                 else agenda end
+                       else agenda end
+   where id = 1;
   update public.compra_cotacao set status = 'erro', erro = 'o robô tentou 3 vezes e não conseguiu ler o Mercado Livre'
    where status = 'buscando' and pego_em < now() - interval '20 minutes' and tentativas >= 3;
   with alvo as (
@@ -209,8 +237,8 @@ begin
     into r from upd;
   return jsonb_build_object('ok', true, 'pedidos', r);
 end $$;
-revoke all on function public.compra_robo_pegar(text, int) from public, authenticated;
-grant execute on function public.compra_robo_pegar(text, int) to anon;
+revoke all on function public.compra_robo_pegar(text, int, jsonb) from public, authenticated;
+grant execute on function public.compra_robo_pegar(text, int, jsonb) to anon;
 
 -- ROBÔ: gravar ofertas (valida os campos antes; troca as ofertas antigas da cotação)
 create or replace function public.compra_robo_gravar(p_segredo text, p_id bigint, p_ofertas jsonb, p_ref jsonb default null, p_erro text default null) returns jsonb
@@ -265,7 +293,7 @@ begin
   v_t := left(v_t, 600);
   if public.compra_link_do_texto(v_t) is null and v_t !~* '^\s*(compras?|comprar|cotar)\M' then return jsonb_build_object('ok', true, 'ignorada', true); end if;
   insert into public.compra_cotacao (origem, pedido_por, texto, link, busca, loja, wa_id)
-  values ('whatsapp', left(nullif(btrim(regexp_replace(coalesce(p_nome,''), '[[:cntrl:]]', ' ', 'g')),''), 60), v_t,
+  values ('whatsapp', left(nullif(split_part(btrim(regexp_replace(coalesce(p_nome,''), '[[:cntrl:]]', ' ', 'g')), ' ', 1),''), 30), v_t,
           public.compra_link_do_texto(v_t), public.compra_busca_do_texto(v_t), public.compra_loja_do_texto(v_t), v_wa)
   on conflict (wa_id) do nothing
   returning id into v_id;
@@ -277,7 +305,7 @@ grant execute on function public.compra_wa_receber(text, text, text, text) to an
 -- Rita (compras) passa a ver a tela Mercado Livre
 update public.painel_acesso
    set modulos = array_append(modulos, 'mercadolivre'),
-       observacao = observacao || ' | 17/11/2026: + Mercado Livre (cotação de compras, pedido do Fábio)',
+       observacao = coalesce(observacao, '') || ' | 17/11/2026: + Mercado Livre (cotação de compras, pedido do Fábio)',
        atualizado_em = now()
  where email = 'rita@cidadaodomundo.com.br' and not ('mercadolivre' = any(modulos));
 

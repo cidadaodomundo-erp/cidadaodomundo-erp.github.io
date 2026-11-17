@@ -133,6 +133,16 @@ function quando(ts) {
          d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, TZ));
 }
 const minutosDesde = (ts) => ts ? (Date.now() - new Date(ts).getTime()) / 60000 : Infinity;
+// agenda do robô = {a_cada_min, das, ate}, gravada pelo próprio robô no banco (compra_robo_estado.agenda)
+const hh = (t) => { const [h, m] = String(t || '').split(':'); return Number(h) + 'h' + (m && m !== '00' ? m : ''); };
+const paraMin = (t) => { const [h, m] = String(t || '').split(':'); return Number(h) * 60 + Number(m || 0); };
+function agoraMin() {
+  const t = new Date().toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit', hour12: false }, TZ));
+  return paraMin(t);
+}
+function agendaOk(a) { return !!(a && Number(a.a_cada_min) > 0 && /^\d{2}:\d{2}$/.test(String(a.das)) && /^\d{2}:\d{2}$/.test(String(a.ate))); }
+function noHorario(a) { if (!agendaOk(a)) return true; const n = agoraMin(); return n >= paraMin(a.das) && n < paraMin(a.ate); }
+const agendaDoRobo = () => (DADOS && DADOS.robo && agendaOk(DADOS.robo.agenda)) ? DADOS.robo.agenda : null;
 const linkSeguro = (u) => /^https:\/\/(www\.|produto\.)?mercadolivre\.com\.br\//.test(String(u || '')) ? String(u) : null;
 const linkPedido = (u) => /^https?:\/\/([a-z0-9-]+\.)*(mercadolivre\.com\.br|mercadolibre\.com|meli\.la)\//i.test(String(u || '')) ? String(u) : null;
 
@@ -168,29 +178,46 @@ async function carregar(silencioso) {
   let d; try { d = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
   if (minha !== ULTIMA) return;
   DADOS = d || {};
+  const sig = (Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []).map((p) => p.id + ':' + p.status).join(',');
+  SEM_MUDAR = sig === ASSINATURA ? SEM_MUDAR + 1 : 0;
+  ASSINATURA = sig;
   desenhar();
   agendar();
 }
 function mostrarErro(t) { const el = document.getElementById('erroMsg'); el.style.display = 'block'; el.textContent = t; }
 
+// Atualiza sozinha de 60 em 60 s só enquanto há pedido na fila, e só lê o banco com a tela à vista (aba do navegador e
+// moldura da casca), dentro do horário do robô e até 30 leituras seguidas sem mudança. Fora disso o timer só confere,
+// sem rede, se a tela voltou a aparecer. clearTimeout antes de rearmar: nunca fica timer sobrando.
+let SEM_MUDAR = 0;
+let ASSINATURA = '';
+function telaVisivel() {
+  if (document.hidden) return false;
+  try { if (window.frameElement && window.frameElement.offsetParent === null) return false; } catch (e) {}
+  return true;
+}
 function agendar() {
   clearTimeout(TIMER);
   const pend = (DADOS && DADOS.pedidos || []).some((p) => p.status === 'novo' || p.status === 'buscando');
-  if (pend && !document.hidden) TIMER = setTimeout(() => carregar(true), 60000);
+  if (!pend) return;
+  TIMER = setTimeout(() => {
+    if (telaVisivel() && noHorario(agendaDoRobo()) && SEM_MUDAR < 30) carregar(true); else agendar();
+  }, 60000);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) carregar(true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { SEM_MUDAR = 0; carregar(true); } });
 
 function desenharRobo(robo) {
   const el = document.getElementById('robo');
+  const ag = robo && agendaOk(robo.agenda) ? robo.agenda : null;
+  const txtAg = ag ? ' Ele avisa que passa a cada ' + Number(ag.a_cada_min) + ' minutos, das ' + esc(hh(ag.das)) + ' às ' + esc(hh(ag.ate)) + '.' : '';
   const v = robo && robo.ultima_volta;
-  if (!v) { el.innerHTML = 'Robô de Compras: <b>ainda não rodou</b>. Ele passa a cada 5 minutos, das 7h às 23h.'; return; }
+  if (!v) { el.innerHTML = 'Robô de Compras: <b>ainda não rodou</b>.' + txtAg; return; }
   const m = minutosDesde(v);
-  const h = new Date().toLocaleString('en-US', Object.assign({ hour: 'numeric', hour12: false }, TZ));
-  const horario = Number(h) >= 7 && Number(h) < 23;
-  const atraso = horario && m > 20;
+  // "parado" só com a agenda que o robô gravou: dentro do horário dele e sem passar há mais de 4 voltas (mínimo 20 min)
+  const limite = ag ? Math.max(20, 4 * Number(ag.a_cada_min)) : null;
+  const atraso = ag && noHorario(ag) && (agoraMin() - paraMin(ag.das)) > limite && m > limite;
   el.innerHTML = 'Robô de Compras (Escritório 2): última passada em <b>' + esc(quando(v)) + '</b>' +
-    (atraso ? ' <span class="ml-velho">· parado há ' + Math.round(m) + ' min</span>' : '') +
-    '. Passa a cada 5 minutos, das 7h às 23h.' +
+    (atraso ? ' <span class="ml-velho">· parado há ' + Math.round(m) + ' min</span>' : '') + '.' + txtAg +
     (robo.ultima_busca ? ' Última busca: ' + esc(quando(robo.ultima_busca)) + (robo.ultimo_status === 'falha' ? ' <span class="ml-velho">(falhou)</span>' : '') + '.' : '');
 }
 
@@ -214,11 +241,11 @@ function oferta(o, p, melhorId, melhorGratisId) {
   if (o.vendidos) det.push(esc(o.vendidos));
   if (o.obs) det.push(esc(o.obs));
   if (o.parecido != null && o.parecido < 100) det.push('nome ' + o.parecido + '% parecido');
-  const frete = o.frete_gratis === true ? '<span class="ml-gratis">Frete grátis</span>' : (o.frete_gratis === false ? '<span class="ml-pago">Frete pago</span>' : '');
+  const frete = o.frete_gratis === true ? '<span class="ml-gratis">Frete grátis</span>' : (o.frete_gratis === false ? '<span class="ml-pago">frete: ver no carrinho</span>' : '');
   const escolhida = p.oferta_escolhida === o.id;
   const podeEscolher = p.status === 'pronto';
   return '<div class="ml-of' + (o.id === melhorId ? ' melhor' : '') + (escolhida ? ' escolhida' : '') + '">' +
-    (o.imagem && /^https:\/\/[a-z0-9.-]*mlstatic\.com\//.test(o.imagem) ? '<img loading="lazy" alt="" src="' + esc(o.imagem) + '">' : '<div class="semimg"></div>') +
+    (o.imagem && /^https:\/\/([a-z0-9-]+\.)*mlstatic\.com\//.test(o.imagem) ? '<img loading="lazy" alt="" src="' + esc(o.imagem) + '">' : '<div class="semimg"></div>') +
     '<div><div class="ml-of-tit">' + (link ? '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">' + esc(o.titulo) + '</a>' : esc(o.titulo)) + ' ' + tags.join(' ') + '</div>' +
       '<div class="ml-of-det">' + det.join('<span>·</span>') + '</div>' +
       (podeEscolher ? '<div class="ml-acoes"><button type="button" class="ml-btn peq" data-acao="comprado" data-id="' + p.id + '" data-oferta="' + o.id + '">Comprei esta</button></div>' : '') +
@@ -238,7 +265,9 @@ function pedido(p) {
   const lp = linkPedido(p.link);
   let corpo = '';
   if (p.status === 'novo' || p.status === 'buscando') {
-    corpo = '<div class="ml-ped-ref">' + (p.status === 'buscando' ? 'O robô está buscando agora…' : 'Na fila. O robô passa a cada 5 minutos (das 7h às 23h).') + '</div>';
+    const ag = agendaDoRobo();
+    corpo = '<div class="ml-ped-ref">' + (p.status === 'buscando' ? 'O robô está buscando agora…'
+      : 'Na fila. O robô busca na próxima passada' + (ag && !noHorario(ag) ? ' (ele volta às ' + esc(hh(ag.das)) + ')' : '') + '.') + '</div>';
   } else if (p.status === 'erro') {
     corpo = '<div class="ml-msg erro">' + esc(p.erro || 'O robô não conseguiu buscar.') + '</div>';
   }
@@ -285,7 +314,7 @@ async function pedir() {
     const d = await r.json();
     document.getElementById('fTexto').value = '';
     msg.className = 'ml-msg ok';
-    msg.textContent = 'Pedido #' + (d && d.id) + ' na fila. O robô busca em até 5 minutos (das 7h às 23h); esta tela atualiza sozinha.';
+    msg.textContent = 'Pedido #' + (d && d.id) + ' na fila. O robô busca na próxima passada; esta tela atualiza sozinha.';
     FILTRO = 'abertas';
     carregar();
   } finally { btn.disabled = false; }
@@ -317,7 +346,7 @@ else {
   avisarCasca({ tipo: 'casca-modulo', nome: TELA });
   (async () => { await lojasPermitidas(); carregar(); })();
 }
-window.reentrarTela = () => carregar();
+window.reentrarTela = () => { SEM_MUDAR = 0; carregar(); };
 </script>
 </body>
 </html>
