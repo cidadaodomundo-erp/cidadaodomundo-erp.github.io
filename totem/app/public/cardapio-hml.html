@@ -20,6 +20,7 @@
     <p class="abertura-sub">SEU PRÓXIMO DESTINO.</p>
     <button id="btnEntrar" class="cta" type="button">VER CARDÁPIO</button>
     <p class="abertura-teste">Modo teste · nada é cobrado</p>
+    <p class="abertura-credito">Construído pelo Claude</p>
   </div>
 </section>
 
@@ -73,7 +74,7 @@
   </div>
   <div class="carrinho-rodape">
     <p class="total">Total <b id="total">R$ 0,00</b></p>
-    <p class="pagamento">Pagamento: <b>Dinheiro (teste)</b> · <span id="valorTeste">Valor de teste igual ao total. Nada é cobrado.</span></p>
+    <p class="pagamento">Pagamento: <b id="rotuloPagamento">Dinheiro (teste)</b> · <span id="valorTeste">Valor de teste igual ao total. Nada é cobrado.</span></p>
     <button id="btnEnviar" class="cta" type="button" disabled>Enviar pedido de teste</button>
     <button id="btnNovo" class="secundario" type="button" hidden>Começar novo pedido de teste</button>
   </div>
@@ -97,6 +98,7 @@
   </div>
 </dialog>
 
+<script src="/vendor/qrcode.js"></script>
 <script src="/cardapio-hml.js"></script>
 </body>
 </html>

@@ -22,7 +22,11 @@ const reais = (centavos) => (centavos / 100).toFixed(2);
 
 // banco: { criarCobranca(txid, corpo), consultarCobranca(txid) } -> respostas no formato do BC.
 // chavePix: chave Pix da loja (CNPJ ou aleatoria), informada na configuracao do servidor.
-export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - Totem" }) {
+// banco.removerCobranca(txid) e opcional (PATCH /cob/{txid} status REMOVIDA_PELO_USUARIO_RECEBEDOR).
+// QR vencido (ATIVA depois de criacao + expiracao + folga) conta como cancelado: o BC nao aceita mais pagar.
+export const FOLGA_VENCIMENTO_MS = 60_000;
+
+export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - Totem", agora = () => Date.now() }) {
   if (!banco || typeof banco.criarCobranca !== "function" || typeof banco.consultarCobranca !== "function") {
     throw new Error("banco Pix invalido");
   }
@@ -37,8 +41,13 @@ export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - 
     if (status === "REMOVIDA_PELO_USUARIO_RECEBEDOR" || status === "REMOVIDA_PELO_PSP") {
       return { estado: "cancelado", motivo: status };
     }
+    if (status === "DESCONHECIDA" || status === "INEXISTENTE") return { estado: "inexistente" };
     if (status === "ATIVA") {
-      return { estado: "aguardando", qr: cob.pixCopiaECola || null, centavos };
+      const criacao = Date.parse(cob.calendario?.criacao ?? "");
+      const exp = Number(cob.calendario?.expiracao ?? VALIDADE_SEGUNDOS);
+      const r = { estado: "aguardando", qr: cob.pixCopiaECola || null, centavos };
+      if (Number.isFinite(criacao)) r.expiraEm = new Date(criacao + exp * 1000).toISOString();
+      return r;
     }
     return { estado: "incerto" };
   }
@@ -56,14 +65,26 @@ export function adaptadorPix({ banco, chavePix, descricao = "Cidadao do Mundo - 
       return traduzir(cob, centavos);
     },
     async consultar({ idempotencyKey }) {
-      const cob = await banco.consultarCobranca(txidDoPedido(idempotencyKey));
+      const txid = txidDoPedido(idempotencyKey);
+      let cob = await banco.consultarCobranca(txid);
+      const criacao = Date.parse(cob?.calendario?.criacao ?? "");
+      const exp = Number(cob?.calendario?.expiracao ?? VALIDADE_SEGUNDOS);
+      // QR vencido: so o BANCO decide. Pede a remocao e consulta de novo; CONCLUIDA sempre vence.
+      if (cob?.status === "ATIVA" && Number.isFinite(criacao) && agora() > criacao + exp * 1000 + FOLGA_VENCIMENTO_MS &&
+          typeof banco.removerCobranca === "function") {
+        await banco.removerCobranca(txid);
+        cob = await banco.consultarCobranca(txid);
+      }
       return traduzir(cob);
+    },
+    async cancelar({ idempotencyKey }) {
+      if (typeof banco.removerCobranca === "function") await banco.removerCobranca(txidDoPedido(idempotencyKey));
     },
   };
 }
 
 // Banco de mentira para testes. Nao fala com nenhum banco.
-export function bancoPixSimulado() {
+export function bancoPixSimulado({ agora = () => Date.now() } = {}) {
   const cobrancas = new Map();
   let criadas = 0;
   return {
@@ -71,7 +92,7 @@ export function bancoPixSimulado() {
     async criarCobranca(txid, corpo) {
       if (!cobrancas.has(txid)) {
         criadas += 1;
-        cobrancas.set(txid, { txid, status: "ATIVA", valor: { original: corpo.valor.original }, pixCopiaECola: "00020126SIMULADO" + txid });
+        cobrancas.set(txid, { txid, status: "ATIVA", calendario: { criacao: new Date(agora()).toISOString(), expiracao: corpo.calendario.expiracao }, valor: { original: corpo.valor.original }, pixCopiaECola: "00020126SIMULADO" + txid });
       }
       return { ...cobrancas.get(txid) };
     },
@@ -79,10 +100,17 @@ export function bancoPixSimulado() {
       const c = cobrancas.get(txid);
       return c ? { ...c } : { status: "DESCONHECIDA" };
     },
+    async removerCobranca(txid) {
+      const c = cobrancas.get(txid);
+      if (c && c.status === "ATIVA") c.status = "REMOVIDA_PELO_USUARIO_RECEBEDOR";
+    },
     pagar(txid, valorOriginal) {
       const c = cobrancas.get(txid);
+      if (!c || c.status !== "ATIVA") return false; // removida/vencida nao recebe
+
       c.status = "CONCLUIDA";
       if (valorOriginal) c.valor = { original: valorOriginal };
+      return true;
     },
     expirar(txid) { cobrancas.get(txid).status = "REMOVIDA_PELO_PSP"; },
   };
