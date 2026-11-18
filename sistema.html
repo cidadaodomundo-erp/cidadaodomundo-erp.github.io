@@ -711,9 +711,12 @@ function abrir(chave, deDentro) {
   const it = ITENS[chave];
   if (!it || !visivel(chave)) { inicio(); return; }
   // link: outra aba, sem referência à casca e sem levar token (12/11/2026: + noreferrer)
-  if (it.link) { window.open(it.link, '_blank', 'noopener,noreferrer'); return; }
+  // 18/11/2026 (foco na entrega, lista de telas sem uso): o link e as telas do portal do Fabio (origem fabio) não gravam o uso
+  // sozinhas — a casca grava ao abrir, senão a tela aparece como "nunca usada" sem ter sido medida
+  if (it.link) { registrarUsoCasca(chave); window.open(it.link, '_blank', 'noopener,noreferrer'); return; }
   if (semPagina(chave)) { inicio(); abrirModulo('outras'); return; }   // integração pendente (sem rota): mostra o agrupamento, com o aviso
   ATUAL = chave;
+  if (it.origem === 'fabio' && !deDentro) registrarUsoCasca(chave);
   $('titulo').textContent = it.icone + ' ' + it.rotulo;
   atualizarFaixaLoja();
   history.replaceState(null, '', '#' + chave);
