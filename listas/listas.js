@@ -3188,6 +3188,8 @@ function trFechDocHtml(d, opc = {}) {
     temEmb = true;
     return ` <span class="emb"><span class="pt">· </span>${trNum(x.n)} ${e(trEmbPlural(x.nome, x.n))}</span>`;
   };
+  // 18/11/2026 (proposta 2026-10-24-fechamento-linha-a-mao-aviso; dono #603 "fora da grade é tarefa da Rita"): a linha escrita à mão
+  // sem item da base (vw_tr_fech_doc_itens.fora_da_base) diz quem corrige, no lugar do "sem preço" genérico
   const corpo = cats.map(c => {
     const sub = c.itens.reduce((s, i) => s + cent(i.valor), 0);
     impresso += sub;
@@ -3196,7 +3198,7 @@ function trFechDocHtml(d, opc = {}) {
     return `<tr class="cat"><td colspan="4">${e(c.nome)}</td></tr>`
       + c.itens.map(i => `<tr><td>${e(previa && i.nome_base ? i.nome_base : i.item)}${previa && i.tem_aberta ? ' *' : ''}</td><td>${e(i.un || '')}</td>
         <td class="n">${trNum(i.qtd, 4)}${emb(i)}</td>
-        <td class="n">${i.sem_preco ? (cent(i.valor) ? fmt(nu(i.valor)) + ' + sem preço' : 'sem preço') : i.sem_cobranca ? 'sem cobrança' : fmt(nu(i.valor))}</td></tr>`).join('')
+        <td class="n">${i.sem_preco ? (cent(i.valor) ? fmt(nu(i.valor)) + ' + ' : '') + (i.fora_da_base ? 'escrita à mão: a Rita corrige' : 'sem preço') : i.sem_cobranca ? 'sem cobrança' : fmt(nu(i.valor))}</td></tr>`).join('')
       + `<tr class="sub"><td colspan="2">Total ${e(c.nome)}</td><td class="n">${qtdSub}</td><td class="n">${c.itens.every(i => i.sem_cobranca) ? 'sem cobrança' : fmt(sub / 100)}</td></tr>`;
   }).join('');
   // diferenca para o valor fechado: ate 5 centavos e arredondamento (o banco diz em
