@@ -68,7 +68,7 @@ async function entrarRateio() {
     if (!CAR_OUVE_LOJA) { CAR_OUVE_LOJA = true; aoMudarLoja(() => { if (typeof window.reentrarTela === 'function') window.reentrarTela(); else entrarRateio(); }); }
     const l = lojaAtual();
     if (!l || l === 'REDE') {
-      alvo.innerHTML = !l ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>'
+      alvo.innerHTML = !l ? '<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>'
         : `<div class="contexto" style="text-align:left;"><b>O preço alvo é por loja.</b> Cada loja tem o seu custo de canal, então a Rede não tem um preço só. Escolha a loja:
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${LOJA_INFO.lojas.filter((u) => u !== 'REDE')
             .map((u) => `<button class="preset-btn active" onclick="carEscolherLoja('${u}')">${lojaNome(u)}</button>`).join('')}</div></div>`;

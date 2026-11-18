@@ -1416,7 +1416,7 @@ async function estLojaDaTela(alvo, reentrar) {
         apontar ou conferir o estoque. Escolha a loja:
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${(LOJA_INFO.lojas || []).filter((l) => l !== LOJA_REDE_EST)
           .map((l) => `<button class="preset-btn active" onclick="estEscolherLoja('${trEscH(l)}')">${trEscH(lojaNome(l))}</button>`).join('')}</div></div>`
-    : `<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>`;
+    : `<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>`;
   return null;
 }
 const LOJA_REDE_EST = 'REDE';

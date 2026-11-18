@@ -442,7 +442,7 @@ const TELAS_POR_LOJA = new Set(window.CASCA_TELAS_POR_LOJA || []);
 function desenharLoja() {
   const v = $('vendo');
   if (!LOJA_INFO) { v.innerHTML = ''; return; }                       // o banco não respondeu: não inventa loja
-  if (!LOJA_INFO.lojas.length) { v.innerHTML = '<span class="sem">sem loja cadastrada — fale com o Neto</span>'; return; }
+  if (!LOJA_INFO.lojas.length) { v.innerHTML = '<span class="sem">sem loja liberada — toque em Ajuda</span>'; return; }
   const atual = lojaAtual();
   v.innerHTML = LOJA_INFO.travado
     ? `<span class="rot">📍 Vendo:</span> <b>${esc(lojaNome(atual))}</b>`

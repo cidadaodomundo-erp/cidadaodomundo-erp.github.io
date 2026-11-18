@@ -1995,7 +1995,7 @@ function renderModuloCaixa() {
 
   alvo.innerHTML = `
     <div class="section-label">Fechamento de Caixas${visao ? ' · ' + (typeof lojaNome === 'function' ? lojaNome(visao) : visao) : ''}</div>
-    ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>' : ''}
+    ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
     <details class="cx-cofre" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
     <details class="cx-descontos" style="margin-top:6px;color:var(--tx-4);"${DESC.aberto ? ' open' : ''} ontoggle="descAbrir(this.open)"><summary style="cursor:pointer;">descontos do salão e do balcão${DESC.resumo ? ' · ' + DESC.resumo : ''}</summary><div id="descCorpo">${DESC.aberto ? descHtml() : ''}</div></details>

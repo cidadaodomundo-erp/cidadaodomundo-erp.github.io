@@ -9821,7 +9821,7 @@ function prepararTela(nome) {
   });
   if (FIN_TELAS.has(nome) && !lojaFin()) {
     const v = document.getElementById('view-' + nome);
-    if (v) v.innerHTML = `<div class="contexto">${typeof LOJA_INFO !== 'undefined' && LOJA_INFO ? 'Sem loja cadastrada — fale com o Neto.' : '✗ Não consegui ler a sua loja. Recarregue a página.'}</div>`;
+    if (v) v.innerHTML = `<div class="contexto">${typeof LOJA_INFO !== 'undefined' && LOJA_INFO ? 'Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.' : '✗ Não consegui ler a sua loja. Recarregue a página.'}</div>`;
     return false;
   }
   // Periodo pertence ao modulo: entrar num modulo REINICIA a janela dele
