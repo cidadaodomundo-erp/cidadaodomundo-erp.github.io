@@ -31,10 +31,13 @@ async function entrarNotasChegou() {
   }
   if (!NFC.L) alvo.innerHTML = '<h2>Notas que chegaram</h2><div class="contexto">Carregando…</div>';
   try {
-    const [L, rp] = await Promise.all([
+    // 18/11/2026 (Estoque; dono 00:51 "com o motivo à vista"): as notas que saíram da fila por não serem de estoque (ML no cartão)
+    const desde = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    const [L, rp, fora] = await Promise.all([
       consultarTudo('vw_compra_nf_a_conferir?select=*&order=data_emissao.desc,numero.desc'),
-      NFC.papel === null ? trRpcSeguro('tr_meu_papel') : null]);
-    NFC.L = L;
+      NFC.papel === null ? trRpcSeguro('tr_meu_papel') : null,
+      consultarTudo(`vw_compra_nf_fora_da_fila?select=chave,unidade,numero,data_emissao,fornecedor,total,motivo&data_emissao=gte.${desde}&order=data_emissao.desc`).catch(() => null)]);
+    NFC.L = L; NFC.fora = fora;
     if (rp) NFC.papel = rp.ok ? (await rp.json().catch(() => '')) || '' : '';
   } catch (e) {
     alvo.innerHTML = `<h2>Notas que chegaram</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não carregou: ${nfcE(e.message)} <button type="button" class="preset-btn" onclick="entrarNotasChegou()">Tentar de novo</button></div>`;
@@ -67,6 +70,11 @@ function nfcDesenhar() {
     <div id="tabelaNotasChegou"><table><thead><tr><th>Data</th><th>Loja</th><th>Fornecedor</th><th>Nota</th><th>Total</th><th>Itens</th><th>Situação</th></tr></thead><tbody>
     ${mostra.length ? mostra.map(nfcLinha).join('') : '<tr><td colspan="7">Nenhuma nota neste filtro. ✓</td></tr>'}</tbody></table></div>
     ${vis.length > mostra.length ? `<div style="margin:8px 0;"><button type="button" class="preset-btn" onclick="NFC.mais=true;nfcDesenhar()">Mostrar as outras ${vis.length - mostra.length}</button></div>` : ''}`;
+  const fora = (NFC.fora || []).filter((n) => !loja || loja === 'REDE' || n.unidade === loja);
+  if (fora.length) h += `<details style="margin-top:14px;"><summary style="cursor:pointer;color:var(--tx-3);">Saíram da fila: ${fora.length} ${fora.length === 1 ? 'nota' : 'notas'} — não são de estoque (últimos 30 dias)</summary>
+    <div id="tabelaNotasFora"><table><thead><tr><th>Data</th><th>Loja</th><th>Fornecedor</th><th>Nota</th><th>Total</th><th>Por que saiu</th></tr></thead><tbody>
+    ${fora.map((n) => `<tr><td>${nfcE(String(n.data_emissao || '').slice(8, 10) + '/' + String(n.data_emissao || '').slice(5, 7))}</td><td>${nfcE(n.unidade || '')}</td><td style="white-space:normal;">${nfcE(n.fornecedor || '')}</td><td>${nfcE(n.numero || '')}</td><td>R$ ${Number(n.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td style="white-space:normal;">${nfcE(n.motivo || '')}</td></tr>`).join('')}
+    </tbody></table></div></details>`;
   alvo.innerHTML = h;
 }
 function nfcSelo(n) {
