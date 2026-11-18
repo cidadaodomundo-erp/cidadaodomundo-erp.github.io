@@ -7279,7 +7279,8 @@ function renderContasPagar() {
   ${sobraFilialHtml()}`;
   // só depois do motor do Fluxo (a tela já desenhada): as duas views da sobra levam ~5 s cada e, junto com a carga da tela,
   // passavam dos 8 s do painel (18/11 15:45, statement timeout)
-  if (CP.temMotor) sobraFilialCarregar();
+  // não depende do motor terminar (18/11 15:58: com o motor lento o bloco nunca carregava): espera 6 s se o motor ainda roda
+  if (!SOBRA.plano && !SOBRA.carregando && !SOBRA.agendado) { SOBRA.agendado = true; setTimeout(() => { SOBRA.agendado = false; sobraFilialCarregar(); }, CP.temMotor ? 0 : 6000); }
 }
 
 // ---- SOBRA DAS FILIAIS → ÁGUA VERDE (dono 18/11/2026 15:38, pelo Organizador: "esses valores de lista (o que foi feito e quanto
