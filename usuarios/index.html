@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Usuários do painel · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- USUÁRIOS DO PAINEL (qua 18/11/2026, chat Telas). Dono 18/11 01:58 (#1093): "conseguimos trazer uma tela de usuario pro
+     painel? com criação, edição, troca de senha e permissões?"; 02:12 (#1097): "pode começar o quanto antes".
+     Só o dono: as funções painel_usuarios_lista / painel_usuario_salvar / _criar_login / _trocar_senha / _bloquear conferem
+     eh_dono() no banco (script/sql/painel_usuarios_2026_11_18.sql). A senha vai direto ao banco (crypt) e não fica guardada
+     em claro. Telas = painel_acesso.modulos (sem linha = todas). Quem mexe: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .us-lin td { vertical-align:top; }
+  .us-telas { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:2px 12px; margin:4px 0 10px; }
+  .us-telas label { font-size:12.5px; display:flex; gap:6px; align-items:center; }
+  .us-form { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:8px 0 14px; white-space:normal; }
+  .us-form input:not([type=checkbox]), .us-form select { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:7px 10px; font:inherit; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-usuarios" class="modulo" style="display:none;"><div id="view-usuarios"></div></div>
+  </div>
+</div>
+
+<script src="../casca/menu.js?v=20261118us"></script>
+<script src="../casca/modulos.js?v=20261118us"></script>
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const US = { L: null, erro: null, aberto: null, busca: '', novo: false };
+const usE = (s) => trEscH(String(s == null ? '' : s));
+const US_PAPEIS = [['DONO', 'Gestão (vê todo o financeiro)'], ['FINANCEIRO', 'Financeiro'], ['FILIAL', 'Filial (só a própria loja)'], ['SEPARACAO', 'Separação / estoque'], ['', 'sem papel (só as telas marcadas)']];
+const US_LOJAS = [['AGUA VERDE', 'Água Verde'], ['AHU', 'Ahú'], ['SÃO BRAZ', 'São Braz'], ['BOQUEIRAO', 'Boqueirão']];
+// nomes das telas: os mesmos do menu da casca
+function usRotulos() {
+  const R = {}, CFG = window.CASCA_MODULOS_CFG || {};
+  (window.CASCA_MENU || []).forEach((g) => (g.itens || []).forEach((it) => { R[it.chave] = it.rotulo; }));
+  Object.entries(CFG.extras || {}).forEach(([k, v]) => { R[k] = v.rotulo; });
+  Object.entries(CFG.rotulos || {}).forEach(([k, v]) => { R[k] = v; });
+  return R;
+}
+function usGrupos() {
+  const CFG = window.CASCA_MODULOS_CFG || {}, J = CFG.juncoes || {}, R = usRotulos(), vistos = new Set();
+  const abre = (k) => J[k] ? J[k].abas.map(([c]) => c) : [k];
+  const G = (window.CASCA_MODULOS || []).map((m) => {
+    const ks = [...(m.lancar || []), ...(m.acompanhar || [])].flatMap(abre).filter((k) => k !== 'agenda' && k !== 'biblioteca' && !vistos.has(k) && vistos.add(k));
+    return { nome: m.nome, telas: ks.map((k) => [k, R[k] || k]) };
+  }).filter((g) => g.telas.length);
+  return { G, vistos };
+}
+async function entrarUsuarios() {
+  const alvo = document.getElementById('view-usuarios');
+  if (!US.L) alvo.innerHTML = '<h2>Usuários do painel</h2><div class="contexto">Carregando…</div>';
+  const r = await trRpcSeguro('painel_usuarios_lista', {});
+  if (!r.ok) { US.erro = await trErroDe(r); US.L = null; } else { US.erro = null; US.L = await r.json(); }
+  usDesenhar();
+}
+function usBuscar(v) { US.busca = v; clearTimeout(window._usB); window._usB = setTimeout(() => { usDesenhar(); const e = document.getElementById('usBusca'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 200); }
+function usAbrir(em) { US.aberto = US.aberto === em ? null : em; US.novo = false; usDesenhar(); }
+function usQuando(ts) { if (!ts) return '—'; return new Date(ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Sao_Paulo' }); }
+function usTelasTxt(u, R) {
+  if (u.todas_as_telas) return '<b>todas as telas</b>';
+  const m = u.modulos || []; if (!m.length) return '—';
+  return m.slice(0, 4).map((k) => usE(R[k] || k)).join(', ') + (m.length > 4 ? ` <span style="color:var(--tx-4);">+${m.length - 4}</span>` : '');
+}
+function usDesenhar() {
+  const alvo = document.getElementById('view-usuarios');
+  if (US.erro) { alvo.innerHTML = `<h2>Usuários do painel</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ ${usE(US.erro)} <button type="button" class="preset-btn" onclick="entrarUsuarios()">Tentar de novo</button></div>`; return; }
+  const L = US.L || [], R = usRotulos(), b = US.busca.trim().toLowerCase();
+  const vis = L.filter((u) => !b || (u.email + ' ' + (u.nome || '') + ' ' + (u.papel || '') + ' ' + (u.unidade || '')).toLowerCase().includes(b));
+  let h = `<h2>Usuários do painel</h2>
+    <div class="contexto" style="text-align:left;">Quem entra no painel, o que cada um vê e a senha. Clique na pessoa para mudar.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
+      <button type="button" class="preset-btn active" onclick="US.novo=!US.novo;US.aberto=null;usDesenhar()">+ Novo usuário</button>
+      <input id="usBusca" type="search" placeholder="buscar nome, e-mail, loja" value="${usE(US.busca)}" oninput="usBuscar(this.value)" style="flex:0 1 260px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:7px 10px;font:inherit;">
+      <span style="font-size:12px;color:var(--tx-4);">${L.length} pessoas · ${L.filter((u) => u.bloqueado).length} bloqueadas · ${L.filter((u) => !u.tem_login).length} sem login criado</span></div>`;
+  if (US.novo) h += usForm(null);
+  h += `<div id="tabelaUsuarios" style="overflow-x:auto;"><table><thead><tr><th>Pessoa</th><th>Papel</th><th>Telas</th><th>Último acesso</th><th>Situação</th></tr></thead><tbody>
+    ${vis.map((u) => `<tr class="us-lin" style="cursor:pointer;" onclick="usAbrir(${usE(JSON.stringify(u.email))})">
+      <td><b>${usE(u.nome || u.email.split('@')[0])}</b><br><span style="font-size:11.5px;color:var(--tx-4);">${usE(u.email)}</span></td>
+      <td>${usE((u.papel || '—').toLowerCase())}${u.unidade ? ' · ' + usE(u.unidade) : ''}</td>
+      <td style="white-space:normal;font-size:12.5px;">${usTelasTxt(u, R)}</td>
+      <td>${usQuando(u.ultimo_login)}</td>
+      <td>${u.bloqueado ? '<span style="color:var(--farol-fora);font-weight:700;">bloqueado</span>' : !u.tem_login ? '<span style="color:var(--farol-perto);">sem login</span>' : '<span style="color:var(--farol-ok);">ativo</span>'}</td></tr>
+      ${US.aberto === u.email ? `<tr><td colspan="5">${usForm(u)}</td></tr>` : ''}`).join('') || '<tr><td colspan="5">Ninguém com essa busca.</td></tr>'}
+    </tbody></table></div>`;
+  alvo.innerHTML = h;
+}
+function usForm(u) {
+  const novo = !u, { G, vistos } = usGrupos(), R = usRotulos();
+  const marc = new Set(u && !u.todas_as_telas ? (u.modulos || []) : []);
+  const outras = u && u.modulos ? u.modulos.filter((k) => !vistos.has(k)) : [];
+  const todas = u ? !!u.todas_as_telas : false;
+  const emJs = u ? usE(JSON.stringify(u.email)) : 'null';
+  return `<div class="us-form" onclick="event.stopPropagation()">
+    ${novo ? '<div style="font-weight:700;margin-bottom:6px;">Novo usuário</div>' : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      ${novo ? '<input id="us_email" placeholder="e-mail" style="flex:1 1 240px;">' : `<b style="flex:1 1 240px;">${usE(u.email)}</b>`}
+      <input id="us_nome" placeholder="nome" value="${usE(u ? u.nome || '' : '')}" style="flex:1 1 180px;">
+      <select id="us_papel" onchange="document.getElementById('us_loja').style.display = this.value === 'FILIAL' ? '' : 'none'">${US_PAPEIS.map(([v, t]) => `<option value="${v}" ${(u ? u.papel || '' : '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <select id="us_loja" style="${u && u.papel === 'FILIAL' ? '' : 'display:none;'}"><option value="">loja…</option>${US_LOJAS.map(([v, t]) => `<option value="${v}" ${u && u.unidade === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <label style="font-size:12.5px;"><input type="checkbox" id="us_valores" ${u && u.ve_valores ? 'checked' : ''}> vê valores (R$)</label></div>
+    <div style="margin:10px 0 2px;font-weight:700;">Telas que abre</div>
+    <label style="font-size:13px;"><input type="checkbox" id="us_todas" ${todas ? 'checked' : ''} onchange="document.getElementById('us_lista').style.display = this.checked ? 'none' : ''"> todas as telas (como o dono)</label>
+    <div id="us_lista" style="${todas ? 'display:none;' : ''}">
+      ${G.map((g) => `<div class="section-label" style="text-align:left;margin-top:6px;">${usE(g.nome)}</div><div class="us-telas">${g.telas.map(([k, t]) => `<label><input type="checkbox" class="us-tela" value="${usE(k)}" ${marc.has(k) ? 'checked' : ''}> ${usE(t)}</label>`).join('')}</div>`).join('')}
+      ${outras.length ? `<div class="section-label" style="text-align:left;margin-top:6px;">Já liberadas fora do menu</div><div class="us-telas">${outras.map((k) => `<label><input type="checkbox" class="us-tela" value="${usE(k)}" checked> ${usE(R[k] || k)}</label>`).join('')}</div>` : ''}
+      <div style="font-size:12px;color:var(--tx-4);">A Minha agenda e a Biblioteca abrem para todo login.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+      <button type="button" class="preset-btn active" onclick="usSalvar(${emJs})">${novo ? 'Criar' : 'Salvar'}</button>
+      ${novo || !u.tem_login ? '<input id="us_senha" type="password" autocomplete="new-password" placeholder="senha inicial (8+ caracteres)" style="flex:0 1 220px;">' : ''}
+      ${novo ? '<button type="button" class="preset-btn" onclick="US.novo=false;usDesenhar()">Cancelar</button>' : '<button type="button" class="preset-btn" onclick="usAbrir(null)">Fechar</button>'}</div>
+    ${!novo && u.tem_login ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;border-top:1px solid var(--line);padding-top:10px;">
+      <input id="us_senha_nova" type="password" autocomplete="new-password" placeholder="nova senha (8+ caracteres)" style="flex:0 1 220px;">
+      <button type="button" class="preset-btn" onclick="usTrocarSenha(${emJs})">Trocar senha</button>
+      <span style="flex:1;"></span>
+      <button type="button" class="preset-btn" style="color:${u.bloqueado ? 'var(--farol-ok)' : 'var(--farol-fora)'};" onclick="usBloquear(${emJs}, ${!u.bloqueado})">${u.bloqueado ? 'Desbloquear o login' : 'Bloquear o login'}</button></div>` : ''}
+  </div>`;
+}
+async function usSalvar(emailExistente) {
+  const v = (id) => (document.getElementById(id) || {}).value || '';
+  const email = (emailExistente || v('us_email')).trim().toLowerCase();
+  const papel = v('us_papel') || null, loja = v('us_loja') || null;
+  const todas = !!(document.getElementById('us_todas') || {}).checked;
+  const telas = [...document.querySelectorAll('.us-tela:checked')].map((c) => c.value);
+  const senha = v('us_senha');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return avisoAcao('atencao', '! Escreva um e-mail válido.');
+  if (papel === 'FILIAL' && !loja) return avisoAcao('atencao', '! Filial precisa da loja.');
+  if (!todas && !telas.length) return avisoAcao('atencao', '! Marque pelo menos uma tela (ou "todas as telas").');
+  const temLogin = !!(US.L || []).find((u) => u.email === email && u.tem_login);
+  if (!temLogin && !emailExistente && !senha) return avisoAcao('atencao', '! Digite a senha inicial (a pessoa entra com ela).');
+  if (!temLogin && senha && senha.length < 8) return avisoAcao('atencao', '! A senha precisa de pelo menos 8 caracteres.');
+  avisoAcao('enviando', 'Salvando…');
+  const r = await trRpcSeguro('painel_usuario_salvar', { p_email: email, p_nome: v('us_nome') || null, p_papel: papel, p_unidade: loja,
+    p_ve_valores: !!(document.getElementById('us_valores') || {}).checked, p_todas: todas, p_modulos: todas ? null : telas, p_observacao: null });
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO salvou: ${await trErroDe(r)}`, () => usSalvar(emailExistente));
+  let msg = `✓ ${email} salvo às ${avisoHora()}`;
+  if (!temLogin && senha) {
+    const r2 = await trRpcSeguro('painel_usuario_criar_login', { p_email: email, p_senha: senha });
+    if (!r2.ok) { const err = await trErroDe(r2); await entrarUsuarios(); return avisoAcao('erro', `✗ As telas foram salvas, mas o login NÃO foi criado: ${err}`); }
+    msg += ' — login criado: a pessoa já entra com esse e-mail e a senha que você digitou';
+  }
+  US.novo = false; US.aberto = null; await entrarUsuarios();
+  avisoAcao('ok', msg + '.');
+}
+async function usTrocarSenha(email) {
+  const el = document.getElementById('us_senha_nova'), s = (el || {}).value || '';
+  if (s.length < 8) return avisoAcao('atencao', '! A nova senha precisa de pelo menos 8 caracteres.');
+  avisoAcao('enviando', 'Trocando a senha…');
+  const r = await trRpcSeguro('painel_usuario_trocar_senha', { p_email: email, p_senha: s });
+  if (!r.ok) return avisoAcao('erro', `✗ A senha NÃO foi trocada: ${await trErroDe(r)}`, () => usTrocarSenha(email));
+  if (el) el.value = '';
+  avisoAcao('ok', `✓ Senha de ${email} trocada às ${avisoHora()}. Quem estava logado sai e entra com a nova.`);
+}
+async function usBloquear(email, bloquear) {
+  avisoAcao('enviando', bloquear ? 'Bloqueando…' : 'Desbloqueando…');
+  const r = await trRpcSeguro('painel_usuario_bloquear', { p_email: email, p_bloquear: bloquear });
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO ${bloquear ? 'bloqueou' : 'desbloqueou'}: ${await trErroDe(r)}`, () => usBloquear(email, bloquear));
+  await entrarUsuarios();
+  avisoAcao('ok', `✓ ${email} ${bloquear ? 'bloqueado: não entra mais no painel' : 'desbloqueado'} (${avisoHora()}).`);
+}
+
+const TELA = 'usuarios';
+let MODULO_ATUAL = 'usuarios';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-usuarios').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarUsuarios(); };
+entrarUsuarios();
+</script>
+</body>
+</html>

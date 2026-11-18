@@ -25,7 +25,8 @@ window.CASCA_MODULOS_CFG = {
     compliance: { rotulo: 'Documentos e renovações', icone: '📑' },   // 13/11: alvarás, licenças, limpezas, extintores (Compliance)   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     saiposcod: { rotulo: 'Código que falhou no Saipos', icone: '⚠️' },   // 16/11: item que cai no Diversos (Cardápio)
     regras: { rotulo: 'Regras em vigor', icone: '✅' },
-    biblioteca: { rotulo: 'Biblioteca', icone: '📚' },   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
+    biblioteca: { rotulo: 'Biblioteca', icone: '📚' },
+    usuarios: { rotulo: 'Usuários do painel', icone: '🔑' },   // 18/11: criar login, senha e telas de cada um (só o dono, #1093)   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
     motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
   // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
   // um item só no menu; ao abrir, a casca mostra as abas logo abaixo do título. Cada aba é a tela que já existia (mesma
@@ -61,7 +62,7 @@ window.CASCA_MODULOS = [
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: [], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
+    lancar: ['usuarios'], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
 ];
 
 
