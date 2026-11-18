@@ -7339,7 +7339,7 @@ function sobraFilialHtml() {
     if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
     const pergunta = Number(p.lista_mes_pergunta) > 0 ? `<div style="font-size:11.5px;color:var(--farol-perto);">sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)</div>` : '';
     const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
-    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null && Math.abs(Number(p.repasse_valor) - Number(p.sai_da_filial)) >= 0.005 ? `<div style="font-size:11.5px;color:var(--tx-4);">no banco: ${sobraR(p.repasse_valor)}</div>` : '');
+    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial);
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
     const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
@@ -7347,7 +7347,12 @@ function sobraFilialHtml() {
       <td>${v(tot)}</td><td>${v(jaPago)}</td><td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b>${pergunta}</td>
       <td>${lado(fil)}</td><td>${lado(av)}</td></tr>`;
   }).join('');
-  return `<div id="sobraFilialWrap"><details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
+  const hoje = sobraHoje(), prox = (SOBRA.plano.map((p) => String(p.quarta)).filter((d) => d >= hoje).sort()[0]) || null;
+  const daQuarta = prox ? SOBRA.plano.filter((p) => String(p.quarta) === prox && Number(p.sai_da_filial) > 0) : [];
+  const pix = daQuarta.length ? `<div class="section-label" style="text-align:left;margin-top:18px;">PIX das filiais para a Água Verde · ${prox === hoje ? 'hoje' : 'quarta'} ${agDmSobra(prox)}</div>
+    <div class="cards">${daQuarta.map((p) => `<div class="card"><div class="card-lbl">${nome[p.sigla] || trEscH(p.sigla)} → Água Verde</div>
+      <div class="card-val">${sobraR(p.sai_da_filial)}</div><div class="card-pct">${p.travado ? 'um PIX só, desta filial' : 'previsão: o valor fecha na quarta'}</div></div>`).join('')}</div>` : '';
+  return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
     <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th>Lucro</th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
     <tbody>${linhas}</tbody></table></div></details></div>`;
