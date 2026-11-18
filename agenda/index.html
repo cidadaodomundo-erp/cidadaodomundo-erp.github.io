@@ -121,7 +121,7 @@ async function entrarAgenda(silencioso) {   // silencioso = releitura sozinha (s
     ler('rh_folha_validada?select=competencia'),
     ler(`dono_pendencia?select=id,frente,o_que,resolvido_em&para=is.null&resolvido_por=like.conferido*&resolvido_em=gte.${ontem}&order=resolvido_em.desc`)]);
   // 17/11/2026 (Rotinas; dono 11:55 "respostas o mais rápido possível"): tempo de resposta de hoje, por fonte (meta: mediana < 15 min)
-  AG.tempo = await consultarTudo(`vw_resposta_tempo_dia?select=fonte,recados,esperando,mediana_min_comercial,recados_comercial,em_ate_15_min_comercial&dia=eq.${hoje}`).catch(() => null);
+  AG.tempo = await consultarTudo(`vw_resposta_tempo_dia?select=fonte,recados,esperando,mediana_min_comercial,mediana_min,recados_comercial,em_ate_15_min_comercial&dia=eq.${hoje}`).catch(() => null);
   AG.dados = { hoje, fim, pend, cp, fer, prev, calc, rmb, ext, folhaUlt, folhaVal, conf };
   agDesenhar();
 }
@@ -132,8 +132,11 @@ function agTempoHtml() {
   const cor = (m) => m == null ? 'var(--tx-4)' : m <= 15 ? 'var(--farol-ok)' : m <= 30 ? 'var(--farol-perto)' : 'var(--farol-fora)';
   const n = (v) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
   return `<div class="ag-ctx" style="margin:0 0 10px;" title="Do recado chegar até ser tratado, no horário comercial. Meta: metade em até 15 min.">Tempo de resposta hoje: ${T.map((t) => {
-    const m = t.mediana_min_comercial == null ? null : Number(t.mediana_min_comercial);
-    return `<b>${nome[t.fonte] || agE(t.fonte)}</b> <span style="color:${cor(m)};font-weight:700;">${m == null ? '—' : n(m) + ' min'}</span> (${Number(t.recados)} ${Number(t.recados) === 1 ? 'recado' : 'recados'}${Number(t.esperando) ? `, <span style="color:var(--farol-perto);">${Number(t.esperando)} esperando</span>` : ''})`;
+    // 18/11/2026 (dono viu "Agenda —" com 40 recados): recado que chegou fora do horário comercial não entra na mediana
+    // comercial; sem nenhum no horário, vale a mediana do dia todo, e a tela diz
+    const mc = t.mediana_min_comercial == null ? null : Number(t.mediana_min_comercial), md = t.mediana_min == null ? null : Number(t.mediana_min);
+    const m = mc != null ? mc : md, foraHor = mc == null && md != null;
+    return `<b>${nome[t.fonte] || agE(t.fonte)}</b> <span style="color:${cor(m)};font-weight:700;">${m == null ? '—' : n(m) + ' min'}</span>${foraHor ? ' <span class="f">fora do horário comercial</span>' : ''} (${Number(t.recados)} ${Number(t.recados) === 1 ? 'recado' : 'recados'}${Number(t.esperando) ? `, <span style="color:var(--farol-perto);">${Number(t.esperando)} esperando</span>` : ''})`;
   }).join(' · ')}</div>`;
 }
 function agDesenhar() {
@@ -770,6 +773,18 @@ function agBuscar(v, ja) {
   if (ja) { const i = document.getElementById('agBusca'); if (i) i.value = AG_BUSCA; }
   AG_BUSCA_T = setTimeout(agBuscaAplicar, ja ? 0 : 300);
 }
+// 18/11/2026 (dono: "algumas mensagens da agenda estão sem os botões de interação"): o item ABERTO achado pela busca que não
+// está na tela ganha os mesmos botões do cartão (abrir, Responder, Adiar, Feito). Item da agenda de outra pessoa fica só leitura.
+const agBuscaMeu = (p) => !p.resolvido_em && !p.para;
+function agBuscaAcoes(p) {
+  if (!agBuscaMeu(p)) return '';
+  const L = agLinkDe(p.link);
+  const abrir = L.url ? `<a class="preset-btn active" href="${agE(L.url)}" target="_blank" rel="noopener" style="text-decoration:none;font-weight:700;">abrir o link ↗</a>`
+    : L.ir ? `<button type="button" class="preset-btn active" onclick="agIr('${agE(L.ir)}')">abrir a tela →</button>` : '';
+  const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
+  const feito = p.feito_em ? '' : `<button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
+  return abrir + bts + feito;
+}
 async function agBuscaAplicar() {
   const t = AG_BUSCA.trim(), res = document.getElementById('agBuscaRes');
   const num = /^#?\d+$/.test(t) ? Number(t.replace('#', '')) : null;
@@ -783,7 +798,7 @@ async function agBuscaAplicar() {
   // (2) no banco: tudo o que este login pode ver, aberto ou resolvido
   res.innerHTML = '<div class="caption-label" style="text-align:left;">procurando…</div>';
   const w = t.replace(/[,()*%\\"]/g, ' ').trim();
-  const cols = 'select=id,para,frente,o_que,desde,prazo,contexto,resposta,respondido_em,resolvido_em,resolvido_por,feito_em,retorno,retorno_em,fio';
+  const cols = 'select=id,para,frente,o_que,desde,prazo,link,contexto,resposta,respondido_em,resolvido_em,resolvido_por,feito_em,retorno,retorno_em,fio';
   const filtro = num ? `id=eq.${num}` : 'or=(' + ['o_que', 'frente', 'para', 'contexto', 'resposta', 'chave'].map((c) => `${c}.ilike.*${encodeURIComponent(w)}*`).join(',') + ')';
   let L;
   try { L = await consultarTudo(`dono_pendencia?${cols}&${filtro}&order=id.desc&limit=40`); }
@@ -799,15 +814,17 @@ async function agBuscaAplicar() {
         : `<span style="color:var(--farol-perto);font-weight:700;">aberto${p.prazo ? ' · prazo ' + agDm(p.prazo) : ''}</span>`;
       const fio = Array.isArray(p.fio) ? p.fio : [];
       const naTela = document.getElementById('agItem_' + p.id);
+      // o cartão que a busca escondeu (a palavra estava só no contexto ou na conversa) volta a aparecer, com os botões dele
+      if (naTela && naTela.style.display === 'none') naTela.style.display = '';
       return `<div class="ag-lin" id="agBusca_${p.id}" style="flex-wrap:wrap;${AG_BUSCA_FOCO === p.id ? 'outline:2px solid var(--info);' : ''}"><span class="t"><span class="ag-id">#${p.id}</span>${agE(p.o_que)}
           <span class="f">· ${agE(p.frente || '')}${p.para ? ' · agenda de ' + agE(quem(p.para)) : ''}${p.desde ? ' · desde ' + agDm(String(p.desde).slice(0, 10)) : ''}</span> · ${est}</span>
-        ${naTela && naTela.style.display !== 'none' ? `<button type="button" class="preset-btn" onclick="document.getElementById('agItem_${p.id}').scrollIntoView({block:'center',behavior:'smooth'})">ir ao cartão</button>` : ''}
+        ${naTela && naTela.style.display !== 'none' ? `<button type="button" class="preset-btn" onclick="document.getElementById('agItem_${p.id}').scrollIntoView({block:'center',behavior:'smooth'})">ir ao cartão</button>` : agBuscaAcoes(p)}
         <details class="ag-ctx"${AG_BUSCA_FOCO === p.id || L.length === 1 ? ' open' : ''}><summary style="cursor:pointer;">detalhes</summary>
           ${p.contexto ? `<div>${agT(p.contexto)}</div>` : ''}
           ${p.resposta ? `<div style="color:var(--farol-ok);">resposta${p.respondido_em ? ' (' + dmh(p.respondido_em) + ')' : ''}: ${agT(p.resposta)}</div>` : ''}
           ${p.retorno ? `<div style="color:var(--info);">retorno${p.retorno_em ? ' (' + dmh(p.retorno_em) + ')' : ''}: ${agT(p.retorno)}</div>` : ''}
           ${fio.length ? fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${dmh(m.em)}: ${agE(m.texto || m.text || '')}</div>`).join('') : ''}
-        </details></div>`;
+        </details>${!(naTela && naTela.style.display !== 'none') && agBuscaMeu(p) ? `<div id="agForm_${p.id}" style="flex-basis:100%;"></div>` : ''}</div>`;
     }).join('');
   if (AG_BUSCA_FOCO) { const el = document.getElementById('agBusca_' + AG_BUSCA_FOCO); if (el) setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150); }
 }
