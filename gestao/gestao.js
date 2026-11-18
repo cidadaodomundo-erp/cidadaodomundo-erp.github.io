@@ -7285,27 +7285,37 @@ function renderContasPagar() {
 // Fonte: vw_fin_sobra_filial_plano (a conta de cada quarta) + vw_fin_sobra_filial_a_lancar (o título de cada lado no Saipos).
 // A RLS das views só entrega a dono e financeiro: sem linha, o bloco não aparece (filial não vê). Cada view leva ~5 s:
 // carrega uma vez, por fora, sem segurar a tela.
-const SOBRA = { plano: null, lancar: null, carregando: false, erro: null };
+const SOBRA = { plano: null, lancar: null, cob: {}, carregando: false, erro: null };
 async function sobraFilialCarregar(forcar) {
   if (SOBRA.carregando || (SOBRA.plano && !forcar)) return;
   SOBRA.carregando = true; SOBRA.erro = null;
   try {
     [SOBRA.plano, SOBRA.lancar] = await Promise.all([
       consultarTudo('vw_fin_sobra_filial_plano?select=*&order=quarta,sigla'),
-      consultarTudo('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo&order=quarta,quem')]);
+      consultarTudo('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo,id_cobranca&order=quarta,quem')]);
+    // total da lista do mês = tr_cobrancas.valor_total pela id_cobranca da linha LISTA (Financeiro 18/11 15:40)
+    const ids = [...new Set((SOBRA.lancar || []).filter((x) => x.componente === 'LISTA' && x.id_cobranca != null).map((x) => x.id_cobranca))];
+    SOBRA.cob = {};
+    if (ids.length) (await consultarTudo(`tr_cobrancas?select=id,valor_total&id=in.(${ids.join(',')})`).catch(() => [])).forEach((c) => { SOBRA.cob[c.id] = Number(c.valor_total); });
   } catch (e) { SOBRA.erro = e.message; }
   SOBRA.carregando = false;
   const w = document.getElementById('sobraFilialWrap');
   if (w) w.outerHTML = sobraFilialHtml();
 }
-function sobraLado(L) {
-  // um lado (filial paga ou AV recebe) de uma quarta: o pior estado entre lista, bônus e lucro
+function sobraLado(L, quarta, outro) {
+  // um lado (filial paga ou AV recebe) de uma quarta: o pior estado entre lista, bônus e lucro (farol do Financeiro, 18/11 15:40)
   if (!L.length) return { cls: 'na', txt: '—', tit: 'nada a lançar' };
-  const det = L.map((x) => `${x.componente.toLowerCase()} ${sobraR(x.valor_painel)}: ${x.acao === 'JA_CERTO' ? 'certo' : x.acao === 'ABRIR' ? 'falta lançar' : x.acao === 'ALTERAR' ? 'lançado diferente' : 'ainda não (semana não fechou)'}`).join(' · ');
-  if (L.some((x) => x.acao === 'ABRIR')) return { cls: 'fora', txt: '✗ falta lançar', tit: det };
-  if (L.some((x) => x.acao === 'ALTERAR')) return { cls: 'perto', txt: '! lançado diferente', tit: det };
-  if (L.every((x) => x.acao === 'JA_CERTO')) return { cls: 'ok', txt: '✓ certo', tit: det };
-  return { cls: 'na', txt: 'ainda não', tit: det };
+  const certo = (x) => x.acao === 'JA_CERTO' || x.acao === 'JA_PAGO';
+  const det = L.map((x) => `${x.componente.toLowerCase()} ${sobraR(x.valor_painel)}: ${certo(x) ? 'certo' : x.acao === 'ABRIR' ? 'falta lançar' : x.acao === 'ALTERAR' ? 'lançado com valor diferente' : 'ainda não (estimativa)'}`).join(' · ');
+  const errado = L.filter((x) => x.acao === 'ABRIR' || x.acao === 'ALTERAR');
+  if (errado.length) {
+    const passou = String(quarta) < sobraHoje();
+    const outroCerto = outro.length && outro.every(certo) && errado.some((x) => x.acao === 'ABRIR');
+    return passou || outroCerto ? { cls: 'fora', txt: errado.some((x) => x.acao === 'ABRIR') ? '✗ falta lançar' : '✗ valor diferente', tit: det }
+      : { cls: 'perto', txt: '! robô lançando', tit: det };
+  }
+  if (L.every(certo)) return { cls: 'ok', txt: '✓ certo', tit: det };
+  return { cls: 'na', txt: 'estimativa', tit: det };
 }
 function sobraFilialHtml() {
   if (SOBRA.erro) return `<div id="sobraFilialWrap" class="contexto">✗ Não consegui ler a sobra das filiais: ${trEscH(SOBRA.erro)} <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
@@ -7317,22 +7327,29 @@ function sobraFilialHtml() {
   let furos = 0;
   const linhas = SOBRA.plano.map((p) => {
     const L = lanc.filter((x) => x.quem === p.sigla && x.quarta === p.quarta);
-    const fil = sobraLado(L.filter((x) => x.sentido === 'PAGAR')), av = sobraLado(L.filter((x) => x.sentido === 'RECEBER'));
+    const LP = L.filter((x) => x.sentido === 'PAGAR'), LR = L.filter((x) => x.sentido === 'RECEBER');
+    const fil = sobraLado(LP, p.quarta, LR), av = sobraLado(LR, p.quarta, LP);
+    const cobId = (L.find((x) => x.componente === 'LISTA' && x.id_cobranca != null) || {}).id_cobranca;
+    const tot = cobId != null && SOBRA.cob[cobId] != null ? SOBRA.cob[cobId] : null;
+    const jaPago = tot != null && p.abate_lista != null && p.lista_fica_aberta != null ? tot - Number(p.abate_lista) - Number(p.lista_fica_aberta) : null;
     if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
+    const pergunta = Number(p.lista_mes_pergunta) > 0 ? `<div style="font-size:11.5px;color:var(--farol-perto);">sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)</div>` : '';
     const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
     const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null && Math.abs(Number(p.repasse_valor) - Number(p.sai_da_filial)) >= 0.005 ? `<div style="font-size:11.5px;color:var(--tx-4);">no banco: ${sobraR(p.repasse_valor)}</div>` : '');
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
     const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
     return `<tr><td>${agDmSobra(p.quarta)}</td><td><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td>${sit}</td>
-      <td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b></td>
+      <td>${v(tot)}</td><td>${v(jaPago)}</td><td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b>${pergunta}</td>
       <td>${lado(fil)}</td><td>${lado(av)}</td></tr>`;
   }).join('');
   return `<div id="sobraFilialWrap"><details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
-    <div style="overflow-x:auto;"><table><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th>Lucro</th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
+    <div style="overflow-x:auto;"><table><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th>Lucro</th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
     <tbody>${linhas}</tbody></table></div></details></div>`;
 }
+// hoje em Curitiba (AAAA-MM-DD), para o farol: quarta que já passou com título faltando = vermelho
+const sobraHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 const sobraR = (v) => 'R$ ' + fmt(Number(v || 0));
 const agDmSobra = (d) => { const [a, m, dd] = String(d || '').slice(0, 10).split('-'); return dd ? `${dd}/${m}` : ''; };
 
