@@ -37,12 +37,13 @@
 
 <script src="../nucleo/nucleo.js?v=20261109a"></script>
 <script>
-const RG = { L: null, erro: null, farol: null, frente: null, cinza: false, aberto: null };
+const RG = { L: null, erro: null, farol: null, frente: null, cinza: false, aberto: null, arq: null, verArq: false };
 const rgE = (s) => trEscH(String(s == null ? '' : s));
 // grupo da tela: valendo / quebrou / atenção (amarelo e superada) / sem prova
 const RG_GRUPO = { verde: 'ok', vermelho: 'quebrou', amarelo: 'conferir', superada: 'conferir', cinza: 'sem' };
 const RG_COR = { ok: 'var(--farol-ok)', quebrou: 'var(--farol-fora)', conferir: 'var(--farol-perto)', sem: 'var(--tx-4)' };
-const RG_ORDEM = { quebrou: 0, conferir: 1, ok: 2, sem: 3 };
+// 18/11/2026 (dono 01:13, arquivar as que não se usam; proposta 2026-11-18-regras-arquivadas): vermelho, amarelo, cinza (perdida antes), verde
+const RG_ORDEM = { quebrou: 0, conferir: 1, sem: 2, ok: 3 };
 const RG_FRENTE = { 'painel modulos': 'Painel', 'plano saida': 'Plano de saída', 'margem preco': 'Margem e preço', 'troca contas': 'Troca de contas',
   'engenharia cardapio': 'Engenharia do cardápio', rh: 'RH', cardapio: 'Cardápio', promocoes: 'Promoções', logistica: 'Logística',
   boqueirao: 'Boqueirão', avaliacoes: 'Avaliações', contestacao: 'Contestação' };
@@ -64,6 +65,8 @@ async function entrarRegras() {
     RG.L = await consultarTudo('vw_regras_em_vigor?select=chave,frente,regra,farol,conferido_em,detalhe,decidida_em,perdida&order=chave');
     RG.erro = null;
   } catch (e) { RG.erro = e.message; }
+  // arquivadas (decisão única já executada, sem uso, superada): fora do placar, só um link no rodapé
+  RG.arq = await consultarTudo('vw_regras_arquivadas?select=livro_id,frente,regra,tipo,motivo,arquivado_em&order=arquivado_em.desc').catch(() => null);
   rgDesenhar();
 }
 function rgFiltro(k) { RG.farol = RG.farol === k ? null : k; rgDesenhar(); }
@@ -82,13 +85,13 @@ function rgDesenhar() {
   const nConf = g('conferir').length;
   let h = `<h2>Regras em vigor</h2>
     <div class="contexto" style="text-align:left;">O que combinamos está valendo hoje? O robô confere sozinho${ultima ? ` — última conferência ${rgQuando(ultima)}` : ''}.</div>
-    <div class="cards">${card('ok', 'pos', 'Valendo', 'conferidas e funcionando')}${card('quebrou', g('quebrou').length ? 'neg' : 'pos', 'Quebraram', 'a frente já foi avisada')}${nConf ? card('conferir', 'highlight', 'Atenção', 'clique na regra e veja o que o robô viu') : ''}${card('sem', 'neutral', 'Ainda sem prova', 'decididas, falta o robô conferir')}</div>`;
+    <div class="cards">${card('ok', 'pos', 'Valendo', 'conferidas e funcionando')}${card('quebrou', g('quebrou').length ? 'neg' : 'pos', 'Quebraram', 'a frente já foi avisada')}${nConf ? card('conferir', 'highlight', 'Atenção', 'clique na regra e veja o que o robô viu') : ''}${card('sem', 'neutral', 'Viva, sem conferência automática', 'regra em uso; o robô ainda não confere')}</div>`;
   const frentes = [...new Set(L.filter((x) => RG_GRUPO[x.farol] !== 'sem' || x.perdida || RG.cinza || RG.farol === 'sem').map((x) => x.frente))]
     .sort((a, b) => rgFrente(a).localeCompare(rgFrente(b), 'pt-BR'));
   h += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;">
     <button type="button" class="preset-btn${RG.frente ? '' : ' active'}" onclick="RG.frente=null;rgDesenhar()">Todas as frentes</button>
     ${frentes.map((f) => `<button type="button" class="preset-btn${RG.frente === f ? ' active' : ''}" onclick="rgFrenteFiltro(${rgQ(f)})">${rgE(rgFrente(f))}</button>`).join('')}
-    ${RG.farol ? `<button type="button" class="preset-btn" onclick="rgFiltro(RG.farol)">${{ ok: 'valendo', quebrou: 'quebraram', conferir: 'atenção', sem: 'sem prova' }[RG.farol]} ✕</button>` : ''}</div>`;
+    ${RG.farol ? `<button type="button" class="preset-btn" onclick="rgFiltro(RG.farol)">${{ ok: 'valendo', quebrou: 'quebraram', conferir: 'atenção', sem: 'sem conferência automática' }[RG.farol]} ✕</button>` : ''}</div>`;
   const ordenar = (a, b) => (RG_ORDEM[RG_GRUPO[a.farol]] - RG_ORDEM[RG_GRUPO[b.farol]]) || ((b.perdida ? 1 : 0) - (a.perdida ? 1 : 0))
     || String(b.decidida_em || '').localeCompare(String(a.decidida_em || '')) || String(a.regra).localeCompare(String(b.regra), 'pt-BR');
   let vis = daFrente.filter((x) => !RG.farol || RG_GRUPO[x.farol] === RG.farol).sort(ordenar);
@@ -97,9 +100,15 @@ function rgDesenhar() {
   if (escondidas.length) vis = vis.filter((x) => !(RG_GRUPO[x.farol] === 'sem' && !x.perdida));
   h += `<div id="tabelaRegras"><table><thead><tr><th></th><th>Regra</th><th>Frente</th><th>Situação</th></tr></thead><tbody>
     ${vis.length ? vis.map(rgLinha).join('') : '<tr><td colspan="4">Nada neste filtro.</td></tr>'}</tbody></table></div>`;
-  if (escondidas.length) h += `<div style="margin:8px 0;"><button type="button" class="preset-btn" onclick="RG.cinza=true;rgDesenhar()">Ver as ${escondidas.length} decisões ainda sem prova</button>
+  if (escondidas.length) h += `<div style="margin:8px 0;"><button type="button" class="preset-btn" onclick="RG.cinza=true;rgDesenhar()">Ver as ${escondidas.length} regras vivas sem conferência automática</button>
     <span style="font-size:12px;color:var(--tx-4);margin-left:6px;">a fila começa pelas que já se perderam</span></div>`;
-  else if (RG.cinza && RG.farol !== 'sem') h += `<div style="margin:8px 0;"><button type="button" class="preset-btn" onclick="RG.cinza=false;rgDesenhar()">Recolher as sem prova</button></div>`;
+  else if (RG.cinza && RG.farol !== 'sem') h += `<div style="margin:8px 0;"><button type="button" class="preset-btn" onclick="RG.cinza=false;rgDesenhar()">Recolher as sem conferência automática</button></div>`;
+  if (RG.arq && RG.arq.length) {
+    const TIPO = { decisao_unica: 'decisão já executada', sem_uso: 'não se usa mais', superada: 'substituída' };
+    h += `<div style="margin:18px 0 4px;"><a href="javascript:void(0)" style="font-size:12.5px;color:var(--tx-4);" onclick="RG.verArq=!RG.verArq;rgDesenhar()">${RG.verArq ? 'Esconder as arquivadas' : `Arquivadas (${RG.arq.length})`}</a></div>`;
+    if (RG.verArq) h += `<div id="tabelaRegrasArq"><table><thead><tr><th>Regra</th><th>Frente</th><th>Por que saiu</th><th>Quando</th></tr></thead><tbody>
+      ${RG.arq.map((x) => `<tr style="color:var(--tx-4);"><td style="white-space:normal;">${rgE(x.regra)}</td><td>${rgE(rgFrente(x.frente))}</td><td style="white-space:normal;">${rgE(TIPO[x.tipo] || x.tipo || '')}${x.motivo ? ' · ' + rgE(x.motivo) : ''}</td><td>${rgDia(x.arquivado_em)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
   alvo.innerHTML = h;
 }
 function rgSituacao(x) {
@@ -108,7 +117,7 @@ function rgSituacao(x) {
   if (k === 'quebrou') return `quebrou · a frente ${rgE(rgFrente(x.frente))} está avisada`;
   if (x.farol === 'superada') return 'a decisão mudou · a conferência vai ser trocada';
   if (k === 'conferir') return x.detalhe ? 'atenção · clique para ver o que o robô viu' : 'o robô não conseguiu conferir';
-  return `ainda sem prova${x.decidida_em ? ` · decidida em ${rgDia(x.decidida_em)}` : ''}`;
+  return `viva · sem conferência automática ainda${x.decidida_em ? ` · decidida em ${rgDia(x.decidida_em)}` : ''}`;
 }
 function rgLinha(x) {
   const k = RG_GRUPO[x.farol] || 'sem', ab = RG.aberto === x.chave;
