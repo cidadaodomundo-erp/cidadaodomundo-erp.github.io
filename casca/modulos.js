@@ -24,7 +24,7 @@ window.CASCA_MODULOS_CFG = {
     cartao: { rotulo: 'Compra no cartão', icone: '💳' },
     compliance: { rotulo: 'Documentos e renovações', icone: '📑' },   // 13/11: alvarás, licenças, limpezas, extintores (Compliance)   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     saiposcod: { rotulo: 'Código que falhou no Saipos', icone: '⚠️' },   // 16/11: item que cai no Diversos (Cardápio)
-    lanna: { rotulo: 'Central da Lanna', icone: '🧑‍🍳' },   // 18/11: perdas e pedidos jogados fora que a Lanna manda (só o dono)
+    desperdicio: { rotulo: 'Desperdício', icone: '🗑️' },   // 18/11: sobras, queimados e pedidos jogados fora (vw_est_perda)
     regras: { rotulo: 'Regras em vigor', icone: '✅' },
     biblioteca: { rotulo: 'Biblioteca', icone: '📚' },
     usuarios: { rotulo: 'Usuários do painel', icone: '🔑' },   // 18/11: criar login, senha e telas de cada um (só o dono, #1093)   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
@@ -40,7 +40,7 @@ window.CASCA_MODULOS_CFG = {
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'lanna', 'regras', 'compliance', 'vendasagora'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
@@ -49,7 +49,7 @@ window.CASCA_MODULOS = [
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete', 'motoboys'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',
-    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
+    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao', 'desperdicio'] },
   { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)

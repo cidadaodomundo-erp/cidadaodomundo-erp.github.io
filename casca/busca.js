@@ -83,7 +83,7 @@ window.CASCA_BUSCA = {
     'atividades da equipe', 'controle das atividades', 'tarefas', 'whatsapp', 'avisos', 'quem fez', 'equipe', 'travada'],   // 12/11 16:55: as atividades entraram na agenda   // 12/11: o Plano entrou na agenda
   usuarios: ['usuarios', 'usuario', 'login', 'senha', 'trocar senha', 'permissao', 'permissoes', 'acesso', 'criar usuario', 'bloquear'],
   biblioteca: ['biblioteca', 'guia', 'guias', 'passo a passo', 'como funciona', 'estudo', 'estudos', 'dossie', 'artefato', 'manual', 'tutorial'],
-  lanna: ['lanna', 'alana', 'desperdicio', 'desperdício', 'perda da noite', 'pedido jogado fora'],
+  desperdicio: ['desperdicio', 'desperdício', 'perda', 'perdas', 'sobra', 'queimou', 'pedido jogado fora'],
   regras: ['regras', 'regra', 'combinado', 'o que combinamos', 'esta valendo', 'aplicado', 'funcionando', 'decisoes', 'se perdeu', 'quebrou'],
   compliance: ['documentos', 'renovacoes', 'renovacao', 'alvara', 'licenca', 'vigilancia', 'bombeiros', 'extintor', 'dedetizacao', 'limpeza', 'caixa de gordura', 'certificado digital', 'vencimento'],
   cartao: ['cartao de credito', 'compra no cartao', 'fatura', 'anexar fatura', 'fatura do cartao', 'itau', 'assinatura', 'parcela'],

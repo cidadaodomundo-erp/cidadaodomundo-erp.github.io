@@ -49,7 +49,7 @@ window.CASCA_PAGINAS = {
   agenda: 'agenda/index.html',
   biblioteca: 'biblioteca/index.html',
   usuarios: 'usuarios/index.html',   // 18/11/2026: Usuários do painel (só o dono; criar, editar, senha, telas)   // 18/11/2026: Biblioteca — guias, estudos e dossiês de um clique (painel_biblioteca)
-  lanna: 'lanna/index.html',   // 18/11/2026: Central da Lanna (perdas que ela manda pelo WhatsApp; só o dono)
+  desperdicio: 'desperdicio/index.html',   // 18/11/2026: Desperdício — perdas dos últimos 30 dias (vw_est_perda, só leitura)
   regras: 'regras/index.html',   // 16/11/2026: Regras em vigor (só o dono; vw_regras_em_vigor)
   notasfaltam: 'notas/index.html',
   cartao: 'cartao/index.html',
@@ -135,7 +135,7 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['lanna', 'plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras', 'biblioteca', 'usuarios',
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras', 'biblioteca', 'usuarios',
   'prestadores',    // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
   'mercadolivre'];  // 17/11/2026: cada pedido de compra escolhe a loja de entrega na própria tela (o banco filtra pelas lojas do login)
 
