@@ -102,14 +102,20 @@ function usChave(u, c, R) {
 function usUsuario(em) { const e = String(em || '').toLowerCase().trim(); return e.endsWith('@cidadaodomundo.com.br') ? e.slice(0, -'@cidadaodomundo.com.br'.length) : e; }
 function usNomeProprio(n) { const pq = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
   return String(n || '').toLowerCase().trim().split(/\s+/).map((p, i) => i && pq.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)).join(' '); }
+// usuário digitado → e-mail do login (igual à tela de entrar); com @ fica como está (gente de fora do domínio)
+function usEmailDe(t) { t = String(t || '').trim(); if (!t) return ''; if (t.includes('@')) return t.toLowerCase();
+  return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9._-]/g, '') + '@cidadaodomundo.com.br'; }
+function usUsuarioDigitado(el) { if (el.value.includes('@')) return; const n = usUsuario(usEmailDe(el.value)); if (n !== el.value) el.value = n; }
+// a mensagem do banco fala "e-mail"; na tela é "usuário"
+async function usErro(r) { return String(await trErroDe(r)).replace(/Esse e-mail/gi, 'Esse usuário').replace(/e-mail/gi, 'usuário'); }
 function usOrdenar(c) { if (US_ORD.col === c) US_ORD.dir = -US_ORD.dir; else { US_ORD.col = c; US_ORD.dir = c === 'ultimo' ? -1 : 1; } usDesenhar(); }
 function usExcluirPedir(em) { US.excluir = em; usDesenhar(); }
 async function usExcluir(email) {
   avisoAcao('enviando', 'Excluindo o login…');
   const r = await trRpcSeguro('painel_usuario_excluir', { p_email: email });
-  if (!r.ok) return avisoAcao('erro', `✗ NÃO excluiu ${email}: ${await trErroDe(r)}`, () => usExcluir(email));
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO excluiu ${usUsuario(email)}: ${await usErro(r)}`, () => usExcluir(email));
   US.excluir = null; US.aberto = null; await entrarUsuarios();
-  avisoAcao('ok', `✓ ${email} excluído às ${avisoHora()}: não entra mais e saiu da lista de telas. O histórico das listas fica.`);
+  avisoAcao('ok', `✓ ${usUsuario(email)} excluído às ${avisoHora()}: não entra mais e saiu da lista de telas. O histórico das listas fica.`);
 }
 function usDesenhar() {
   const alvo = document.getElementById('view-usuarios');
@@ -122,7 +128,7 @@ function usDesenhar() {
     <div class="contexto" style="text-align:left;">Quem entra no painel, o que cada um vê e a senha. Clique na pessoa para mudar.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
       <button type="button" class="preset-btn active" onclick="US.novo=!US.novo;US.aberto=null;usDesenhar()">+ Novo usuário</button>
-      <input id="usBusca" type="search" placeholder="buscar nome, e-mail, loja" value="${usE(US.busca)}" oninput="usBuscar(this.value)" style="flex:0 1 260px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:7px 10px;font:inherit;">
+      <input id="usBusca" type="search" placeholder="buscar usuário, nome, loja" value="${usE(US.busca)}" oninput="usBuscar(this.value)" style="flex:0 1 260px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:7px 10px;font:inherit;">
       <span style="font-size:12px;color:var(--tx-4);">${L.length} pessoas · ${L.filter((u) => u.bloqueado).length} bloqueadas · ${L.filter((u) => !u.tem_login).length} sem login criado</span></div>`;
   if (US.novo) h += usForm(null);
   h += `<div id="tabelaUsuarios" style="overflow-x:auto;"><table><thead><tr>${US_COLS.map(([c, t]) => `<th style="cursor:pointer;user-select:none;" title="ordenar por ${t.toLowerCase()} (clique de novo inverte)" onclick="usOrdenar('${c}')">${t}${seta(c)}</th>`).join('')}</tr></thead><tbody>
@@ -152,7 +158,7 @@ function usForm(u) {
   return `<div class="us-form" onclick="event.stopPropagation()">
     ${novo ? '<div style="font-weight:700;margin-bottom:6px;">Novo usuário</div>' : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      ${novo ? '<input id="us_email" placeholder="e-mail" style="flex:1 1 240px;">' : `<b style="flex:1 1 240px;">${usE(u.email)}</b>`}
+      ${novo ? '<input id="us_email" placeholder="usuário (ex.: mariaaurelia)" autocomplete="off" oninput="usUsuarioDigitado(this)" style="flex:1 1 240px;">' : `<b style="flex:1 1 240px;">${usE(usUsuario(u.email))}</b>`}
       <input id="us_nome" placeholder="nome" value="${usE(u ? u.nome || '' : '')}" style="flex:1 1 180px;">
       <select id="us_papel" onchange="document.getElementById('us_loja').style.display = this.value === 'FILIAL' ? '' : 'none'">${US_PAPEIS.map(([v, t]) => `<option value="${v}" ${(u ? u.papel || '' : '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <select id="us_loja" style="${u && u.papel === 'FILIAL' ? '' : 'display:none;'}"><option value="">loja…</option>${US_LOJAS.map(([v, t]) => `<option value="${v}" ${u && u.unidade === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -176,12 +182,14 @@ function usForm(u) {
 }
 async function usSalvar(emailExistente) {
   const v = (id) => (document.getElementById(id) || {}).value || '';
-  const email = (emailExistente || v('us_email')).trim().toLowerCase();
+  // 18/11/2026 16:30 (dono: "tem a necessidade do email? não pode ser só o nome direto?"): digita-se o usuário; a tela completa
+  // com @cidadaodomundo.com.br por baixo (o login exige e-mail), a mesma conversão da tela de entrar (emailDoLogin)
+  const email = (emailExistente || usEmailDe(v('us_email'))).trim().toLowerCase();
   const papel = v('us_papel') || null, loja = v('us_loja') || null;
   const todas = !!(document.getElementById('us_todas') || {}).checked;
   const telas = [...document.querySelectorAll('.us-tela:checked')].map((c) => c.value);
   const senha = v('us_senha');
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return avisoAcao('atencao', '! Escreva um e-mail válido.');
+  if (!/^[a-z0-9._-]+@[^@\s]+\.[^@\s]+$/.test(email)) return avisoAcao('atencao', '! Escreva o usuário: só letras e números, sem espaço.');
   if (papel === 'FILIAL' && !loja) return avisoAcao('atencao', '! Filial precisa da loja.');
   if (!todas && !telas.length) return avisoAcao('atencao', '! Marque pelo menos uma tela (ou "todas as telas").');
   const temLogin = !!(US.L || []).find((u) => u.email === email && u.tem_login);
@@ -190,12 +198,12 @@ async function usSalvar(emailExistente) {
   avisoAcao('enviando', 'Salvando…');
   const r = await trRpcSeguro('painel_usuario_salvar', { p_email: email, p_nome: v('us_nome') || null, p_papel: papel, p_unidade: loja,
     p_ve_valores: !!(document.getElementById('us_valores') || {}).checked, p_todas: todas, p_modulos: todas ? null : telas, p_observacao: null });
-  if (!r.ok) return avisoAcao('erro', `✗ NÃO salvou: ${await trErroDe(r)}`, () => usSalvar(emailExistente));
-  let msg = `✓ ${email} salvo às ${avisoHora()}`;
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO salvou: ${await usErro(r)}`, () => usSalvar(emailExistente));
+  let msg = `✓ ${usUsuario(email)} salvo às ${avisoHora()}`;
   if (!temLogin && senha) {
     const r2 = await trRpcSeguro('painel_usuario_criar_login', { p_email: email, p_senha: senha });
-    if (!r2.ok) { const err = await trErroDe(r2); await entrarUsuarios(); return avisoAcao('erro', `✗ As telas foram salvas, mas o login NÃO foi criado: ${err}`); }
-    msg += ' — login criado: a pessoa já entra com esse e-mail e a senha que você digitou';
+    if (!r2.ok) { const err = await usErro(r2); await entrarUsuarios(); return avisoAcao('erro', `✗ As telas foram salvas, mas o login NÃO foi criado: ${err}`); }
+    msg += ` — login criado: a pessoa entra com o usuário "${usUsuario(email)}" e a senha que você digitou`;
   }
   US.novo = false; US.aberto = null; await entrarUsuarios();
   avisoAcao('ok', msg + '.');
@@ -205,16 +213,16 @@ async function usTrocarSenha(email) {
   if (s.length < 8) return avisoAcao('atencao', '! A nova senha precisa de pelo menos 8 caracteres.');
   avisoAcao('enviando', 'Trocando a senha…');
   const r = await trRpcSeguro('painel_usuario_trocar_senha', { p_email: email, p_senha: s });
-  if (!r.ok) return avisoAcao('erro', `✗ A senha NÃO foi trocada: ${await trErroDe(r)}`, () => usTrocarSenha(email));
+  if (!r.ok) return avisoAcao('erro', `✗ A senha NÃO foi trocada: ${await usErro(r)}`, () => usTrocarSenha(email));
   if (el) el.value = '';
-  avisoAcao('ok', `✓ Senha de ${email} trocada às ${avisoHora()}. Quem estava logado sai e entra com a nova.`);
+  avisoAcao('ok', `✓ Senha de ${usUsuario(email)} trocada às ${avisoHora()}. Quem estava logado sai e entra com a nova.`);
 }
 async function usBloquear(email, bloquear) {
   avisoAcao('enviando', bloquear ? 'Bloqueando…' : 'Desbloqueando…');
   const r = await trRpcSeguro('painel_usuario_bloquear', { p_email: email, p_bloquear: bloquear });
-  if (!r.ok) return avisoAcao('erro', `✗ NÃO ${bloquear ? 'bloqueou' : 'desbloqueou'}: ${await trErroDe(r)}`, () => usBloquear(email, bloquear));
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO ${bloquear ? 'bloqueou' : 'desbloqueou'} ${usUsuario(email)}: ${await usErro(r)}`, () => usBloquear(email, bloquear));
   await entrarUsuarios();
-  avisoAcao('ok', `✓ ${email} ${bloquear ? 'bloqueado: não entra mais no painel' : 'desbloqueado'} (${avisoHora()}).`);
+  avisoAcao('ok', `✓ ${usUsuario(email)} ${bloquear ? 'bloqueado: não entra mais no painel' : 'desbloqueado'} (${avisoHora()}).`);
 }
 
 const TELA = 'usuarios';
