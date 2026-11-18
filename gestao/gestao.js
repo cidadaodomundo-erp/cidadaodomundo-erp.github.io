@@ -7277,7 +7277,9 @@ function renderContasPagar() {
         return !PROJ_COM_PAG ? 'o valor da semana para lançar no Saipos' : pend ? `<span style="color:var(--amber-2);">${pend} pendência${pend > 1 ? 's' : ''}</span>` : '<span style="color:var(--farol-ok);">✓ tudo pago até a última semana fechada</span>'; })()}</summary>${comissao}</details>` : ''}
   ${bonus ? `<details class="detalhes-extra"><summary>Bônus do iFood — o que vai para a aplicação, semana a semana</summary>${bonus}</details>` : ''}
   ${sobraFilialHtml()}`;
-  sobraFilialCarregar();
+  // só depois do motor do Fluxo (a tela já desenhada): as duas views da sobra levam ~5 s cada e, junto com a carga da tela,
+  // passavam dos 8 s do painel (18/11 15:45, statement timeout)
+  if (CP.temMotor) sobraFilialCarregar();
 }
 
 // ---- SOBRA DAS FILIAIS → ÁGUA VERDE (dono 18/11/2026 15:38, pelo Organizador: "esses valores de lista (o que foi feito e quanto
@@ -7289,10 +7291,12 @@ const SOBRA = { plano: null, lancar: null, cob: {}, carregando: false, erro: nul
 async function sobraFilialCarregar(forcar) {
   if (SOBRA.carregando || (SOBRA.plano && !forcar)) return;
   SOBRA.carregando = true; SOBRA.erro = null;
+  // uma view de cada vez, e uma segunda tentativa 3 s depois (banco ocupado com a carga da tela)
+  const ler = async (q) => { try { return await consultarTudo(q); } catch (e) { await new Promise((ok) => setTimeout(ok, 3000)); return consultarTudo(q); } };
   try {
-    [SOBRA.plano, SOBRA.lancar] = await Promise.all([
-      consultarTudo('vw_fin_sobra_filial_plano?select=*&order=quarta,sigla'),
-      consultarTudo('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo,id_cobranca&order=quarta,quem')]);
+    SOBRA.plano = await ler('vw_fin_sobra_filial_plano?select=sigla,quarta,abate_lista,lista_fica_aberta,bonus,bonus_estimado,lucro,sai_da_filial,travado,repasse_valor,resto_lista_no_vencimento,falta_caixa_no_vencimento,lista_mes_pergunta&order=quarta,sigla');
+    SOBRA.lancar = Array.isArray(SOBRA.plano) && SOBRA.plano.length
+      ? await ler('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo,id_cobranca&order=quarta,quem') : [];
     // total da lista do mês = tr_cobrancas.valor_total pela id_cobranca da linha LISTA (Financeiro 18/11 15:40)
     const ids = [...new Set((SOBRA.lancar || []).filter((x) => x.componente === 'LISTA' && x.id_cobranca != null).map((x) => x.id_cobranca))];
     SOBRA.cob = {};
@@ -7318,7 +7322,7 @@ function sobraLado(L, quarta, outro) {
   return { cls: 'na', txt: 'estimativa', tit: det };
 }
 function sobraFilialHtml() {
-  if (SOBRA.erro) return `<div id="sobraFilialWrap" class="contexto">✗ Não consegui ler a sobra das filiais: ${trEscH(SOBRA.erro)} <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
+  if (SOBRA.erro) return `<div id="sobraFilialWrap" class="caption-label" style="text-align:left;">✗ A sobra das filiais não carregou (o banco demorou). <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
   if (!Array.isArray(SOBRA.plano) || !SOBRA.plano.length) return '<div id="sobraFilialWrap"></div>';
   const v = (x) => x == null ? '<span style="opacity:.4">—</span>' : sobraR(x);
   const nome = { AHU: 'Ahú', SB: 'São Braz' };
