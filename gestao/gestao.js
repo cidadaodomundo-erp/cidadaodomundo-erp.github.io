@@ -464,7 +464,7 @@ async function entrarConcbanco() {
     // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
     // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
     const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura] = await Promise.all([
+           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura, ofxFalta] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
@@ -486,9 +486,11 @@ async function entrarConcbanco() {
       // 16/11/2026 (dono 14:10, repetida; proposta 2026-11-16-frequencia-conta-conciliacao.md): a frequência normal de
       // cada conta vem do banco (fin_conta_frequencia); sem ela, vale a régua antiga de 30 dias
       consultarTudo('vw_fin_conta_cobertura?select=conta,situacao,coberto_ate,esperado_em,nota').catch(() => null),
+      // 18/11/2026 (dono 12:28: "hoje novamente a Hellen não mandou os OFX, se confundiu achando que a conciliação estava rodando")
+      consultarTudo('vw_fin_ofx_ontem_faltando?select=conta,falta').catch(() => null),
     ]);
     CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, parcial, robo, cobertura };
+              diaSaldo, duvidas, parcial, robo, cobertura, ofxFalta };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -1694,6 +1696,9 @@ function renderConcbanco() {
       // mesmo lugar em que ela salvaria a mao. Um so caminho de importacao.
       '<input type="file" id="concbArquivo" accept=".ofx" multiple style="display:none">' +
       '<button id="concbEnviarOfx" class="preset-btn">enviar extrato (OFX)</button>' +
+      // o extrato de ontem que ainda não chegou: aviso ao lado do botão (o WhatsApp à Hellen sai sozinho do atendedor)
+      ((CONCB.ofxFalta || []).some((x) => x.falta) ? '<span style="color:var(--farol-fora);font-weight:700;font-size:13px;">Os extratos de ontem do Itaú ainda não chegaram (' +
+        (CONCB.ofxFalta || []).filter((x) => x.falta).map((x) => trEscH(typeof nomeConta === 'function' ? nomeConta(x.conta) : x.conta)).join(', ') + '). A conciliação só roda depois do envio.</span>' : '') +
       '<button id="concbRecado" class="preset-btn">mandar uma regra</button></div>' +
 
     '<div class="contexto">' + resumo + '</div>' + blocoDuvidas +
