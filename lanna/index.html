@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Central da Lanna · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- CENTRAL DA LANNA (18/11/2026, dono: "Por favor, já coloca isso dentro do portal novo").
+     O que a Lanna (gerente da noite, Água Verde) manda pelo WhatsApp da API: perdas e pedidos jogados fora.
+     Só leitura. Lê vw_est_perda (linhas com quem = 'Lanna (WhatsApp)') e dono_pendencia (frente = 'Lanna').
+     Só o dono. Dados vêm do próprio ERP; nada do banco pessoal. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ln-dia { color:var(--tx-1); font-size:15px; font-weight:800; margin:18px 2px 6px; }
+  .ln-nota { margin:10px 2px; font-size:13px; color:var(--tx-3); }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-lanna" class="modulo" style="display:none;">
+      <div id="view-lanna"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const LN_QUEM = 'Lanna (WhatsApp)';
+const LN_MOTIVO = { SOBROU: 'Sobrou', QUEIMOU: 'Queimou', DEVOLUCAO: 'Pedido jogado fora', OUTRO: 'Outro', CAIU: 'Caiu', VALIDADE: 'Validade', 'ERRO DE RECEITA': 'Erro de receita' };
+const LN = { perdas: null, pend: null };
+const lnDdmm = (d) => (d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '–');
+const lnNum = (n) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+const lnReais = (n) => 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// valor do pedido vem escrito na observação ("R$ 40,08 (Saipos...)"); linhas "Ver linha..." são do mesmo pedido e não somam
+function lnValor(p) {
+  const o = p.observacao || '';
+  if (/Ver linha/i.test(o)) return 0;
+  const m = o.match(/R\$\s*([\d.]+,\d{2})/);
+  return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : 0;
+}
+async function entrarLanna() {
+  const alvo = document.getElementById('view-lanna');
+  alvo.innerHTML = '<div class="contexto">Carregando…</div>';
+  try {
+    LN.perdas = await consultarTudo(`vw_est_perda?select=*&quem=eq.${encodeURIComponent(LN_QUEM)}&order=data.desc,id.asc`);
+    LN.pend = await consultarTudo('dono_pendencia?select=id,o_que,desde,prazo,resolvido_em,resposta&frente=eq.Lanna&order=desde.desc').catch(() => []);
+    lnDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<h2>Central da Lanna</h2><div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler: ${trEscH(e.message)} <button type="button" class="preset-btn" onclick="entrarLanna()">Tentar de novo</button></div>`;
+  }
+}
+function lnDesenhar() {
+  const alvo = document.getElementById('view-lanna');
+  const P = (LN.perdas || []).filter((p) => !p.foi_corrigida);
+  let h = '<h2>Central da Lanna</h2><div class="ln-nota">O que a Lanna manda pelo WhatsApp de madrugada (Água Verde). Valores dos pedidos são os do cupom ou do Saipos, escritos na observação.</div>';
+  const kg = P.filter((p) => p.un === 'kg').reduce((s, p) => s + Number(p.qtd || 0), 0);
+  const pedidos = P.filter((p) => p.motivo === 'DEVOLUCAO' && lnValor(p) > 0);
+  const reais = P.reduce((s, p) => s + lnValor(p), 0);
+  const abertas = (LN.pend || []).filter((x) => !x.resolvido_em);
+  h += `<div class="cards">
+    <div class="card neutral"><div class="card-lbl">Sobras pesadas</div><div class="card-val">${lnNum(kg)} kg</div></div>
+    <div class="card neutral"><div class="card-lbl">Pedidos jogados fora</div><div class="card-val">${pedidos.length}</div></div>
+    <div class="card ${reais ? 'highlight' : 'neutral'}"><div class="card-lbl">Valor desses pedidos</div><div class="card-val">${lnReais(reais)}</div></div>
+    <div class="card ${abertas.length ? 'highlight' : 'neutral'}"><div class="card-lbl">Pendências abertas</div><div class="card-val">${abertas.length}</div></div></div>`;
+  if (abertas.length) {
+    h += `<div class="ln-dia">Pendências</div><div style="overflow-x:auto;"><table><thead><tr><th>O quê</th><th>Desde</th><th>Prazo</th></tr></thead><tbody>
+      ${abertas.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.o_que || '')}</td><td>${lnDdmm(x.desde)}</td><td>${lnDdmm(x.prazo)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (!P.length) { alvo.innerHTML = h + '<div class="contexto" style="text-align:left;">Nenhuma perda da Lanna gravada ainda.</div>'; return; }
+  const dias = [...new Set(P.map((p) => p.data))];
+  dias.forEach((d, i) => {
+    const L = P.filter((p) => p.data === d);
+    const v = L.reduce((s, p) => s + lnValor(p), 0);
+    h += `<div class="ln-dia">${lnDdmm(d)} · ${L.length} ${L.length === 1 ? 'linha' : 'linhas'}${v ? ' · ' + lnReais(v) : ''}</div>
+      <div id="tabelaLn${i}" style="overflow-x:auto;"><table><thead><tr><th>Item</th><th>Quanto</th><th>Motivo</th><th>Estoque</th><th>Observação</th></tr></thead><tbody>
+      ${L.map((p) => `<tr><td>${trEscH(p.item || '')}</td><td>${lnNum(p.qtd)} ${trEscH(p.un || '')}</td>
+        <td>${trEscH(LN_MOTIVO[p.motivo] || p.motivo || '')}</td><td style="color:var(--tx-3);">${trEscH((p.leitura || '').toLowerCase())}</td>
+        <td style="white-space:normal;">${trEscH(p.observacao || '')}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  });
+  alvo.innerHTML = h;
+  if (typeof barrasTopoTabelas === 'function') { try { barrasTopoTabelas(); } catch (e) {} }
+}
+
+const TELA = 'lanna';
+let MODULO_ATUAL = 'lanna';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-lanna').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarLanna(); };
+entrarLanna();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
