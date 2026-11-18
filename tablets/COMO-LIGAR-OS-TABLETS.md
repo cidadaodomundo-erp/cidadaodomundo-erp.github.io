@@ -20,6 +20,11 @@ Nada aqui cobra dinheiro. O pedido vai para a tela da cozinha de teste e, se voc
 5. Para o cliente não sair do app: nas Configurações, use a lupa de busca e digite **Fixar** (o nome muda conforme a versão do Redmi: "Fixar app" ou "Fixação de tela") e ligue. Depois, em Apps recentes, segure o app e toque em **Fixar**. Para soltar: segurar **Voltar + Recentes**.
 6. Tela sempre ligada: deixe na tomada; Configurações → Tela → **Suspensão** no maior tempo.
 
+## Como o cliente paga (TESTE: simulado, nada é cobrado)
+- Ao tocar em Confirmar, aparece **PAGAR A RODADA** com um QR Code e os botões Pix, Apple Pay, Google Pay, Crédito e Débito.
+- O cliente paga no tablet ou aponta a câmera do celular para o QR. O pedido só vai para a cozinha depois do pagamento aprovado.
+- **Cancelar pagamento** não manda nada para a cozinha; o carrinho continua.
+
 ## 3. Na cozinha / caixa
 - Abra `http://<ip>:4662/cozinha` num computador ou tablet.
 - Cada rodada aparece sozinha: **Começar preparo** → **Marcar pronta** → **Entregue na mesa**. O tablet da mesa mostra o andamento.

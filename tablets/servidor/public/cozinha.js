@@ -64,6 +64,7 @@
       const [t, cls] = SAIPOS[r.saipos.estado] || ["Saipos: ?", "atencao"];
       meta.appendChild(el("span", "selo " + cls, r.saipos.estado === "aceito" ? t + r.saipos.ficha : t));
     }
+    if (r.pago) meta.appendChild(el("span", "selo ok", `PAGO (teste) · ${r.pago}`));
     c.appendChild(meta);
     for (const i of r.itens) {
       c.appendChild(el("div", "item", `${i.quantidade} × ${i.nome}${i.variacao ? " — " + i.variacao : ""}`));

@@ -43,14 +43,42 @@
     if (memoria) memoria.semResposta = true;
     try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); if (p) { p.semResposta = true; localStorage.setItem(PENDENTE, JSON.stringify(p)); } } catch { /* ok */ }
   };
-  const temPendente = () => {
-    if (memoria && memoria.semResposta) return true;
-    try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); return !!(p && p.semResposta); } catch { return false; }
+  // Rodada esperando pagamento: carrinho tambem fica travado (o que esta sendo pago nao muda).
+  const marcarPagando = () => {
+    if (memoria) memoria.pagando = true;
+    try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); if (p) { p.pagando = true; delete p.semResposta; localStorage.setItem(PENDENTE, JSON.stringify(p)); } } catch { /* ok */ }
   };
+  const temPendente = () => {
+    if (memoria && (memoria.semResposta || memoria.pagando)) return true;
+    try { const p = JSON.parse(localStorage.getItem(PENDENTE) || "null"); return !!(p && (p.semResposta || p.pagando)); } catch { return false; }
+  };
+  async function getJson(caminho) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 5000);
+    try { const r = await fetch(caminho, { cache: "no-store", signal: ctl.signal }); return { status: r.status, json: await r.json().catch(() => null) }; }
+    finally { clearTimeout(t); }
+  }
 
   const chaveOcup = (o) => (o.modalidade === "mesa" ? `mesa:${o.mesa}` : `comanda:${o.comanda}`);
   window.CDMEnvio = {
     modo: cfg.modo,
+    pagarAntes: cfg.pagarAntes === true,
+    async pagamento(token) {
+      try { const r = await getJson(`/api/pagamento?t=${encodeURIComponent(token)}`); return r.status === 200 ? r.json : null; } catch { return null; }
+    },
+    async simularPagamento(token, forma, resultado) {
+      try {
+        const r = await post("/api/pagamento/simular", { token, forma, resultado });
+        return r.status === 200 && r.json ? r.json : { ok: false, mensagem: (r.json && r.json.mensagem) || "Não foi possível pagar." };
+      } catch { return { ok: false, mensagem: "Sem conexão. Tente de novo (não cobra duas vezes)." }; }
+    },
+    async cancelarPagamento(token) {
+      try {
+        const r = await post("/api/pagamento/cancelar", { token });
+        if (r.status === 200) { limpar(); return { ok: true, mensagem: r.json.mensagem }; }
+        return { ok: false, mensagem: (r.json && r.json.mensagem) || "Não foi possível cancelar." };
+      } catch { return { ok: false, mensagem: "Sem conexão. O pagamento não foi cancelado." }; }
+    },
     temPendente,
     limparPendente: limpar,
     mesaFixa: Number.isInteger(cfg.mesaFixa) ? cfg.mesaFixa : null,
@@ -82,6 +110,10 @@
       let r;
       try { r = await post("/api/rodada", { idempotencyKey, ...conteudo }); }
       catch { marcarSemResposta(); return { ok: false, mensagem: "Sem conexão com a cozinha. O carrinho foi mantido: toque em Confirmar de novo (não duplica)." }; }
+      if (r.status === 200 && r.json && r.json.ok && r.json.pagamento && r.json.pagamento.estado !== "aprovado") {
+        marcarPagando();
+        return { ok: true, aguardandoPagamento: true, id: r.json.id, token: r.json.pagamento.token, estadoPagamento: r.json.pagamento.estado, mensagem: r.json.mensagem, totalCentavos: r.json.totalCentavos };
+      }
       if (r.status === 200 && r.json && r.json.ok) {
         limpar();
         return { ok: true, id: r.json.id, status: r.json.status, mensagem: r.json.mensagem, totalCentavos: r.json.totalCentavos };

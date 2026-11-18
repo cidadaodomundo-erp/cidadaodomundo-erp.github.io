@@ -174,3 +174,14 @@ textarea{width:100%;border-radius:10px;border:1px solid var(--linha);padding:10p
   .dlg-rodape .acoes-linha{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* pagamento antes da cozinha */
+#dlgPag{width:min(860px,96vw)}
+.pag{padding:20px 24px;overflow:auto}
+.pag h2{margin:0;font-weight:400}
+.pag-total{font-size:40px;margin:4px 0}
+.pag-cols{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:20px;align-items:start;margin:12px 0}
+.pag-qr svg.qr{width:100%;height:auto;border-radius:12px;background:#fff}
+.pag-formas{display:grid;gap:10px}
+.pag-status{min-height:1.4em}
+@media (max-width:640px){.pag-cols{grid-template-columns:1fr}}

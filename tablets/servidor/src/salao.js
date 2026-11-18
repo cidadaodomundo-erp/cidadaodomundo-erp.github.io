@@ -36,7 +36,10 @@ const PUBLIC = join(AQUI, "..", "public");
 export const COD_STORE_TESTE = "ef2dc467-a4a8-4734-a4d7-eb3442ff3401"; // unica loja permitida (HML 93936)
 export const PAGAMENTO_CODIGO = "DIN"; // metadado de teste conferido no canal HML; nada e cobrado
 export const SENHA_INICIAL = 7001; // faixa propria dos tablets (o totem usa 92xx)
-export const STATUS = { local: "Na cozinha de teste", saipos: "Na cozinha e no Saipos (teste)", conferir: "Na cozinha · Saipos a conferir", enviando: "Na cozinha · enviando ao Saipos" };
+export const STATUS = { local: "Na cozinha de teste", saipos: "Na cozinha e no Saipos (teste)", conferir: "Na cozinha · Saipos a conferir", enviando: "Na cozinha · enviando ao Saipos", aguardandoPagamento: "Aguardando pagamento" };
+// Formas aceitas no pagamento de TESTE (simulado). Com o e.Rede liberado, o mesmo fluxo usa o checkout real.
+export const FORMAS_PAGAMENTO = { pix: "Pix", credito: "Crédito", debito: "Débito", applepay: "Apple Pay", googlepay: "Google Pay" };
+const TOKEN_PAG = /^[0-9a-f]{32}$/;
 const LIMITE_CORPO = 48 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PREPARO = ["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE"];
@@ -194,7 +197,7 @@ async function iniciarSaipos({ envPath, fetchImpl, timeoutMs }) {
 
 // ---------- paginas ----------
 
-function tabletHtml({ menu, modo, csrf, base, mesaFixa = null }) {
+function tabletHtml({ menu, modo, csrf, base, mesaFixa = null, pagarAntes = false }) {
   let html = readFileSync(join(APP, "src", "index.template.html"), "utf8");
   const dados = { ...menu, fotos: Object.fromEntries(menu.produtos.map((p) => [p.id, `/fotos/p${p.id}.webp`])) };
   const seguro = (s) => s.replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
@@ -209,9 +212,9 @@ function tabletHtml({ menu, modo, csrf, base, mesaFixa = null }) {
     ["Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.", "Pede confirmação e envia a rodada para a cozinha de teste. Nada é cobrado."],
   ];
   for (const [a, b] of trocas) html = html.replace(a, b);
-  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa }))}</script>\n<script type="application/json" id="dados">`;
+  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa, pagarAntes }))}</script>\n<script type="application/json" id="dados">`;
   html = html.replace('<script type="application/json" id="dados">', cfg);
-  const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
+  const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.qr + "\n" + base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
   for (const [k, v] of Object.entries(subst)) html = html.split(k).join(v);
   return html;
 }
@@ -231,6 +234,7 @@ function baseEstatica() {
     core: readFileSync(join(APP, "src", "core.js"), "utf8"),
     app: readFileSync(join(APP, "src", "app.js"), "utf8"),
     envio: readFileSync(join(APP, "src", "envio.js"), "utf8"),
+    qr: readFileSync(join(TOTEM_APP, "public", "vendor", "qrcode.js"), "utf8"),
   };
 }
 
@@ -241,7 +245,7 @@ const CSP = "default-src 'none'; img-src 'self' data:; font-src data:; style-src
 // modo: "local" (cozinha de teste apenas) | "saipos" (cozinha + loja TESTE do Saipos; exige envPath).
 // statePath: arquivo de estado (padrao: tablets/servidor/dados/salao-estado.json no local; ao lado do .env privado no saipos).
 // hosts: lista de "ip:porta" aceitos no cabecalho Host (padrao: 127.0.0.1/localhost na porta).
-export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET", pin, envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [] } = {}) {
+export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET", pin, envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [], pagarAntes = false } = {}) {
   if (!["local", "saipos"].includes(modo)) throw new ErroConector("MODO_INVALIDO", "Modo inválido.");
   if (!["TICKET", "TABLE"].includes(modoSaipos)) throw new ErroConector("MODO_INVALIDO", "Modo do Saipos inválido.");
   if (typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) throw new ErroConector("PIN_INVALIDO", "Senha da equipe deve ter de 4 a 8 números.");
@@ -274,6 +278,11 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     .replace("{{CFG}}", JSON.stringify({ csrf, modo: modo }))
     .replace("{{JS}}", readFileSync(join(PUBLIC, "cozinha.js"), "utf8"));
 
+  const pagarHtml = readFileSync(join(PUBLIC, "pagar.html"), "utf8")
+    .replace("{{FONTES}}", base.fontesCss)
+    .replace("{{CFG}}", JSON.stringify({ csrf }))
+    .replace("{{JS}}", readFileSync(join(PUBLIC, "pagar.js"), "utf8"));
+
   let fila = Promise.resolve();
   const serial = (fn) => { const p = fila.then(fn); fila = p.then(() => {}, () => {}); return p; };
   let filaS = Promise.resolve();
@@ -281,6 +290,16 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   const esperarSaipos = () => filaS;
 
   function respostaRodada(r) {
+    if (r.pagamento && r.pagamento.estado !== "aprovado") {
+      return { ok: true, id: r.id, status: STATUS.aguardandoPagamento, totalCentavos: r.totalCentavos,
+        mensagem: `aguardando pagamento (${C.reais(r.totalCentavos)}). A rodada só vai para a cozinha depois do pagamento aprovado.`,
+        pagamento: { estado: r.pagamento.estado, token: r.pagamento.token } };
+    }
+    const pago = r.pagamento ? `Pagamento aprovado (teste, ${FORMAS_PAGAMENTO[r.pagamento.forma]}). ` : "";
+    const fim = (x) => ({ ...x, mensagem: pago + x.mensagem, pagamento: r.pagamento ? { estado: "aprovado", forma: r.pagamento.forma } : undefined });
+    return fim(respostaBase(r));
+  }
+  function respostaBase(r) {
     let status = STATUS.local;
     let mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}). Nada foi cobrado.`;
     if (r.saipos && ["reservado", "enviando"].includes(r.saipos.estado)) { status = STATUS.enviando; mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}); enviando ao Saipos de teste. Nada foi cobrado.`; }
@@ -367,6 +386,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     if (existente) {
       if (existente.hash !== h) throw new ErroSalao(409, "Esta rodada já foi enviada com outro conteúdo.");
       if (existente.fechada) throw new ErroSalao(409, "Esta rodada é de uma conta já fechada. Toque em Confirmar de novo.");
+      if (existente.pagamento?.estado === "cancelado") throw new ErroSalao(409, "Este pagamento foi cancelado. Toque em Confirmar para começar de novo.");
       return respostaRodada(existente); // reenvio do tablet: mesma resposta, nada duplicado
     }
     const data = agora();
@@ -378,20 +398,81 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       if (hml.totalCentavos !== val.totalCentavos) throw new ErroSalao(409, "Preço do cardápio diferente da loja TESTE. Rodada não enviada.");
       hml.linhas = val.linhas;
     }
-    const chave = chaveOcupacao(val.ocupacao);
-    const aberta = estado.rodadas.find((x) => !x.fechada && chaveOcupacao(x.ocupacao) === chave);
     const r = {
       id: randomUUID(), chave: corpo.idempotencyKey, hash: h, criadoEm: data.toISOString(),
       ocupacao: val.ocupacao, numero: val.numero, itens: val.resumo, totalCentavos: val.totalCentavos,
-      preparo: "NOVO", contaId: aberta ? aberta.contaId : randomUUID(), fechada: false,
-      saipos: saipos ? { estado: "reservado", senha: estado.proximaSenha, orderId: null, modo: modoSaipos } : null,
+      preparo: "NOVO", contaId: null, fechada: false, saipos: null,
     };
-    if (saipos) estado.proximaSenha += 1;
+    if (pagarAntes) {
+      // Paga ANTES: a rodada espera o pagamento fora da cozinha e fora do Saipos.
+      r.pagamento = { estado: "aguardando", token: randomBytes(16).toString("hex"), forma: null, tentativas: 0 };
+      r.itensCliente = corpo.itens; // para remontar o pedido do Saipos quando o pagamento for aprovado
+      estado.rodadas.push(r);
+      await salvar();
+      return respostaRodada(r);
+    }
+    liberar(r, hml);
     estado.rodadas.push(r);
     await salvar(); // uma gravacao so: rodada + reserva do Saipos. A cozinha ja ve a rodada.
-    // Saipos fora da fila principal: o tablet recebe a resposta na hora; o envio segue numa fila propria.
-    if (saipos) filaSaipos(() => enviarSaipos(r, hml).catch(() => { r.saipos.estado = "ambiguo"; return salvar(); }));
+    if (saipos) agendarSaipos(r, hml);
     return respostaRodada(r);
+  }
+
+  // Rodada entra na conta da mesa e reserva a ficha do Saipos (sem gravar; quem chama grava).
+  function liberar(r, hml) {
+    const chave = chaveOcupacao(r.ocupacao);
+    const aberta = estado.rodadas.find((x) => x !== r && naCozinha(x) && !x.fechada && chaveOcupacao(x.ocupacao) === chave);
+    r.contaId = aberta ? aberta.contaId : randomUUID();
+    if (saipos && hml) { r.saipos = { estado: "reservado", senha: estado.proximaSenha, orderId: null, modo: modoSaipos }; estado.proximaSenha += 1; }
+  }
+  // Saipos fora da fila principal: o tablet recebe a resposta na hora; o envio segue numa fila propria.
+  function agendarSaipos(r, hml) {
+    if (r.saipos) filaSaipos(() => enviarSaipos(r, hml).catch(() => { r.saipos.estado = "ambiguo"; return salvar(); }));
+  }
+  const naCozinha = (r) => !r.pagamento || r.pagamento.estado === "aprovado";
+
+  // ---------- pagamento (TESTE: simulado; nada e cobrado) ----------
+  const porToken = (t) => {
+    if (!TOKEN_PAG.test(String(t ?? ""))) throw new ErroSalao(404, "Pagamento não encontrado.");
+    const r = estado.rodadas.find((x) => x.pagamento && x.pagamento.token === t);
+    if (!r) throw new ErroSalao(404, "Pagamento não encontrado.");
+    return r;
+  };
+  function verPagamento(t) {
+    const r = porToken(t);
+    return { ok: true, estado: r.pagamento.estado, forma: r.pagamento.forma, totalCentavos: r.totalCentavos, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero,
+      itens: r.itens.map((i) => ({ quantidade: i.quantidade, nome: i.nome })), simulado: true, rodada: r.pagamento.estado === "aprovado" ? respostaRodada(r) : null };
+  }
+  async function simularPagamento(corpo) {
+    if (!so(corpo, ["token", "forma", "resultado"]) || !(corpo.forma in FORMAS_PAGAMENTO) || !["aprovado", "recusado"].includes(corpo.resultado)) throw bad("Pagamento inválido.");
+    const r = porToken(corpo.token);
+    const p = r.pagamento;
+    if (p.estado === "aprovado") return verPagamento(corpo.token); // pagar de novo nunca cobra duas vezes
+    if (p.estado === "cancelado") throw new ErroSalao(409, "Este pagamento foi cancelado na mesa.");
+    p.tentativas += 1;
+    if (corpo.resultado === "recusado") { p.estado = "recusado"; p.forma = corpo.forma; await salvar(); return verPagamento(corpo.token); }
+    // Aprovado: confere o pedido de novo (com a hora em que foi feito) e so entao libera cozinha e Saipos.
+    let hml = null;
+    if (saipos) {
+      const data = new Date(r.criadoEm);
+      const val = validarRodada(cardapio, { idempotencyKey: r.chave, ocupacao: r.ocupacao, numero: r.numero, itens: r.itensCliente }, data, permitidos);
+      hml = validarCarrinho(saipos.ctx, { idempotencyKey: r.chave, itens: val.linhas.map((l) => ({ produto: l.produto, variacao: l.variacao, quantidade: l.quantidade, opcoes: l.opcoes })) }, data);
+      hml.linhas = val.linhas;
+    }
+    p.estado = "aprovado"; p.forma = corpo.forma; p.pagoEm = agora().toISOString();
+    r.criadoEm = p.pagoEm; // na cozinha conta a partir do pagamento
+    liberar(r, hml);
+    delete r.itensCliente;
+    await salvar();
+    agendarSaipos(r, hml);
+    return verPagamento(corpo.token);
+  }
+  async function cancelarPagamento(corpo) {
+    if (!so(corpo, ["token"])) throw bad("Pedido inválido.");
+    const r = porToken(corpo.token);
+    if (r.pagamento.estado === "aprovado") throw new ErroSalao(409, "Este pagamento já foi aprovado; a rodada está na cozinha.");
+    if (r.pagamento.estado !== "cancelado") { r.pagamento.estado = "cancelado"; r.fechada = true; r.fechadaEm = agora().toISOString(); delete r.itensCliente; await salvar(); }
+    return { ok: true, mensagem: "Pagamento cancelado. Nada foi cobrado; o carrinho continua no tablet." };
   }
 
   async function novoAviso(corpo) {
@@ -406,9 +487,9 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   }
 
   // Conta aberta = rodadas ainda nao fechadas da mesa/comanda (por marca na rodada, nunca por relogio).
-  const rodadasAbertas = (chave) => estado.rodadas.filter((r) => !r.fechada && chaveOcupacao(r.ocupacao) === chave);
+  const rodadasAbertas = (chave) => estado.rodadas.filter((r) => naCozinha(r) && !r.fechada && chaveOcupacao(r.ocupacao) === chave);
   function mesasAbertas() {
-    const chaves = [...new Set(estado.rodadas.filter((r) => !r.fechada).map((r) => chaveOcupacao(r.ocupacao)))];
+    const chaves = [...new Set(estado.rodadas.filter((r) => naCozinha(r) && !r.fechada).map((r) => chaveOcupacao(r.ocupacao)))];
     return chaves.map((chave) => {
       const rs = rodadasAbertas(chave);
       if (!rs.length) return null;
@@ -444,8 +525,13 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     if (!cozinha) conferirPin(corpo.pin, ip);
     const o = lerChaveOcupacao(corpo.ocupacao);
     const chave = chaveOcupacao(o);
+    const em0 = agora().toISOString();
+    let cancelou = false;
+    for (const r of estado.rodadas) if (r.pagamento && ["aguardando", "recusado"].includes(r.pagamento.estado) && chaveOcupacao(r.ocupacao) === chave) {
+      r.pagamento.estado = "cancelado"; r.fechada = true; r.fechadaEm = em0; delete r.itensCliente; cancelou = true;
+    }
     const rs = rodadasAbertas(chave);
-    if (!rs.length) return { ok: true, mensagem: "Não havia conta aberta." };
+    if (!rs.length) { if (cancelou) await salvar(); return { ok: true, mensagem: "Não havia conta aberta." }; }
     const em = agora().toISOString();
     for (const r of rs) { r.fechada = true; r.fechadaEm = em; if (r.preparo !== "ENTREGUE") { r.preparo = "ENTREGUE"; r.entregueEm = em; } }
     estado.fechamentos.push({ chave, contaId: rs[0].contaId, em, rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0) });
@@ -467,17 +553,22 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   function arquivar() {
     const limite = agora().getTime() - 2 * 86400e3;
     const antes = estado.rodadas.length;
-    estado.rodadas = estado.rodadas.filter((r) => !r.fechada || Date.parse(r.fechadaEm ?? r.criadoEm) > limite);
+    const limitePag = agora().getTime() - 86400e3; // pagamento abandonado (nao aprovado) some depois de 1 dia
+    estado.rodadas = estado.rodadas.filter((r) => (r.pagamento && r.pagamento.estado !== "aprovado")
+      ? Date.parse(r.criadoEm) > limitePag
+      : !r.fechada || Date.parse(r.fechadaEm ?? r.criadoEm) > limite);
     return antes !== estado.rodadas.length;
   }
   if (arquivar()) await salvar();
 
   function painel() {
-    const ativos = estado.rodadas.filter((r) => r.preparo !== "ENTREGUE");
-    const entregues = estado.rodadas.filter((r) => r.preparo === "ENTREGUE").slice(-10);
+    const visiveis = estado.rodadas.filter(naCozinha);
+    const ativos = visiveis.filter((r) => r.preparo !== "ENTREGUE").sort((a, b) => a.criadoEm.localeCompare(b.criadoEm));
+    const entregues = visiveis.filter((r) => r.preparo === "ENTREGUE").slice(-10);
     const pub = (r) => ({
       id: r.id, criadoEm: r.criadoEm, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, itens: r.itens, totalCentavos: r.totalCentavos,
       preparo: r.preparo, saipos: r.saipos ? { estado: r.saipos.estado, ficha: r.saipos.senha } : null,
+      pago: r.pagamento ? FORMAS_PAGAMENTO[r.pagamento.forma] : null,
     });
     return {
       modo, agora: agora().toISOString(),
@@ -489,7 +580,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
 
   async function acaoCozinha(id, acao) {
     const r = estado.rodadas.find((x) => x.id === id);
-    if (!r) throw new ErroSalao(404, "Rodada não encontrada.");
+    if (!r || !naCozinha(r)) throw new ErroSalao(404, "Rodada não encontrada.");
     const alvo = { preparando: "PREPARANDO", pronto: "PRONTO", entregue: "ENTREGUE" }[acao];
     if (PREPARO.indexOf(alvo) < PREPARO.indexOf(r.preparo)) throw new ErroSalao(409, "A rodada já passou desta etapa.");
     if (r.preparo !== alvo) { r.preparo = alvo; r[`${acao}Em`] = agora().toISOString(); await salvar(); }
@@ -519,8 +610,10 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
         if (url.pathname === "/" || url.pathname === "/tablet") {
           const mesaFixa = url.searchParams.has("mesa") ? C.normalizarMesa(url.searchParams.get("mesa")) : null;
           if (url.searchParams.has("mesa") && mesaFixa === null) return enviar(400, "Mesa inválida no endereço (use /tablet?mesa=1 a 150).", "text/plain; charset=utf-8");
-          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
+          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa, pagarAntes }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         }
+        if (url.pathname === "/api/pagamento") return enviar(200, verPagamento(url.searchParams.get("t")));
+        if (url.pathname === "/pagar") { porToken(url.searchParams.get("t")); return enviar(200, pagarHtml, "text/html; charset=utf-8", { "Content-Security-Policy": CSP }); }
         if (url.pathname === "/api/tablet/estado") return enviar(200, estadoTablet(url.searchParams.get("ids")));
         if (url.pathname === "/cozinha") return enviar(200, cozinhaHtml, "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         if (url.pathname === "/api/cozinha") return ehCozinha(req) ? enviar(200, painel()) : enviar(401, { ok: false, mensagem: "Digite a senha da equipe." });
@@ -549,6 +642,8 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       try { corpo = JSON.parse(Buffer.concat(partes).toString("utf8") || "null"); } catch { return enviar(400, { ok: false, mensagem: "JSON inválido." }); }
       let m;
       if (url.pathname === "/api/rodada") return enviar(200, await serial(() => novaRodada(corpo)));
+      if (url.pathname === "/api/pagamento/simular") return enviar(200, await serial(() => simularPagamento(corpo)));
+      if (url.pathname === "/api/pagamento/cancelar") return enviar(200, await serial(() => cancelarPagamento(corpo)));
       if (url.pathname === "/api/aviso") return enviar(200, await serial(() => novoAviso(corpo)));
       const ip = req.socket.remoteAddress ?? "?";
       if (url.pathname === "/api/equipe/pin") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin, ip); return enviar(200, { ok: true }); }
@@ -564,7 +659,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       return enviar(500, { ok: false, mensagem: "Erro interno. A rodada pode não ter sido registrada; confira na cozinha." });
     }
   });
-  server.salao = { estado, caminhoEstado, permitidos, cardapio, modoSaipos, esperarSaipos, cozinhaToken: estado.cozinhaToken };
+  server.salao = { pagarAntes, estado, caminhoEstado, permitidos, cardapio, modoSaipos, esperarSaipos, cozinhaToken: estado.cozinhaToken };
   return server;
 }
 

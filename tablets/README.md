@@ -18,6 +18,8 @@ O cardápio é a cópia do cadastro do totem (Gama/VNDX, 11/11/2026, 93 produtos
 Passo a passo simples para a equipe: [COMO-LIGAR-OS-TABLETS.md](COMO-LIGAR-OS-TABLETS.md) (atalhos `LIGAR-SALAO-TESTE.bat` e `LIGAR-SALAO-SAIPOS-TESTE.bat`).
 
 ## Recursos de salão
+- **Paga antes (padrão):** ao confirmar, o tablet abre a tela de pagamento (QR Code para pagar no celular, ou Pix/Apple Pay/Google Pay/crédito/débito no próprio tablet). A rodada só vai para a cozinha e para o Saipos depois do pagamento **aprovado**. Recusado: tenta de novo; cancelado: nada é enviado e o carrinho fica. Pagar duas vezes não cobra nem duplica. **Hoje o pagamento é SIMULADO**; o real depende do e.Rede liberado pela Rede. `--pagar-na-saida` volta ao jeito antigo (paga no fim, na conta).
+- Celular do cliente: `/pagar?t=<código>` (o QR leva até lá). No teste o celular precisa estar no Wi-Fi do salão; com o e.Rede o QR abre o checkout da Rede na internet.
 - `/tablet?mesa=N` prende o tablet na mesa N. Trocar a mesa e fechar a conta no tablet pedem a **senha da equipe** (`SALAO_PIN` ou gerada no 1º uso em `servidor/dados/pin-equipe.txt`; 5 erros bloqueiam 1 minuto).
 - Tablet mostra o andamento de cada rodada (Recebida, Preparando, Pronta, Entregue) e se libera sozinho quando a cozinha fecha a conta.
 - `/cozinha`: só abre com a senha da equipe (vira um token guardado no aparelho). Fila de rodadas, avisos de atendente/conta, contas abertas com "Fechar conta".
@@ -53,7 +55,7 @@ No Windows (PowerShell): `$env:CONNECTOR_ENV_PATH="C:\...\.env"` antes do comand
 ## Testes (sem rede, Saipos simulado)
 ```
 cd tablets/app && node --test tests/*.mjs        # 50 (núcleo, Goomer, payload mesa/comanda)
-cd tablets/servidor && node --test test/salao.test.js   # 14 (fluxo, senha, conta, login da cozinha, segurança, Saipos FAKE ficha e mesa)
+cd tablets/servidor && node --test test/salao.test.js   # 16 (fluxo, pagar antes, senha, conta, login da cozinha, segurança, Saipos FAKE ficha e mesa)
 ```
 HTML avulso (demonstração sem envio, cardápio inteiro): `node tablets/app/tools/build.mjs --completo`.
 
@@ -64,3 +66,4 @@ HTML avulso (demonstração sem envio, cardápio inteiro): `node tablets/app/too
 4. **Teste no Redmi Pad SE** de verdade e modo quiosque (tela cheia, abrir sozinho).
 5. Computador fixo ligado no salão (servidor) e Wi-Fi dos tablets.
 6. Pedir conta vai só para a tela da equipe; fechar/pagar conta não existe na API do Saipos.
+7. **Pagamento real (e.Rede)**: Rede liberar o e.Rede com Apple Pay/Google Pay e informar a taxa; depois trocar o simulado pelo checkout do e.Rede e lançar a forma de pagamento certa no Saipos.

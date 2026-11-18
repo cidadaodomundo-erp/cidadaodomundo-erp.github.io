@@ -6,7 +6,7 @@ import http from "node:http";
 import { mkdtemp, writeFile, readFile, rm, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { criarServidorSalao, notaSaipos, SENHA_INICIAL, STATUS, COD_STORE_TESTE } from "../src/salao.js";
+import { criarServidorSalao, notaSaipos, SENHA_INICIAL, STATUS, COD_STORE_TESTE, FORMAS_PAGAMENTO } from "../src/salao.js";
 import { dtoFixtureV2, catalogoHmlV2, mapaFixtureV2, itemBurger, itemCerveja, TOTAL_REFERENCIA, AS_12H, AS_01H } from "../../../totem/app/test/fixture-cardapio.js";
 
 const SEGREDO = "FAKE-SECRET-aaaa1111";
@@ -39,7 +39,7 @@ function criarFetch({ ordem } = {}) {
 }
 
 const PIN = "4321";
-async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos = "TICKET" } = {}) {
+async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos = "TICKET", pagarAntes = false } = {}) {
   if (!dir) {
     dir = await mkdtemp(join(tmpdir(), "salao-test-"));
     dirs.push(dir);
@@ -57,7 +57,7 @@ async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos =
   const f = criarFetch({ ordem });
   const server = await criarServidorSalao({
     modo, modoSaipos, pin: PIN, envPath: modo === "saipos" ? join(dir, "priv", ".env") : undefined, fetchImpl: f, timeoutMs: 300,
-    gamaPath: join(dir, "gama.json"), fotosDir: join(dir, "fotos"), statePath: modo === "local" ? join(dir, "estado.json") : undefined, agora: () => relogio.t,
+    gamaPath: join(dir, "gama.json"), fotosDir: join(dir, "fotos"), statePath: modo === "local" ? join(dir, "estado.json") : undefined, agora: () => relogio.t, pagarAntes,
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   servers.push(server);
@@ -318,4 +318,68 @@ test("saipos TABLE (FAKE): recusa 4xx fica 'a conferir' e nao reenvia", async ()
   assert.equal((await post(s, "/api/rodada", rodada(60, [itemCerveja()]))).json.status, STATUS.conferir);
   assert.equal(s.f.pedidos().length, 1);
   assert.equal((await painelDe(s)).json.rodadas[0].saipos.estado, "recusado");
+});
+
+test("paga antes: rodada so vai para a cozinha e o Saipos depois do pagamento aprovado; pagar 2x nao duplica", async () => {
+  const s = await subir({ modo: "saipos", pagarAntes: true });
+  assert.match(s.pagina.texto, /"pagarAntes":true/);
+  const r = await post(s, "/api/rodada", rodada(80, [itemBurger({ obs: "sem picles" }), itemCerveja()]));
+  assert.equal(r.status, 200, r.texto);
+  assert.equal(r.json.status, STATUS.aguardandoPagamento);
+  const t = r.json.pagamento.token;
+  assert.match(t, /^[0-9a-f]{32}$/);
+  await s.esperar();
+  assert.equal(s.f.pedidos().length, 0, "nada no Saipos antes de pagar");
+  assert.equal((await painelDe(s)).json.rodadas.length, 0, "nada na cozinha antes de pagar");
+  assert.equal((await postC(s, `/api/cozinha/rodada/${r.json.id}/pronto`, {})).status, 404, "cozinha nao mexe em rodada nao paga");
+  // reenvio da mesma rodada: mesmo pagamento
+  assert.equal((await post(s, "/api/rodada", rodada(80, [itemBurger({ obs: "sem picles" }), itemCerveja()]))).json.pagamento.token, t);
+  // pagina do celular
+  assert.equal((await chamar(s.porta, { caminho: `/pagar?t=${t}` })).status, 200);
+  assert.equal((await chamar(s.porta, { caminho: "/pagar?t=" + "0".repeat(32) })).status, 404);
+  const v = (await chamar(s.porta, { caminho: `/api/pagamento?t=${t}` })).json;
+  assert.equal(v.estado, "aguardando"); assert.equal(v.totalCentavos, TOTAL_REFERENCIA); assert.equal(v.rotulo, "MESA 7");
+  assert.ok(!JSON.stringify(v).includes("501"), "sem codigo Saipos na tela do celular");
+  // recusado: continua fora da cozinha
+  assert.equal((await post(s, "/api/pagamento/simular", { token: t, forma: "credito", resultado: "recusado" })).json.estado, "recusado");
+  assert.equal((await painelDe(s)).json.rodadas.length, 0);
+  // sem csrf (outro site) nao paga
+  assert.equal((await post(s, "/api/pagamento/simular", { token: t, forma: "pix", resultado: "aprovado" }, { "x-cdm-csrf": "x" })).status, 403);
+  // aprovado: cozinha + Saipos
+  const a = await post(s, "/api/pagamento/simular", { token: t, forma: "applepay", resultado: "aprovado" });
+  assert.equal(a.json.estado, "aprovado");
+  await s.esperar();
+  assert.equal(s.f.pedidos().length, 1);
+  const p = (await painelDe(s)).json;
+  assert.equal(p.rodadas.length, 1);
+  assert.equal(p.rodadas[0].pago, FORMAS_PAGAMENTO.applepay);
+  assert.deepEqual(p.mesas.map((m) => m.totalCentavos), [TOTAL_REFERENCIA]);
+  // pagar de novo e reenviar: nada duplica
+  await post(s, "/api/pagamento/simular", { token: t, forma: "pix", resultado: "aprovado" });
+  const fim = await post(s, "/api/rodada", rodada(80, [itemBurger({ obs: "sem picles" }), itemCerveja()]));
+  assert.equal(fim.json.status, STATUS.saipos);
+  assert.match(fim.json.mensagem, /Pagamento aprovado \(teste, Apple Pay\)/);
+  await s.esperar();
+  assert.equal(s.f.pedidos().length, 1);
+  assert.equal((await painelDe(s)).json.rodadas.length, 1);
+  assert.equal((await post(s, "/api/pagamento/cancelar", { token: t })).status, 409, "pago nao cancela");
+});
+
+test("paga antes: cancelar na mesa nao manda nada; fechar a conta cancela pagamento esquecido; reinicio mantem", async () => {
+  const s = await subir({ pagarAntes: true });
+  const r = await post(s, "/api/rodada", rodada(90, [itemCerveja()]));
+  const t = r.json.pagamento.token;
+  assert.equal((await post(s, "/api/pagamento/cancelar", { token: t })).json.ok, true);
+  assert.equal((await post(s, "/api/pagamento/simular", { token: t, forma: "pix", resultado: "aprovado" })).status, 409);
+  assert.equal((await post(s, "/api/rodada", rodada(90, [itemCerveja()]))).status, 409, "chave do pagamento cancelado nao volta");
+  assert.equal((await painelDe(s)).json.rodadas.length, 0);
+  // pagamento esquecido + conta paga de outra rodada; reinicio no meio
+  const r2 = await post(s, "/api/rodada", rodada(91, [itemCerveja()]));
+  await post(s, "/api/pagamento/simular", { token: r2.json.pagamento.token, forma: "pix", resultado: "aprovado" });
+  const r3 = await post(s, "/api/rodada", rodada(92, [itemCerveja()], { numero: 2 }));
+  const s2 = await subir({ dir: s.dir, pagarAntes: true });
+  assert.equal((await chamar(s2.porta, { caminho: `/api/pagamento?t=${r3.json.pagamento.token}` })).json.estado, "aguardando");
+  assert.deepEqual((await painelDe(s2)).json.mesas.map((m) => m.rodadas), [1]);
+  assert.equal((await postC(s2, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7" })).json.ok, true);
+  assert.equal((await chamar(s2.porta, { caminho: `/api/pagamento?t=${r3.json.pagamento.token}` })).json.estado, "cancelado");
 });

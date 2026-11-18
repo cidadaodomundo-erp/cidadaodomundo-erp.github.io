@@ -391,8 +391,16 @@
       if (!ok) { msg("Registro cancelado. O carrinho foi mantido."); return; }
       if (ENVIO) {
         msg("Enviando a rodada para a cozinha…");
-        const res = await ENVIO.enviarRodada({ ocupacao: C.ocupacaoAtual(estado), numero: estado.rodadas.length + 1, itens: estado.carrinho });
+        let res = await ENVIO.enviarRodada({ ocupacao: C.ocupacaoAtual(estado), numero: estado.rodadas.length + 1, itens: estado.carrinho });
         if (!res.ok) { msg(res.mensagem); return; } // carrinho mantido; tocar de novo reenvia com a MESMA chave (sem duplicar)
+        if (res.aguardandoPagamento) {
+          // Paga ANTES: so depois do pagamento aprovado a rodada vai para a cozinha (e o carrinho vira rodada aqui).
+          msg("Escolha como pagar. A rodada vai para a cozinha assim que o pagamento for aprovado.");
+          const fim = await telaPagamento(res);
+          if (!fim.ok) { msg(fim.mensagem); return; }
+          ENVIO.limparPendente();
+          res = fim.res;
+        }
         const r = C.confirmarRodada(ix, estado);
         if (r) {
           if (C.STATUS_VALIDOS.includes(res.status)) r.status = res.status;
@@ -581,12 +589,95 @@
       inp.focus();
     });
   }
+  // ---------- pagamento antes da cozinha (TESTE: simulado; QR para pagar no celular) ----------
+  function desenharQr(texto) {
+    if (typeof window.qrcode !== "function") return null;
+    const qr = window.qrcode(0, "M");
+    qr.addData(texto);
+    qr.make();
+    const n = qr.getModuleCount();
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `-4 -4 ${n + 8} ${n + 8}`);
+    svg.setAttribute("class", "qr");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "QR Code para pagar no celular");
+    const fundo = document.createElementNS(NS, "rect");
+    fundo.setAttribute("x", "-4"); fundo.setAttribute("y", "-4");
+    fundo.setAttribute("width", String(n + 8)); fundo.setAttribute("height", String(n + 8)); fundo.setAttribute("fill", "#fff");
+    svg.appendChild(fundo);
+    let d = "";
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d); path.setAttribute("fill", "#111");
+    svg.appendChild(path);
+    return svg;
+  }
+  const FORMAS_PAG = [["pix", "Pix"], ["applepay", "Apple Pay"], ["googlepay", "Google Pay"], ["credito", "Crédito"], ["debito", "Débito"]];
+  let dlgPag = null;
+  function telaPagamento(res) {
+    if (!dlgPag) { dlgPag = el("dialog"); dlgPag.id = "dlgPag"; document.body.appendChild(dlgPag); }
+    dlgPag.textContent = "";
+    const box = el("div", "pag");
+    box.appendChild(el("h2", "cubano", "PAGAR A RODADA"));
+    box.appendChild(el("p", "pag-total cubano", reais(res.totalCentavos)));
+    box.appendChild(el("p", "pequeno", `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. A rodada vai para a cozinha assim que o pagamento for aprovado. TESTE: nada é cobrado.`));
+    const cols = el("div", "pag-cols");
+    const qrBox = el("div", "pag-qr");
+    const qr = desenharQr(`${location.origin}/pagar?t=${res.token}`);
+    if (qr) qrBox.appendChild(qr);
+    qrBox.appendChild(el("p", "pequeno", "Pague pelo celular: aponte a câmera para o QR Code."));
+    const botoes = el("div", "pag-formas");
+    botoes.appendChild(el("p", "pequeno", "Ou pague aqui no tablet:"));
+    for (const [forma, nome] of FORMAS_PAG) { const b = el("button", "btn prim", nome); b.type = "button"; b.dataset.forma = forma; botoes.appendChild(b); }
+    const recusa = el("button", "btn sec", "Simular recusado (teste)"); recusa.type = "button"; recusa.dataset.forma = "credito"; recusa.dataset.recusar = "1";
+    botoes.appendChild(recusa);
+    cols.append(qrBox, botoes);
+    const st = el("p", "aviso pag-status"); st.setAttribute("role", "status");
+    const cancelar = el("button", "btn sec", "Cancelar pagamento"); cancelar.type = "button";
+    box.append(cols, st, cancelar);
+    dlgPag.appendChild(box);
+    return new Promise((ok) => {
+      let acabou = false, ocupado = false;
+      const sair = (v) => { if (acabou) return; acabou = true; clearInterval(timer); fechar(dlgPag); ok(v); };
+      const tratar = (j) => {
+        if (!j) return;
+        if (j.estado === "aprovado" && j.rodada) sair({ ok: true, res: j.rodada });
+        else if (j.estado === "cancelado") { ENVIO.limparPendente(); sair({ ok: false, mensagem: "Pagamento cancelado. Nada foi cobrado; o carrinho continua aqui." }); }
+        else if (j.estado === "recusado") st.textContent = "Pagamento recusado. Escolha outra forma ou tente de novo.";
+      };
+      botoes.addEventListener("click", async (ev) => {
+        const b = ev.target.closest("button");
+        if (!b || ocupado) return;
+        ocupado = true;
+        for (const x of botoes.querySelectorAll("button")) x.disabled = true;
+        st.textContent = "Processando o pagamento…";
+        const j = await ENVIO.simularPagamento(res.token, b.dataset.forma, b.dataset.recusar ? "recusado" : "aprovado");
+        if (j && j.ok === false) st.textContent = j.mensagem; else tratar(j);
+        ocupado = false;
+        for (const x of botoes.querySelectorAll("button")) x.disabled = false;
+      });
+      cancelar.addEventListener("click", async () => {
+        if (ocupado) return;
+        ocupado = true;
+        const r = await ENVIO.cancelarPagamento(res.token);
+        ocupado = false;
+        if (r.ok) sair({ ok: false, mensagem: r.mensagem });
+        else { st.textContent = r.mensagem; tratar(await ENVIO.pagamento(res.token)); }
+      });
+      dlgPag.addEventListener("cancel", (ev) => ev.preventDefault(), { once: false }); // Esc nao fecha: use "Cancelar pagamento"
+      const timer = setInterval(async () => { if (!ocupado && !acabou) tratar(await ENVIO.pagamento(res.token)); }, 2000);
+      abrir(dlgPag);
+    });
+  }
+
   if (ENVIO) {
     // Tablet preso a uma mesa pelo endereco (/tablet?mesa=5): so vale com a comanda vazia.
     if (ENVIO.mesaFixa && C.comandaVazia(estado) && !(estado.modalidade === "mesa" && estado.mesa === ENVIO.mesaFixa)) {
       try { C.definirOcupacao(estado, "mesa", ENVIO.mesaFixa); salvar(); } catch { /* mantem */ }
     }
     $("btnFechar").textContent = "Fechar conta (equipe)";
+    if (ENVIO.pagarAntes && ENVIO.temPendente() && estado.carrinho.length) msg("Há uma rodada esperando pagamento. Toque em Confirmar para continuar.");
     // Andamento das rodadas e fechamento feito pela equipe (tela da cozinha/caixa)
     let consultando = false;
     const consultar = async () => {

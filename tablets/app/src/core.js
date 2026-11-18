@@ -10,7 +10,7 @@
   const LIM = { maxQuantidade: 20, maxObservacao: 140, maxLinhasCarrinho: 40, mesaMin: 1, mesaMax: 150, mesaInicial: 12, maxSimulacoes: 50 };
   const STATUS_RODADA = "Registrado nesta demonstração";
   // Status vindos do servidor do salao (modo teste). Qualquer outro valor volta a STATUS_RODADA ao recarregar.
-  const STATUS_VALIDOS = [STATUS_RODADA, "Na cozinha de teste", "Na cozinha e no Saipos (teste)", "Na cozinha · Saipos a conferir", "Na cozinha · enviando ao Saipos"];
+  const STATUS_VALIDOS = [STATUS_RODADA, "Na cozinha de teste", "Na cozinha e no Saipos (teste)", "Na cozinha · Saipos a conferir", "Na cozinha · enviando ao Saipos", "Aguardando pagamento"];
 
   const reais = (c) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const inteiro = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;
