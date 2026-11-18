@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>As 6 entregas</title>
+<!-- Retrato das 6 entregas até 31/12, lido AO VIVO de plano_retrato_entrega e transicao_itens (RLS pode_ver_plano:
+     só Neto e Fabio). Nenhum número mora neste arquivo. Feita pelo chat "Plano de saída e Junção" em 18/11/2026
+     (Organizador 03:20; regra do dono 13/11: ao Fabio, página visual travada só para Neto e Fabio). Destino: docs/retrato-entregas.html.
+     Mesma sessão do painel (localStorage 'rmbSessao'); nunca renova o token (o refresh_token é de uso único). -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .placar { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 1.2rem; }
+  .placar span { padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:600; }
+  .f-PRONTO { background:var(--ok-fundo); color:var(--ok); } .f-ANDA { background:var(--anda-fundo); color:var(--anda); }
+  .f-RISCO, .f-PARADO { background:var(--acento-fundo); color:var(--acento); }
+  .ent { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:14px 16px; margin-bottom:12px; }
+  .ent.b-PRONTO { border-left:5px solid var(--ok); } .ent.b-ANDA { border-left:5px solid var(--anda); }
+  .ent.b-RISCO, .ent.b-PARADO { border-left:5px solid var(--acento); }
+  .topo { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
+  .tit { font-weight:700; font-size:1.05rem; }
+  .ref { font-size:.75rem; color:var(--mudo); }
+  .diss { font-size:.82rem; color:var(--mudo); font-style:italic; margin:.2rem 0 .5rem; }
+  .bl { margin:.45rem 0 0; font-size:.92rem; }
+  .bl b { display:inline-block; min-width:64px; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--mudo); }
+  .bl.semdono { color:var(--acento); } .bl.semdono b { color:var(--acento); }
+  details > summary { cursor:pointer; color:var(--mudo); font-size:.8rem; margin-top:.5rem; }
+  .card { border-top:1px solid var(--linha); padding:6px 0; font-size:.85rem; color:var(--suave); }
+  .card i { color:var(--mudo); font-style:normal; font-size:.75rem; }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  @media (max-width:520px) { h1 { font-size:1.45rem; } .bl b { display:block; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app');
+const FAROL = { PRONTO: 'Pronto', ANDA: 'Andando', RISCO: 'Em risco', PARADO: 'Parado' };
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dataBR = d => d ? String(d).slice(8,10) + '/' + String(d).slice(5,7) : '';
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">As 6 entregas</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:((t) => { t = String(t || '').trim(); return !t || t.includes('@') ? t : t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br'; })(document.getElementById('e').value), password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+
+async function ler(q, s) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } });
+  if (r.status === 401) throw new Error('401');
+  return r.ok ? r.json() : [];
+}
+
+async function carregar() {
+  const s = sessaoValida();
+  if (!s) return telaLogin();
+  let E, C;
+  try { [E, C] = await Promise.all([ler('plano_retrato_entrega?select=*&order=ordem', s),
+                                    ler('vw_juncao_desenvolvimento?select=chave,titulo,estado,andamento,andamento_em', s)]); }
+  catch (e) { return telaLogin('Sessão vencida, entre de novo.'); }
+  if (!E.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (é só do Neto e do Fabio).</p>
+      <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  const porChave = {}; (C || []).forEach(c => { porChave[c.chave] = c; });
+  const conta = Object.keys(FAROL).map(k => [k, E.filter(e => e.farol === k).length]).filter(([, n]) => n);
+  const ult = E.map(e => e.atualizado_em).sort().pop();
+  app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · até 31/12/2026</p><h1>As 6 entregas</h1>
+    <p class="lede">O que está pronto, o que anda e o que falta em cada entrega que o Neto assumiu até a saída.</p>
+    <div class="placar">${conta.map(([k, n]) => `<span class="f-${k}">${n} ${FAROL[k].toLowerCase()}</span>`).join('')}</div>
+    ${E.map(e => {
+      const cards = (e.cards || []).map(id => porChave[id.startsWith('juncao:') ? id : 'plano:' + id]).filter(Boolean);
+      return `<div class="ent b-${esc(e.farol)}"><div class="topo"><span class="tit">${e.ordem}. ${esc(e.entrega)}</span>
+        <span class="f-${esc(e.farol)}" style="padding:1px 8px;border-radius:999px;font-size:.75rem;font-weight:600;">${esc(FAROL[e.farol] || e.farol)}</span>
+        ${e.referencia ? `<span class="ref">${esc(e.referencia)}</span>` : ''}</div>
+        <p class="diss">"${esc(e.palavras_dono)}"</p>
+        <p class="bl"><b>Pronto</b>${esc(e.pronto)}</p>
+        <p class="bl"><b>Andando</b>${esc(e.anda)}</p>
+        <p class="bl"><b>Falta</b>${esc(e.falta)}</p>
+        ${e.sem_dono ? `<p class="bl semdono"><b>Sem dono</b>${esc(e.sem_dono)}</p>` : ''}
+        ${cards.length ? `<details><summary>os cards desta entrega (${cards.length})</summary>${cards.map(c =>
+          `<div class="card">${esc(c.titulo)} <i>· ${c.andamento_em ? 'andou ' + dataBR(c.andamento_em) : 'sem andamento'}</i></div>`).join('')}</details>` : ''}
+      </div>`; }).join('')}
+    <footer>Atualizado em ${ult ? new Date(ult).toLocaleString('pt-BR', { timeZone:'America/Sao_Paulo', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''}.
+      Detalhe de cada card nos Desenvolvimentos da agenda. <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+carregar();
+</script>
+</body>
+</html>

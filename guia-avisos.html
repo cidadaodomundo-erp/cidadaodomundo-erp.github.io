@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Guia dos avisos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Guia dos avisos do robô para a equipe (Avisos 18/11/2026, molde da admissão; pedido do dono no #647). Uma coluna, 5 passos. */
+:root{
+  --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --line:#e3e1da; --tx:#1d1d1b; --tx-2:#5f5e58;
+  --voce:#2f6f8f; --hellen:#7a4e9b; --robo:#3f7d4e; --contab:#9a6a1f; --atencao:#a8741a;
+  --f-titulo:"Space Grotesk",system-ui,sans-serif; --f-texto:"Inter",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --voce:#6fb0d0; --hellen:#b994d6; --robo:#7fbf8c; --contab:#d9a85a; --atencao:#d9a85a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --voce:#6fb0d0; --hellen:#b994d6; --robo:#7fbf8c; --contab:#d9a85a; --atencao:#d9a85a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f-texto);font-size:16px;line-height:1.5}
+.pg{max-width:720px;margin:0 auto;padding:28px 16px 48px;display:grid;gap:24px}
+h1,h2{font-family:var(--f-titulo);text-wrap:balance;margin:0}
+h1{font-size:1.8rem}
+h2{font-size:1.1rem}
+.sub{color:var(--tx-2);margin:6px 0 0}
+.quem{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2)}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.passos{list-style:none;margin:0;padding:0}
+.passo{display:grid;grid-template-columns:34px 1fr;gap:14px;position:relative;padding-bottom:18px}
+.passo:not(:last-child)::before{content:"";position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--line)}
+.n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-titulo);font-weight:700;color:var(--surface);background:var(--c)}
+.cx{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:6px}
+.topo{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.quando{font-size:.8rem;color:var(--tx-2)}
+.cx ul,.cx ol{margin:0;padding-left:20px;display:grid;gap:3px}
+.caminho{font-size:.85rem;font-weight:600;color:var(--tx-2)}
+.alerta{border:2px solid var(--atencao);border-radius:8px;background:var(--surface);padding:12px 14px}
+.alerta b{color:var(--atencao)}
+.btn{display:inline-block;margin-top:4px;padding:8px 14px;border-radius:6px;background:var(--voce);color:var(--surface);font-weight:600;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="pg">
+  <header>
+    <h1>Guia dos avisos</h1>
+    <p class="sub">Como funcionam as mensagens do robô no WhatsApp: o que chega, o que fazer e quando ele confere sozinho.</p>
+  </header>
+
+  <div class="quem">
+    <span class="chip" style="--c:var(--robo)"><i></i>Robô</span>
+    <span class="chip" style="--c:var(--voce)"><i></i>Você</span>
+  </div>
+
+  <ol class="passos">
+    <li class="passo" style="--c:var(--robo)"><span class="n">1</span>
+      <div class="cx">
+        <div class="topo"><b>O robô manda uma atividade</b><span class="quando">só no seu horário de trabalho</span></div>
+        <ul>
+          <li>Chega pelo número <b>Avisos</b>. Salve o contato com esse nome.</li>
+          <li>Cada mensagem é uma atividade só, com o caminho no painel.</li>
+          <li>No máximo 2 por dia. Recado com prazo para amanhã passa na frente.</li>
+        </ul>
+      </div></li>
+
+    <li class="passo" style="--c:var(--voce)"><span class="n">2</span>
+      <div class="cx">
+        <div class="topo"><b>Você faz pelo painel</b><span class="quando">quando der, no seu turno</span></div>
+        <ol>
+          <li>Toque no link da mensagem ou siga o caminho que ela mostra.</li>
+          <li>Faça a atividade na tela e salve.</li>
+          <li>Se a mensagem pedir uma resposta, responda no próprio WhatsApp do Avisos.</li>
+        </ol>
+      </div></li>
+
+    <li class="passo" style="--c:var(--robo)"><span class="n">3</span>
+      <div class="cx">
+        <div class="topo"><b>O robô confere sozinho</b><span class="quando">de 10 em 10 minutos</span></div>
+        <ul>
+          <li>Feito no painel, a atividade sai da sua lista. Não precisa avisar.</li>
+          <li>A sua resposta pelo WhatsApp chega a quem pediu.</li>
+        </ul>
+      </div></li>
+
+    <li class="passo" style="--c:var(--voce)"><span class="n">4</span>
+      <div class="cx">
+        <div class="topo"><b>Veja tudo o que é seu</b><span class="quando">quando quiser</span></div>
+        <div class="caminho">Painel → Sistema → Minha agenda</div>
+        <ul>
+          <li>Mostra o que está pendente com você e o prazo.</li>
+          <li>Precisa de ajuda numa atividade? Peça por lá.</li>
+        </ul>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#agenda">Abrir Minha agenda</a>
+      </div></li>
+
+    <li class="passo" style="--c:var(--voce)"><span class="n">5</span>
+      <div class="cx">
+        <div class="topo"><b>Dúvida em alguma tela</b><span class="quando">a qualquer hora</span></div>
+        <ul>
+          <li>Toque no botão <b>Ajuda</b> da própria tela e escreva a dúvida.</li>
+          <li>Ou responda a mensagem do Avisos. A resposta vem pelo WhatsApp.</li>
+        </ul>
+      </div></li>
+  </ol>
+
+  <div class="alerta"><b>Importante:</b> responda sempre no WhatsApp do <b>Avisos</b>, não no privado de alguém. Lá o robô lê e entrega a quem pediu.</div>
+</div>
+</body>
+</html>

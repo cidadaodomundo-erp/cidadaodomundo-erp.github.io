@@ -208,7 +208,7 @@ function agDesenhar() {
   const alvo = document.getElementById('view-agenda');
   const dias = []; for (let i = 0; i <= 7; i++) dias.push(agMais(hoje, i));
   const ordemTipo = { atraso: 0, alerta: 1, '': 2 };
-  let h = '<h2>Minha agenda</h2>' + agOrdemHtml(true) + agTempoHtml();
+  let h = '<h2>Minha agenda <a href="../guia-avisos.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;font-size:12px;" title="como funcionam as mensagens do robô no WhatsApp">Como funciona (guia)</a></h2>' + agOrdemHtml(true) + agTempoHtml();
   if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
   const linha = (x) => {
     const acao = x.url ? `<a class="preset-btn active" href="${agE(x.url)}" target="_blank" rel="noopener" style="text-decoration:none;font-weight:700;" title="${agE(x.url)}">abrir o link ↗</a>`
@@ -632,7 +632,8 @@ async function agPlanoMontar(reler) {
         <b>Desenvolvimentos</b> · ${nPr} prontos de ${D.length}
         · <a href="javascript:void(0)" onclick="agDevFiltro('hoje')" style="color:var(--info);">mudou hoje: <b>${fHoje.length}</b></a>
         · <a href="javascript:void(0)" onclick="agDevFiltro('parado')" style="color:${fPar.length ? 'var(--farol-fora)' : 'var(--tx-3)'};">parado há 3+ dias: <b>${fPar.length}</b></a>
-        · <a href="javascript:void(0)" onclick="AGPL.filtro=null;agPlanoMontar();agIrDesenv()">ver ↓</a></div>`;
+        · <a href="javascript:void(0)" onclick="AGPL.filtro=null;agPlanoMontar();agIrDesenv()">ver ↓</a>
+        · <a href="../retrato-entregas.html" target="_blank" rel="noopener" style="color:var(--info);font-weight:700;">as 6 entregas ↗</a></div>`;
     }
     const fil = AGPL.filtro === 'hoje' ? fHoje : AGPL.filtro === 'parado' ? fPar : null;
     h += `<div class="ag-bloco" id="agDesenv">Desenvolvimentos <span class="f">· evolução: ${nPr} de ${D.length} prontos (${Math.round(100 * nPr / D.length)}%) · ${cont}</span></div>`
