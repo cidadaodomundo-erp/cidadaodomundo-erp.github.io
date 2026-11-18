@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Guia do Pedir material</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Guia passo a passo do Pedir material para a equipe (frente Pedir material por praça, 18/11/2026). Mesmo formato do guia da admissão: uma coluna, 4 passos, quem faz cada um. As quatro cores de pessoa (--arissa, --hellen, --robo, --contab) são reaproveitadas: praça, quem separa, robô, dono. */
+:root{
+  --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --line:#e3e1da; --tx:#1d1d1b; --tx-2:#5f5e58;
+  --arissa:#2f6f8f; --hellen:#7a4e9b; --robo:#3f7d4e; --contab:#9a6a1f; --atencao:#a8741a;
+  --f-titulo:"Space Grotesk",system-ui,sans-serif; --f-texto:"Inter",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --arissa:#6fb0d0; --hellen:#b994d6; --robo:#7fbf8c; --contab:#d9a85a; --atencao:#d9a85a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --arissa:#6fb0d0; --hellen:#b994d6; --robo:#7fbf8c; --contab:#d9a85a; --atencao:#d9a85a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f-texto);font-size:16px;line-height:1.5}
+.pg{max-width:720px;margin:0 auto;padding:28px 16px 48px;display:grid;gap:24px}
+h1,h2{font-family:var(--f-titulo);text-wrap:balance;margin:0}
+h1{font-size:1.8rem}
+h2{font-size:1.1rem}
+.sub{color:var(--tx-2);margin:6px 0 0}
+.quem{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2)}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.passos{list-style:none;margin:0;padding:0}
+.passo{display:grid;grid-template-columns:34px 1fr;gap:14px;position:relative;padding-bottom:18px}
+.passo:not(:last-child)::before{content:"";position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--line)}
+.n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-titulo);font-weight:700;color:var(--surface);background:var(--c)}
+.cx{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:6px}
+.topo{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.quando{font-size:.8rem;color:var(--tx-2)}
+.cx ul,.cx ol{margin:0;padding-left:20px;display:grid;gap:3px}
+.caminho{font-size:.85rem;font-weight:600;color:var(--tx-2)}
+.alerta{border:2px solid var(--atencao);border-radius:8px;background:var(--surface);padding:12px 14px}
+.alerta b{color:var(--atencao)}
+.btn{display:inline-block;margin-top:4px;padding:8px 14px;border-radius:6px;background:var(--arissa);color:var(--surface);font-weight:600;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="pg">
+  <header>
+    <h1>Guia do Pedir material</h1>
+    <p class="sub">A praça pede pelo painel, o estoque separa e entrega. A grade mostra tudo o que a sua praça usa, para ninguém esquecer nada.</p>
+  </header>
+
+  <div class="quem">
+    <span class="chip" style="--c:var(--arissa)"><i></i>Quem pede (a praça)</span>
+    <span class="chip" style="--c:var(--hellen)"><i></i>Quem separa (Rita ou Habrahan)</span>
+    <span class="chip" style="--c:var(--robo)"><i></i>Robô</span>
+    <span class="chip" style="--c:var(--contab)"><i></i>Neto</span>
+  </div>
+
+  <ol class="passos">
+    <li class="passo" style="--c:var(--arissa)"><span class="n">1</span>
+      <div class="cx">
+        <div class="topo"><b>A praça abre a grade</b><span class="quando">quando precisar de material</span></div>
+        <div class="caminho">Painel → Estoque → Pedir material</div>
+        <ul>
+          <li>A tela já abre na sua praça: Cozinha, Salão, Delivery ou Produção.</li>
+          <li>A grade traz <b>todos os itens da praça</b>, separados por grupo (Secos, Resfriados, Embalagens, Limpeza...).</li>
+        </ul>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#reqpedir">Abrir Pedir material</a>
+      </div></li>
+
+    <li class="passo" style="--c:var(--arissa)"><span class="n">2</span>
+      <div class="cx">
+        <div class="topo"><b>Preenche só o que precisa</b><span class="quando">1 minuto</span></div>
+        <ol>
+          <li>Passe pela grade inteira e ponha a quantidade ao lado de cada item que precisa.</li>
+          <li><b>Em branco = não pede.</b> Não precisa pôr zero.</li>
+          <li>Não achou o item na grade? Use a busca no fim da tela.</li>
+          <li>Clique em <b>Pedir</b> e espere o ✓ com o número do pedido (ex.: REQ-2026-0003).</li>
+        </ol>
+      </div></li>
+
+    <li class="passo" style="--c:var(--hellen)"><span class="n">3</span>
+      <div class="cx">
+        <div class="topo"><b>O estoque separa e entrega</b><span class="quando">Rita ou Habrahan</span></div>
+        <div class="caminho">Painel → Estoque → Separar requisições</div>
+        <ol>
+          <li>Os pedidos esperando aparecem na tela, com o saldo de cada item. Pedido de ontem que ficou aberto continua lá.</li>
+          <li>Se quiser, imprima: sai uma folha por praça.</li>
+          <li>Separe e entregue. Se entregou menos do que pediram, corrija a quantidade na coluna <b>Saiu</b>.</li>
+          <li>Clique em <b>Entreguei</b>: a baixa no estoque é pelo que saiu.</li>
+        </ol>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#reqseparar">Abrir Separar requisições</a>
+      </div></li>
+
+    <li class="passo" style="--c:var(--robo)"><span class="n">4</span>
+      <div class="cx">
+        <div class="topo"><b>O robô dá a baixa no estoque</b><span class="quando">sozinho, na hora em que separou</span></div>
+        <ul>
+          <li>Sai do estoque o que foi <b>entregue</b>, não o que foi pedido.</li>
+          <li>Item marcado "sai pela ficha" (hambúrguer, pão, molho...) não baixa aqui: ele já baixa pela venda.</li>
+        </ul>
+      </div></li>
+  </ol>
+
+  <div class="alerta"><b>Importante:</b> item que não existe no cadastro pode ser pedido pela busca ("pedir mesmo assim"), mas ele <b>não sai do estoque</b> até o Neto validar. Pediu errado? Cancele o pedido na própria tela antes de ser separado e faça outro.</div>
+</div>
+</body>
+</html>

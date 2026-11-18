@@ -4969,7 +4969,7 @@ function reqPedirDesenhar() {
     gradeHtml += linhaItem(g.nome_base, g.un, REQ.manda && g.a_rita_confirma);
   }
   const fora = noCarrinho.filter(([nb]) => !naGrade.has(nb));
-  alvo.innerHTML = `<h2>Pedir material</h2>
+  alvo.innerHTML = `<h2>Pedir material ${'<a href="../guia-pedir-material.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;font-size:12px;" title="o passo a passo de quem pede e de quem separa">Como funciona (guia)</a>'}</h2>
     <div class="caption-label">${trEscH(estNomeLoja(REQ.unidade))}${REQ.praca ? ' · praça <b>' + trEscH(REQ.praca) + '</b>' : ''}. Peça tudo o que a praça precisa; quem separa entrega e dá a baixa no estoque.</div>
     ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='reqTrocarPraca(${JSON.stringify(p)})'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
     ${grade.length ? `<div class="caption-label" style="text-align:left;">Todos os itens da praça (${grade.length}): digite a quantidade do que precisa; em branco não pede.</div><div id="reqGrade">${gradeHtml}</div>
@@ -5070,7 +5070,7 @@ function reqSepararDesenhar() {
   if (!alvo) return;
   const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
   const diaAberto = REQS.dia.filter((x) => !x.situacao || /ABERT|SEPARAR/i.test(x.situacao));
-  alvo.innerHTML = `<h2>Separar requisições</h2>
+  alvo.innerHTML = `<h2>Separar requisições ${'<a href="../guia-pedir-material.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;font-size:12px;" title="o passo a passo de quem pede e de quem separa">Como funciona (guia)</a>'}</h2>
     <div class="caption-label">${trEscH(estNomeLoja(REQS.unidade))}: ${REQS.abertas.length} ${REQS.abertas.length === 1 ? 'requisição esperando' : 'requisições esperando'}. Separe, ajuste a quantidade que saiu e clique em <b>Entreguei</b>: a baixa no estoque é pelo que saiu.</div>
     ${REQS.abertas.length ? `<div style="margin:8px 0;"><button class="preset-btn active" style="font-size:15px; padding:10px 18px;" onclick="reqImprimirPracas()">🖨️ Imprimir para separar (uma folha por praça)</button></div>` : ''}
     ${diaAberto.length ? `<div class="section-label">Somado por item</div><div id="tabelaReqDia" style="overflow-x:auto;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Saldo</th><th>Praças</th></tr></thead><tbody>
