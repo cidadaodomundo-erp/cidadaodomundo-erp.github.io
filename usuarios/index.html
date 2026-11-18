@@ -90,12 +90,18 @@ function usProtegido(u) { const e = String(u.email || '').toLowerCase(); let eu 
   return e === eu || (u.papel === 'DONO' && u.todas_as_telas) || e.startsWith('robo.') || /^(info|administrativo)@/.test(e); }
 function usInativo(u) { return u.bloqueado || u.ativo === false || usDias(u) > 30; }
 function usChave(u, c, R) {
-  if (c === 'pessoa') return String(u.nome || u.email).toLowerCase();
+  if (c === 'pessoa') return usUsuario(u.email);
   if (c === 'papel') return `${u.papel || 'zzz'} ${u.unidade || ''}`.toLowerCase();
   if (c === 'telas') return u.todas_as_telas ? 9999 : (u.modulos || []).length;
   if (c === 'ultimo') return u.ultimo_login ? new Date(u.ultimo_login).getTime() : 0;
   return usSituacao(u);
 }
+// 18/11/2026 16:25 (dono: "deixar os usuarios das pessoas no padrão tudo minúsculo"): a 1ª coluna mostra o usuário como a pessoa
+// digita para entrar (e-mail sem @cidadaodomundo.com.br, minúsculo; de fora do domínio, inteiro) e o nome em formato de nome próprio.
+// Só exibição: o banco fica como está.
+function usUsuario(em) { const e = String(em || '').toLowerCase().trim(); return e.endsWith('@cidadaodomundo.com.br') ? e.slice(0, -'@cidadaodomundo.com.br'.length) : e; }
+function usNomeProprio(n) { const pq = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+  return String(n || '').toLowerCase().trim().split(/\s+/).map((p, i) => i && pq.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)).join(' '); }
 function usOrdenar(c) { if (US_ORD.col === c) US_ORD.dir = -US_ORD.dir; else { US_ORD.col = c; US_ORD.dir = c === 'ultimo' ? -1 : 1; } usDesenhar(); }
 function usExcluirPedir(em) { US.excluir = em; usDesenhar(); }
 async function usExcluir(email) {
@@ -121,7 +127,7 @@ function usDesenhar() {
   if (US.novo) h += usForm(null);
   h += `<div id="tabelaUsuarios" style="overflow-x:auto;"><table><thead><tr>${US_COLS.map(([c, t]) => `<th style="cursor:pointer;user-select:none;" title="ordenar por ${t.toLowerCase()} (clique de novo inverte)" onclick="usOrdenar('${c}')">${t}${seta(c)}</th>`).join('')}</tr></thead><tbody>
     ${vis.map((u) => `<tr class="us-lin" style="cursor:pointer;" onclick="usAbrir(${usE(JSON.stringify(u.email))})">
-      <td><b>${usE(u.nome || u.email.split('@')[0])}</b><br><span style="font-size:11.5px;color:var(--tx-4);">${usE(u.email)}</span></td>
+      <td><b>${usE(usUsuario(u.email))}</b>${u.nome ? `<br><span style="font-size:11.5px;color:var(--tx-4);">${usE(usNomeProprio(u.nome))}</span>` : ''}</td>
       <td>${usE((u.papel || '—').toLowerCase())}${u.unidade ? ' · ' + usE(u.unidade) : ''}</td>
       <td style="white-space:normal;font-size:12.5px;">${usTelasTxt(u, R)}</td>
       <td>${usQuando(u.ultimo_login)}</td>
@@ -131,7 +137,7 @@ function usDesenhar() {
         if (!usInativo(u) || usProtegido(u)) return sel;
         const emJs = usE(JSON.stringify(u.email));
         return sel + (US.excluir === u.email
-          ? `<div onclick="event.stopPropagation()" style="margin-top:6px;white-space:normal;">Excluir o login de ${usE(u.nome || u.email)}? Ele não entra mais no painel. <button type="button" class="preset-btn" style="color:var(--farol-fora);font-weight:700;" onclick="usExcluir(${emJs})">Sim, excluir</button> <button type="button" class="preset-btn" onclick="US.excluir=null;usDesenhar()">Não</button></div>`
+          ? `<div onclick="event.stopPropagation()" style="margin-top:6px;white-space:normal;">Excluir o login de ${usE(usUsuario(u.email))}? Ele não entra mais no painel. <button type="button" class="preset-btn" style="color:var(--farol-fora);font-weight:700;" onclick="usExcluir(${emJs})">Sim, excluir</button> <button type="button" class="preset-btn" onclick="US.excluir=null;usDesenhar()">Não</button></div>`
           : ` <button type="button" class="preset-btn" style="margin-left:6px;color:var(--farol-fora);" onclick="event.stopPropagation();usExcluirPedir(${emJs})">Excluir</button>`); })()}</td></tr>
       ${US.aberto === u.email ? `<tr><td colspan="5">${usForm(u)}</td></tr>` : ''}`).join('') || '<tr><td colspan="5">Ninguém com essa busca.</td></tr>'}
     </tbody></table></div>`;
