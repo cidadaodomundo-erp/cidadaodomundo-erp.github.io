@@ -401,13 +401,15 @@ function guiaRegistrar(tela, passos) {
   GUIAS[tela] = passos;
   // 09/11/2026: uma página com várias telas (Pessoas, Estoque) tem um "?" só — ele reabre o guia da tela registrada por último
   const ja = document.getElementById('guiaRever');
-  if (ja) { ja.dataset.tela = tela; ja.style.display = ''; return; }
+  if (ja) { ja.dataset.tela = tela; ja.style.display = window.parent !== window ? 'none' : ''; return; }
   const b = document.createElement('button');
   b.dataset.tela = tela;
   b.id = 'guiaRever'; b.type = 'button'; b.textContent = '?'; b.title = 'Rever o guia desta tela';
   b.style.cssText = 'position:fixed; left:14px; bottom:14px; z-index:10040; width:34px; height:34px; border-radius:50%; cursor:pointer;'
     + ' border:1px solid var(--line-2); background:var(--surface-2); color:var(--tx-2); font:700 16px/1 inherit;';
   b.onclick = () => guiaAbrir(b.dataset.tela, 0);
+  // 18/11/2026: dentro da casca o botão fica escondido — o "Guia" da barra de cima clica nele
+  if (window.parent !== window) b.style.display = 'none';
   document.body.appendChild(b);
 }
 function guiaTalvez(tela) { if (GUIAS[tela] && !guiaVisto(tela)) setTimeout(() => guiaAbrir(tela, 0), 500); }

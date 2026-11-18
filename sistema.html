@@ -123,6 +123,16 @@
   .busca input { width:230px; max-width:100%; box-sizing:border-box; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1); font:inherit; font-size:13px; }
   .busca input:focus { outline:none; border-color:var(--marca-amarelo); }
   .busca-res { position:absolute; right:0; top:calc(100% + 4px); width:320px; max-width:90vw; max-height:60vh; overflow:auto; background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:4px; z-index:60; }
+  /* 18/11/2026 (dono 02:30: "o buscar poderia ao lado do inicio"): a busca mora na lateral, logo abaixo do Início; o resultado
+     abre embaixo dela, dentro da lateral (a lateral rola; lista solta seria cortada) */
+  .side .busca { margin:4px 0 8px; flex-shrink:0; }
+  .side .busca input { width:100%; }
+  .side .busca-res { position:static; width:auto; max-width:none; max-height:50vh; margin-top:4px; }
+  /* 18/11/2026 (dono 02:30: "o ajuda é importante que a galera use, e o botão do guia ... poderia ser do lado dele, com um
+     destaque nos dois"): Ajuda e Guia lado a lado, em amarelo da marca */
+  #btnAjuda.btn, .btn.btn-destaque { background:var(--marca-amarelo); border-color:var(--marca-amarelo); color:var(--bg); font-weight:800; flex-shrink:0; }
+  #btnAjuda.btn:hover, .btn.btn-destaque:hover { filter:brightness(1.08); }
+  #btnGuia[hidden] { display:none; }
   .busca-res .br { display:flex; gap:8px; align-items:baseline; width:100%; text-align:left; padding:7px 9px; border:none; border-radius:6px; background:none; color:var(--tx-2); font:inherit; font-size:13.5px; cursor:pointer; }
   .busca-res .br.sel, .busca-res .br:hover { background:var(--surface-2); color:var(--tx-1); }
   .busca-res .br small { margin-left:auto; color:var(--tx-4); font-size:11px; white-space:nowrap; }
@@ -204,9 +214,8 @@
     .ti { flex:1; min-width:0; }
     .acoes { margin-left:0; }
     .acoes .btn { min-height:40px; padding:6px 10px; }
-    .busca { order:10; flex:1 0 100%; margin:4px 0 0; }
+    .busca { margin:4px 0 8px; }
     .busca input { width:100%; font-size:16px; min-height:38px; }
-    .busca-res { left:0; right:0; width:auto; max-width:none; }
     #btnRecarregar { display:none; }
     .vendo { order:9; flex:1 0 100%; min-width:0; margin:0; padding:0; border:0; border-radius:0; background:none; color:var(--tx-3); font-size:12.5px; font-weight:600; }
     .vendo b { font-size:13px; padding:0; }
@@ -236,6 +245,7 @@
   <aside class="side" id="side">
     <div class="marca"><img src="logo.png" alt=""><span>Cidadão do Mundo</span></div>
     <button class="mi" id="miInicio" type="button"><span class="ic">🏠</span>Início</button>
+    <div class="busca" id="buscaCx"><input id="busca" type="search" placeholder="🔎 Buscar tela… (Ctrl+K)" autocomplete="off" spellcheck="false" aria-label="Buscar tela" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" role="listbox" hidden></div></div>
     <nav id="menu"></nav>
     <div class="rodape"><span id="quem"></span><button class="btn" type="button" id="btnSair">Sair</button></div>
   </aside>
@@ -245,9 +255,9 @@
       <button class="ham" type="button" id="btnHam" aria-label="Abrir o menu">☰</button>
       <div class="ti" id="titulo">Início</div>
       <div class="vendo" id="vendo"></div>
-      <div class="busca" id="buscaCx"><input id="busca" type="search" placeholder="🔎 Buscar tela… (Ctrl+K)" autocomplete="off" spellcheck="false" aria-label="Buscar tela" aria-controls="buscaRes"><div class="busca-res" id="buscaRes" role="listbox" hidden></div></div>
       <button class="btn" type="button" id="btnTema" title="Mudar para o visual claro">☀️</button>
       <div class="acoes" id="acoes"></div>
+      <button class="btn btn-destaque" type="button" id="btnGuia" hidden title="O passo a passo desta tela">Guia</button>
     </div>
     <div class="abas-juncao" id="abasJuncao" hidden></div>
     <div class="faixa-loja" id="faixaLoja" hidden></div>
@@ -714,12 +724,14 @@ function abrir(chave, deDentro) {
   mostrarSo(f);
   // página própria reaberta: recarrega os dados da tela, como o painel antigo faz no mostrarModulo (24/10/2026)
   if (url !== 'painel' && jaAberta && !deDentro) { try { if (typeof f.contentWindow.reentrarTela === 'function') f.contentWindow.reentrarTela(); } catch (e) {} }
-  let botoes = '<button class="btn" type="button" id="btnRecarregar" title="Recarregar a tela">↻</button>';
-  if (url !== 'painel') botoes += `<a class="btn so-largo" href="${esc(url)}" target="_blank" rel="noopener">↗ abrir</a>`;
-  $('acoes').innerHTML = botoes;
+  // 18/11/2026 (dono 02:30: "o atualizar funciona? o abrir acho que não precisa"): o "↗ abrir" saiu. O ↻ antes trocava o
+  // endereço da moldura pelo mesmo endereço — nas páginas com várias telas só mudava o "#" e nada recarregava; agora recarrega.
+  $('acoes').innerHTML = '<button class="btn" type="button" id="btnRecarregar" title="Recarregar esta tela (lê tudo de novo)">↻</button>';
   $('btnRecarregar').onclick = () => {
-    if (url === 'painel') { PAINEL_PRONTO = false; PAINEL_ALVO = ATUAL; f.src = urlDoPainel(ATUAL); } else f.src = url;
+    if (url === 'painel') { PAINEL_PRONTO = false; PAINEL_ALVO = ATUAL; f.src = urlDoPainel(ATUAL); return; }
+    try { f.contentWindow.location.reload(); } catch (e) { f.src = url; }
   };
+  guiaCascaVer();
   if (url === 'painel' && !deDentro) {
     if (PAINEL_PRONTO && f.contentWindow && typeof f.contentWindow.mostrarModulo === 'function') {
       f.contentWindow.mostrarModulo(chave);
@@ -728,6 +740,20 @@ function abrir(chave, deDentro) {
     }
   }
 }
+
+// 18/11/2026: o Guia da barra abre o passo a passo da tela aberta (o "?" que cada página punha no canto de baixo, guiaRegistrar
+// no nucleo). Aparece só quando a tela tem passo a passo; a página, dentro da casca, esconde o "?" dela.
+function guiaCascaFrame() { const k = ATUAL && (PAGINAS[ATUAL] || 'painel'); return k ? MOLDURAS[k] : null; }
+function guiaCascaVer() {
+  const b = $('btnGuia'); if (!b) return;
+  let tem = false;
+  try { const f = guiaCascaFrame(); tem = !!(f && !f.hidden && f.contentDocument && f.contentDocument.getElementById('guiaRever')); } catch (e) {}
+  b.hidden = !tem;
+}
+$('btnGuia').onclick = () => {
+  try { const f = guiaCascaFrame(), g = f && f.contentDocument.getElementById('guiaRever'); if (g) g.click(); } catch (e) {}
+};
+setInterval(guiaCascaVer, 1500);
 
 // O painel antigo conversa com a casca por mensagem (só da mesma origem).
 window.addEventListener('message', (e) => {
