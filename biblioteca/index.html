@@ -47,9 +47,18 @@ const BB_TIPO = { guia: ['Passo a passo', 'como fazer, tela por tela'], estudo: 
 async function entrarBiblioteca() {
   const alvo = document.getElementById('view-biblioteca');
   if (!BB.L) alvo.innerHTML = '<h2>Biblioteca</h2><div class="contexto">Carregando…</div>';
-  try { BB.L = await consultarTudo('painel_biblioteca?select=id,titulo,tipo,frente,url,descricao,para,so_neto_fabio,ordem,atualizado_em&order=ordem,titulo'); BB.erro = null; }
+  try { BB.L = await consultarTudo('painel_biblioteca?select=id,titulo,tipo,frente,url,descricao,para,so_neto_fabio,telas,ordem,atualizado_em&order=ordem,titulo'); BB.L = BB.L.filter(bbGuiaMeu); BB.erro = null; }
   catch (e) { BB.erro = e.message; }
   bbDesenhar();
+}
+// 18/11/2026 15:03 (dono, pelo Organizador: "temos que liberar na biblioteca apenas as guias destinadas a cada usuário"):
+// o guia aparece só para quem vê alguma das telas dele (coluna telas), pela MESMA regra do menu (visivel() da casca).
+// Estudos e links seguem só a RLS (para / so_neto_fabio). Fora da casca não há como saber as telas: fica só a RLS.
+function bbGuiaMeu(x) {
+  if (x.tipo !== 'guia' || !Array.isArray(x.telas) || !x.telas.length) return true;
+  let vis = null; try { vis = NA_CASCA && typeof parent.visivel === 'function' ? parent.visivel : null; } catch (e) { vis = null; }
+  if (!vis) return true;
+  return x.telas.some((k) => { try { return !!vis(k); } catch (e) { return false; } });
 }
 function bbBuscar(v) { BB.busca = v; clearTimeout(window._bbB); window._bbB = setTimeout(() => { bbDesenhar(); const e = document.getElementById('bbBusca'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 200); }
 function bbCard(x) {
