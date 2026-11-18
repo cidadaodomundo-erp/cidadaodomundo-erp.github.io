@@ -150,6 +150,9 @@ function agDesenhar() {
   const itens = [];   // { dia, txt, ir, chat, tipo: 'atraso'|'alerta'|'', id (pendência) }
   AG.sinal = 0;
   const add = (o) => itens.push(Object.assign({ tipo: '' }, o));
+  // 18/11/2026 (dono: "minha agenda mostra 29" e no banco eram 38): o item com prazo depois da janela de 8 dias não entra no dia,
+  // mas aparece no fim do grupo dele, recolhido, com o número à vista — nada fica escondido sem a tela dizer
+  const depois = [];
   const falhou = [];
   const ok = (x, rot) => { if (x && x.erro) { falhou.push(rot); return false; } return Array.isArray(x); };
   // 1) o que depende de mim (os chats gravam)
@@ -157,11 +160,11 @@ function agDesenhar() {
     const espera = !!(p.resposta || p.feito_em);   // respondido (aguardando aplicar) ou feito (conferindo): sai do número
     if (!espera && (!p.prazo || p.prazo <= hoje)) AG.sinal++;
     const dia = !p.prazo || p.prazo < hoje ? hoje : p.prazo;
-    if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
     // 12/11/2026 (dono 01:30): "desde dd/mm (N dias)" e "prazo dd/mm" com farol em cada cartão
     add({ dep: !espera, grupo: espera ? 'anda' : 'dep', dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : agLinkDe(p.link).ir, url: chat ? null : agLinkDe(p.link).url, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
       desde: String(p.desde || '').slice(0, 10), prazo: p.prazo || '' });
+    if (dia > fim) depois.push(itens.pop());
   });
   // 13/11/2026 (chat Avisos): os rascunhos esperando o "manda" saíram da agenda geral e vivem na aba Avisos; contam no número
   const avEsp = Array.isArray(AG.avisos) ? AG.avisos.filter((a) => Number(a.grupo) === 1 && a.estado === 'ESPERA').length : 0;
@@ -271,6 +274,8 @@ function agDesenhar() {
   if (f === 'avisos' && !AG.soNovos) h += agAvisosHtml();
   else if (AG.soNovos) h += `<div class="ag-bloco">Respostas novas</div>` + porDia(novos, '');
   else h += `<div class="ag-bloco">${ROT[f][0]}</div>` + porDia(G[f], f === 'dep' ? '✓ nada depende de você hoje' : f === 'anda' ? 'nada em andamento' : 'nada para saber hoje');
+  const dep2 = depois.filter((x) => (x.grupo || 'saber') === f).sort((a, b) => String(a.prazo).localeCompare(String(b.prazo)));
+  if (dep2.length && !AG.soNovos && f !== 'avisos') h += `<details class="ag-depois" style="margin:10px 2px;"><summary style="cursor:pointer;color:var(--tx-2);font-weight:700;">+ ${dep2.length} ${dep2.length === 1 ? 'item' : 'itens'} com prazo depois de ${agDm(fim)} (o mais perto: ${agDm(dep2[0].prazo)})</summary>${dep2.map(linha).join('')}</details>`;
   alvo.innerHTML = h;
   agRolarAteItem();
   // o número do menu (casca): o que depende de mim com prazo até hoje + contas vencidas de verdade (por título)
