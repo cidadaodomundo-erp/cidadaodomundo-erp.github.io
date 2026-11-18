@@ -712,11 +712,21 @@
       if (estado.carrinho.length || ENVIO.temPendente() || document.querySelector("dialog[open]") || confirmando) return;
       location.reload();
     }, 60000);
-    // Tela cheia no primeiro toque (o Android pede um gesto do usuario)
-    document.addEventListener("pointerdown", () => {
+    // Tela cheia (o Android pede um toque). O toque que liga a tela cheia NAO abre nada: se abrisse uma janela
+    // (produto, pagamento) no mesmo toque, a pagina em tela cheia ficaria por cima dela e a janela sumiria.
+    let engolirClique = false;
+    document.addEventListener("pointerdown", (ev) => {
       const d = document.documentElement;
-      if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen().catch(() => {});
-    }, { once: true });
+      if (document.fullscreenElement || !d.requestFullscreen || document.querySelector("dialog[open]")) return;
+      engolirClique = true;
+      ev.preventDefault();
+      d.requestFullscreen().catch(() => { engolirClique = false; });
+    }, { capture: true });
+    document.addEventListener("click", (ev) => {
+      if (!engolirClique) return;
+      engolirClique = false;
+      ev.preventDefault(); ev.stopPropagation();
+    }, { capture: true });
   }
 
   renderCategorias();
