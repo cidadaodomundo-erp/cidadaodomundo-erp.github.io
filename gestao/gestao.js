@@ -7339,7 +7339,8 @@ function sobraFilialHtml() {
     if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
     const pergunta = Number(p.lista_mes_pergunta) > 0 ? `<div style="font-size:11.5px;color:var(--farol-perto);">sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)</div>` : '';
     const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
-    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial);
+    // repasse_valor = repasse semanal do iFood que caiu no banco da FILIAL (Financeiro 18/11 15:47); o PIX para a AV é sai_da_filial
+    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null ? `<div style="font-size:11.5px;color:var(--tx-4);">repasse do iFood no banco da filial: ${sobraR(p.repasse_valor)}</div>` : '');
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
     const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
