@@ -167,7 +167,8 @@
         if (l.lidoHaMin !== null) c.appendChild(el('div', 'pao-lido', 'lido há ' + fmtIdade(l.lidoHaMin)));
         tb.appendChild(tr);
       });
-      tab.appendChild(tb); ui.rol.appendChild(tab);
+      tab.appendChild(tb);
+      const rolar = el('div', 'pao-rolar'); rolar.appendChild(tab); ui.rol.appendChild(rolar);   // celular: mesma lista do PC, uma linha por pessoa, arrastando para o lado
     }
 
     // modo direto (Água Verde): "hoje" da tela é o dia OPERACIONAL (antes das 07:00 ainda é ontem); modo lote segue o dia civil
