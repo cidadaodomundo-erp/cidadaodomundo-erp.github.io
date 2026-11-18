@@ -561,7 +561,16 @@ async function agFeito(id, desfazer) {
 // Bloco A "Pendente com você" (para o Fabio) / "Com o Fabio" (para o dono, só leitura) · Bloco B "Desenvolvimentos".
 // Sem linha nas duas fontes (equipe), nada aparece.
 // =====================================================================================================================
-const AGPL = { pend: null, dev: null };
+const AGPL = { pend: null, dev: null, filtro: null };
+// 18/11/2026 (dono 02:16: "hoje elas ficam esquecidas lá embaixo na agenda"; proposta 2026-11-18-desenvolvimentos-no-topo):
+// idade do card pelo andamento_em; parado = EM_CONSTRUCAO sem andamento há mais de 3 dias
+function agDevDias(d) {
+  if (!d.andamento_em) return null;
+  const dia = new Date(d.andamento_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return Math.round((new Date(agHoje() + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5);
+}
+const agDevParado = (d) => d.estado === 'EM_CONSTRUCAO' && agDevDias(d) != null && agDevDias(d) > 3;
+function agDevFiltro(k) { AGPL.filtro = AGPL.filtro === k ? null : k; agPlanoMontar(); agIrDesenv(); }
 const AGPL_ESTADO = { ESPERANDO_DECISAO: ['Esperando decisão', 'var(--farol-perto)'], EM_CONSTRUCAO: ['Em construção', 'var(--info)'], A_FAZER: ['A fazer', 'var(--tx-3)'], PRONTO: ['Pronto', 'var(--farol-ok)'] };
 const AGPL_LADO = { NETO: 'Neto', FABIO: 'Fabio', JUNTOS: 'os dois' };
 async function agPlanoMontar(reler) {
@@ -600,10 +609,12 @@ async function agPlanoMontar(reler) {
     // 12/11/2026 (dono 15:35; proposta 2026-11-12-desenvolvimentos-em-ordem): um subtítulo por etapa, na ordem de execução.
     // Na etapa 1 a posição vira "1º, 2º…" (ali uma coisa destrava a seguinte). "Em espera" (6) e "Pronto" (9) recolhidos.
     // Sem etapa no banco = "8. Novo: a ordenar". O que mudou nos últimos 7 dias leva "· mudou esta semana".
-    const semana = new Date(Date.now() - 7 * 86400000).toISOString();
     const linhaB = (d) => { const E = AGPL_ESTADO[d.estado] || [d.estado, 'var(--tx-3)'];
       const pos = Number(d.etapa_ordem) === 1 && d.ordem != null ? `<b>${d.ordem}º</b> ` : '';
-      const mudou = d.atualizado_em && d.atualizado_em >= semana ? ' <span style="color:var(--info);">· mudou esta semana</span>' : '';
+      // 18/11/2026: a idade pelo andamento_em (hoje / há N dias / parado há N dias em vermelho)
+      const nd = agDevDias(d);
+      const mudou = nd == null || d.estado === 'PRONTO' ? '' : agDevParado(d) ? ` <span style="color:var(--farol-fora);font-weight:700;">· parado há ${nd} dias</span>`
+        : nd <= 0 ? ' <span style="color:var(--info);">· hoje</span>' : ` <span class="f">· há ${nd} ${nd === 1 ? 'dia' : 'dias'}</span>`;
       return `<div class="ag-lin" style="flex-wrap:wrap;"><span class="t">${pos}<b style="color:${E[1]};">${E[0]}</b> · ${agE(d.titulo)} <span class="f">· ${agE(AGPL_LADO[d.lado] || d.lado || '')}${d.quem ? ' · ' + agE(d.quem) : ''}${d.prazo ? ' · prazo ' + agDm(d.prazo) : ''}</span>${mudou}</span>${d.link && /^https?:/.test(d.link) ? `<a class="preset-btn" style="text-decoration:none;" href="${agE(d.link)}" target="_blank" rel="noopener">abrir</a>` : ''}${agDevDet(d)}</div>`; };
     const cont = Object.keys(AGPL_ESTADO).map((k) => [k, D.filter((d) => d.estado === k).length]).filter(([, n]) => n).map(([k, n]) => `${AGPL_ESTADO[k][0].toLowerCase()} ${n}`).join(' · ');
     const etapas = [];
@@ -611,11 +622,25 @@ async function agPlanoMontar(reler) {
       let e = etapas.find((x) => x.nome === nome); if (!e) { e = { nome, eo, itens: [] }; etapas.push(e); } e.itens.push(d); });
     etapas.sort((a, b) => a.eo - b.eo);
     const nPr = D.filter((d) => d.estado === 'PRONTO').length;
+    const fHoje = D.filter((d) => d.estado !== 'PRONTO' && agDevDias(d) === 0), fPar = D.filter(agDevParado);
+    // a faixa no topo da agenda do dono (para o Fabio o bloco já fica no topo)
+    if (dono) {
+      let topo = document.getElementById('agDevTopo');
+      const h2 = alvo.querySelector('h2');
+      if (!topo && h2) { topo = document.createElement('div'); topo.id = 'agDevTopo'; h2.insertAdjacentElement('afterend', topo); }
+      if (topo) topo.innerHTML = `<div class="contexto" style="text-align:left;margin:4px 0 8px;">
+        <b>Desenvolvimentos</b> · ${nPr} prontos de ${D.length}
+        · <a href="javascript:void(0)" onclick="agDevFiltro('hoje')" style="color:var(--info);">mudou hoje: <b>${fHoje.length}</b></a>
+        · <a href="javascript:void(0)" onclick="agDevFiltro('parado')" style="color:${fPar.length ? 'var(--farol-fora)' : 'var(--tx-3)'};">parado há 3+ dias: <b>${fPar.length}</b></a>
+        · <a href="javascript:void(0)" onclick="AGPL.filtro=null;agPlanoMontar();agIrDesenv()">ver ↓</a></div>`;
+    }
+    const fil = AGPL.filtro === 'hoje' ? fHoje : AGPL.filtro === 'parado' ? fPar : null;
     h += `<div class="ag-bloco" id="agDesenv">Desenvolvimentos <span class="f">· evolução: ${nPr} de ${D.length} prontos (${Math.round(100 * nPr / D.length)}%) · ${cont}</span></div>`
-      + etapas.map((e) => { const tit = `${agE(e.nome)} <span class="f">(${e.itens.length})</span>`, corpo = e.itens.map(linhaB).join('');
+      + (fil ? `<div style="margin:6px 2px;"><button type="button" class="preset-btn active" onclick="agDevFiltro(AGPL.filtro)">${AGPL.filtro === 'hoje' ? 'mudou hoje' : 'parado há 3+ dias'} (${fil.length}) ✕</button></div>${fil.map(linhaB).join('') || '<div class="ag-lin"><span class="t">Nenhum.</span></div>'}` : '')
+      + (fil ? '' : etapas.map((e) => { const tit = `${agE(e.nome)} <span class="f">(${e.itens.length})</span>`, corpo = e.itens.map(linhaB).join('');
         return e.eo === 6 || e.eo === 9
           ? `<details style="margin:6px 2px;"><summary style="cursor:pointer;color:var(--tx-3);font-size:13px;font-weight:700;">${tit}</summary>${corpo}</details>`
-          : `<div style="margin:10px 2px 4px;color:var(--tx-2);font-size:13px;font-weight:700;">${tit}</div>${corpo}`; }).join('');
+          : `<div style="margin:10px 2px 4px;color:var(--tx-2);font-size:13px;font-weight:700;">${tit}</div>${corpo}`; }).join(''));
   }
   box.innerHTML = h;
   if (AG_DESENV_IR) { AG_DESENV_IR = false; agIrDesenv(); }
