@@ -2690,7 +2690,7 @@ function cgAbaAdm() {
   // 07/11/2026 (dono 11:54, chat RH): editar a admissão enquanto está em andamento ou falta documento obrigatório
   const pEd = F.formando ? CARGOS.pessoas.find((p) => p.id === F.formando) : null;
   const edita = pEd && cgAdmDaPessoa(pEd.id);
-  let h = `<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">${F.formando === 0 || edita ? '' : '<button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Nova admissão</button>'}</div>
+  let h = `<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">${F.formando === 0 || edita ? '' : '<button type="button" class="preset-btn active" onclick="cgFormAbrir(0)">+ Nova admissão</button>'}<a href="../guia-admissao.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;" title="o passo a passo da admissão, de quem faz cada parte (18/11, pedido do dono #647)">Como funciona (guia)</a></div>
     ${F.formando === 0 ? `<div class="section-label" style="text-align:left;">Nova admissão</div>${cgFormPessoa(null)}` : ''}
     ${edita ? `<div id="cgAdmEditando" class="section-label" style="text-align:left;">Editar admissão · ${cgEsc(cgNome(pEd.nome))}</div>${cgFormPessoa(pEd, true)}` : ''}
     ${cgAdmAndamento()}`;
