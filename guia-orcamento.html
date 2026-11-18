@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Guia do orçamento</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Guia do orçamento (frente Atacado e Lojinha, 18/11/2026, molde do guia dos pedidos da lojinha). Texto: contexto/propostas-telas/2026-11-18-guia-orcamento.md */
+:root{
+  --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --line:#e3e1da; --tx:#1d1d1b; --tx-2:#5f5e58;
+  --cliente:#2f6f8f; --aprova:#7a4e9b; --robo:#3f7d4e; --separa:#9a6a1f; --atencao:#a8741a;
+  --f-titulo:"Space Grotesk",system-ui,sans-serif; --f-texto:"Inter",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --cliente:#6fb0d0; --aprova:#b994d6; --robo:#7fbf8c; --separa:#d9a85a; --atencao:#d9a85a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111110; --surface:#1e1e1c; --surface-2:#2a2a27; --line:#34332f; --tx:#eceae4; --tx-2:#a5a39b;
+  --cliente:#6fb0d0; --aprova:#b994d6; --robo:#7fbf8c; --separa:#d9a85a; --atencao:#d9a85a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f-texto);font-size:16px;line-height:1.5}
+.pg{max-width:720px;margin:0 auto;padding:28px 16px 48px;display:grid;gap:24px}
+h1,h2{font-family:var(--f-titulo);text-wrap:balance;margin:0}
+h1{font-size:1.8rem}
+h2{font-size:1.1rem}
+.sub{color:var(--tx-2);margin:6px 0 0}
+.quem{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--surface-2)}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.passos{list-style:none;margin:0;padding:0}
+.passo{display:grid;grid-template-columns:34px 1fr;gap:14px;position:relative;padding-bottom:18px}
+.passo:not(:last-child)::before{content:"";position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--line)}
+.n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-titulo);font-weight:700;color:var(--surface);background:var(--c)}
+.cx{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:6px}
+.topo{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.quando{font-size:.8rem;color:var(--tx-2)}
+.cx ul,.cx ol{margin:0;padding-left:20px;display:grid;gap:3px}
+.caminho{font-size:.85rem;font-weight:600;color:var(--tx-2)}
+.alerta{border:2px solid var(--atencao);border-radius:8px;background:var(--surface);padding:12px 14px}
+.alerta b{color:var(--atencao)}
+.btn{display:inline-block;margin-top:4px;padding:8px 14px;border-radius:6px;background:var(--cliente);color:var(--surface);font-weight:600;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="pg">
+  <header>
+    <h1>Guia do orçamento</h1>
+    <p class="sub">Do pedido do cliente ao orçamento aprovado e separado. O custo é o do dia; você só escolhe itens, quantidade e preço.</p>
+  </header>
+
+  <div class="quem">
+    <span class="chip" style="--c:var(--aprova)"><i></i>Fabio ou Rita</span>
+    <span class="chip" style="--c:var(--separa)"><i></i>Lana</span>
+  </div>
+
+  <ol class="passos">
+    <li class="passo" style="--c:var(--aprova)"><span class="n">1</span>
+      <div class="cx">
+        <div class="topo"><b>Montar o orçamento</b><span class="quando">quando o cliente pedir</span></div>
+        <div class="caminho">Painel → Atacado → Orçamentos → aba Montar</div>
+        <ol>
+          <li>Digite o <b>Cliente</b> (o nome aparece se já comprou) e o <b>Telefone</b>.</li>
+          <li>Escolha <b>Forma de entrega</b>, <b>Quando</b> e <b>Onde</b>.</li>
+          <li>Escolha o tipo: <b>Itens (T-bone, costelinha…)</b> ou <b>Kit burgers</b>.</li>
+          <li>Clique em <b>+ item</b>, busque o produto e informe a <b>quantidade</b>.
+            <ul>
+              <li>Itens: o preço sugerido já vem; mude se combinou outro.</li>
+              <li>Kit burgers: informe as <b>Pessoas</b>; <b>Burger padrão</b> monta o kit; o valor por pessoa aparece sozinho.</li>
+            </ul></li>
+          <li>Informe o <b>Frete</b> combinado (entra no total, sem lucro).</li>
+          <li>Confira <b>Lucro</b> e <b>Total ao cliente</b> embaixo e clique em <b>Salvar orçamento</b>.</li>
+        </ol>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#orcamentos">Abrir Orçamentos</a>
+      </div></li>
+
+    <li class="passo" style="--c:var(--aprova)"><span class="n">2</span>
+      <div class="cx">
+        <div class="topo"><b>Mandar ao cliente</b><span class="quando">logo depois de salvar</span></div>
+        <div class="caminho">Painel → Atacado → Orçamentos → aba Histórico</div>
+        <ul>
+          <li>Abra o orçamento e mande o total ao cliente.</li>
+        </ul>
+      </div></li>
+
+    <li class="passo" style="--c:var(--aprova)"><span class="n">3</span>
+      <div class="cx">
+        <div class="topo"><b>Cliente aceitou: aprovar</b><span class="quando">no mesmo dia</span></div>
+        <div class="caminho">Painel → Atacado → Orçamentos → aba Histórico → abra o orçamento</div>
+        <ol>
+          <li>Confira a data e o endereço de entrega.</li>
+          <li>Clique em <b>Aprovar</b>.</li>
+        </ol>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#orcamentos">Abrir Orçamentos</a>
+      </div></li>
+
+    <li class="passo" style="--c:var(--separa)"><span class="n">4</span>
+      <div class="cx">
+        <div class="topo"><b>Lana separa</b><span class="quando">antes da data de entrega</span></div>
+        <div class="caminho">Painel → Atacado → Orçamentos → aba Pedidos aprovados</div>
+        <ul>
+          <li>Veja os itens, a forma de entrega e a cobrança de cada pedido.</li>
+          <li>Separe e entregue na data marcada.</li>
+        </ul>
+        <a class="btn" href="https://cidadaodomundo-erp.github.io/sistema.html#orcamentos">Abrir Pedidos aprovados</a>
+      </div></li>
+  </ol>
+
+  <div class="alerta"><b>Importante:</b> aprovar já tira a mercadoria do estoque da Água Verde. Confira data e endereço antes. Aprovou por engano? Clique em <b>Voltar para orçado</b>: o estoque volta. O custo de cada item é o da última nota: ninguém digita custo.</div>
+</div>
+</body>
+</html>
