@@ -78,11 +78,40 @@ function usTelasTxt(u, R) {
   const m = u.modulos || []; if (!m.length) return '—';
   return m.slice(0, 4).map((k) => usE(R[k] || k)).join(', ') + (m.length > 4 ? ` <span style="color:var(--tx-4);">+${m.length - 4}</span>` : '');
 }
+// 18/11/2026 16:17 (dono, pelo Organizador: "tem como colocar uma ordenação no cabeçalho da tabela dos usuários e uma opção de
+// excluir usuarios inativos?"): clicar no cabeçalho ordena, clicar de novo inverte; a setinha mostra coluna e sentido.
+// "Excluir" só para inativo (bloqueado, ativo=false nas listas ou sem entrar há mais de 30 dias); nunca dono, robo.*, info@, administrativo@.
+// O banco (painel_usuario_excluir) confere tudo de novo.
+const US_ORD = { col: null, dir: 1 };
+const US_COLS = [['pessoa', 'Pessoa'], ['papel', 'Papel'], ['telas', 'Telas'], ['ultimo', 'Último acesso'], ['situacao', 'Situação']];
+function usSituacao(u) { return u.bloqueado ? 'bloqueado' : !u.tem_login ? 'sem login' : u.ativo === false ? 'inativo' : usDias(u) > 30 ? 'parado' : 'ativo'; }
+function usDias(u) { const t = u.ultimo_login || u.criado_em; return t ? (Date.now() - new Date(t).getTime()) / 864e5 : Infinity; }
+function usProtegido(u) { const e = String(u.email || '').toLowerCase(); let eu = ''; try { const ss = rmbSessao(); eu = String((ss && ss.user && ss.user.email) || '').toLowerCase(); } catch (x) {}
+  return e === eu || (u.papel === 'DONO' && u.todas_as_telas) || e.startsWith('robo.') || /^(info|administrativo)@/.test(e); }
+function usInativo(u) { return u.bloqueado || u.ativo === false || usDias(u) > 30; }
+function usChave(u, c, R) {
+  if (c === 'pessoa') return String(u.nome || u.email).toLowerCase();
+  if (c === 'papel') return `${u.papel || 'zzz'} ${u.unidade || ''}`.toLowerCase();
+  if (c === 'telas') return u.todas_as_telas ? 9999 : (u.modulos || []).length;
+  if (c === 'ultimo') return u.ultimo_login ? new Date(u.ultimo_login).getTime() : 0;
+  return usSituacao(u);
+}
+function usOrdenar(c) { if (US_ORD.col === c) US_ORD.dir = -US_ORD.dir; else { US_ORD.col = c; US_ORD.dir = c === 'ultimo' ? -1 : 1; } usDesenhar(); }
+function usExcluirPedir(em) { US.excluir = em; usDesenhar(); }
+async function usExcluir(email) {
+  avisoAcao('enviando', 'Excluindo o login…');
+  const r = await trRpcSeguro('painel_usuario_excluir', { p_email: email });
+  if (!r.ok) return avisoAcao('erro', `✗ NÃO excluiu ${email}: ${await trErroDe(r)}`, () => usExcluir(email));
+  US.excluir = null; US.aberto = null; await entrarUsuarios();
+  avisoAcao('ok', `✓ ${email} excluído às ${avisoHora()}: não entra mais e saiu da lista de telas. O histórico das listas fica.`);
+}
 function usDesenhar() {
   const alvo = document.getElementById('view-usuarios');
   if (US.erro) { alvo.innerHTML = `<h2>Usuários do painel</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ ${usE(US.erro)} <button type="button" class="preset-btn" onclick="entrarUsuarios()">Tentar de novo</button></div>`; return; }
   const L = US.L || [], R = usRotulos(), b = US.busca.trim().toLowerCase();
   const vis = L.filter((u) => !b || (u.email + ' ' + (u.nome || '') + ' ' + (u.papel || '') + ' ' + (u.unidade || '')).toLowerCase().includes(b));
+  if (US_ORD.col) vis.sort((x, y) => { const a = usChave(x, US_ORD.col, R), c = usChave(y, US_ORD.col, R); return (a < c ? -1 : a > c ? 1 : 0) * US_ORD.dir; });
+  const seta = (c) => US_ORD.col === c ? (US_ORD.dir > 0 ? ' ▲' : ' ▼') : ' <span style="opacity:.3;">↕</span>';
   let h = `<h2>Usuários do painel</h2>
     <div class="contexto" style="text-align:left;">Quem entra no painel, o que cada um vê e a senha. Clique na pessoa para mudar.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;">
@@ -90,13 +119,20 @@ function usDesenhar() {
       <input id="usBusca" type="search" placeholder="buscar nome, e-mail, loja" value="${usE(US.busca)}" oninput="usBuscar(this.value)" style="flex:0 1 260px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:7px 10px;font:inherit;">
       <span style="font-size:12px;color:var(--tx-4);">${L.length} pessoas · ${L.filter((u) => u.bloqueado).length} bloqueadas · ${L.filter((u) => !u.tem_login).length} sem login criado</span></div>`;
   if (US.novo) h += usForm(null);
-  h += `<div id="tabelaUsuarios" style="overflow-x:auto;"><table><thead><tr><th>Pessoa</th><th>Papel</th><th>Telas</th><th>Último acesso</th><th>Situação</th></tr></thead><tbody>
+  h += `<div id="tabelaUsuarios" style="overflow-x:auto;"><table><thead><tr>${US_COLS.map(([c, t]) => `<th style="cursor:pointer;user-select:none;" title="ordenar por ${t.toLowerCase()} (clique de novo inverte)" onclick="usOrdenar('${c}')">${t}${seta(c)}</th>`).join('')}</tr></thead><tbody>
     ${vis.map((u) => `<tr class="us-lin" style="cursor:pointer;" onclick="usAbrir(${usE(JSON.stringify(u.email))})">
       <td><b>${usE(u.nome || u.email.split('@')[0])}</b><br><span style="font-size:11.5px;color:var(--tx-4);">${usE(u.email)}</span></td>
       <td>${usE((u.papel || '—').toLowerCase())}${u.unidade ? ' · ' + usE(u.unidade) : ''}</td>
       <td style="white-space:normal;font-size:12.5px;">${usTelasTxt(u, R)}</td>
       <td>${usQuando(u.ultimo_login)}</td>
-      <td>${u.bloqueado ? '<span style="color:var(--farol-fora);font-weight:700;">bloqueado</span>' : !u.tem_login ? '<span style="color:var(--farol-perto);">sem login</span>' : '<span style="color:var(--farol-ok);">ativo</span>'}</td></tr>
+      <td>${(() => { const st = usSituacao(u);
+        const sel = st === 'bloqueado' || st === 'inativo' ? `<span style="color:var(--farol-fora);font-weight:700;">${st}</span>` : st === 'sem login' ? '<span style="color:var(--farol-perto);">sem login</span>'
+          : st === 'parado' ? `<span style="color:var(--farol-perto);">sem entrar há ${Math.floor(usDias(u))} dias</span>` : '<span style="color:var(--farol-ok);">ativo</span>';
+        if (!usInativo(u) || usProtegido(u)) return sel;
+        const emJs = usE(JSON.stringify(u.email));
+        return sel + (US.excluir === u.email
+          ? `<div onclick="event.stopPropagation()" style="margin-top:6px;white-space:normal;">Excluir o login de ${usE(u.nome || u.email)}? Ele não entra mais no painel. <button type="button" class="preset-btn" style="color:var(--farol-fora);font-weight:700;" onclick="usExcluir(${emJs})">Sim, excluir</button> <button type="button" class="preset-btn" onclick="US.excluir=null;usDesenhar()">Não</button></div>`
+          : ` <button type="button" class="preset-btn" style="margin-left:6px;color:var(--farol-fora);" onclick="event.stopPropagation();usExcluirPedir(${emJs})">Excluir</button>`); })()}</td></tr>
       ${US.aberto === u.email ? `<tr><td colspan="5">${usForm(u)}</td></tr>` : ''}`).join('') || '<tr><td colspan="5">Ninguém com essa busca.</td></tr>'}
     </tbody></table></div>`;
   alvo.innerHTML = h;
