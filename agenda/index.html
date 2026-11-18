@@ -65,6 +65,17 @@ const agSem = (d) => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date
 const agR = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const agR0 = (v) => 'R$ ' + Math.round(Number(v || 0)).toLocaleString('pt-BR');
 const agE = (s) => trEscH(String(s == null ? '' : s));
+// 18/11/2026 (dono, agenda #283 "não tem como mandar o link do artefato por aqui?", #284 "mandar o link tbem", #851 "aonde está
+// o dossie?"): endereço dentro do texto (contexto, retorno, resposta, conversa) vira link de um clique, numa aba nova
+const agT = (s) => agE(s).replace(/(https?:\/\/[^\s<"']+?)([.,;:)]*)(?=\s|$|<)/g, (m, u, fim) => `<a href="${u}" target="_blank" rel="noopener" style="color:var(--info);font-weight:700;">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>${fim}`);
+// o campo link do item: endereço (http…, página .html) abre numa aba nova; nome de tela abre a tela; "chat:" é só rótulo
+function agLinkDe(link) {
+  const l = String(link || '').trim();
+  if (!l || l.startsWith('chat:')) return { ir: null, url: null };
+  if (/^https?:\/\//.test(l)) return { ir: null, url: l };
+  if (/\.html/.test(l)) return { ir: null, url: '../' + l.replace(/^\/+/, '') };
+  return { ir: l.replace(/^#/, ''), url: null };
+}
 const agNome = (s) => String(s || '').toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 // atalho para a tela onde o dono age (na casca abre a tela; solta, troca o endereço)
 function agIr(nome) { if (NA_CASCA) avisarCasca({ tipo: 'casca-modulo', nome }); else location.href = '../sistema.html#' + nome; }
@@ -146,7 +157,7 @@ function agDesenhar() {
     if (dia > fim) return;
     const chat = String(p.link || '').startsWith('chat:') ? p.link.slice(5) : null;
     // 12/11/2026 (dono 01:30): "desde dd/mm (N dias)" e "prazo dd/mm" com farol em cada cartão
-    add({ dep: !espera, grupo: espera ? 'anda' : 'dep', dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : String(p.link || '').replace(/^#/, '') || null, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
+    add({ dep: !espera, grupo: espera ? 'anda' : 'dep', dia, txt: `${agE(p.o_que)} ${agDatas(p.desde, p.prazo, espera)}`, ir: chat ? null : agLinkDe(p.link).ir, url: chat ? null : agLinkDe(p.link).url, chat, id: p.id, frente: p.frente, tipo: espera ? '' : p.prazo && p.prazo < hoje ? 'atraso' : 'alerta', pend: p,
       desde: String(p.desde || '').slice(0, 10), prazo: p.prazo || '' });
   });
   // 13/11/2026 (chat Avisos): os rascunhos esperando o "manda" saíram da agenda geral e vivem na aba Avisos; contam no número
@@ -200,7 +211,8 @@ function agDesenhar() {
   let h = '<h2>Minha agenda</h2>' + agOrdemHtml(true) + agTempoHtml();
   if (falhou.length) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li: ${falhou.join(', ')}. <button type="button" class="preset-btn" onclick="entrarAgenda()">Tentar de novo</button></div>`;
   const linha = (x) => {
-    const acao = x.ir ? `<button type="button" class="preset-btn" onclick="agIr('${agE(x.ir)}')">abrir</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
+    const acao = x.url ? `<a class="preset-btn active" href="${agE(x.url)}" target="_blank" rel="noopener" style="text-decoration:none;font-weight:700;" title="${agE(x.url)}">abrir o link ↗</a>`
+      : x.ir ? `<button type="button" class="preset-btn active" onclick="agIr('${agE(x.ir)}')">abrir a tela →</button>` : x.chat ? `<span class="f">chat ${agE(x.chat)}</span>` : '';
     // 12/11/2026 (dono 01:09): "Feito" não fecha — fica "feito por você — conferindo" e o robô confere na fonte
     const feito = x.id && !(x.pend && x.pend.feito_em) ? `<button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${x.id})">Feito</button>` : '';
     // 12/11/2026 (dono, pelo Organizador): o contexto do item à vista, e responder ou tirar dúvida ali mesmo
@@ -212,16 +224,16 @@ function agDesenhar() {
       <a href="javascript:void(0)" onclick="agFeito(${p.id},true)">desfazer</a></div>` : '';
     // 17/11/2026 (Rotinas; dono 11:55: "até receber a resposta, o assunto já foi tratado e fica desatualizado"): recebido → tratado
     const tratado = p.resposta && p.retorno_em && p.respondido_em && p.retorno_em >= p.respondido_em;
-    const resp = p.resposta ?`<div class="ag-ctx" style="color:var(--farol-ok);">${tratado ? `✓ tratado ${agDm(new Date(p.retorno_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.retorno_em)}` : `✓ recebido ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — em análise`}: “${agE(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>${tratado && p.retorno ? `<div class="ag-ctx" style="color:var(--info);">↩ ${agE(p.retorno)}</div>` : ''}` : '';
+    const resp = p.resposta ?`<div class="ag-ctx" style="color:var(--farol-ok);">${tratado ? `✓ tratado ${agDm(new Date(p.retorno_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.retorno_em)}` : `✓ recebido ${agDm(new Date(p.respondido_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} às ${agHm(p.respondido_em)} — em análise`}: “${agT(p.resposta)}” <a href="javascript:void(0)" onclick="agRespForm(${p.id})">mudar</a></div>${tratado && p.retorno ? `<div class="ag-ctx" style="color:var(--info);">↩ ${agT(p.retorno)}</div>` : ''}` : '';
     // 12/11/2026 (Organizador): a frente devolve ao dono ("↩ resposta para você"); o fio guarda a conversa
     const fio = Array.isArray(p.fio) ? p.fio : [];
     const quando = (t) => t ? `${agDm(new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))} ${agHm(t)}` : '';
-    const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
-    const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
+    const volta = !p.resposta && !p.feito_em && p.retorno ?`<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ resposta para você${p.retorno_em ? ' (' + quando(p.retorno_em) + ')' : ''}: <span style="font-weight:400;color:var(--tx-1);">${agT(p.retorno)}</span></div>` : '';
+    const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${quando(m.em)}: ${agT(m.texto)}</div>`).join('')}</details>` : '';
     const bts = p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="o item sai de hoje sem fechar" onclick="agAdiarForm(${p.id})">Adiar para…</button>`;
     const nv = agRetNovo(p);
     return `<div class="ag-lin ${x.tipo}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t"><span class="ag-id" title="número do item (os chats citam por ele)">#${p.id}</span>${nv ? agBolinha(p.id) : ''}${x.txt}${x.frente ? ` <span class="f">· ${agE(x.frente)}</span>` : ''}</span>${acao}${bts}${feito}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agT(p.contexto)}</div>` : ''}${feitoTx}${volta}${resp}${conversa}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   const porDia = (lista, vazio) => {
     let b = '';
@@ -574,12 +586,12 @@ async function agPlanoMontar(reler) {
     const fio = Array.isArray(p.fio) ? p.fio : [];
     const atraso = p.prazo && p.prazo < hoje && !p.resposta && !p.feito_em;
     const estado = p.feito_em ? `<div class="ag-ctx" style="color:var(--farol-ok);">✓ feito ${quando(p.feito_em)} — conferindo</div>`
-      : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">${p.retorno_em && p.respondido_em && p.retorno_em >= p.respondido_em ? '✓ tratado ' + quando(p.retorno_em) : '✓ recebido ' + quando(p.respondido_em) + ' — em análise'}: ${agE(p.resposta)}</div>`
-      : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agE(p.retorno)}</span></div>` : '';
+      : p.resposta ? `<div class="ag-ctx" style="color:var(--farol-ok);">${p.retorno_em && p.respondido_em && p.retorno_em >= p.respondido_em ? '✓ tratado ' + quando(p.retorno_em) : '✓ recebido ' + quando(p.respondido_em) + ' — em análise'}: ${agT(p.resposta)}</div>`
+      : p.retorno ? `<div class="ag-ctx" style="color:var(--info);font-weight:700;">↩ ${quando(p.retorno_em)}: <span style="font-weight:400;color:var(--tx-1);">${agT(p.retorno)}</span></div>` : '';
     const bts = dono || p.resposta || p.feito_em ? '' : `<button type="button" class="preset-btn" onclick="agRespForm(${p.id})">Responder</button><button type="button" class="preset-btn" title="avisar que já fez (o robô confere)" onclick="agFeito(${p.id})">Feito</button>`;
     const nv = !dono && agRetNovo(p);   // no "Com o Fabio" a resposta é para ele: só ele apaga a bolinha
     return `<div class="ag-lin ${atraso ? 'atraso' : p.resposta || p.feito_em ? '' : 'alerta'}" id="agItem_${p.id}" style="flex-wrap:wrap;"${nv ? ` onclick="agRetVisto(${p.id})"` : ''}><span class="t"><span class="ag-id" title="número do item (os chats citam por ele)">#${p.id}</span>${nv ? agBolinha(p.id) : ''}${agE(p.o_que)} ${agDatas(p.desde, p.prazo, !!(p.resposta || p.feito_em))}${p.frente ? ` <span class="f">· ${agE(p.frente)}</span>` : ''}</span>${bts}
-      ${p.contexto ? `<div class="ag-ctx">${agE(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : ''}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
+      ${p.contexto ? `<div class="ag-ctx">${agT(p.contexto)}</div>` : ''}${estado}${fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) => `<div><b>${agE(m.de)}</b> ${quando(m.em)}: ${agT(m.texto)}</div>`).join('')}</details>` : ''}${agAnxLugar('pendencia', p.id)}<div id="agForm_${p.id}" style="flex-basis:100%;"></div></div>`;
   };
   let h = '';
   if (AGPL.pend && AGPL.pend.erro) h += `<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não li as pendências: ${agE(AGPL.pend.erro)}</div>`;
@@ -689,7 +701,7 @@ function agPessoaHtml(L, soLeitura) {
         : x.estado === 'Feito sem conferência' ? `feito por você ${agQuando(x.concluiu_em)} — sem conferência automática: quem passou a atividade confere${x.nota ? ' · ' + agE(x.nota) : ''}`
         : x.estado === 'Conferido' ? '<span style="color:var(--farol-ok);">✓ conferido</span>'
         : x.estado === 'Falta' ? `<span style="color:var(--info);font-weight:700;">↩ o robô conferiu ${agQuando(x.conferido_em)} e ainda ${falta === '1' ? 'falta 1' : 'faltam ' + (falta || 'itens')}.</span> Termine e toque em Feito de novo`
-        : x.estado === 'Voltou' ? `<span style="color:var(--info);font-weight:700;">↩ resposta para você${x.retorno_em ? ' (' + agQuando(x.retorno_em) + ')' : ''}:</span> <span style="color:var(--tx-1);">${agE(x.retorno)}</span>`
+        : x.estado === 'Voltou' ? `<span style="color:var(--info);font-weight:700;">↩ resposta para você${x.retorno_em ? ' (' + agQuando(x.retorno_em) + ')' : ''}:</span> <span style="color:var(--tx-1);">${agT(x.retorno)}</span>`
         : x.estado === 'Respondido' ? `<span style="color:var(--farol-ok);">✓ resposta enviada ${agQuando(x.resposta_em)}</span> — aguardando quem passou a atividade`
         : x.estado === 'Atrasada' ? `atrasada desde ${agDm(x.dia)}`
         : x.estado === 'Travada' ? 'travada: sem resposta ao robô'
@@ -706,9 +718,9 @@ function agPessoaHtml(L, soLeitura) {
       // o contexto do item e a conversa (Feito, respostas e retornos), como na agenda do dono
       const fio = Array.isArray(x.fio) ? x.fio : [];
       const conversa = fio.length > 1 ? `<details class="ag-ctx"><summary style="cursor:pointer;">conversa (${fio.length})</summary>${fio.map((m) =>
-        `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agE(m.texto)}</div>`).join('')}</details>` : '';
+        `<div><b>${m.de === 'voce' ? 'você' : agE(m.de)}</b> ${agQuando(m.em)}: ${agT(m.texto)}</div>`).join('')}</details>` : '';
       h += `<div class="ag-lin ${AG_ESTADO[x.estado] || ''}" id="agItem_${id}" style="flex-wrap:wrap;"><span class="t"><span class="ag-id" title="número do item">#${id}</span>${agE(x.atividade)} ${agDatas(x.dia_original, x.dia, AG_FEITO.includes(x.estado))}${nota ? ` <span class="f">· ${nota}</span>` : ''}</span><span class="bts">${bts}</span>
-        ${x.contexto ? `<div class="ag-ctx">${agE(x.contexto)}</div>` : ''}${conversa}${agAnxLugar('tarefa', id)}</div>`;
+        ${x.contexto ? `<div class="ag-ctx">${agT(x.contexto)}</div>` : ''}${conversa}${agAnxLugar('tarefa', id)}</div>`;
       if (!soLeitura && AGP.form && AGP.form.id === id) h += agPessoaFormHtml(id, AGP.form.tipo);
     });
   });
@@ -764,9 +776,9 @@ async function agBuscaAplicar() {
           <span class="f">· ${agE(p.frente || '')}${p.para ? ' · agenda de ' + agE(quem(p.para)) : ''}${p.desde ? ' · desde ' + agDm(String(p.desde).slice(0, 10)) : ''}</span> · ${est}</span>
         ${naTela && naTela.style.display !== 'none' ? `<button type="button" class="preset-btn" onclick="document.getElementById('agItem_${p.id}').scrollIntoView({block:'center',behavior:'smooth'})">ir ao cartão</button>` : ''}
         <details class="ag-ctx"${AG_BUSCA_FOCO === p.id || L.length === 1 ? ' open' : ''}><summary style="cursor:pointer;">detalhes</summary>
-          ${p.contexto ? `<div>${agE(p.contexto)}</div>` : ''}
-          ${p.resposta ? `<div style="color:var(--farol-ok);">resposta${p.respondido_em ? ' (' + dmh(p.respondido_em) + ')' : ''}: ${agE(p.resposta)}</div>` : ''}
-          ${p.retorno ? `<div style="color:var(--info);">retorno${p.retorno_em ? ' (' + dmh(p.retorno_em) + ')' : ''}: ${agE(p.retorno)}</div>` : ''}
+          ${p.contexto ? `<div>${agT(p.contexto)}</div>` : ''}
+          ${p.resposta ? `<div style="color:var(--farol-ok);">resposta${p.respondido_em ? ' (' + dmh(p.respondido_em) + ')' : ''}: ${agT(p.resposta)}</div>` : ''}
+          ${p.retorno ? `<div style="color:var(--info);">retorno${p.retorno_em ? ' (' + dmh(p.retorno_em) + ')' : ''}: ${agT(p.retorno)}</div>` : ''}
           ${fio.length ? fio.map((m) => `<div><b>${m.de === 'dono' ? 'você' : agE(m.de)}</b> ${dmh(m.em)}: ${agE(m.texto || m.text || '')}</div>`).join('') : ''}
         </details></div>`;
     }).join('');
