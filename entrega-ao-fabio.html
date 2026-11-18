@@ -150,7 +150,7 @@ function card(i) {
     ? `<div class="resp"><input id="txt_${esc(i.id)}" placeholder="o que falta? (curto)" maxlength="1000"><button class="bt cheio" onclick="responder('${esc(i.id)}','falta')">Enviar</button><button class="bt" onclick="D.aberto=null;desenhar()">Cancelar</button></div>`
     : `<div class="resp"><button class="bt okb" onclick="responder('${esc(i.id)}','ok')">Recebido, ok</button><button class="bt faltab" onclick="D.aberto='${esc(i.id)}';desenhar();document.getElementById('txt_${esc(i.id)}').focus()">Falta algo</button></div>`;
   return `<div class="item ${cls}" id="it_${esc(i.id)}"><div class="topo"><span class="tit">${esc(i.titulo)}</span><span class="est ${cls}">${rot}</span></div>
-    <div class="info">Onde está: ${onde} · Quem opera hoje: ${esc(i.quem || '—')}</div>
+    <div class="info">Onde está: ${onde} · Quem opera hoje: ${esc(semPrazo(i.quem) || '—')}</div>
     <details class="det"><summary>o que foi combinado e o que já está feito</summary>
       ${i.detalhe ? `<p>${esc(semPrazo(i.detalhe))}</p>` : ''}${i.andamento ? `<p><b>Último passo${i.andamento_em ? ' (' + esc(i.andamento_em.slice(8,10) + '/' + i.andamento_em.slice(5,7)) + ')' : ''}:</b> ${esc(semPrazo(i.andamento))}</p>` : ''}${i.evidencia ? `<p><b>Prova:</b> ${esc(i.evidencia)}</p>` : ''}</details>
     ${dito}${form}<div class="aviso" id="av_${esc(i.id)}"></div></div>`;
