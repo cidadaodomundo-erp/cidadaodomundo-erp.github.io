@@ -566,7 +566,8 @@ const AGPL = { pend: null, dev: null, filtro: null };
 // idade do card pelo andamento_em; parado = EM_CONSTRUCAO sem andamento há mais de 3 dias
 function agDevDias(d) {
   if (!d.andamento_em) return null;
-  const dia = new Date(d.andamento_em).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  // andamento_em pode vir só como data (AAAA-MM-DD): nesse caso vale a própria data (new Date leria meia-noite UTC = véspera em SP)
+  const t = String(d.andamento_em), dia = t.length <= 10 ? t : new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   return Math.round((new Date(agHoje() + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5);
 }
 const agDevParado = (d) => d.estado === 'EM_CONSTRUCAO' && agDevDias(d) != null && agDevDias(d) > 3;
