@@ -24,7 +24,8 @@ window.CASCA_MODULOS_CFG = {
     cartao: { rotulo: 'Compra no cartão', icone: '💳' },
     compliance: { rotulo: 'Documentos e renovações', icone: '📑' },   // 13/11: alvarás, licenças, limpezas, extintores (Compliance)   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     saiposcod: { rotulo: 'Código que falhou no Saipos', icone: '⚠️' },   // 16/11: item que cai no Diversos (Cardápio)
-    regras: { rotulo: 'Regras em vigor', icone: '✅' },   // 16/11: o que combinamos está valendo? (só o dono)
+    regras: { rotulo: 'Regras em vigor', icone: '✅' },
+    biblioteca: { rotulo: 'Biblioteca', icone: '📚' },   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
     motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
   // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
   // um item só no menu; ao abrir, a casca mostra as abas logo abaixo do título. Cada aba é a tela que já existia (mesma
@@ -37,7 +38,7 @@ window.CASCA_MODULOS_CFG = {
 };
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'regras', 'compliance', 'vendasagora'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },

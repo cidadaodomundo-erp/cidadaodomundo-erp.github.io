@@ -256,10 +256,10 @@
 </div>
 
 <script src="casca/menu.js?v=20261117t"></script>
-<script src="casca/paginas.js?v=20261117nfc"></script>
-<script src="casca/modulos.js?v=20261117nfc"></script>
+<script src="casca/paginas.js?v=20261118bib"></script>
+<script src="casca/modulos.js?v=20261118bib"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
-<script src="casca/busca.js?v=20261117nfc"></script>
+<script src="casca/busca.js?v=20261118bib"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -500,6 +500,8 @@ function visivel(chave) {
   if (chave === 'cartao') return true;
   // 13/11/2026: Documentos e renovações — cada responsável vê a sua lista; a view já filtra a filial
   if (chave === 'compliance') return true;
+  // 18/11/2026: Biblioteca abre para todo login; a RLS de painel_biblioteca mostra a cada um só o que é dele
+  if (chave === 'biblioteca') return true;
   // 16/11/2026: Código que falhou no Saipos usa a MESMA permissão das Fichas técnicas (sem chave nova no painel_acesso); o banco filtra a filial
   if (chave === 'saiposcod') return visivel('fichas');
   // 17/11/2026: Notas que chegaram — quem vê a contagem do estoque ou o teto de compras; o banco confere o papel ao gravar

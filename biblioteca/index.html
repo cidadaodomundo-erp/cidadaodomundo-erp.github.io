@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Biblioteca · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- BIBLIOTECA (qua 18/11/2026, chat Telas). Dono 18/11 01:40: "termos um local no painel onde as pessoas pudessem abrir os
+     artefatos, eles são ótimas ferramentas, mas acessar eles poderia ser mais fácil". Livro chat-frente-telas/respostas/artefato-um-clique-e-biblioteca.
+     Lê painel_biblioteca (a RLS mostra a cada login só o que é dele). Cadastro: a frente grava pela porta do SQL
+     (molde script/sql/painel_biblioteca_2026_11_18.sql). Quem mexe na tela: o chat "Telas do painel". -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .bb-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px; margin:6px 0 16px; }
+  .bb-card { display:flex; flex-direction:column; gap:6px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px; text-decoration:none; color:var(--tx-1); }
+  .bb-card:hover { border-color:var(--marca-amarelo); }
+  .bb-card b { font-size:15px; }
+  .bb-card .d { font-size:12.5px; color:var(--tx-3); }
+  .bb-card .f { font-size:11.5px; color:var(--tx-4); }
+  .bb-card .ir { margin-top:auto; font-weight:700; color:var(--info); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-biblioteca" class="modulo" style="display:none;"><div id="view-biblioteca"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const BB = { L: null, erro: null, tipo: null, busca: '' };
+const bbE = (s) => trEscH(String(s == null ? '' : s));
+const BB_TIPO = { guia: ['Passo a passo', 'como fazer, tela por tela'], estudo: ['Estudos', 'análises para decidir'], dossie: ['Dossiês', 'documentos prontos para enviar'], ferramenta: ['Ferramentas', 'páginas de apoio'] };
+async function entrarBiblioteca() {
+  const alvo = document.getElementById('view-biblioteca');
+  if (!BB.L) alvo.innerHTML = '<h2>Biblioteca</h2><div class="contexto">Carregando…</div>';
+  try { BB.L = await consultarTudo('painel_biblioteca?select=id,titulo,tipo,frente,url,descricao,para,so_neto_fabio,ordem,atualizado_em&order=ordem,titulo'); BB.erro = null; }
+  catch (e) { BB.erro = e.message; }
+  bbDesenhar();
+}
+function bbBuscar(v) { BB.busca = v; clearTimeout(window._bbB); window._bbB = setTimeout(() => { bbDesenhar(); const e = document.getElementById('bbBusca'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 200); }
+function bbCard(x) {
+  const claude = /^https:\/\/claude\.ai\//.test(x.url || '');
+  const quem = x.so_neto_fabio ? 'só Neto e Fabio (pede login)' : claude ? 'só você (abre no seu Claude)' : (x.para && x.para.length ? 'para ' + x.para.map((p) => p.toLowerCase()).join(', ') : 'para toda a equipe');
+  return `<a class="bb-card" href="${bbE(x.url)}" target="_blank" rel="noopener">
+    <b>${bbE(x.titulo)}</b>${x.descricao ? `<span class="d">${bbE(x.descricao)}</span>` : ''}
+    <span class="f">${bbE(x.frente)} · ${bbE(quem)}</span><span class="ir">Abrir ↗</span></a>`;
+}
+function bbDesenhar() {
+  const alvo = document.getElementById('view-biblioteca');
+  if (BB.erro) { alvo.innerHTML = `<h2>Biblioteca</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler: ${bbE(BB.erro)} <button type="button" class="preset-btn" onclick="entrarBiblioteca()">Tentar de novo</button></div>`; return; }
+  const L = BB.L || [], b = BB.busca.trim().toLowerCase();
+  const vis = L.filter((x) => (!BB.tipo || x.tipo === BB.tipo) && (!b || (x.titulo + ' ' + (x.descricao || '') + ' ' + x.frente).toLowerCase().includes(b)));
+  const tipos = Object.keys(BB_TIPO).filter((t) => L.some((x) => x.tipo === t));
+  let h = `<h2>Biblioteca</h2>
+    <div class="contexto" style="text-align:left;">Guias, estudos e documentos prontos. Clique para abrir — abre numa aba nova.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0 4px;">
+      <input id="bbBusca" type="search" placeholder="buscar" value="${bbE(BB.busca)}" oninput="bbBuscar(this.value)" style="flex:0 1 240px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:7px 10px;font:inherit;">
+      <button type="button" class="preset-btn${BB.tipo ? '' : ' active'}" onclick="BB.tipo=null;bbDesenhar()">Tudo (${L.length})</button>
+      ${tipos.map((t) => `<button type="button" class="preset-btn${BB.tipo === t ? ' active' : ''}" onclick="BB.tipo='${t}';bbDesenhar()">${BB_TIPO[t][0]} (${L.filter((x) => x.tipo === t).length})</button>`).join('')}</div>`;
+  if (!L.length) h += '<div class="contexto">Ainda não há nada aqui para o seu login.</div>';
+  else if (!vis.length) h += '<div class="contexto">Nada com esse filtro.</div>';
+  else (BB.tipo ? [BB.tipo] : tipos).forEach((t) => {
+    const g = vis.filter((x) => x.tipo === t); if (!g.length) return;
+    h += `<div class="section-label" style="text-align:left;margin-top:12px;">${BB_TIPO[t][0]} <span style="font-weight:400;color:var(--tx-4);text-transform:none;">· ${BB_TIPO[t][1]}</span></div><div class="bb-grade">${g.map(bbCard).join('')}</div>`;
+  });
+  alvo.innerHTML = h;
+}
+
+const TELA = 'biblioteca';
+let MODULO_ATUAL = 'biblioteca';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-biblioteca').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarBiblioteca(); };
+entrarBiblioteca();
+</script>
+</body>
+</html>
