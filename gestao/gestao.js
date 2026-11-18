@@ -8552,6 +8552,7 @@ const FXL_ORIGEM = { SAIPOS: 'título do Saipos', SAIPOS_PAGO: 'pago no Saipos d
   BONUS: 'bônus para a XP', EPADOCA: 'boleto do atacado', LISTAS: 'lista entre lojas', PROVISAO: 'provisão mensal',
   'FORA DA FOLHA': 'fora da folha', FATURA_CARTAO: 'fatura do cartão',
   RH_PREVISAO: 'folha prevista', NF_SEM_TITULO: 'nota sem título', BONUS_FILIAL: 'bônus das filiais',
+  CARTAO_SEM_TITULO: 'cartão: compra sem título',   // 18/11/2026 (Financeiro): parcela do Mercado Livre no cartão sem título no Saipos
   EXTRATO: 'no banco, sem lançamento' };
 
 function fxlDiasAte() {
