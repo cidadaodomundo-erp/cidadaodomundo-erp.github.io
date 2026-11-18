@@ -4935,7 +4935,13 @@ async function entrarReqPedir() {
     REQ.lider = (Array.isArray(lid) ? lid : []).find((x) => x.unidade === u) || null;
     REQ.manda = rm.ok ? !!(await rm.json()) : false;
     REQ.unidade = u;
-    if (!REQ.praca) REQ.praca = REQ.lider ? REQ.lider.setor : '';
+    // 18/11/2026 (dono 14:25: "liberar as requisições ... nos usuários da Flavia e Yaimar"): quem pede e não é líder
+    // (Yaimar, Flávia no salão; Alejo, Gabriel, João Pedro no delivery) acha a praça pelo banco; sem ela, vale o setor do líder
+    if (!REQ.praca) {
+      let v = null;
+      try { const mp = await trRpcSeguro('est_requisicao_minha_praca', { p_unidade: u }); v = mp.ok ? await mp.json() : null; } catch (e) { v = null; }
+      REQ.praca = v || (REQ.lider ? REQ.lider.setor : '');
+    }
     await reqMinhasCarregar();
     reqPedirDesenhar();
   } catch (e) {
