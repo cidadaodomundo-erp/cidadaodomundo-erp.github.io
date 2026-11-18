@@ -74,7 +74,7 @@ function cpDesenhar() {
   const card = (k, cls, rot, sub) => `<div class="card ${cls}" style="cursor:pointer;${CP.filtro === k ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="CP.filtro=CP.filtro==='${k}'?null:'${k}';cpDesenhar()">
       <div class="card-lbl">${rot}</div><div class="card-val">${g(k)}</div><div class="card-pct">${sub}</div></div>`;
   const lojas = [...new Set(base.map((x) => x.unidade))].sort();
-  let h = `<h2>Documentos e renovações</h2>
+  let h = `<h2>Documentos e renovações <a href="../guia-compliance.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;font-size:12px;" title="o passo a passo de quem cuida de cada renovação">Como funciona (guia)</a></h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px;">
       <button type="button" class="preset-btn${CP.minha ? ' active' : ''}" onclick="CP.minha=true;cpDesenhar()">Minha lista</button>
       <button type="button" class="preset-btn${CP.minha ? '' : ' active'}" onclick="CP.minha=false;cpDesenhar()">Todos</button>
