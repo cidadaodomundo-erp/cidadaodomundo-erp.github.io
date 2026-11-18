@@ -39,7 +39,7 @@
 
 <script src="../nucleo/nucleo.js?v=20261109a"></script>
 <script>
-const CC = { cartoes: [], compras: [], faturas: null, erro: null, cancelando: null };
+const CC = { cartoes: [], compras: [], faturas: null, erro: null, cancelando: null, pend: null, pendAberto: null, mesmoAssim: false };
 const ccE = (s) => trEscH(String(s == null ? '' : s));
 const ccR = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ccD = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '–';
@@ -62,7 +62,11 @@ async function entrarCartao() {
     CC.cartoes = cartoes || []; CC.compras = compras || []; CC.erro = null;
   } catch (e) { CC.erro = e.message; }
   // as faturas já anexadas: só quem vê o financeiro lê; os outros não veem a lista (o anexar continua valendo)
-  CC.faturas = await consultarTudo('fin_cartao_fatura?select=id,conta_cartao,vencimento,total,anexado_por,anexado_em&order=vencimento.desc,conta_cartao&limit=24').catch(() => null);
+  // 18/11/2026 (Cartões; proposta 2026-11-18-fatura-cartao-conferir-no-anexo): o resultado da leitura de cada fatura
+  // (estado, leitura_obs) e as cobranças da fatura fechada que ninguém registrou
+  [CC.faturas, CC.pend] = await Promise.all([
+    consultarTudo('fin_cartao_fatura?select=id,conta_cartao,vencimento,total,anexado_por,anexado_em,estado,leitura_obs,lido_em&order=vencimento.desc,conta_cartao&limit=24').catch(() => null),
+    consultarTudo('vw_fin_cartao_fatura_pendente?select=fatura_id,conta_cartao,unidade,vencimento,linha_id,data_compra,descricao,final_cartao,parcela,parcelas,valor,grupo&order=grupo,data_compra').catch(() => null)]);
   ccDesenhar();
 }
 function ccDesenhar() {
@@ -83,7 +87,7 @@ function ccDesenhar() {
     </div>`;
   if (CC.faturas && CC.faturas.length) h += `<div id="tabelaCcFaturas" style="margin-top:8px;"><table><thead><tr><th>Cartão</th><th>Vencimento</th><th>Total</th><th>Anexada</th></tr></thead><tbody>
     ${CC.faturas.map((f) => `<tr><td>${ccE(nomeCartao(f.conta_cartao))}</td><td>${ccD(f.vencimento)}</td><td>${f.total == null ? '–' : ccR(f.total)}</td>
-      <td style="color:var(--farol-ok);">✓ ${ccD(String(f.anexado_em || '').slice(0, 10))}${f.anexado_por ? ' · ' + ccE(String(f.anexado_por).split('@')[0]) : ''}</td></tr>`).join('')}</tbody></table></div>`;
+      <td style="white-space:normal;">${ccFatSituacao(f)}</td></tr>`).join('')}</tbody></table></div>`;
   // 2) REGISTRAR COMPRA
   h += `<div class="section-label" style="text-align:left;margin-top:18px;">Registrar compra</div>
     <div class="cc-form">
@@ -98,6 +102,7 @@ function ccDesenhar() {
       <label style="flex-direction:row;align-items:center;gap:6px;color:var(--tx-2);"><input id="ccAssin" type="checkbox" style="width:auto;"> É assinatura (todo mês)</label>
       <button type="button" class="preset-btn active" style="padding:10px 14px;" onclick="ccRegistrar()">Registrar compra</button>
     </div>`;
+  h += ccPendHtml();
   // 3) MINHAS COMPRAS, por fatura
   const L = CC.compras.slice().sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
   h += `<div class="section-label" style="text-align:left;margin-top:18px;">Compras registradas</div>`;
@@ -110,6 +115,70 @@ function ccDesenhar() {
         <td>${Number(x.parcela) || 1}/${Number(x.parcelas) || 1}</td><td>${ccR(x.valor_parcela)}</td><td style="color:${cor};font-weight:700;">${st}</td><td style="white-space:nowrap;">${acao}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="caption-label" style="text-align:left;">Nenhuma compra registrada ainda.</div>';
   alvo.innerHTML = h;
+}
+// a coluna "Anexada" diz se o arquivo é a fatura pedida (o leitor do servidor grava estado e leitura_obs)
+function ccFatSituacao(f) {
+  const quem = `${ccD(String(f.anexado_em || '').slice(0, 10))}${f.anexado_por ? ' · ' + ccE(String(f.anexado_por).split('@')[0]) : ''}`;
+  const de_novo = `<button type="button" class="preset-btn" style="margin-left:6px;" onclick="ccAnexarDeNovo(${ccE(JSON.stringify(f.conta_cartao))}, '${ccE(String(f.vencimento || ''))}')">Anexar de novo</button>`;
+  if (f.leitura_obs) return `<span style="color:var(--farol-fora);font-weight:700;">✗ ${ccE(f.leitura_obs)}</span>${de_novo}`;
+  if (f.estado === 'FECHADA') return `<span style="color:var(--farol-ok);font-weight:700;">✓ fatura lida</span>${f.total == null ? '' : ' · ' + ccR(f.total)} <span style="color:var(--tx-4);font-size:12px;">${quem}</span>`;
+  if (f.estado === 'ABERTA') return `<span style="color:var(--farol-perto);font-weight:700;">! fatura ainda aberta: anexe a fechada depois do fechamento</span>${de_novo}`;
+  return `<span style="color:var(--tx-4);">anexada ${quem}, ainda não lida</span>`;
+}
+function ccAnexarDeNovo(conta, venc) {
+  const s = document.getElementById('ccFatCartao'), v = document.getElementById('ccFatVenc');
+  if (s) s.value = conta; if (v) v.value = venc;
+  const a = document.getElementById('ccFatArq'); if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
+}
+// "A fatura cobrou e ninguém registrou": linha da fatura FECHADA sem compra registrada nem título no Saipos, por grupo
+function ccPendHtml() {
+  const P = CC.pend;
+  if (!Array.isArray(P) || !P.length) return '';
+  const tot = P.reduce((t, x) => t + Number(x.valor || 0), 0);
+  const G = {}; P.forEach((x) => { (G[x.grupo || 'Outros'] = G[x.grupo || 'Outros'] || []).push(x); });
+  const nomeCartao = (conta) => { const c = CC.cartoes.find((x) => x.conta === conta); return c ? ccRotulo(c) : conta; };
+  const grupos = Object.entries(G).sort((a, b) => b[1].reduce((t, x) => t + Number(x.valor || 0), 0) - a[1].reduce((t, x) => t + Number(x.valor || 0), 0));
+  return `<div class="section-label" style="text-align:left;margin-top:18px;">A fatura cobrou e ninguém registrou · ${P.length} ${P.length === 1 ? 'cobrança' : 'cobranças'} · ${ccR(tot)}</div>
+    <div class="caption-label" style="text-align:left;">Clique no grupo para ver as linhas. Se a compra é sua, "É minha: registrar" preenche o formulário acima.</div>
+    <div id="tabelaCcPendente"><table><thead><tr><th>Grupo</th><th>Cobranças</th><th>Valor</th></tr></thead><tbody>
+    ${grupos.map(([g, L]) => { const ab = CC.pendAberto === g, soma = L.reduce((t, x) => t + Number(x.valor || 0), 0);
+      return `<tr style="cursor:pointer;" onclick="CC.pendAberto = CC.pendAberto === ${ccE(JSON.stringify(g))} ? null : ${ccE(JSON.stringify(g))}; ccDesenhar()"><td><b>${ab ? '▾' : '▸'} ${ccE(g)}</b></td><td>${L.length}</td><td>${ccR(soma)}</td></tr>`
+        + (ab ? L.map((x) => `<tr><td colspan="3" style="white-space:normal;padding-left:22px;font-size:12.5px;">${ccD(x.data_compra)} · ${ccE(x.descricao)}${x.parcelas > 1 ? ` (${x.parcela}/${x.parcelas})` : ''} · final ${ccE(x.final_cartao || '')} · <b>${ccR(x.valor)}</b> · fatura de ${ccD(x.vencimento)} (${ccE(nomeCartao(x.conta_cartao))})
+          ${Number(x.valor) > 0 ? ` <button type="button" class="preset-btn" onclick='event.stopPropagation(); ccEhMinha(${JSON.stringify({ c: x.conta_cartao, d: x.data_compra, v: x.valor, t: x.descricao })})'>É minha: registrar</button>` : ' <span style="color:var(--tx-4);">estorno</span>'}</td></tr>`).join('') : '');
+    }).join('')}</tbody></table></div>`;
+}
+function ccEhMinha(x) {
+  const g = (id) => document.getElementById(id);
+  if (g('ccCartao')) g('ccCartao').value = x.c;
+  if (g('ccData')) g('ccData').value = String(x.d || '').slice(0, 10);
+  if (g('ccValor')) g('ccValor').value = Number(x.v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (g('ccDesc')) { g('ccDesc').value = ''; g('ccDesc').placeholder = 'o que foi (na fatura: ' + x.t + ')'; g('ccDesc').scrollIntoView({ block: 'center' }); g('ccDesc').focus(); }
+  avisoAcao('atencao', '! Escreva o que foi comprado e clique em "Registrar compra".');
+}
+// Antes de subir: a 1ª página do PDF diz o cartão (FINAL nnnn), se está Fechada ou Aberta e o vencimento. Se não bate com o
+// que foi escolhido, não sobe e diz por quê. Sem conseguir ler o PDF (imagem, foto), sobe como antes: o leitor do servidor confere.
+let CC_PDFJS = null;
+async function ccPdfTexto(arq) {
+  if (!/\.pdf$/i.test(arq.name || '') && arq.type !== 'application/pdf') return null;
+  if (!CC_PDFJS) CC_PDFJS = new Promise((ok, erro) => { const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload = () => ok(window.pdfjsLib); sc.onerror = () => erro(new Error('pdf.js')); document.head.appendChild(sc); });
+  const lib = await CC_PDFJS;
+  lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const doc = await lib.getDocument({ data: new Uint8Array(await arq.arrayBuffer()) }).promise;
+  const pg = await doc.getPage(1), tc = await pg.getTextContent();
+  return tc.items.map((i) => i.str).join(' ').replace(/\s+/g, ' ');
+}
+async function ccConferirPdf(arq, conta, venc) {
+  let t = null; try { t = await ccPdfTexto(arq); } catch (e) { return null; }
+  if (!t) return null;
+  const c = CC.cartoes.find((x) => x.conta === conta), finais = (c && c.finais || []).map(String);
+  const achados = [...new Set([...t.matchAll(/FINAL\s+(\d{4})/gi), ...t.matchAll(/\.(\d{4})\b/g)].map((m) => m[1]))];
+  if (finais.length && achados.length && !achados.some((f) => finais.includes(f)))
+    return `o arquivo é de outro cartão (final ${achados.slice(0, 3).join('/')}), e você escolheu o final ${finais.join('/')}.`;
+  const est = t.match(/\b(Fechada|Aberta)\b\s*(\d{2}\/\d{2}\/\d{4})?/i);
+  if (est && /aberta/i.test(est[1])) return 'essa fatura ainda está aberta: baixe a fatura FECHADA.';
+  if (est && est[2]) { const [d, m, a] = est[2].split('/'); if (`${a}-${m}-${d}` !== venc) return `a fatura do arquivo vence em ${est[2]}, e você escreveu ${ccD(venc)}.`; }
+  return null;
 }
 async function ccSubir(arquivo, pasta) {
   if (arquivo.size > 15000000) throw new Error('arquivo maior que 15 MB');
@@ -126,6 +195,15 @@ async function ccAnexarFatura() {
   if (!venc) return avisoAcao('atencao', '! Escreva o vencimento que está na fatura.');
   if (!arq) return avisoAcao('atencao', '! Escolha o arquivo da fatura.');
   if (Number.isNaN(total)) return avisoAcao('atencao', '! O total da fatura não é um número.');
+  if (!CC.mesmoAssim) {
+    avisoAcao('enviando', 'Conferindo o arquivo…');
+    const erro = await ccConferirPdf(arq, conta, venc);
+    if (erro) {
+      CC.mesmoAssim = false;
+      return avisoAcao('erro', `✗ A fatura NÃO foi anexada: ${erro} Escolha o arquivo certo. Se tem certeza de que este arquivo está certo, "Tentar de novo" anexa mesmo assim.`, () => { CC.mesmoAssim = true; ccAnexarFatura(); });
+    }
+  }
+  CC.mesmoAssim = false;
   avisoAcao('enviando', 'Enviando a fatura…');
   try {
     const caminho = await ccSubir(arq, 'faturas-cartao/' + conta.replace(/[^A-Za-z0-9]/g, '_'));
