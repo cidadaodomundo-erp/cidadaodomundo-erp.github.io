@@ -5043,6 +5043,25 @@ async function reqCancelarConfirmar(id, numero, motivoDado) {
   if (EST_TELA === 'reqseparar') entrarReqSeparar(); else { await reqMinhasCarregar(); reqPedirDesenhar(); }
 }
 
+// TROCA DE ÓLEO (18/11/2026, Estoque; dono 02:27): o óleo sai da ficha e baixa na ida para a cozinha. A troca fica registrada quando
+// a requisição com óleo é entregue; aqui só a leitura: o esperado da semana contra o que saiu, e as últimas trocas.
+function reqOleoHtml() {
+  const S = REQS.oleo, T = REQS.trocas;
+  if (!Array.isArray(S) && !Array.isArray(T)) return '';
+  const cor = (x) => /DENTRO/.test(x) ? 'var(--farol-ok)' : /SEM BAIXA/.test(x) ? 'var(--tx-4)' : 'var(--farol-perto)';
+  const n = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const dm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '';
+  let h = '<div class="section-label" style="margin-top:18px;">Troca de óleo</div>';
+  if (Array.isArray(S) && S.length) h += `<div id="tabelaOleoSemana" style="overflow-x:auto;"><table><thead><tr><th>Semana</th><th style="text-align:right;">Esperado</th><th style="text-align:right;">Saiu</th><th style="text-align:right;">Trocas</th><th>Situação</th></tr></thead><tbody>
+    ${S.map((x) => `<tr><td>${dm(x.de)} a ${dm(x.ate)}</td><td style="text-align:right;">${n(x.esperado_l)} L</td><td style="text-align:right;">${n(x.baixado_l)} L</td><td style="text-align:right;">${x.trocas || 0}</td>
+      <td style="color:${cor(x.situacao)};font-weight:700;">${trEscH(String(x.situacao || '').toLowerCase())}</td></tr>`).join('')}</tbody></table></div>`;
+  h += Array.isArray(T) && T.length ? `<div id="tabelaOleoTrocas" style="overflow-x:auto;margin-top:6px;"><table><thead><tr><th>Dia</th><th>Praça</th><th style="text-align:right;">Litros</th><th>Desde a anterior</th><th>Pediu</th><th>Entregou</th></tr></thead><tbody>
+    ${T.map((x) => `<tr><td>${dm(x.dia)}</td><td>${trEscH(String(x.praca || '').toLowerCase())}</td><td style="text-align:right;">${n(x.litros)} ${trEscH(String(x.un || '').toLowerCase())}</td>
+      <td>${x.dias_desde_a_anterior == null ? 'primeira' : 'há ' + x.dias_desde_a_anterior + (Number(x.dias_desde_a_anterior) === 1 ? ' dia' : ' dias')}</td><td>${trEscH(x.pedido_por || '')}</td><td>${trEscH(x.separado_por || '')}</td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="caption-label" style="text-align:left;">Nenhuma troca registrada ainda: ela entra quando o óleo pedido pela praça é entregue aqui.</div>';
+  return h;
+}
+
 // ---- Separar: quem entrega (Habrahan, Rita, dono) ----
 const REQS = { abertas: [], itens: [], dia: [], fora: [], separado: {}, unidade: null };
 async function entrarReqSeparar() {
@@ -5054,11 +5073,14 @@ async function entrarReqSeparar() {
   const u = await estLojaDaTela(alvo, entrarReqSeparar); if (!u) return;
   try {
     const q = encodeURIComponent(u);
-    const [ab, dia, fora] = await Promise.all([
+    const [ab, dia, fora, oleo, trocas] = await Promise.all([
       consultarTudo(`vw_est_requisicao?select=*&unidade=eq.${q}&situacao=eq.ABERTA&order=criado_em`),
       consultarTudo(`vw_est_requisicao_do_dia?select=*&unidade=eq.${q}&order=nome_base`).catch(() => []),
-      consultarTudo('vw_est_requisicao_fora_da_base?select=*&order=ultima_vez.desc').catch(() => [])]);
-    REQS.abertas = ab; REQS.dia = dia; REQS.fora = fora; REQS.unidade = u;
+      consultarTudo('vw_est_requisicao_fora_da_base?select=*&order=ultima_vez.desc').catch(() => []),
+      // 18/11/2026 (dono 02:27: "baixa na ida pra cozinha e controlamos a frequencia com a troca de oleo"): só leitura
+      consultarTudo(`vw_est_oleo_esperado_x_baixado?select=*&unidade=eq.${q}&order=semana.desc&limit=4`).catch(() => null),
+      consultarTudo(`vw_est_troca_oleo?select=*&unidade=eq.${q}&order=dia.desc&limit=10`).catch(() => null)]);
+    REQS.abertas = ab; REQS.dia = dia; REQS.fora = fora; REQS.unidade = u; REQS.oleo = oleo; REQS.trocas = trocas;
     REQS.itens = ab.length ? await consultarTudo(`vw_est_requisicao_item?select=*&id_requisicao=in.(${ab.map((r) => r.id).join(',')})&order=id`) : [];
     reqSepararDesenhar();
   } catch (e) {
@@ -5095,6 +5117,7 @@ function reqSepararDesenhar() {
     ${REQS.fora.length ? `<div class="section-label" style="margin-top:18px;">Pedidos fora da base: o Neto valida</div><div id="tabelaReqFora" style="overflow-x:auto;"><table><thead><tr><th>Como pediram</th><th style="text-align:right;">Vezes</th><th>Desde</th><th>Quem pediu</th></tr></thead><tbody>
       ${REQS.fora.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.nome_pedido)}</td><td style="text-align:right;">${x.vezes_pedido}</td><td>${trEscH(reqQuando(x.primeira_vez))}</td><td style="white-space:normal;">${trEscH(String(x.quem_pediu || '').replace(/@[^,\s]+/g, ''))}</td></tr>`).join('')}
     </tbody></table></div>` : ''}`;
+  alvo.insertAdjacentHTML('beforeend', reqOleoHtml());
 }
 // 13/11/2026 (dono 00:59, teste ponta a ponta das requisições; pedido do Estoque): a folha que o Habrahan leva para separar,
 // no molde da separação da ordem (prdOrdemImprimir). Só imprime: a baixa continua pelo "Entreguei".
