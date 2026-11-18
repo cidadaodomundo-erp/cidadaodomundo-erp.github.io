@@ -7275,8 +7275,66 @@ function renderContasPagar() {
   })()}
   ${comissao ? `<details class="detalhes-extra"><summary>Comissão do atacado — ${(() => { const pend = (PROJ_COM_PAG || []).filter(x => ['EM_ABERTO', 'PAGO_DIFERENTE', 'PAGO_SEM_BANCO'].includes(x.situacao)).length;
         return !PROJ_COM_PAG ? 'o valor da semana para lançar no Saipos' : pend ? `<span style="color:var(--amber-2);">${pend} pendência${pend > 1 ? 's' : ''}</span>` : '<span style="color:var(--farol-ok);">✓ tudo pago até a última semana fechada</span>'; })()}</summary>${comissao}</details>` : ''}
-  ${bonus ? `<details class="detalhes-extra"><summary>Bônus do iFood — o que vai para a aplicação, semana a semana</summary>${bonus}</details>` : ''}`;
+  ${bonus ? `<details class="detalhes-extra"><summary>Bônus do iFood — o que vai para a aplicação, semana a semana</summary>${bonus}</details>` : ''}
+  ${sobraFilialHtml()}`;
+  sobraFilialCarregar();
 }
+
+// ---- SOBRA DAS FILIAIS → ÁGUA VERDE (dono 18/11/2026 15:38, pelo Organizador: "esses valores de lista (o que foi feito e quanto
+// falta) e de lucro, aparecem em algum lugar do contas a pagar? percebi hoje que é ruim de conferir eles no portal").
+// Fonte: vw_fin_sobra_filial_plano (a conta de cada quarta) + vw_fin_sobra_filial_a_lancar (o título de cada lado no Saipos).
+// A RLS das views só entrega a dono e financeiro: sem linha, o bloco não aparece (filial não vê). Cada view leva ~5 s:
+// carrega uma vez, por fora, sem segurar a tela.
+const SOBRA = { plano: null, lancar: null, carregando: false, erro: null };
+async function sobraFilialCarregar(forcar) {
+  if (SOBRA.carregando || (SOBRA.plano && !forcar)) return;
+  SOBRA.carregando = true; SOBRA.erro = null;
+  try {
+    [SOBRA.plano, SOBRA.lancar] = await Promise.all([
+      consultarTudo('vw_fin_sobra_filial_plano?select=*&order=quarta,sigla'),
+      consultarTudo('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo&order=quarta,quem')]);
+  } catch (e) { SOBRA.erro = e.message; }
+  SOBRA.carregando = false;
+  const w = document.getElementById('sobraFilialWrap');
+  if (w) w.outerHTML = sobraFilialHtml();
+}
+function sobraLado(L) {
+  // um lado (filial paga ou AV recebe) de uma quarta: o pior estado entre lista, bônus e lucro
+  if (!L.length) return { cls: 'na', txt: '—', tit: 'nada a lançar' };
+  const det = L.map((x) => `${x.componente.toLowerCase()} ${sobraR(x.valor_painel)}: ${x.acao === 'JA_CERTO' ? 'certo' : x.acao === 'ABRIR' ? 'falta lançar' : x.acao === 'ALTERAR' ? 'lançado diferente' : 'ainda não (semana não fechou)'}`).join(' · ');
+  if (L.some((x) => x.acao === 'ABRIR')) return { cls: 'fora', txt: '✗ falta lançar', tit: det };
+  if (L.some((x) => x.acao === 'ALTERAR')) return { cls: 'perto', txt: '! lançado diferente', tit: det };
+  if (L.every((x) => x.acao === 'JA_CERTO')) return { cls: 'ok', txt: '✓ certo', tit: det };
+  return { cls: 'na', txt: 'ainda não', tit: det };
+}
+function sobraFilialHtml() {
+  if (SOBRA.erro) return `<div id="sobraFilialWrap" class="contexto">✗ Não consegui ler a sobra das filiais: ${trEscH(SOBRA.erro)} <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
+  if (!Array.isArray(SOBRA.plano) || !SOBRA.plano.length) return '<div id="sobraFilialWrap"></div>';
+  const v = (x) => x == null ? '<span style="opacity:.4">—</span>' : sobraR(x);
+  const nome = { AHU: 'Ahú', SB: 'São Braz' };
+  const cor = { ok: 'var(--farol-ok)', perto: 'var(--farol-perto)', fora: 'var(--farol-fora)', na: 'var(--tx-4)' };
+  const lanc = SOBRA.lancar || [];
+  let furos = 0;
+  const linhas = SOBRA.plano.map((p) => {
+    const L = lanc.filter((x) => x.quem === p.sigla && x.quarta === p.quarta);
+    const fil = sobraLado(L.filter((x) => x.sentido === 'PAGAR')), av = sobraLado(L.filter((x) => x.sentido === 'RECEBER'));
+    if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
+    const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
+    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null && Math.abs(Number(p.repasse_valor) - Number(p.sai_da_filial)) >= 0.005 ? `<div style="font-size:11.5px;color:var(--tx-4);">no banco: ${sobraR(p.repasse_valor)}</div>` : '');
+    const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
+    const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
+    const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
+    return `<tr><td>${agDmSobra(p.quarta)}</td><td><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td>${sit}</td>
+      <td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b></td>
+      <td>${lado(fil)}</td><td>${lado(av)}</td></tr>`;
+  }).join('');
+  return `<div id="sobraFilialWrap"><details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
+    <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
+    <div style="overflow-x:auto;"><table><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th>Lucro</th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
+    <tbody>${linhas}</tbody></table></div></details></div>`;
+}
+const sobraR = (v) => 'R$ ' + fmt(Number(v || 0));
+const agDmSobra = (d) => { const [a, m, dd] = String(d || '').slice(0, 10).split('-'); return dd ? `${dd}/${m}` : ''; };
 
 // ---- CONTAS A RECEBER — "o que vai entrar, de quem, e quem está atrasado?" (dono, 16/10/2026).
 // O que vai entrar vem do MESMO motor do Fluxo projetado (projCalc): a media do que cai na conta, aberta
