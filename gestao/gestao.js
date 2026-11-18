@@ -1287,8 +1287,8 @@ function renderConcbanco() {
                    extrato_ate: sdOntem && sdOntem.extrato_ate,
                    movimenta_diariamente: sdOntem && sdOntem.movimenta_diariamente,
                    ultimo_movimento: sdOntem && sdOntem.ultimo_movimento } : null);
-    // Um centavo de diferença é arredondamento de soma, não dinheiro.
-    const TOL_SALDO = 0.015;
+    // 18/11/2026: um centavo é dinheiro (dono, R$ 0,01 do Juliatto em 10/11)
+    const TOL_SALDO = 0.005;
     let saldoTxt = '<span style="opacity:.4">—</span>', saldoTitulo = '';
     if (sd) {
       // CONTA QUE NAO MOVIMENTA TODO DIA NAO ESTA "PARADA" (dono, 02/09/2026): a
