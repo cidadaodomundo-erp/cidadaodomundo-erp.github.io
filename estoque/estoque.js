@@ -3705,13 +3705,17 @@ async function prdOrdensCarregar() {
     // o motivo de cada item final que o apontamento não confere (a ação é diferente para cada motivo)
     if (!PRD.semFator) PRD.semFator = await consultarTudo("vw_est_item_final_sem_fator?select=familia,item_final,situacao&situacao=neq.TEM FATOR&order=familia,item_final").catch(() => []);
     // 13/11/2026 (Estoque, proposta 2026-11-12-etapas-em-dias): as etapas de cada ordem e o tempo medido; leitura que nunca derruba a tela
-    const [etapas, etPadrao, etTempo] = ids.length ? await Promise.all([
+    // 19/11/2026 (dono pelo Organizador): as etapas de cada receita vêm de Processos, na sequência que a Rita cadastrou
+    const nomesRec = [...new Set(itens.map((i) => i.nome_base).filter(Boolean))];
+    const [etapas, etPadrao, etTempo, procs] = ids.length ? await Promise.all([
       consultarTudo(`est_ordem_etapa?select=*&id_ordem=in.(${ids.join(',')})&order=id_ordem,ordem`).catch(() => []),
       consultarTudo('est_etapa_padrao?select=familia,ordem,etapa,dia_relativo,prazo_minutos&order=familia,ordem').catch(() => []),
       consultarTudo(`vw_est_etapa_tempo?select=familia,ordem,etapa,medicoes,minutos_mediana&unidade=eq.${u}&order=familia,ordem`).catch(() => []),
-    ]) : [[], [], []];
+      nomesRec.length ? consultarTudo(`vw_est_processo_receita?select=nome_base,dias&nome_base=in.(${encodeURIComponent(nomesRec.map((n) => '"' + String(n).replace(/"/g, '\\"') + '"').join(','))})`).catch(() => null) : [],
+      estNomesCarregar(),
+    ]) : [[], [], [], []];
     PRD.ordens = { rel, itens, contas: new Map(contas.map((c) => [c.id, c])), fam: new Map(fam.map((f) => [f.id, f])), sep: (PRD.ordens && PRD.ordens.sep) || {},
-      etapas, etPadrao, etTempo };
+      etapas, etPadrao, etTempo, procs: procs == null ? null : new Map(procs.map((p) => [p.nome_base, p.dias || []])) };
   } catch (e) { PRD.ordens = { erro: e.message, rel: [], itens: [], contas: new Map(), sep: {} }; }
 }
 // 27/10/2026 (dono): relógio correndo em hh:mm:ss. O banco manda os segundos e se está correndo; a tela conta sozinha.
@@ -3794,7 +3798,101 @@ function prdOrdensHtml() {
 }
 // ---- ETAPAS EM DIAS (13/11/2026; livro chat-frente-estoque/respostas/tempos-por-etapa-e-dias): pré-preparo num dia, finalização
 // no outro. Uma linha por etapa com Iniciar / Fechar e o dia previsto. Nenhum prazo inventado: só o tempo medido (mediana).
+// 19/11/2026 (dono pelo Organizador 18:05: "trazer as etapas de cada preparo já fixas, ordenadas na sequência que a Rita
+// cadastrou … ela pode errar na digitação"): as etapas vêm de Processos (est_praca_dia), uma por nome, na ordem dos dias.
+// Ordem com várias receitas: agrupadas por receita, a etapa grava "RECEITA: etapa". Campo livre só para receita sem etapa.
 function prdEtapasHtml(o) {
+  const O = PRD.ordens || {};
+  if (!O.procs) return prdEtapasHtmlFamilia(o);   // Processos não respondeu: segue o jeito anterior
+  const its = (O.itens || []).filter((i) => i.id_ordem === o.id);
+  const recs = [...new Set(its.map((i) => i.nome_base))];
+  const feitas = (O.etapas || []).filter((e) => e.id_ordem === o.id);
+  const fam = ((O.fam && O.fam.get(o.id)) || {}).familia || null;
+  const varias = recs.length > 1;
+  const curto = (r) => String(r).replace(/\s+RECEITA$/i, '');
+  const chave = (s) => String(s || '').trim().toLowerCase();
+  const hm = (t) => t ? new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '';
+  const t0 = Date.now();
+  const campoE = 'background:var(--p-paper, var(--surface-2)); border:1px solid var(--p-line, var(--line)); border-radius:8px; color:var(--p-ink, var(--tx-1)); padding:5px 8px;';
+  // número de cada etapa na ordem: a que já foi marcada guarda o dela (casada pelo nome); a nova pega o da sequência se livre
+  const usados = new Set(feitas.map((e) => Number(e.ordem)));
+  const usadas = new Set();
+  let seq = 0;
+  const grupos = recs.map((r) => {
+    const vistos = new Set();
+    const passos = [];
+    (O.procs.get(r) || []).forEach((d) => {
+      const nm = String(d.etapa || '').trim(); if (!nm || vistos.has(chave(nm))) return;
+      vistos.add(chave(nm)); passos.push({ nome: nm, dias: [] });
+    });
+    (O.procs.get(r) || []).forEach((d) => { const p = passos.find((x) => chave(x.nome) === chave(d.etapa)); if (p && d.dia && !p.dias.includes(d.dia)) p.dias.push(d.dia); });
+    passos.forEach((p) => {
+      seq += 1;
+      p.gravar = varias ? `${curto(r)}: ${p.nome}` : p.nome;
+      p.e = feitas.find((e) => !usadas.has(e.id) && chave(e.etapa) === chave(p.gravar)) || null;
+      if (p.e) { usadas.add(p.e.id); p.n = Number(p.e.ordem); }
+    });
+    return { r, passos, seqIni: seq - passos.length };
+  });
+  let maxN = Math.max(0, seq, ...usados);
+  grupos.forEach((g) => g.passos.forEach((p, k) => {
+    if (p.n) return;
+    const alvo = g.seqIni + k + 1;
+    p.n = usados.has(alvo) ? ++maxN : alvo; usados.add(p.n);
+  }));
+  // marcadas que não casam com nenhuma etapa cadastrada (nome digitado antes, ou etapa que saiu de Processos)
+  const soltas = feitas.filter((e) => !usadas.has(e.id));
+  const linha = (n, nome, gravar, e, destaque, dias) => {
+    const correndo = e && e.iniciada_em && !e.fechada_em;
+    const med = (O.etTempo || []).find((t) => t.familia === fam && Number(t.ordem) === n && Number(t.medicoes) > 0);
+    const sit = !e || !e.iniciada_em ? `<span style="color:var(--tx-4);">${destaque ? '<b style="color:var(--p-ink, var(--tx-1));">é a próxima</b>' : 'não iniciada'}</span>`
+      : correndo ? `<span style="color:var(--farol-ok); font-weight:700;">correndo desde ${hm(e.iniciada_em)}</span>${e.quem_iniciou ? ` <span style="color:var(--tx-4);">· ${trEscH(estNome(e.quem_iniciou))}</span>` : ''}`
+      : `<span style="color:var(--farol-ok);">${hm(e.iniciada_em)} → ${hm(e.fechada_em)}</span> <span style="color:var(--tx-4);">· ${trEscH(estNome(e.quem_iniciou))}${e.quem_fechou && e.quem_fechou !== e.quem_iniciou ? ' / ' + trEscH(estNome(e.quem_fechou)) : ''}</span>`;
+    const seg = e && e.iniciada_em ? ((e.fechada_em ? new Date(e.fechada_em) : new Date()) - new Date(e.iniciada_em)) / 1000 : null;
+    const tempo = (seg == null ? '—' : prdRelSpan(Math.round(seg), null, !!correndo, t0))
+      + (med ? ` <span style="color:var(--tx-4); font-size:11.5px;">costuma levar ${fmt(Number(med.minutos_mediana))} min</span>` : '');
+    const g = trEscH(JSON.stringify(gravar));
+    const acao = !e || !e.iniciada_em ? `<button class="preset-btn${destaque ? ' active' : ''} est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${g}, 'INICIAR')">Iniciar</button>`
+      : correndo ? `<button class="preset-btn active est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${g}, 'FECHAR')">Encerrar</button>` : '<span style="color:var(--farol-ok);">✓ feita</span>';
+    const bd = destaque ? 'background:var(--surface-2); box-shadow:inset 3px 0 0 var(--brand);' : '';
+    return `<tr style="${bd}"><td>${destaque ? '▶ ' : ''}${trEscH(nome)}</td><td style="color:var(--tx-4);">${dias && dias.length ? trEscH(dias.join(', ')) : '—'}</td>`
+      + `<td style="font-size:12.5px;">${sit}</td><td style="white-space:nowrap; font-variant-numeric:tabular-nums;">${tempo}</td><td style="white-space:nowrap;">${acao}</td></tr>`;
+  };
+  let h = `<div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--p-line, var(--line));"><b>Etapas</b>
+    <span style="color:var(--tx-5); font-size:12px;">na sequência cadastrada em Processos</span>`;
+  const comPassos = grupos.filter((g) => g.passos.length);
+  if (comPassos.length || soltas.length) {
+    h += `<div id="tabelaPrdEtapa${o.id}" style="margin-top:4px;"><table><thead><tr><th>Etapa</th><th>Dia em Processos</th><th>Início, fim e quem</th><th>Tempo</th><th>Ação</th></tr></thead><tbody>`;
+    comPassos.forEach((g) => {
+      if (varias) h += `<tr class="sub"><td colspan="5" style="font-weight:800; letter-spacing:.4px;">${trEscH(g.r)}</td></tr>`;
+      const prox = g.passos.find((p) => !(p.e && p.e.fechada_em));
+      g.passos.forEach((p, k) => { h += linha(p.n, `${k + 1}. ${p.nome}`, p.gravar, p.e, p === prox, p.dias); });
+    });
+    if (soltas.length) {
+      h += `<tr class="sub"><td colspan="5" style="font-weight:800; letter-spacing:.4px;">MARCADAS FORA DA SEQUÊNCIA</td></tr>`;
+      soltas.forEach((e) => { h += linha(Number(e.ordem), e.etapa, e.etapa, e, false, null); });
+    }
+    h += `</tbody></table></div>`;
+  }
+  // receita sem etapa cadastrada: o aviso com o caminho, e só aqui o campo livre
+  grupos.filter((g) => !g.passos.length).forEach((g, k) => {
+    const id = `prdEtNova_${o.id}_${k}`;
+    const pref = varias ? trEscH(JSON.stringify(curto(g.r) + ': ')) : '""';
+    h += `<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+      <span style="color:var(--farol-perto); font-size:12.5px;">${varias ? `<b>${trEscH(g.r)}</b>: ` : ''}sem etapas cadastradas — <a href="javascript:void(0)" onclick="prdIrProcessos(${trEscH(JSON.stringify(g.r))})" style="color:var(--brand);">cadastre em Processos</a></span>
+      <input id="${id}" placeholder="enquanto isso, o nome da etapa" style="flex:1 1 200px; max-width:300px; ${campoE}">
+      <button class="preset-btn est-ciclo" onclick="(function(v){ v = String(v || '').trim(); prdEtapaMarcar(${o.id}, ${++maxN}, v ? ${pref} + v : '', 'INICIAR'); })((document.getElementById('${id}') || {}).value)">Iniciar etapa</button></div>`;
+  });
+  return h + `</div>`;
+}
+function prdIrProcessos(nome) {
+  PRC = PRC || { aberta: null, filtro: undefined, praca: null, busca: '' };
+  PRC.aberta = nome; PRC.filtro = null; PRC.praca = null; PRC.busca = '';
+  mostrarModulo('processos');
+  setTimeout(() => { const el = [...document.querySelectorAll('#tabelaProcessos tr')].find((t) => t.textContent.trim().startsWith(nome)); if (el) el.scrollIntoView({ block: 'center' }); }, 800);
+}
+// o jeito de 13/11 (etapa-padrão por família + campo livre): só quando Processos não respondeu
+function prdEtapasHtmlFamilia(o) {
   const O = PRD.ordens || {};
   const fam = ((O.fam && O.fam.get(o.id)) || {}).familia || null;
   const feitas = (O.etapas || []).filter((e) => e.id_ordem === o.id);
