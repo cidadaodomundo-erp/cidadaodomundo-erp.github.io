@@ -90,18 +90,9 @@ const MEDIDO = 'qua 18/11/2026, noite';
 // Todas as telas do menu de hoje, na ordem do menu (de: Neto ou Fabio). Medido; ver o comentário do alto.
 // 19/11/2026: os dados do estudo NÃO ficam neste arquivo (o repositório do painel é público): moram no banco, em
 // juncao_dados (RLS pode_ver_plano = Neto e Fabio), e chegam no carregar().
-let TELAS = [], GRUPOS = [];
-const LOGINS = [
- ['diego', 'líder São Braz', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia, Consulta de ponto e Ponto ao Vivo da loja'],
- ['edgar', 'líder Ahú', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia, Consulta de ponto e Ponto ao Vivo da loja'],
- ['gabriel', 'delivery (dia)', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia'],
- ['alejo', 'delivery (noite)', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia'],
- ['flavia', 'salão', 'Reservas, Pausados do Salão, Avaliações do Google'],
- ['yaimar', 'salão', 'Reservas, Pausados do Salão, Avaliações do Google'],
- ['arissa', 'RH', 'Consulta de ponto, Ponto ao Vivo, Taxas e Freelas, Ponto dos taxas'],
- ['rita', 'compras e estoque', 'Mercado Livre (já vê), Quem conserta'],
- ['hellen', 'financeiro', 'já vê todas'],
-];
+let TELAS = [], GRUPOS = [], USO = [];
+// a lista de logins e a proposta por cargo também vêm do banco (juncao_dados)
+let LOGINS = [];
 
 const app = document.getElementById('app');
 const D = { resp: [], aberto: null, filtro: 'todas' };
@@ -146,7 +137,7 @@ async function carregar() {
   D.resp = r.ok ? await r.json() : [];
   const dd = rd.ok ? await rd.json() : [];
   if (!dd.length) { app.innerHTML = '<p class="erro">✗ Não consegui ler os dados do estudo. <button class="sair" onclick="carregar()">tentar de novo</button></p>'; return; }
-  TELAS = dd[0].dados.telas || []; GRUPOS = dd[0].dados.grupos || [];
+  TELAS = dd[0].dados.telas || []; GRUPOS = dd[0].dados.grupos || []; USO = dd[0].dados.uso || []; LOGINS = dd[0].dados.logins || [];
   desenhar();
 }
 // decisão = a última resposta de quem não é o dono (o Fabio); comentário = a última do dono
