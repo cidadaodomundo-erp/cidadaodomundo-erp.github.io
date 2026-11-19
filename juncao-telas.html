@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Junção das telas</title>
+<!-- JUNÇÃO DAS TELAS (qua 18/11/2026, chat Telas do painel). Etapa "unificar" da entrega ao Fabio. Dono, pelo Organizador 21:03:
+     "como as telas dele já estão aqui [...] agora era o momento de entendermos o que cada tela traz e fazer a junção do que fala
+     da mesma coisa, tirar o que não faz sentido, organizar o menu com todas" + 21:05 "e a parte dos usuarios, como fica?".
+     Só Neto e Fabio (login + RLS pode_ver_plano, modelo docs/plano-saida.html). Números medidos em 18/11 ~21:10 (SELECT no banco,
+     código publicado de cada tela); respostas em juncao_telas_resposta pela função juncao_telas_responder (quem e quando).
+     O menu NÃO muda antes das respostas. SQL: script/sql/juncao_telas_2026_11_18.sql -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; --azul:#2F5F8A; --azul-fundo:#E5EEF6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; --azul:#8DB8E0; --azul-fundo:#1A2632; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; --azul:#8DB8E0; --azul-fundo:#1A2632; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:980px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  h2 { font-size:1.15rem; margin:2rem 0 .5rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .placar { display:flex; gap:10px; flex-wrap:wrap; margin:.6rem 0 1rem; }
+  .placar div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; min-width:130px; }
+  .placar b { display:block; font-size:1.5rem; line-height:1.1; }
+  .placar span { font-size:.8rem; color:var(--mudo); }
+  .item { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:12px 14px; margin-bottom:8px; }
+  .item.JUNTAR { border-left:4px solid var(--azul); } .item.TIRAR { border-left:4px solid var(--acento); } .item.MANTER { border-left:4px solid var(--ok); }
+  .topo { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; }
+  .tit { font-weight:600; }
+  .tag { font-size:.72rem; font-weight:700; padding:1px 8px; border-radius:999px; }
+  .tag.JUNTAR { background:var(--azul-fundo); color:var(--azul); } .tag.TIRAR { background:var(--acento-fundo); color:var(--acento); } .tag.MANTER { background:var(--ok-fundo); color:var(--ok); }
+  .tag.nao { background:var(--alt); color:var(--mudo); } .tag.parcial { background:var(--anda-fundo); color:var(--anda); }
+  .grade { display:grid; grid-template-columns:160px 1fr; gap:2px 12px; font-size:.86rem; margin-top:.4rem; }
+  .grade dt { color:var(--mudo); } .grade dd { margin:0; color:var(--suave); }
+  .prop { margin-top:.5rem; padding:8px 10px; background:var(--alt); border-radius:4px; font-size:.9rem; }
+  .resp { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:.6rem; }
+  .bt { background:var(--papel); color:var(--tinta); border:1px solid var(--forte); border-radius:4px; padding:5px 12px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .bt.sim { border-color:var(--ok); color:var(--ok); font-weight:600; } .bt.nao { border-color:var(--acento); color:var(--acento); font-weight:600; }
+  .bt.cheio { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .resp input { flex:1 1 240px; padding:6px 9px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; font-size:.88rem; }
+  .dito { font-size:.82rem; margin-top:.35rem; color:var(--mudo); }
+  .dito b.sim { color:var(--ok); } .dito b.nao { color:var(--acento); } .dito b.outro { color:var(--anda); }
+  .aviso { font-size:.84rem; margin-top:.3rem; } .aviso.erro { color:var(--acento); } .aviso.certo { color:var(--ok); }
+  table { border-collapse:collapse; width:100%; font-size:.86rem; background:var(--papel); }
+  th, td { border:1px solid var(--linha); padding:5px 8px; text-align:left; vertical-align:top; }
+  th { background:var(--alt); font-weight:600; }
+  .menu { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+  .menu div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 12px; font-size:.86rem; }
+  .menu b { display:block; margin-bottom:4px; }
+  .menu .novo { color:var(--azul); font-weight:600; } .menu .sai { color:var(--acento); text-decoration:line-through; }
+  .nota { font-size:.82rem; color:var(--mudo); }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  @media (max-width:600px) { .grade { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const MEDIDO = 'qua 18/11/2026, 21:10';
+// Uma linha por tela do Fabio (origem "fabio" no menu). Medido: código publicado de cada tela + SELECT no banco + painel_uso (30 dias).
+// par: a nossa tela que fala da mesma coisa e os dois números, mesmo período e mesma loja.
+const TELAS = [
+ { k:'delivery', t:'Delivery do dia', g:'Entrega', o:'Placar do delivery do dia: pedidos, tempo de entrega, cancelamentos e avaliações.', f:'iFood (pedidos e avaliações), TrackEat (entregas), Vendas agora', h:'parcial: iFood sim; TrackEat parou às 12:50 de hoje', u:'44 · fabio', ok:'parcial',
+   par:{ n:'Atrasos e turnos (nossa) e Vendas agora (nossa)', a:'parcial', num:'17/11, Água Verde: 262 pedidos e R$ 13.935,35 nas duas (batem). Atrasadas em 15/11: dele AV 63 · Ahú 11 · SB 14; nossa AV 46 · Ahú 10 · SB 10 (nós damos 5 min de tolerância; com tolerância 0 a nossa dá AV 64 · Ahú 11 · SB 14). Tempo de rua: 6,6 min dele × 19,2 min nosso (ele mede da saída, nós da coleta).' },
+   p:'JUNTAR', pt:'Fica a Delivery do dia (operação é do Fabio). A nossa "Atrasos e turnos" entra nela. Falta escolher a régua do atraso: sem tolerância (dele) ou 5 min (nossa).', ng:'Entrega' },
+ { k:'chegada', t:'Chegada dos motoboys', g:'Entrega', o:'Quais motoboys estão rodando e a hora em que chegaram.', f:'banco do portal do Fabio (outro banco, não o nosso)', h:'não medido (outro banco)', u:'25 · fabio', ok:'não medido',
+   par:{ n:'nenhuma', a:'não', num:'A nossa "Atrasos e turnos" mede o atraso do pedido; a Chegada mede a pontualidade do motoboy. Não há número igual.' },
+   p:'MANTER', pt:'Operação. Só ela mede a chegada do motoboy.', ng:'Entrega' },
+ { k:'pagarmoto', t:'Pagar motoboys', g:'Entrega', o:'A conta do dia de cada motoboy: entregas, taxas, garantido, lanche e corte por atraso.', f:'TrackEat, escala, ficha e tarifas dos motoboys, lanches do Saipos', h:'parcial: escala de hoje sim; entregas só até 12:50', u:'não medido antes de 18/11', ok:'parcial',
+   par:{ n:'Financeiro da logística e Acertos dos motoboys (nossas)', a:'sim', num:'Semana 09–15/11: entregas e taxas iguais centavo a centavo (1.711 / 286 / 318 entregas). Total a pagar: dele R$ 16.405,75 · nosso R$ 16.100,82 (diferença R$ 304,93, 1,9%). O garantido muda: o dele usa as horas da escala × tarifa por loja e turno e desconta o lanche; o nosso usa da 1ª à última entrega × R$ 20 (dia útil) / R$ 25 (fim de semana). Acertos: a mesma tabela nas duas (R$ 0 na semana).' },
+   p:'JUNTAR', pt:'Dinheiro fica no nosso (regra de 03/11): uma tela só, "Pagar motoboys", no Financeiro, com o Acertos dentro. Falta escolher a regra do garantido: pela escala e tarifa do turno (dele) ou da 1ª à última entrega (nossa).', ng:'Financeiro' },
+ { k:'motodocs', t:'Documentos dos motoboys', g:'Entrega', o:'Ficha de cada motoboy: documentos, validade, equipamento e quem rodou sem ficha.', f:'cadastro dos motoboys (nosso banco)', h:'cadastro (última mudança 12/11)', u:'2 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação. Não há tela nossa igual.', ng:'Entrega' },
+ { k:'escalaclima', t:'Escala e Clima', g:'Entrega', o:'Escala dos motoboys ao lado da previsão do tempo e de quantos pedir por turno.', f:'escala dos motoboys + previsão do tempo', h:'sim (escala gravada hoje 08:17)', u:'2 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação.', ng:'Entrega' },
+ { k:'pausadosdel', t:'Itens pausados · iFood x Site', g:'Entrega', o:'Produtos pausados no iFood comparados com os do site, por loja.', f:'cardápio do iFood (API) + site (Accon)', h:'sim (iFood lido hoje 21:05; site do São Braz só até 17/11)', u:'9 · fabio', ok:'sim',
+   par:{ n:'nossa página de pausados (fora do menu)', a:'parcial', num:'Hoje, itens pausados: AV 13 · Ahú 4 · SB 5 nas duas (batem). A nossa conta também categoria pausada e complementos (rede: 200 itens + 174 complementos).' },
+   p:'JUNTAR', pt:'Fica a do Fabio (operação). A nossa página de pausados, que já está fora do menu, sai.', ng:'Entrega' },
+ { k:'avaldel', t:'Avaliações do dia · iFood e Site', g:'Entrega', o:'Avaliações que os clientes deram no iFood no dia, por loja.', f:'avaliações do iFood (API)', h:'última avaliação de 17/11 18:48 (a leitura rodou hoje 19:50)', u:'1 · fabio', ok:'sim',
+   par:{ n:'Avaliações (nossa, fora do menu desde 03/11)', a:'sim', num:'17/11, AV: dele 16 avaliações (nota 4,94) · nossa 6 (5,00). Semana 09–15/11, AV: 305 (4,70) × 273 (4,75). Ele conta pela data da avaliação; nós pela data do pedido, com filtro de situação.' },
+   p:'MANTER', pt:'Fica a do Fabio (operação, conta pelo dia em que o cliente avaliou). A nossa já está fora do menu.', ng:'Entrega' },
+ { k:'reservas', t:'Reservas (GetIn)', g:'Entrega', o:'Reservas do salão vindas do GetIn: cliente, data e pessoas.', f:'robô do GetIn (rodou hoje 21:05)', h:'nenhuma reserva para hoje; próxima 29/11', u:'21 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação do salão. Vai para o grupo novo "Salão".', ng:'Salão' },
+ { k:'pausados', t:'Itens pausados · Salão (Goomer)', g:'Entrega', o:'Produtos pausados no cardápio do tablet do salão.', f:'robô do Goomer (hoje 21:09: AV 158 produtos, 15 pausados)', h:'sim', u:'22 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação do salão. Vai para o grupo "Salão".', ng:'Salão' },
+ { k:'avalsalao', t:'Avaliações do dia · Google', g:'Entrega', o:'Avaliações do Google de cada loja no dia e a nota geral.', f:'Google (coleta hoje 20:59)', h:'sim', u:'1 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação do salão. Vai para o grupo "Salão".', ng:'Salão' },
+ { k:'salao', t:'Central do Salão', g:'Entrega', o:'Capa do salão: eventos da cidade, reservas, pausados do tablet e avaliações do Google.', f:'as mesmas das 3 telas do salão + eventos da cidade', h:'sim', u:'0 (nunca aberta)', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'Repete as 3 telas do salão.' }, p:'TIRAR', pt:'Nunca foi aberta e repete Reservas, Pausados do Goomer e Avaliações do Google.', ng:'—' },
+ { k:'cozinha', t:'Cozinha', g:'Entrega', o:'Nada: cartão apagado "integração pendente".', f:'nenhuma', h:'—', u:'0', ok:'não (sem página)',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'TIRAR', pt:'Não tem página.', ng:'—' },
+ { k:'tvs', t:'TVs', g:'Entrega', o:'Nada: cartão apagado "integração pendente".', f:'nenhuma', h:'—', u:'0', ok:'não (sem página)',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'TIRAR', pt:'Não tem página.', ng:'—' },
+ { k:'reuniao', t:'Reunião semanal', g:'Começar por aqui', o:'Pauta da reunião por loja, com atalhos para as outras telas; não fica salva.', f:'nenhuma (não guarda nada)', h:'—', u:'8 · fabio', ok:'sim',
+   par:{ n:'A semana e Indicadores e metas (nossas)', a:'parcial', num:'A Reunião não tem número próprio: abre as outras telas.' }, p:'MANTER', pt:'É o roteiro da reunião do Fabio.', ng:'Começar por aqui' },
+ { k:'pcartao', t:'Consulta de ponto', g:'Pessoas', o:'Cartão de ponto por pessoa e por dia (entrada e saída), com "Todos da loja".', f:'batidas da Flash (banco até 17/11; o dia de hoje direto da Flash)', h:'até 17/11 + hoje ao vivo', u:'19 · fabio', ok:'sim',
+   par:{ n:'Cálculos da folha / Envio à contabilidade (nossas)', a:'parcial', num:'Não dá para comparar: a dele mostra só as batidas (não calcula falta nem horas); a nossa trabalha com as faltas do relatório da Flash e da folha, por mês.' },
+   p:'MANTER', pt:'Operação (o dia a dia do ponto). O cálculo de dinheiro segue no nosso.', ng:'Pessoas' },
+ { k:'pao', t:'Ponto ao Vivo', g:'Pessoas', o:'Quem já bateu ponto agora em cada loja e quem está faltando.', f:'Flash ao vivo', h:'não medido (ao vivo)', u:'40 · fabio 38, neto 2', ok:'não medido',
+   par:{ n:'O que fazer hoje (nossa)', a:'parcial', num:'—' }, p:'MANTER', pt:'A tela do Fabio mais usada.', ng:'Pessoas' },
+ { k:'prh', t:'Gestão do RH', g:'Pessoas', o:'Abre a tela Cargos e salários por engano.', f:'nenhuma própria', h:'—', u:'1 · fabio', ok:'não (abre outra tela)',
+   par:{ n:'Cargos, salários e custo (nossa)', a:'sim', num:'—' }, p:'TIRAR', pt:'Já saiu do menu em 16/11; Pessoas cobre.', ng:'—' },
+ { k:'peventos', t:'Eventos e ausências', g:'Pessoas', o:'Férias, atestados, folgas e ocorrências por pessoa.', f:'Flash (ausências) + ocorrências', h:'sim', u:'12 · fabio', ok:'sim',
+   par:{ n:'Consulta de ponto, modo "Todos da loja"', a:'sim', num:'—' }, p:'TIRAR', pt:'Já virou o "Todos da loja" da Consulta de ponto (16/11).', ng:'—' },
+ { k:'freelas', t:'Taxas e Freelas', g:'Pessoas', o:'Contatos dos freelas e o valor da hora de cada loja.', f:'cadastro dos freelas (76 contatos, último 23/09)', h:'cadastro', u:'12 · fabio 11, hellen 1', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Operação.', ng:'Pessoas' },
+ { k:'taxaponto', t:'Ponto dos taxas (QR)', g:'Pessoas', o:'Batidas dos taxas pelo QR da semana e as horas de cada um.', f:'batidas pelo QR', h:'nenhuma batida ainda', u:'2 · fabio', ok:'não (ninguém bateu)',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Nova (17/11); ainda ninguém bateu ponto pelo QR.', ng:'Pessoas' },
+ { k:'manutencao', t:'Manutenção', g:'Produção e estoque', o:'Formulário de chamado com os campos desligados; não envia nada.', f:'nenhuma', h:'—', u:'não medido antes de 18/11', ok:'não (em construção)',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'TIRAR', pt:'Sai do menu até funcionar; volta quando enviar chamado.', ng:'—' },
+ { k:'prestadores', t:'Quem conserta', g:'Produção e estoque', o:'Lista de prestadores de conserto: contato e especialidade.', f:'cadastro (23 prestadores, até 02/10)', h:'cadastro', u:'não medido antes de 18/11', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Consulta útil.', ng:'Produção e estoque' },
+ { k:'mercadolivre', t:'Mercado Livre', g:'Produção e estoque', o:'Pedido de cotação: o robô traz as ofertas do Mercado Livre.', f:'robô de compras (cotação hoje 11:12, 8 ofertas)', h:'sim', u:'2 · fabio', ok:'sim',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'MANTER', pt:'Compras.', ng:'Produção e estoque' },
+ { k:'encomendas', t:'Encomendas', g:'Produção e estoque', o:'Nada.', f:'nenhuma', h:'—', u:'0', ok:'não (sem página)',
+   par:{ n:'nenhuma', a:'não', num:'—' }, p:'TIRAR', pt:'Sem página; já fora do menu desde 16/11.', ng:'—' },
+];
+// Menu novo proposto (todos os grupos). novo = entra/move; sai = sai do menu.
+const MENU_NOVO = [
+ ['Começar por aqui', ['Esta semana', 'O Placar', 'Indicadores e metas', 'A semana', 'Reunião semanal', 'Fechamento do mês']],
+ ['Resultado', ['Evolução de vendas', 'DRE', 'Fluxo de caixa realizado', 'Análise de despesas', 'Preço alvo por produto', 'Lucro por unidade', 'Engenharia de cardápio', 'Fichas técnicas']],
+ ['Canal · iFood', ['Vendas agora', 'Resumo do canal', 'Promoções', 'Cancelamentos', 'Contestações', 'Atendimento ao cliente', 'Negociações', 'Avaliações', 'Qualidade & Super', 'Cardápio', 'Clientes do iFood']],
+ ['Canal · Site próprio', ['Site próprio']],
+ ['Entrega', ['Delivery do dia (com Atrasos e turnos dentro)', 'Chegada dos motoboys', 'Escala e Clima', 'Documentos dos motoboys', 'Itens pausados · iFood x Site', 'Avaliações do dia · iFood e Site', 'Frete por distância', '~Atrasos e turnos (vai para dentro da Delivery do dia)', '~Central do Salão', '~Cozinha', '~TVs']],
+ ['Salão (novo)', ['+Reservas (GetIn)', '+Itens pausados · Salão (Goomer)', '+Avaliações do dia · Google']],
+ ['Financeiro', ['Conciliação bancária', 'Fechamento de Caixas', 'Contas a pagar', 'Contas a receber', 'Fluxo projetado', 'Taxas da maquininha', 'Acertos da folha no Saipos', '+Pagar motoboys (junta Financeiro da logística e Acertos dos motoboys)']],
+ ['Pessoas', ['O que fazer hoje', 'Consulta de ponto', 'Ponto ao Vivo', 'Cálculos da folha', 'Descontos em folha', 'Envio à contabilidade', 'Conferência da folha', 'Admissões', 'Férias', 'Rescisões', 'Cargos, salários e custo', 'Seguro de vida', 'Taxas e Freelas', 'Ponto dos taxas (QR)', '~Gestão do RH', '~Eventos e ausências']],
+ ['Atacado', ['Orçamentos', 'Lojinha por empresa']],
+ ['Produção e estoque', ['Contagem de estoque', 'Processos da produção', 'Planejar produção', 'Separação', 'Ordens de produção', 'Apontar produção', 'Fechar o turno', 'Históricos da produção', 'Conferências', 'Pedir material', 'Separar requisições', 'Controle de estoque', 'Posição de estoque', 'Teto de compra', 'Quem conserta', 'Mercado Livre', 'Listas · Pedidos', 'Listas · Financeiro', '~Manutenção', '~Encomendas']],
+ ['Sistema', ['Resumos semanais', 'Conferência da base', 'Minha agenda', 'Rotinas', 'Telas do painel', 'Calendário de promos']],
+];
+// Quem usa o quê. Uso: painel_uso, 30 dias, só as telas do Fabio. Logins: o nosso banco hoje.
+const USO = [['fabio', 'Delivery do dia 44 · Ponto ao Vivo 38 · Chegada 25 · Pausados Salão 22 · Reservas 21 · Consulta de ponto 19 · Eventos 12 · Freelas 11 · Pausados iFood 9 · Reunião 8 · outras 1–2'], ['neto', 'Ponto ao Vivo 2'], ['hellen', 'Taxas e Freelas 1']];
+// Proposta pelo cargo: o que cada login daqui passa a ver das telas do Fabio. PROVISÓRIA até a lista do portal antigo.
+const LOGINS = [
+ ['diego', 'líder São Braz', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia, Consulta de ponto e Ponto ao Vivo da loja'],
+ ['edgar', 'líder Ahú', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia, Consulta de ponto e Ponto ao Vivo da loja'],
+ ['gabriel', 'delivery (dia)', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia'],
+ ['alejo', 'delivery (noite)', 'Delivery do dia, Chegada, Escala e Clima, Pausados iFood x Site, Avaliações do dia'],
+ ['flavia', 'salão', 'Reservas, Pausados do Salão, Avaliações do Google'],
+ ['yaimar', 'salão', 'Reservas, Pausados do Salão, Avaliações do Google'],
+ ['arissa', 'RH', 'Consulta de ponto, Ponto ao Vivo, Taxas e Freelas, Ponto dos taxas'],
+ ['rita', 'compras e estoque', 'Mercado Livre (já vê), Quem conserta'],
+ ['hellen', 'financeiro', 'já vê todas'],
+];
+
+const app = document.getElementById('app');
+const D = { resp: [], aberto: null };
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const quandoBR = ts => ts ? new Date(ts).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' }) : '';
+const H = () => { const s = sessaoValida(); return { apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}`, 'Content-Type':'application/json' }; };
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Junção das telas</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome (ex.: fabio)"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:((t) => { t = String(t || '').trim(); return !t || t.includes('@') ? t : t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br'; })(document.getElementById('e').value), password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+async function carregar() {
+  if (!sessaoValida()) return telaLogin();
+  // a trava: só quem pode ver o plano lê o plano (mesma RLS do plano de saída)
+  const r0 = await fetch(`${SUPABASE_URL}/rest/v1/transicao_itens?select=id&limit=1`, { headers:H() });
+  if (r0.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  const ok = r0.ok ? await r0.json() : [];
+  if (!ok.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (a página é só do Neto e do Fabio).</p>
+    <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/juncao_telas_resposta?select=*&order=criado_em.desc`, { headers:H() });
+  D.resp = r.ok ? await r.json() : [];
+  desenhar();
+}
+function respHtml(chave, prop) {
+  const ult = D.resp.find(x => x.tela === chave);
+  const dito = ult ? `<div class="dito">Respondido: <b class="${ult.resposta}">${ult.resposta === 'sim' ? 'sim' : ult.resposta === 'nao' ? 'não' : 'outro'}</b>${ult.texto ? ' — ' + esc(ult.texto) : ''} · ${esc(ult.quem.replace('@cidadaodomundo.com.br', ''))} · ${esc(quandoBR(ult.criado_em))}</div>` : '';
+  const id = chave.replace(/[^a-z0-9]/gi, '_');
+  const form = D.aberto === chave
+    ? `<div class="resp"><input id="tx_${id}" placeholder="o que fazer com esta? (curto)" maxlength="1000"><button class="bt cheio" onclick="responder('${esc(chave)}','${esc(prop)}','outro')">Enviar</button><button class="bt" onclick="D.aberto=null;desenhar()">Cancelar</button></div>`
+    : `<div class="resp"><button class="bt sim" onclick="responder('${esc(chave)}','${esc(prop)}','sim')">Sim</button><button class="bt nao" onclick="responder('${esc(chave)}','${esc(prop)}','nao')">Não</button><button class="bt" onclick="D.aberto='${esc(chave)}';desenhar();document.getElementById('tx_${id}').focus()">Outro…</button></div>`;
+  return dito + form + `<div class="aviso" id="av_${id}"></div>`;
+}
+function card(x) {
+  return `<div class="item ${x.p}"><div class="topo"><span class="tit">${esc(x.t)}</span><span class="tag ${x.p}">${x.p}</span><span class="nota">hoje em ${esc(x.g)}</span></div>
+    <dl class="grade">
+      <dt>O que mostra</dt><dd>${esc(x.o)}</dd>
+      <dt>De onde vem</dt><dd>${esc(x.f)}</dd>
+      <dt>Dado de hoje</dt><dd>${esc(x.h)}</dd>
+      <dt>Uso em 30 dias</dt><dd>${esc(x.u)}</dd>
+      <dt>Funciona hoje</dt><dd>${esc(x.ok)}</dd>
+      <dt>Tela nossa igual</dt><dd>${esc(x.par.n)} <span class="tag ${x.par.a === 'sim' ? 'JUNTAR' : x.par.a === 'parcial' ? 'parcial' : 'nao'}">${x.par.a === 'sim' ? 'mesmo assunto' : x.par.a === 'parcial' ? 'em parte' : 'não'}</span></dd>
+      ${x.par.num && x.par.num !== '—' ? `<dt>Os números</dt><dd>${esc(x.par.num)}</dd>` : ''}
+    </dl>
+    <div class="prop"><b>Proposta: ${x.p}</b> — ${esc(x.pt)}${x.ng && x.ng !== '—' ? ` <span class="nota">· grupo: ${esc(x.ng)}</span>` : ''}</div>
+    ${respHtml(x.k, x.p)}</div>`;
+}
+function desenhar() {
+  const n = p => TELAS.filter(x => x.p === p).length;
+  const resp = new Set(D.resp.map(x => x.tela));
+  const s = sessao() || {};
+  const ordem = ['JUNTAR', 'TIRAR', 'MANTER'];
+  app.innerHTML = `
+    <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio · medido em ${MEDIDO}</p>
+    <h1>Junção das telas</h1>
+    <p class="lede">As ${TELAS.length} telas que vieram do portal do Fabio: o que cada uma traz, se a nossa fala da mesma coisa (com os dois números), e a proposta. Regra de 03/11: dinheiro no nosso painel, operação no do Fabio. Marque sim, não ou outro em cada linha. O menu só muda depois das respostas.</p>
+    <div class="placar"><div><b style="color:var(--azul)">${n('JUNTAR')}</b><span>juntar</span></div><div><b style="color:var(--acento)">${n('TIRAR')}</b><span>tirar</span></div><div><b style="color:var(--ok)">${n('MANTER')}</b><span>manter</span></div><div><b>${TELAS.filter(x => resp.has(x.k)).length} de ${TELAS.length}</b><span>já respondidas</span></div></div>
+    ${ordem.map(p => `<h2>${p === 'JUNTAR' ? 'Juntar: falam da mesma coisa' : p === 'TIRAR' ? 'Tirar do menu: sem página, sem uso ou repetida' : 'Manter'}</h2>${TELAS.filter(x => x.p === p).map(card).join('')}`).join('')}
+
+    <h2>O menu novo, com todos os grupos</h2>
+    <p class="nota">Em azul o que entra ou muda de lugar; riscado o que sai.</p>
+    <div class="menu">${MENU_NOVO.map(([g, L]) => `<div><b>${esc(g)}</b>${L.map(i => i.startsWith('+') ? `<div class="novo">${esc(i.slice(1))}</div>` : i.startsWith('~') ? `<div class="sai">${esc(i.slice(1))}</div>` : `<div>${esc(i)}</div>`).join('')}</div>`).join('')}</div>
+    <div class="item MANTER" style="margin-top:10px;"><div class="topo"><span class="tit">O menu novo inteiro</span></div>${respHtml('menu-novo', 'MENU')}</div>
+
+    <h2>Quem usa o quê</h2>
+    <p class="nota"><b>Portal antigo:</b> a lista de quem usa o portal antigo ainda não foi lida: o portal pediu login no Chrome do Neto. Assim que o Neto entrar lá, a lista entra aqui e a proposta abaixo é conferida contra ela.</p>
+    <table><thead><tr><th>Quem abriu as telas do Fabio aqui (30 dias)</th><th>Quais e quantas vezes</th></tr></thead><tbody>${USO.map(([u, t]) => `<tr><td>${esc(u)}</td><td>${esc(t)}</td></tr>`).join('')}</tbody></table>
+    <p class="nota" style="margin-top:6px;">Hoje só neto, fabio e hellen enxergam as telas do Fabio aqui; a rita vê só o Mercado Livre; os outros 18 logins não veem nenhuma. A equipe ainda usa essas telas pelo portal antigo.</p>
+    <h2 style="font-size:1rem;">Proposta: o que cada login daqui passa a ver (pelo cargo, provisória)</h2>
+    <p class="nota">Todos já têm login aqui. Quem aparecer só no portal antigo ganha login novo na tela Usuários, pelo Neto (nome em minúsculo, sem e-mail).</p>
+    ${LOGINS.map(([u, c, t]) => `<div class="item"><div class="topo"><span class="tit">${esc(u)}</span><span class="nota">${esc(c)}</span></div><div class="nota" style="color:var(--suave)">${esc(t)}</div>${respHtml('login:' + u, 'VER: ' + t)}</div>`).join('')}
+    <footer>Entrou como ${esc((s.email || '').replace('@cidadaodomundo.com.br', ''))} · <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+async function responder(chave, prop, resposta) {
+  const id = chave.replace(/[^a-z0-9]/gi, '_'), av = () => document.getElementById('av_' + id);
+  const campo = document.getElementById('tx_' + id), texto = campo ? campo.value.trim() : '';
+  if (resposta === 'outro' && !texto) { av().className = 'aviso erro'; av().textContent = '! Escreva o que fazer antes de enviar.'; return; }
+  av().className = 'aviso'; av().textContent = 'Enviando…';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/juncao_telas_responder`, { method:'POST', headers:H(),
+      body: JSON.stringify({ p_tela: chave, p_proposta: prop, p_resposta: resposta, p_texto: texto || null }) });
+    if (!r.ok) { let m = ''; try { m = (await r.json()).message || ''; } catch (e) {} throw new Error(m || 'erro ' + r.status); }
+    D.aberto = null; await carregar();
+    const a = av(); if (a) { a.className = 'aviso certo'; a.textContent = '✓ Chegou: a resposta ficou gravada.'; }
+  } catch (e) {
+    const a = av(); a.className = 'aviso erro'; a.innerHTML = `✗ Não chegou: ${esc(e.message)} <button class="bt" onclick="responder('${esc(chave)}','${esc(prop)}','${resposta}')">tentar de novo</button>`;
+  }
+}
+carregar();
+</script>
+</body>
+</html>
