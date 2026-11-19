@@ -3124,7 +3124,6 @@ async function entrarHoje() {
     hojeLerFrescor().catch(() => {}),
     hojeLerFilas().catch(e => { erros.filas = e.message; }),
     consultarTudo(`vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento,promo_ok&dia=gte.${fxSomaDias(trHoje(), -21)}`).then(r => { HOJE_TK = r; }).catch(() => { HOJE_TK = null; }),
-    consultarTudo('compra_orcamento_foto?select=mes,unidade,usado_pct,mes_corrido_pct,situacao,falta_comprar,notas_ate,calculado_em&grupo=eq.TOTAL&order=mes.desc').then(r => { HOJE_TETO = r; }).catch(() => { HOJE_TETO = null; }),
   ]);
   HOJE_ERROS = erros;
   HOJE_CONFERIDO = new Date();
@@ -3540,7 +3539,8 @@ function renderHoje() {
         farol(mil1(c.receitaPrev), c.receitaPrev, c.meta, 'acima') + (c.outrasMes > 500 ? sub('inclui ' + mil1(c.outrasMes) + ' de listas e atacado') : ''),
         c.meta ? mil1(c.meta) : '—',
         mPess ? farol(um(c.cmoEst) + '%', c.cmoEst, mPess.meta, mPess.sentido) : um(c.cmoEst) + '%',
-        hojeTetoCel(c.u, sub),
+        // 18/11/2026 23:13 (dono: "mas CMV e teto de compras não são a mesma coisa"): o teto saiu; a coluna espera o pedido certo
+        '<span style="color:var(--tx-5);">em construção</span>',
       ])).join('') + '</table></div>';
 
     // ---- tabela 2: o ultimo mes fechado ----
