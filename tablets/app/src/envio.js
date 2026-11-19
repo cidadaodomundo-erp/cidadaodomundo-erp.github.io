@@ -104,8 +104,8 @@
         return r.ok ? await r.json() : null;
       } catch { return null; } finally { clearTimeout(t); }
     },
-    async enviarRodada({ ocupacao, numero, itens }) {
-      const conteudo = { ocupacao, numero, itens };
+    async enviarRodada({ ocupacao, numero, itens, nome }) {
+      const conteudo = nome ? { ocupacao, numero, itens, nome } : { ocupacao, numero, itens };
       const idempotencyKey = chave(conteudo);
       let r;
       try { r = await post("/api/rodada", { idempotencyKey, ...conteudo }); }

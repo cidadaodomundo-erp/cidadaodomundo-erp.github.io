@@ -9,7 +9,7 @@
   let ocupado = false;
 
   function mostrar(d) {
-    $("titulo").textContent = `${d.rotulo} · rodada ${d.numero}`;
+    $("titulo").textContent = `${d.rotulo}${d.nome ? " · " + d.nome : ""} · rodada ${d.numero}`;
     $("total").textContent = reais(d.totalCentavos);
     const ul = $("itens"); ul.textContent = "";
     for (const i of d.itens) { const li = document.createElement("li"); li.textContent = `${i.quantidade} × ${i.nome}`; ul.appendChild(li); }

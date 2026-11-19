@@ -185,3 +185,10 @@ textarea{width:100%;border-radius:10px;border:1px solid var(--linha);padding:10p
 .pag-formas{display:grid;gap:10px}
 .pag-status{min-height:1.4em}
 @media (max-width:640px){.pag-cols{grid-template-columns:1fr}}
+
+/* pedir e facil */
+.passos-facil{list-style:none;display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0;padding:0}
+.passos-facil li{display:flex;align-items:center;gap:8px;background:var(--preto);color:var(--creme);border-radius:999px;padding:6px 14px 6px 6px;font-weight:600;font-size:15px}
+.passo-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#E0A81C;color:var(--preto);font-size:15px}
+.nota-previa{font-size:14px}
+.pag-facil{font-size:18px;font-weight:600;margin:4px 0 6px}

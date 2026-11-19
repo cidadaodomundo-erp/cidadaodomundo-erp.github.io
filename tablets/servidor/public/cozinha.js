@@ -58,6 +58,7 @@
   function card(r) {
     const c = el("article", "card " + r.preparo);
     const h = el("h2", "cubano", r.rotulo);
+    if (r.nome) h.appendChild(el("span", "nome", ` · ${r.nome}`));
     c.appendChild(h);
     const meta = el("div", "meta", `Rodada ${r.numero} · ${hora(r.criadoEm)} (${minutos(r.criadoEm)} min) · ${ETAPA[r.preparo] || r.preparo}`);
     if (r.saipos) {
@@ -101,13 +102,13 @@
     for (const m of d.mesas) {
       const x = el("div", "mesa");
       const t = el("div");
-      t.append(el("strong", "", m.rotulo), el("div", "meta", `${m.rodadas} rodada(s) · ${reais(m.totalCentavos)} · desde ${hora(m.desde)}${m.pendentes ? ` · ${m.pendentes} na cozinha` : ""}`));
+      t.append(el("strong", "", m.rotulo + (m.nomes && m.nomes.length ? ` · ${m.nomes.join(", ")}` : "")), el("div", "meta", `${m.rodadas} rodada(s) · ${reais(m.totalCentavos)} · desde ${hora(m.desde)}${m.pendentes ? ` · ${m.pendentes} na cozinha` : ""}`));
       const b = el("button", "sec", "Fechar conta"); b.type = "button";
       b.addEventListener("click", () => fecharConta(m));
       x.append(t, b); ms.appendChild(x);
     }
     const e = $("entregues");
-    e.textContent = d.entregues.length ? d.entregues.map((r) => `${r.rotulo} R${r.numero} (${hora(r.criadoEm)})`).join(" · ") : "Nenhuma ainda.";
+    e.textContent = d.entregues.length ? d.entregues.map((r) => `${r.rotulo}${r.nome ? " " + r.nome : ""} R${r.numero} (${hora(r.criadoEm)})`).join(" · ") : "Nenhuma ainda.";
     $("estado").textContent = `${cfg.modo === "saipos" ? "Ligado à loja TESTE do Saipos" : "Cozinha de teste (sem Saipos)"} · atualizado ${hora(d.agora)}`;
   }
 

@@ -115,7 +115,8 @@ export function produtosProntosNoSaipos(ctx, data) {
 
 // Valida a rodada contra o cardapio (precos SEMPRE do servidor). Retorna linhas normalizadas + resumo para a cozinha.
 export function validarRodada(cardapio, corpo, data, permitidos = null) {
-  if (!so(corpo, ["idempotencyKey", "ocupacao", "numero", "itens"])) throw bad("Pedido com campos não permitidos.");
+  if (!so(corpo, ["idempotencyKey", "ocupacao", "numero", "itens", "nome"], ["idempotencyKey", "ocupacao", "numero", "itens"])) throw bad("Pedido com campos não permitidos.");
+  const nome = lerNome(corpo.nome);
   if (typeof corpo.idempotencyKey !== "string" || !UUID.test(corpo.idempotencyKey)) throw bad("Chave do pedido inválida.");
   const ocupacao = lerOcupacao(corpo.ocupacao);
   if (!Number.isInteger(corpo.numero) || corpo.numero < 1 || corpo.numero > 200) throw bad("Número da rodada inválido.");
@@ -151,12 +152,22 @@ export function validarRodada(cardapio, corpo, data, permitidos = null) {
       obs: linha.obs || "", retiradas: linha.retiradas || [], centavos: valor,
     });
   }
-  return { ocupacao, numero: corpo.numero, linhas, resumo, totalCentavos: total };
+  return { ocupacao, numero: corpo.numero, nome, linhas, resumo, totalCentavos: total };
+}
+
+// Primeiro nome de quem pediu (para o garcom entregar). Opcional; so letras, ate 20.
+export function lerNome(v) {
+  if (v === undefined || v === null || v === "") return null;
+  if (typeof v !== "string") throw bad("Nome inválido.");
+  const t = v.normalize("NFC").trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  if (t.length > 20 || !/^[\p{L}][\p{L}' -]*$/u.test(t)) throw bad("Digite só o primeiro nome (letras, até 20).");
+  return t.split(" ").map((w) => w.charAt(0).toLocaleUpperCase("pt-BR") + w.slice(1).toLocaleLowerCase("pt-BR")).join(" ");
 }
 
 // Nota do item na ficha Saipos: identifica mesa/rodada (TICKET nao tem campo de mesa) + observacao do cliente.
-export function notaSaipos(ocupacao, numero, linha) {
-  const partes = [`${rotuloOcupacao(ocupacao)} R${numero}`];
+export function notaSaipos(ocupacao, numero, linha, nome = null) {
+  const partes = [`${rotuloOcupacao(ocupacao)} R${numero}${nome ? " " + nome.toLocaleUpperCase("pt-BR") : ""}`];
   if (linha.retiradas?.length) partes.push(`SEM ${linha.retiradas.join(", ")}`);
   if (linha.obs) partes.push(linha.obs);
   return partes.join(" | ").slice(0, 110);
@@ -312,7 +323,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
 
   async function enviarSaipos(r, val) {
     if (modoSaipos === "TABLE") return enviarSaiposMesa(r, val);
-    const itens = val.itensHml.map((it, i) => ({ ...it, nota: notaSaipos(r.ocupacao, r.numero, val.linhas[i]) }));
+    const itens = val.itensHml.map((it, i) => ({ ...it, nota: notaSaipos(r.ocupacao, r.numero, val.linhas[i], r.nome) }));
     let prep;
     try {
       prep = await prepararCarrinho({ caminhos: saipos.caminhos, meta: saipos.meta, itens, paymentCode: PAGAMENTO_CODIGO, senha: r.saipos.senha, agora: agora(), mode: "TICKET" });
@@ -345,7 +356,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       env = SaiposMesa.criarPedidoMesaComanda({
         pedidoId: orderId, displayId: String(r.saipos.senha), lojaCodigo: saipos.meta.codStore, criadoEm: r.criadoEm,
         destino: r.ocupacao.modalidade === "mesa" ? { tipo: "mesa", descTable: String(r.ocupacao.mesa) } : { tipo: "comanda", descOrderPad: r.ocupacao.comanda },
-        observacao: `TESTE-NAO PRODUZIR | ${rotuloOcupacao(r.ocupacao)} R${r.numero}`,
+        observacao: `TESTE-NAO PRODUZIR | ${rotuloOcupacao(r.ocupacao)} R${r.numero}${r.nome ? " " + r.nome.toLocaleUpperCase("pt-BR") : ""}`,
         itens: val.itensHml.map((it, i) => {
           const item = { codigo: it.codigo, descricao: it.descricao, quantidade: it.quantidade, precoCentavos: it.centavos,
             complementos: it.complementos.map((c) => ({ codigo: c.codigo, descricao: c.descricao, quantidade: c.quantidade, precoAdicionalCentavos: c.centavos })) };
@@ -382,7 +393,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
 
   async function novaRodada(corpo) {
     const existente = estado.rodadas.find((r) => r.chave === corpo?.idempotencyKey);
-    const h = hash({ ocupacao: corpo?.ocupacao, numero: corpo?.numero, itens: corpo?.itens });
+    const h = hash({ ocupacao: corpo?.ocupacao, numero: corpo?.numero, itens: corpo?.itens, ...(corpo?.nome ? { nome: corpo.nome } : {}) });
     if (existente) {
       if (existente.hash !== h) throw new ErroSalao(409, "Esta rodada já foi enviada com outro conteúdo.");
       if (existente.fechada) throw new ErroSalao(409, "Esta rodada é de uma conta já fechada. Toque em Confirmar de novo.");
@@ -400,7 +411,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     }
     const r = {
       id: randomUUID(), chave: corpo.idempotencyKey, hash: h, criadoEm: data.toISOString(),
-      ocupacao: val.ocupacao, numero: val.numero, itens: val.resumo, totalCentavos: val.totalCentavos,
+      ocupacao: val.ocupacao, numero: val.numero, nome: val.nome, itens: val.resumo, totalCentavos: val.totalCentavos,
       preparo: "NOVO", contaId: null, fechada: false, saipos: null,
     };
     if (pagarAntes) {
@@ -440,7 +451,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   };
   function verPagamento(t) {
     const r = porToken(t);
-    return { ok: true, estado: r.pagamento.estado, forma: r.pagamento.forma, totalCentavos: r.totalCentavos, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero,
+    return { ok: true, estado: r.pagamento.estado, forma: r.pagamento.forma, totalCentavos: r.totalCentavos, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, nome: r.nome ?? null,
       itens: r.itens.map((i) => ({ quantidade: i.quantidade, nome: i.nome })), simulado: true, rodada: r.pagamento.estado === "aprovado" ? respostaRodada(r) : null };
   }
   async function simularPagamento(corpo) {
@@ -493,7 +504,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     return chaves.map((chave) => {
       const rs = rodadasAbertas(chave);
       if (!rs.length) return null;
-      return { chave, rotulo: rotuloOcupacao(rs[0].ocupacao), rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0), desde: rs[0].criadoEm,
+      return { chave, rotulo: rotuloOcupacao(rs[0].ocupacao), nomes: [...new Set(rs.map((r) => r.nome).filter(Boolean))], rodadas: rs.length, totalCentavos: rs.reduce((s, r) => s + r.totalCentavos, 0), desde: rs[0].criadoEm,
         pendentes: rs.filter((r) => r.preparo !== "ENTREGUE").length };
     }).filter(Boolean).sort((a, b) => a.desde.localeCompare(b.desde));
   }
@@ -566,7 +577,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     const ativos = visiveis.filter((r) => r.preparo !== "ENTREGUE").sort((a, b) => a.criadoEm.localeCompare(b.criadoEm));
     const entregues = visiveis.filter((r) => r.preparo === "ENTREGUE").slice(-10);
     const pub = (r) => ({
-      id: r.id, criadoEm: r.criadoEm, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, itens: r.itens, totalCentavos: r.totalCentavos,
+      id: r.id, criadoEm: r.criadoEm, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, nome: r.nome ?? null, itens: r.itens, totalCentavos: r.totalCentavos,
       preparo: r.preparo, saipos: r.saipos ? { estado: r.saipos.estado, ficha: r.saipos.senha } : null,
       pago: r.pagamento ? FORMAS_PAGAMENTO[r.pagamento.forma] : null,
     });

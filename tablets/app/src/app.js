@@ -30,7 +30,19 @@
   const msg = (t) => { $("msg").textContent = t; };
   const hora = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); };
 
-  $("notaPrevia").textContent = ENVIO
+  // Frases de "pedir e facil" (so no modo servidor; a demonstracao avulsa fica como era).
+  const FACIL = !!ENVIO;
+  if (FACIL) {
+    const passos = el("ol", "passos-facil");
+    passos.setAttribute("aria-label", "Como pedir");
+    for (const [n, t] of [["1", "Toque na foto"], ["2", "Escolha do seu jeito"], ["3", ENVIO.pagarAntes ? "Confirme e pague aqui" : "Confirme e pronto"]]) {
+      const li = el("li"); li.append(el("span", "passo-n cubano", n), el("span", "", t)); passos.appendChild(li);
+    }
+    $("notaPrevia").after(passos);
+  }
+  $("notaPrevia").textContent = FACIL
+    ? "Pedir aqui é fácil: sem fila e sem esperar o garçom. Você escolhe, confirma e a gente leva até a mesa."
+    : ENVIO
     ? `Cardápio do totem (cópia de ${menu.meta.consultaData}): ${menu.meta.amostra} itens. MODO TESTE: ${ENVIO.modo === "saipos" ? "a rodada vai para a cozinha de teste e para a loja TESTE do Saipos" : "a rodada vai para a tela da cozinha de teste"}; nada é cobrado.`
     : `Protótipo de mesas — amostra do totem; cardápio do salão ainda não importado. ${menu.meta.amostra} de ${menu.meta.totalProdutosSnapshot} itens (consulta ${menu.meta.consultaData}); preços de teste, não oficiais.`;
 
@@ -289,7 +301,8 @@
     salvar();
     fecharProduto();
     renderComanda();
-    msg(`“${p.nome}” adicionado ao carrinho. Ainda não registrado na comanda.`);
+    msg(FACIL ? `Pronto! “${p.nome}” está no carrinho. Quer mais alguma coisa? Quando terminar, é só tocar em ${ENVIO.pagarAntes ? "Confirmar e pagar" : "Confirmar"}.`
+      : `“${p.nome}” adicionado ao carrinho. Ainda não registrado na comanda.`);
   });
 
   // ---------- comanda ----------
@@ -312,7 +325,8 @@
     caixa.textContent = "";
     if (!estado.carrinho.length) {
       const v = el("p", "vazio");
-      v.append(el("strong", "", "O carrinho está vazio"), el("span", "", "Toque em uma foto do cardápio para escolher o primeiro item."));
+      v.append(el("strong", "", FACIL ? "Seu pedido começa aqui" : "O carrinho está vazio"),
+        el("span", "", FACIL ? "É só tocar na foto do que você quiser. Leva poucos segundos." : "Toque em uma foto do cardápio para escolher o primeiro item."));
       caixa.appendChild(v);
     }
     estado.carrinho.forEach((l, i) => {
@@ -385,13 +399,21 @@
     try {
       if (!C.ocupacaoPronta(estado)) { msg("Informe e confirme o identificador do cartão/comanda antes de registrar."); return; }
       const qtd = estado.carrinho.reduce((s, l) => s + l.quantidade, 0);
-      const ok = await confirmar("REGISTRAR PEDIDO",
+      let nome = null;
+      if (FACIL) {
+        nome = await pedirNome();
+        if (nome === null) { msg("Tudo bem, o carrinho continua aqui. Quando quiser, toque em Confirmar."); return; }
+      }
+      const ok = FACIL ? await confirmar(`TUDO CERTO, ${nome.toLocaleUpperCase("pt-BR")}?`,
+        `${qtd} ${qtd === 1 ? "item" : "itens"}, ${reais(C.totalCarrinho(ix, estado))}, para a ${C.rotuloOcupacao(estado).toLowerCase()}. ${ENVIO.pagarAntes ? "Agora é só pagar e a cozinha começa na hora." : "Confirme e a cozinha começa na hora."} (Teste: nada é cobrado.)`,
+        ENVIO.pagarAntes ? "Sim, ir para o pagamento" : "Sim, enviar à cozinha")
+      : await confirmar("REGISTRAR PEDIDO",
         `Registrar rodada ${estado.rodadas.length + 1} em ${C.rotuloOcupacao(estado).toLowerCase()}: ${qtd} ${qtd === 1 ? "item" : "itens"}, ${reais(C.totalCarrinho(ix, estado))}? Depois de registrada, a mesa/comanda não pode mais ser trocada até fechar a comanda. ${ENVIO ? "A rodada vai para a cozinha de teste. Nada é cobrado." : "Demonstração: nada é enviado à cozinha."}`,
         ENVIO ? "Enviar à cozinha" : "Registrar rodada");
       if (!ok) { msg("Registro cancelado. O carrinho foi mantido."); return; }
       if (ENVIO) {
         msg("Enviando a rodada para a cozinha…");
-        let res = await ENVIO.enviarRodada({ ocupacao: C.ocupacaoAtual(estado), numero: estado.rodadas.length + 1, itens: estado.carrinho });
+        let res = await ENVIO.enviarRodada({ ocupacao: C.ocupacaoAtual(estado), numero: estado.rodadas.length + 1, itens: estado.carrinho, nome });
         if (!res.ok) { msg(res.mensagem); return; } // carrinho mantido; tocar de novo reenvia com a MESMA chave (sem duplicar)
         if (res.aguardandoPagamento) {
           // Paga ANTES: so depois do pagamento aprovado a rodada vai para a cozinha (e o carrinho vira rodada aqui).
@@ -407,7 +429,9 @@
           if (typeof res.id === "string") r.idServidor = res.id;
           if (res.totalCentavos !== r.totalCentavos) console.warn("total do servidor difere do tablet");
           salvar();
-          msg(`Rodada ${r.numero} — ${res.mensagem}`);
+          msg(FACIL
+            ? `Rodada ${r.numero}: pedido feito!${r.status && res.mensagem.startsWith("Pagamento aprovado") ? " Pagamento aprovado." : ""} Já está na cozinha e você acompanha aqui ao lado. Quer mais alguma coisa? É só pedir de novo.`
+            : `Rodada ${r.numero} — ${res.mensagem}`);
         }
         return;
       }
@@ -548,6 +572,7 @@
     C.fecharComanda(estado);
     preparo.clear();
     if (ENVIO) ENVIO.limparPendente();
+    try { localStorage.removeItem(CHAVE_NOME); } catch { /* ok */ }
     salvar(); renderComanda();
     msg(texto);
   }
@@ -589,6 +614,46 @@
       inp.focus();
     });
   }
+  // ---------- primeiro nome de quem pede (para o garcom entregar) ----------
+  const CHAVE_NOME = "cdm-tablet-nome-v1";
+  const NOME_OK = /^[\p{L}][\p{L}' -]{0,19}$/u;
+  let dlgNome = null;
+  function pedirNome() {
+    if (!dlgNome) {
+      dlgNome = el("dialog"); dlgNome.id = "dlgNome";
+      const box = el("div", "dlg-simples");
+      const inp = el("input"); inp.id = "nomeCliente"; inp.type = "text"; inp.maxLength = 20; inp.autocomplete = "off"; inp.setAttribute("autocapitalize", "words"); inp.placeholder = "Ex.: Ana";
+      const lab = el("label", "", "Seu primeiro nome"); lab.htmlFor = "nomeCliente";
+      const erro = el("p", "aviso"); erro.setAttribute("role", "alert");
+      const linha = el("div", "acoes-linha");
+      const nao = el("button", "btn sec", "Voltar"); nao.type = "button";
+      const sim = el("button", "btn prim", "Continuar"); sim.type = "button";
+      linha.append(nao, sim);
+      box.append(el("h2", "cubano", "COMO VOCÊ SE CHAMA?"), el("p", "pequeno", "Só o primeiro nome, para o garçom entregar o pedido certinho para você."), lab, inp, erro, linha);
+      dlgNome.appendChild(box);
+      document.body.appendChild(dlgNome);
+    }
+    const inp = dlgNome.querySelector("#nomeCliente"), erro = dlgNome.querySelector(".aviso");
+    const [nao, sim] = dlgNome.querySelector(".acoes-linha").children;
+    try { inp.value = localStorage.getItem(CHAVE_NOME) || ""; } catch { inp.value = ""; }
+    erro.textContent = "";
+    return new Promise((ok) => {
+      const sair = (v) => { sim.onclick = nao.onclick = inp.onkeydown = null; dlgNome.oncancel = null; fechar(dlgNome); ok(v); };
+      const tentar = () => {
+        const t = inp.value.normalize("NFC").trim().replace(/\s+/g, " ");
+        if (!NOME_OK.test(t)) { erro.textContent = t ? "Use só letras (até 20)." : "Digite seu primeiro nome."; inp.focus(); return; }
+        try { localStorage.setItem(CHAVE_NOME, t); } catch { /* ok */ }
+        sair(t);
+      };
+      nao.onclick = () => sair(null);
+      sim.onclick = tentar;
+      inp.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); tentar(); } };
+      dlgNome.oncancel = (ev) => { ev.preventDefault(); sair(null); };
+      abrir(dlgNome);
+      inp.focus(); inp.select();
+    });
+  }
+
   // ---------- pagamento antes da cozinha (TESTE: simulado; QR para pagar no celular) ----------
   function desenharQr(texto) {
     if (typeof window.qrcode !== "function") return null;
@@ -621,7 +686,8 @@
     const box = el("div", "pag");
     box.appendChild(el("h2", "cubano", "PAGAR A RODADA"));
     box.appendChild(el("p", "pag-total cubano", reais(res.totalCentavos)));
-    box.appendChild(el("p", "pequeno", `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. A rodada vai para a cozinha assim que o pagamento for aprovado. TESTE: nada é cobrado.`));
+    box.appendChild(el("p", "pag-facil", "Falta pouco! Pague como preferir: aponte a câmera do celular para o QR Code ou toque numa opção aqui no tablet."));
+    box.appendChild(el("p", "pequeno", `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. Pagou, a cozinha já começa. TESTE: nada é cobrado.`));
     const cols = el("div", "pag-cols");
     const qrBox = el("div", "pag-qr");
     const qr = desenharQr(`${location.origin}/pagar?t=${res.token}`);
@@ -677,6 +743,8 @@
       try { C.definirOcupacao(estado, "mesa", ENVIO.mesaFixa); salvar(); } catch { /* mantem */ }
     }
     $("btnFechar").textContent = "Fechar conta (equipe)";
+    $("btnConfirmar").textContent = ENVIO.pagarAntes ? "Confirmar e pagar" : "Confirmar pedido";
+    $("btnConfirmar").nextElementSibling.textContent = ENVIO.pagarAntes ? "Confira, pague aqui mesmo e a cozinha já começa. Simples assim." : "Confira e envie: a cozinha começa na hora.";
     if (ENVIO.pagarAntes && ENVIO.temPendente() && estado.carrinho.length) msg("Há uma rodada esperando pagamento. Toque em Confirmar para continuar.");
     // Andamento das rodadas e fechamento feito pela equipe (tela da cozinha/caixa)
     let consultando = false;

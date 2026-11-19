@@ -6,7 +6,7 @@ import http from "node:http";
 import { mkdtemp, writeFile, readFile, rm, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { criarServidorSalao, notaSaipos, SENHA_INICIAL, STATUS, COD_STORE_TESTE, FORMAS_PAGAMENTO } from "../src/salao.js";
+import { criarServidorSalao, notaSaipos, lerNome, SENHA_INICIAL, STATUS, COD_STORE_TESTE, FORMAS_PAGAMENTO } from "../src/salao.js";
 import { dtoFixtureV2, catalogoHmlV2, mapaFixtureV2, itemBurger, itemCerveja, TOTAL_REFERENCIA, AS_12H, AS_01H } from "../../../totem/app/test/fixture-cardapio.js";
 
 const SEGREDO = "FAKE-SECRET-aaaa1111";
@@ -382,4 +382,24 @@ test("paga antes: cancelar na mesa nao manda nada; fechar a conta cancela pagame
   assert.deepEqual((await painelDe(s2)).json.mesas.map((m) => m.rodadas), [1]);
   assert.equal((await postC(s2, "/api/cozinha/mesa/fechar", { ocupacao: "mesa:7" })).json.ok, true);
   assert.equal((await chamar(s2.porta, { caminho: `/api/pagamento?t=${r3.json.pagamento.token}` })).json.estado, "cancelado");
+});
+
+test("primeiro nome de quem pediu: vai para a cozinha, a pagina do celular e a ficha do Saipos", async () => {
+  assert.equal(lerNome("  joão  "), "João");
+  assert.equal(lerNome("ana maria"), "Ana Maria");
+  assert.equal(lerNome(undefined), null);
+  assert.throws(() => lerNome("<script>"));
+  assert.throws(() => lerNome("x".repeat(21)));
+  assert.equal(notaSaipos({ modalidade: "mesa", mesa: 4 }, 2, { obs: "sem gelo" }, "João"), "MESA 4 R2 JOÃO | sem gelo");
+  const s = await subir({ modo: "saipos", pagarAntes: true });
+  assert.equal((await post(s, "/api/rodada", rodada(100, [itemCerveja()], { nome: "Ana<1>" }))).status, 400);
+  const r = await post(s, "/api/rodada", rodada(101, [itemBurger({ obs: "sem picles" })], { nome: "joão" }));
+  const t = r.json.pagamento.token;
+  assert.equal((await chamar(s.porta, { caminho: `/api/pagamento?t=${t}` })).json.nome, "João");
+  await post(s, "/api/pagamento/simular", { token: t, forma: "pix", resultado: "aprovado" });
+  await s.esperar();
+  const p = (await painelDe(s)).json;
+  assert.equal(p.rodadas[0].nome, "João");
+  assert.deepEqual(p.mesas[0].nomes, ["João"]);
+  assert.equal(JSON.parse(s.f.pedidos()[0].corpo).items[0].notes, "TESTE MESA 7 R1 JOÃO | sem picles");
 });
