@@ -37,32 +37,38 @@ window.CASCA_MODULOS_CFG = {
     motoboys: { abas: [['logfin', 'Financeiro da logística'], ['macertos', 'Acertos']] },
   },
 };
+// 18/11/2026 23:20 (dono: "tem como já ordenar o menu com a sugestão do artefato da junção? ele ficou bom e vai ser melhor pra irmos
+// decidindo cada tela"; livro chat-frente-telas/respostas/menu-ordenado-pela-juncao): as telas do Fabio saem da "Operação das lojas"
+// e entram nos módulos propostos em juncao-telas.html (Entrega e Salão novos). TODAS continuam no menu: juntar e tirar só depois da
+// decisão do Fabio, tela a tela. As chaves não mudam (acessos e links seguem valendo).
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora', 'reuniao'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
-    lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos'],
+    lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos', 'pagarmoto', 'motoboys'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
     lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
-    lancar: [], acompanhar: ['resumo', 'promocoes', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete', 'motoboys'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
+    lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete'] },
+  { id: 'entrega', nome: 'Entrega', icone: '🏍️',   // 18/11: as telas do delivery do Fabio + as nossas que a junção propõe juntar nelas
+    lancar: [], acompanhar: ['delivery', 'atrasos', 'chegada', 'escalaclima', 'motodocs', 'pausadosdel', 'avaldel', 'atendimento', 'link:portal-qualidade', 'cozinha', 'tvs'] },
+  { id: 'salao', nome: 'Salão', icone: '🍽️',
+    lancar: [], acompanhar: ['reservas', 'pausados', 'avalsalao', 'salao'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
-  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto'] },
+  { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto', 'mercadolivre'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
-    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
+    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist', 'manutencao', 'prestadores'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
   { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio', 'saiposcod'] },
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
-    lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pseguro', 'pacertos'], acompanhar: [] },   // ordem do dono (06/11)
-  { id: 'fabio', nome: 'Operação do Fabio', icone: '🧭',
-    lancar: [], acompanhar: ['atrasos', 'atendimento', 'link:portal-qualidade'] },
+    lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pseguro', 'pacertos'], acompanhar: ['pcartao', 'pao', 'freelas', 'taxaponto'] },   // ordem do dono (06/11)
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: ['usuarios'], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios', 'link:promos.html'] },
+    lancar: ['usuarios'], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios'] },
 ];
 
 

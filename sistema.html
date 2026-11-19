@@ -267,7 +267,7 @@
 
 <script src="casca/menu.js?v=20261117t"></script>
 <script src="casca/paginas.js?v=20261118usu"></script>
-<script src="casca/modulos.js?v=20261118usu"></script>
+<script src="casca/modulos.js?v=20261118jun"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
 <script src="casca/busca.js?v=20261118usu"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
@@ -338,8 +338,9 @@ function setoresDe(sobra) {
 // tela do agrupamento Operação das lojas com integração pendente (sem rota em casca/paginas.js, mesmo que o arquivo exista): sem botão ativo, nunca abre a moldura
 // do painel antigo (dashboard.html virou redirecionamento e, numa moldura, só mostra "esta tela mudou de lugar")
 function semPagina(k) {
+  // 18/11/2026: as telas do Fabio saíram da "Operação das lojas" para os módulos; a tela dele sem página (Cozinha, TVs) segue sem botão
   const it = ITENS[k], o = MODULOS.find((m) => m.id === 'outras');
-  return !!(it && o && o.acompanhar.includes(k) && !it.link && !JUNCOES[k] && !PAGINAS[k]);
+  return !!(it && ((o && o.acompanhar.includes(k)) || it.origem === 'fabio') && !it.link && !JUNCOES[k] && !PAGINAS[k]);
 }
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';
 function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && alvoMenu(k)); }
