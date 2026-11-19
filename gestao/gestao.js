@@ -5792,6 +5792,7 @@ function dreRangeSet() {
   renderModuloDRE();
 }
 
+const PONTE_PC = {};   // 19/11/2026: a ponte papel × caixa por loja e mês (vw_fin_ponte_papel_caixa)
 function renderModuloDRE() {
   const alvo = document.getElementById('view-dre');
   if (!DRE_FIN || !DRE_FIN.length) {
@@ -6191,55 +6192,49 @@ function renderModuloDRE() {
       // ---- PONTE DRE x DFC (ultima ideia absorvida do fechamento do Matheus,
       // 16/08/2026): o lucro do papel virou caixa? Mesmos predicados nas duas
       // views (competencia = vw_fin_dre_mensal, caixa = vw_fin_dfc_mensal). ----
-      if (DFC_MENSAL && DFC_MENSAL.length) {
-        const mesF = meses[iF];
-        const somaMes = (rows, pred, sinal = 1) => rows.reduce((s, r) =>
-          s + (r.mes === mesF && pred(r) ? ((r.credito || 0) - (r.debito || 0)) * sinal : 0), 0);
-        const predG = (gi) => { const tipos = DRE_GRUPOS[gi][2]; return (r) => r.natureza === 'DESPESAS' && r.tipo !== 'INVESTIMENTOS' && tipos.includes(r.tipo); };
-        const tiposMap = DRE_GRUPOS.flatMap(g => g[2]).concat(['DESPESAS FINANCEIRAS']);
-        const linhasPonte = [
-          ['Recebimentos das vendas', r => r.natureza === 'RECEITAS', 1, 'rec'],
-          ['Impostos sobre venda (ICMS etc.)', r => r.natureza === 'DEDUÇOES DA RECEITA', -1, 'desp'],
-          ['Mercadoria + uso e consumo', predG(0), -1, 'desp'],
-          ['Pessoal (inclui pró-labore)', predG(1), -1, 'desp'],
-          ['Despesas de venda', predG(2), -1, 'desp'],
-          ['Administrativas', predG(3), -1, 'desp'],
-          ['Financeiras (juros e tarifas)', r => r.natureza === 'DESPESAS' && r.tipo === 'DESPESAS FINANCEIRAS', -1, 'desp'],
-          ['Outras despesas', r => r.natureza === 'DESPESAS' && r.tipo !== 'INVESTIMENTOS' && !tiposMap.includes(r.tipo), -1, 'desp'],
-        ];
-        let compTot = 0, caixaTot = 0;
-        const tr = linhasPonte.map(([rotulo, pred, sinal, natu]) => {
-          const comp = somaMes(DRE_FIN, pred, sinal);
-          const caixa = somaMes(DFC_MENSAL, pred, sinal);
-          if (Math.abs(comp) < 0.005 && Math.abs(caixa) < 0.005) return '';
-          const efeito = natu === 'rec' ? 1 : -1;   // sinal com que entra no resultado
-          compTot += comp * efeito; caixaTot += caixa * efeito;
-          const dif = caixa - comp;
-          const alinhado = Math.abs(dif) < Math.max(500, Math.abs(comp) * 0.02);
-          const leitura = alinhado ? 'alinhado'
-            : natu === 'rec'
-              ? (dif > 0 ? 'caiu na conta MAIS do que o mês gerou (repasses de semanas anteriores)' : 'parte da venda ainda não caiu na conta')
-              : (dif > 0 ? 'pagou também contas de meses anteriores' : 'parte ficou para pagar depois — vai pesar num próximo mês');
-          return `<tr><td>${rotulo}</td><td>${fmt(comp)}</td><td>${fmt(caixa)}</td>
-            <td class="${dif < -0.005 && natu === 'rec' || dif > 0.005 && natu === 'desp' ? 'negativo' : ''}">${dif >= 0 ? '+' : '−'} ${fmt(Math.abs(dif))}</td>
-            <td style="text-align:left; white-space:normal; color:${alinhado ? 'var(--tx-4)' : 'var(--tx-2)'};">${leitura}</td></tr>`;
-        }).join('');
-        const difTot = caixaTot - compTot;
+      // 19/11/2026 (Financeiro, erro provado; dono viu no Ahú de outubro): a ponte lê vw_fin_ponte_papel_caixa. Antes o "no papel"
+      // somava a natureza RECEITAS do livro (o que caiu no Saipos = caixa) e o "no caixa" não via a lista paga à AV. Agora:
+      // papel = vw_fin_resultado_fato (a linha 9 é o resultado da DRE, travado no SQL); caixa = vw_fin_dfc_mensal com os mesmos
+      // grupos + a lista entre lojas. Os valores já vêm com sinal (custo negativo).
+      {
+        const mesF = meses[iF], uP = lojaFin() || 'REDE', kP = uP + '|' + String(mesF).slice(0, 7);
+        if (PONTE_PC[kP] === undefined) {
+          PONTE_PC[kP] = null;
+          consultarTudo(`vw_fin_ponte_papel_caixa?select=ordem,linha,papel,caixa,diferenca&unidade=eq.${encodeURIComponent(uP)}&mes=eq.${String(mesF).slice(0, 7)}-01&order=ordem`)
+            .then(r => { PONTE_PC[kP] = r || []; }).catch(() => { PONTE_PC[kP] = false; })
+            .then(() => { if (MODULO_ATUAL === 'dre') renderModuloDRE(); });
+        }
+        const L = PONTE_PC[kP];
+        const leitura = (r, dif) => {
+          const alinhado = Math.abs(dif) < Math.max(500, Math.abs(Number(r.papel)) * 0.02);
+          if (alinhado) return ['alinhado', true];
+          if (Number(r.ordem) === 1) return [dif > 0 ? 'caiu na conta MAIS do que o mês gerou (repasses de semanas anteriores)' : 'parte da venda ainda não caiu na conta', false];
+          return [dif > 0 ? 'parte ficou para pagar depois — vai pesar num próximo mês' : 'pagou também contas de meses anteriores', false];
+        };
+        const corpo = L === null ? '<tr><td colspan="5" style="color:var(--tx-4);">lendo a ponte…</td></tr>'
+          : L === false ? '<tr><td colspan="5">✗ Não consegui ler a ponte. Recarregue a tela.</td></tr>'
+          : !L.length ? '<tr><td colspan="5" style="color:var(--tx-4);">sem a ponte deste mês</td></tr>'
+          : L.map(r => {
+              const papel = Number(r.papel || 0), caixa = Number(r.caixa || 0), dif = caixa - papel, fim = Number(r.ordem) === 9;
+              if (!fim && Math.abs(papel) < 0.005 && Math.abs(caixa) < 0.005) return '';
+              if (fim) return `<tr class="liq"><td>${trEscH(r.linha)}</td><td>${fmt(papel)}</td><td>${fmt(caixa)}</td><td>${dif >= 0 ? '+' : '−'} ${fmt(Math.abs(dif))}</td>
+                <td style="text-align:left; white-space:normal;">${Math.abs(dif) < Math.max(2000, Math.abs(papel) * 0.05) ? 'papel e caixa andaram juntos — mês saudável'
+                  : dif > 0 ? 'o caixa rendeu mais que o papel: entrou dinheiro de meses anteriores ou ficou conta para depois'
+                  : 'o caixa rendeu menos que o papel: o mês pagou contas antigas ou tem venda ainda por cair'}</td></tr>`;
+              const [txt, ok] = leitura(r, dif);
+              return `<tr><td>${trEscH(r.linha)}</td><td>${fmt(papel)}</td><td>${fmt(caixa)}</td>
+                <td class="${(Number(r.ordem) === 1 ? dif < -0.005 : dif < -0.005) ? 'negativo' : ''}">${dif >= 0 ? '+' : '−'} ${fmt(Math.abs(dif))}</td>
+                <td style="text-align:left; white-space:normal; color:${ok ? 'var(--tx-4)' : 'var(--tx-2)'};">${txt}</td></tr>`;
+            }).join('');
         ponteHtml = `
         <div class="section-label" style="margin-top:26px;">O lucro virou caixa? — ponte de ${rotuloMes(mesF)}</div>
         <div class="caption-label" style="text-align:center;" title="A diferença é capital de giro: o que o mês quitou de trás ou empurrou para frente.">
-          No papel = competência (como a DRE) · no caixa = o que entrou e saiu no mês.
+          No papel = competência (o resultado da DRE) · no caixa = o que entrou e saiu do banco no mês, com a lista entre lojas.
         </div>
         <div id="tabelaPonte">
           <table>
             <tr><th>Linha</th><th>No papel (R$)</th><th>No caixa (R$)</th><th>Diferença</th><th>O que significa</th></tr>
-            ${tr}
-            <tr class="liq"><td>Resultado do mês</td><td>${fmt(compTot)}</td><td>${fmt(caixaTot)}</td>
-              <td>${difTot >= 0 ? '+' : '−'} ${fmt(Math.abs(difTot))}</td>
-              <td style="text-align:left; white-space:normal;">${
-                Math.abs(difTot) < Math.max(2000, Math.abs(compTot) * 0.05) ? 'papel e caixa andaram juntos — mês saudável'
-                : difTot > 0 ? 'o caixa rendeu mais que o papel: entrou dinheiro de meses anteriores ou ficou conta para depois'
-                : 'o caixa rendeu menos que o papel: o mês pagou contas antigas ou tem venda ainda por cair'}</td></tr>
+            ${corpo}
           </table>
         </div>
         <div class="caption-label" style="text-align:center;">
