@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Entrega ao Fabio</title>
+<!-- ENTREGA AO FABIO (qua 18/11/2026, chat Telas do painel). Prioridade um do dono (19:03, livro
+     chat-frente-organizador/respostas/juncao-e-passagem-prioridade-um): "quero entregar de uma forma que deixe claro que a nossa
+     parte tá feita, e entender dele o que ele ainda precisa de mim [...] sem nada pendente do que acordei da nossa parte".
+     Só abre com login de quem pode ver o plano (pode_ver_plano = Neto e Fabio), como docs/plano-saida.html.
+     Itens AO VIVO de transicao_itens (fases 10 e 11 + 'conta-claude'); onde mora cada um: entrega_fabio_tela; respostas:
+     entrega_fabio_responder (falta/precisa viram item na agenda do dono, que fecha quando o Neto marca "tratado");
+     prova de leitura: entrega_fabio_abriu (cada abertura). SQL: script/sql/entrega_fabio_2026_11_18.sql -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  h2 { font-size:1.1rem; margin:1.8rem 0 .6rem; }
+  .placar { display:flex; gap:10px; flex-wrap:wrap; margin:.6rem 0 1rem; }
+  .placar div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; min-width:150px; }
+  .placar b { display:block; font-size:1.5rem; line-height:1.1; }
+  .placar span { font-size:.8rem; color:var(--mudo); }
+  .placar .ok b { color:var(--ok); } .placar .anda b { color:var(--anda); } .placar .falta b { color:var(--acento); }
+  .item { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:12px 14px; margin-bottom:8px; }
+  .item.ok { border-left:4px solid var(--ok); } .item.anda { border-left:4px solid var(--anda); } .item.falta { border-left:4px solid var(--acento); }
+  .topo { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; }
+  .tit { font-weight:600; }
+  .est { font-size:.75rem; font-weight:700; padding:1px 8px; border-radius:999px; }
+  .est.ok { background:var(--ok-fundo); color:var(--ok); } .est.anda { background:var(--anda-fundo); color:var(--anda); } .est.falta { background:var(--acento-fundo); color:var(--acento); }
+  .info { font-size:.85rem; color:var(--suave); margin-top:.25rem; }
+  .info a { color:var(--acento); }
+  details.det > summary { cursor:pointer; color:var(--mudo); font-size:.8rem; margin-top:.35rem; }
+  .det p { white-space:pre-wrap; color:var(--suave); font-size:.88rem; margin:.4rem 0 0; }
+  .resp { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:.6rem; padding-top:.5rem; border-top:1px solid var(--linha); }
+  .bt { background:var(--papel); color:var(--tinta); border:1px solid var(--forte); border-radius:4px; padding:6px 12px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .bt.okb { border-color:var(--ok); color:var(--ok); font-weight:600; } .bt.faltab { border-color:var(--acento); color:var(--acento); font-weight:600; }
+  .bt.cheio { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .resp input, textarea { flex:1 1 240px; padding:7px 9px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; font-size:.9rem; }
+  textarea { width:100%; min-height:90px; }
+  .dito { font-size:.82rem; margin-top:.4rem; }
+  .dito.ok { color:var(--ok); } .dito.falta { color:var(--acento); }
+  .tratado { color:var(--mudo); }
+  .aviso { font-size:.85rem; margin:.4rem 0 0; }
+  .aviso.erro { color:var(--acento); } .aviso.certo { color:var(--ok); }
+  .caixa { background:var(--papel); border:1px solid var(--forte); border-radius:6px; padding:14px; }
+  .leitura { font-size:.8rem; color:var(--mudo); margin:-.4rem 0 .8rem; }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const PAINEL = 'https://cidadaodomundo-erp.github.io/';
+const EMAIL_DONO = 'neto@cidadaodomundo.com.br';
+const app = document.getElementById('app');
+const D = { itens: [], telas: {}, resp: [], acesso: [], aberto: null };
+// Mesma sessão do painel (localStorage 'rmbSessao'); esta página NUNCA renova o token (o refresh é de uso único).
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// sem prazo na página (Organizador 19:03): "até 31/12" sai do texto
+const semPrazo = t => String(t || '').replace(/\s*(at[ée]|antes de) 3[01]\/12(\/\d{2,4})?/gi, '').replace(/Meta:\s*/i, 'Combinado: ');
+const quandoBR = ts => ts ? new Date(ts).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' }) : '';
+const H = () => { const s = sessaoValida(); return { apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}`, 'Content-Type':'application/json' }; };
+const meuEmail = () => String((sessao() || {}).email || '').toLowerCase();
+const souDono = () => meuEmail() === EMAIL_DONO;
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Entrega ao Fabio</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome (ex.: fabio)"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:((t) => { t = String(t || '').trim(); return !t || t.includes('@') ? t : t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br'; })(document.getElementById('e').value), password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar(true);
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+
+async function ler(caminho) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${caminho}`, { headers:H() });
+  if (r.status === 401) throw new Error('401');
+  if (!r.ok) throw new Error('não consegui ler (' + r.status + ')');
+  return r.json();
+}
+async function rpc(fn, args) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method:'POST', headers:H(), body:JSON.stringify(args || {}) });
+  if (!r.ok) { let m = ''; try { const j = await r.json(); m = j.message || ''; } catch (e) {} throw new Error(m || ('erro ' + r.status)); }
+  return r.status === 204 ? null : r.json();
+}
+async function carregar(abriu) {
+  if (!sessaoValida()) return telaLogin();
+  try {
+    const [itens, telas, resp] = await Promise.all([
+      ler('transicao_itens?select=id,fase_ordem,ordem,titulo,quem,estado,andamento,andamento_em,detalhe,resolvido_em,evidencia&or=(fase_ordem.in.(10,11),id.eq.conta-claude)&estado=neq.na&order=fase_ordem,ordem'),
+      ler('entrega_fabio_tela?select=item_id,tela,rotulo'),
+      ler('entrega_fabio_resposta?select=*&order=criado_em.desc')]);
+    if (!itens.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (a página é só do Neto e do Fabio).</p>
+      <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+    D.itens = itens; D.resp = resp; D.telas = {}; telas.forEach(t => { D.telas[t.item_id] = t; });
+    if (abriu) { try { await rpc('entrega_fabio_abriu'); } catch (e) {} }
+    D.acesso = await ler('entrega_fabio_acesso?select=quem,quando&order=quando.desc&limit=50').catch(() => []);
+    desenhar();
+  } catch (e) {
+    if (e.message === '401') return telaLogin('Sessão vencida, entre de novo.');
+    app.innerHTML = `<p class="erro">✗ ${esc(e.message)}</p><button class="sair" onclick="carregar()">tentar de novo</button>`;
+  }
+}
+
+function estadoDe(i) { return i.estado === 'feito' ? ['ok', '✓ entregue'] : i.estado === 'andando' ? ['anda', 'em andamento'] : ['falta', 'falta']; }
+function respostaDoItem(id) { return D.resp.filter(r => r.item_id === id); }
+function card(i) {
+  const [cls, rot] = estadoDe(i), t = D.telas[i.id], R = respostaDoItem(i.id), ult = R[0];
+  const onde = t ? `<a href="${PAINEL}${esc(t.tela)}" target="_blank" rel="noopener">${esc(t.rotulo)} ↗</a>` : 'fora do painel';
+  const dito = ult ? (ult.tipo === 'ok'
+      ? `<div class="dito ok">✓ Recebido, ok · ${esc(quandoBR(ult.criado_em))}</div>`
+      : `<div class="dito falta">Falta: ${esc(ult.texto)} · ${esc(quandoBR(ult.criado_em))}${ult.tratado_em ? ` <span class="tratado">· tratado ${esc(quandoBR(ult.tratado_em))}${ult.tratado_nota ? ': ' + esc(ult.tratado_nota) : ''}</span>` : ''}
+          ${souDono() && !ult.tratado_em ? ` <button class="bt" onclick="tratarAbrir(${ult.id})">marcar como tratado</button>` : ''}</div>`) : '';
+  const form = D.aberto === i.id
+    ? `<div class="resp"><input id="txt_${esc(i.id)}" placeholder="o que falta? (curto)" maxlength="1000"><button class="bt cheio" onclick="responder('${esc(i.id)}','falta')">Enviar</button><button class="bt" onclick="D.aberto=null;desenhar()">Cancelar</button></div>`
+    : `<div class="resp"><button class="bt okb" onclick="responder('${esc(i.id)}','ok')">Recebido, ok</button><button class="bt faltab" onclick="D.aberto='${esc(i.id)}';desenhar();document.getElementById('txt_${esc(i.id)}').focus()">Falta algo</button></div>`;
+  return `<div class="item ${cls}" id="it_${esc(i.id)}"><div class="topo"><span class="tit">${esc(i.titulo)}</span><span class="est ${cls}">${rot}</span></div>
+    <div class="info">Onde está: ${onde} · Quem opera hoje: ${esc(semPrazo(i.quem) || '—')}</div>
+    <details class="det"><summary>o que foi combinado e o que já está feito</summary>
+      ${i.detalhe ? `<p>${esc(semPrazo(i.detalhe))}</p>` : ''}${i.andamento ? `<p><b>Último passo${i.andamento_em ? ' (' + esc(i.andamento_em.slice(8,10) + '/' + i.andamento_em.slice(5,7)) + ')' : ''}:</b> ${esc(semPrazo(i.andamento))}</p>` : ''}${i.evidencia ? `<p><b>Prova:</b> ${esc(i.evidencia)}</p>` : ''}</details>
+    ${dito}${form}<div class="aviso" id="av_${esc(i.id)}"></div></div>`;
+}
+function desenhar() {
+  const I = D.itens, n = (f) => I.filter(f).length;
+  const ent = n(i => i.estado === 'feito'), anda = n(i => i.estado === 'andando'), falta = I.length - ent - anda;
+  const okF = new Set(D.resp.filter(r => r.tipo === 'ok').map(r => r.item_id));
+  const grupos = [['O que o Neto combinou entregar', I.filter(i => i.fase_ordem === 10)], ['Os demais módulos', I.filter(i => i.fase_ordem === 11)], ['As ferramentas do sistema', I.filter(i => i.fase_ordem !== 10 && i.fase_ordem !== 11)]];
+  const precisa = D.resp.filter(r => r.tipo === 'precisa');
+  const fabio = D.acesso.filter(a => a.quem !== EMAIL_DONO);
+  const s = sessao() || {};
+  app.innerHTML = `
+    <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio</p>
+    <h1>Entrega ao Fabio</h1>
+    <p class="lede">Tudo o que o Neto combinou entregar, onde está no painel e quem opera hoje. O estado vem direto do sistema. Em cada item, diga se recebeu ou se falta algo.</p>
+    ${souDono() ? `<p class="leitura">${fabio.length ? `O Fabio abriu esta página ${fabio.length} ${fabio.length === 1 ? 'vez' : 'vezes'} · a última em ${esc(quandoBR(fabio[0].quando))}` : 'O Fabio ainda não abriu esta página.'}</p>` : ''}
+    <div class="placar"><div class="ok"><b>${ent} de ${I.length}</b><span>entregues</span></div><div class="anda"><b>${anda}</b><span>em andamento</span></div>${falta ? `<div class="falta"><b>${falta}</b><span>falta</span></div>` : ''}<div><b>${okF.size}</b><span>que o Fabio já deu ok</span></div></div>
+    ${grupos.filter(g => g[1].length).map(([t, L]) => `<h2>${t}</h2>${L.map(card).join('')}`).join('')}
+    <h2>O que mais você precisa do Neto para assumir?</h2>
+    <div class="caixa"><textarea id="precisa" placeholder="Escreva aqui o que ainda falta para você assumir: uma tela, um acesso, uma explicação…" maxlength="1000"></textarea>
+      <div style="margin-top:8px;"><button class="bt cheio" onclick="responder(null,'precisa')">Enviar ao Neto</button></div><div class="aviso" id="av_precisa"></div>
+      ${precisa.length ? `<div style="margin-top:10px;">${precisa.map(r => `<div class="dito falta">${esc(r.texto)} · ${esc(quandoBR(r.criado_em))}${r.tratado_em ? ` <span class="tratado">· tratado ${esc(quandoBR(r.tratado_em))}${r.tratado_nota ? ': ' + esc(r.tratado_nota) : ''}</span>` : souDono() ? ` <button class="bt" onclick="tratarAbrir(${r.id})">marcar como tratado</button>` : ''}</div>`).join('')}</div>` : ''}</div>
+    <footer>Entrou como ${esc((s.email || '').replace('@cidadaodomundo.com.br', ''))} · <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+async function responder(item, tipo) {
+  const avId = item ? 'av_' + item : 'av_precisa', av = () => document.getElementById(avId);
+  const campo = item ? document.getElementById('txt_' + item) : document.getElementById('precisa');
+  const texto = campo ? campo.value.trim() : '';
+  if (tipo !== 'ok' && !texto) { av().className = 'aviso erro'; av().textContent = '! Escreva o que falta antes de enviar.'; return; }
+  av().className = 'aviso'; av().textContent = 'Enviando…';
+  try {
+    await rpc('entrega_fabio_responder', { p_item: item, p_tipo: tipo, p_texto: texto || null });
+    D.aberto = null; await carregar();
+    const a = document.getElementById(avId); if (a) { a.className = 'aviso certo'; a.textContent = tipo === 'ok' ? '✓ Chegou: o Neto vê que você recebeu.' : '✓ Chegou: virou item na agenda do Neto.'; }
+  } catch (e) {
+    const a = av(); a.className = 'aviso erro'; a.innerHTML = `✗ Não chegou: ${esc(e.message)} <button class="bt" onclick="responder(${item ? `'${esc(item)}'` : 'null'}, '${tipo}')">tentar de novo</button>`;
+  }
+}
+async function tratarAbrir(id) {
+  // marca direto (sem caixa do navegador); o item da agenda do Neto fecha sozinho
+  try { await rpc('entrega_fabio_tratar', { p_id: id, p_nota: null }); await carregar(); }
+  catch (e) { alertaTopo('✗ Não marcou: ' + e.message); }
+}
+function alertaTopo(m) { const p = document.createElement('p'); p.className = 'aviso erro'; p.textContent = m; app.prepend(p); }
+carregar(true);
+</script>
+</body>
+</html>

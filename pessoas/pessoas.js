@@ -754,6 +754,8 @@ function renderModuloCargos() {
     ${T.acomp ? `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;justify-content:flex-end;margin:0 0 12px;font-size:12px;color:var(--tx-4);">Acompanhar:
       ${CG_ACOMP.map(([k, r]) => `<a href="javascript:void(0)" onclick="cargosAba('${k}')" style="color:${F.aba === k ? 'var(--tx-1)' : 'var(--tx-3)'};font-weight:${F.aba === k ? 700 : 400};margin-left:8px;">${r}${k === 'flash' && flashN ? ` (${flashN})` : ''}</a>`).join('')}</div>` : ''}
     <div id="cgMsg" style="font-size:12px;min-height:16px;margin-bottom:4px;"></div>`;
+  // 18/11/2026 18:33 (dono: "coloca uma lista de impressão nos calculos da folha, igual fizemos na conferencia")
+  if ((F.tela || '') === 'pcalc') h += `<div style="display:flex;justify-content:flex-end;margin:-4px 0 8px;">${cgBotaoPasso('🖨 Imprimir / PDF desta lista', 'cgImprimirTela()', true)}</div>`;
   if (F.aba === 'pessoas') h += cgAbaPessoas();
   else if (F.aba === 'tabela') h += cgAbaTabela();
   else if (F.aba === 'custo') h += cgAbaCusto();
@@ -3206,6 +3208,41 @@ function cgImprimirPagamento(titulo, grupos) {
     w.document.close();
     avisoAcao('ok', `✓ Lista aberta às ${avisoHora()} (${nTot} pessoas, ${R(tot)}) — na janela de impressão, escolha a impressora ou "Salvar como PDF".`);
   } catch (err) { avisoAcao('erro', '✗ Não abriu a lista: ' + err.message, () => cgImprimirPagamento(titulo, grupos)); }
+}
+// IMPRIMIR OS CÁLCULOS DA FOLHA (18/11/2026, dono 18:33 pelo Organizador): a mesma folha limpa da Conferência
+// (cgImprimirPagamento), com a grade que a aba mostra agora — uma linha por pessoa, as mesmas colunas, os totais da tela —
+// e no cabeçalho a tela, a aba, a loja, o mês e a hora. Imprime o que a tela mostra: quem não vê um valor na tela não o vê no papel.
+function cgImprimirTela() {
+  try {
+    const alvo = cgAlvo(), F = CARGOS_F, T = CG_TELAS[F.tela || 'cargos'] || {};
+    const aba = ((T.abas || []).find(([k]) => k === F.aba) || [null, ''])[1];
+    const tabs = [...alvo.querySelectorAll('table')].filter((t) => t.offsetParent !== null && !t.closest('details:not([open])'));
+    if (!tabs.length) return avisoAcao('atencao', '! Nada para imprimir nesta aba.');
+    const limpa = (t) => { const c = t.cloneNode(true);
+      c.querySelectorAll('input, select, textarea').forEach((i) => { const sp = document.createElement('span'); sp.textContent = i.tagName === 'SELECT' ? (i.selectedOptions[0] || {}).text || '' : i.type === 'checkbox' ? (i.checked ? '✓' : '') : i.value; i.replaceWith(sp); });
+      c.querySelectorAll('button, .noprint, script').forEach((b) => b.remove());
+      c.querySelectorAll('[style]').forEach((x) => x.removeAttribute('style'));
+      c.querySelectorAll('[onclick]').forEach((x) => x.removeAttribute('onclick'));
+      return c.outerHTML; };
+    const sel = [...alvo.querySelectorAll('select')].find((x) => x.offsetParent !== null && /\b(20\d\d|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i.test((x.selectedOptions[0] || {}).text || ''));
+    const mes = sel ? (sel.selectedOptions[0] || {}).text : '';
+    const loja = F.unidade ? cgEmpresaCurta(F.unidade) : 'Todas as lojas';
+    const titulo = `${T.titulo || 'Cálculos da folha'}${aba ? ' — ' + aba : ''}`;
+    const w = window.open('', '_blank');
+    if (!w) throw new Error('o navegador bloqueou a janela de impressão — libere pop-ups para o painel');
+    const e = cgEsc;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(titulo)}</title><style>
+      body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:24px;} h1{font-size:18px;margin:0 0 2px;} .sub{font-size:12px;color:#000;margin:0 0 14px;}
+      table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:16px;} th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;color:#000;background:none;}
+      th{background:#ccc;} tfoot td, tr.total td, tr.t td{font-weight:bold;background:#ccc;} a{color:#000;text-decoration:none;}
+      @media print{body{margin:10mm;} .noprint{display:none;}}</style></head><body>
+      <div class="noprint" style="margin-bottom:12px;"><button onclick="window.print()" style="font-size:14px;padding:8px 14px;">Imprimir / salvar em PDF</button></div>
+      <h1>${e(titulo)}</h1><p class="sub">${e(loja)}${mes ? ' · ' + e(mes) : ''} · impresso em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+      ${tabs.map(limpa).join('')}
+      <script>setTimeout(function(){window.print();},300);<\/script></body></html>`);
+    w.document.close();
+    avisoAcao('ok', `✓ Lista aberta às ${avisoHora()} — na janela de impressão, escolha a impressora ou "Salvar como PDF".`);
+  } catch (err) { avisoAcao('erro', '✗ Não abriu a lista: ' + err.message, () => cgImprimirTela()); }
 }
 function cgImprimirAdt(mes) {
   const F = CARGOS_F, emp = (x) => cgEmpresaCurta(x.empresa || x.unidade || '');

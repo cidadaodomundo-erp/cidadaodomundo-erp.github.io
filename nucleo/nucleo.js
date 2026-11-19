@@ -342,7 +342,7 @@ function barrasTopoTabelas() {
   if (matchMedia('(max-width:760px)').matches) {
     document.querySelectorAll('table').forEach((t) => {
       const p = t.parentElement;
-      if (!t.offsetParent || p.closest('table') || p.classList.contains('cel-cartao') || t.closest('#view-caixa') || CEL_FICA_TABELA.has(p.id)) return;
+      if (!t.offsetParent || p.closest('table') || p.classList.contains('cel-cartao') || p.classList.contains('cel-fica-tabela') || t.closest('#view-caixa') || CEL_FICA_TABELA.has(p.id)) return;
       if (t.offsetWidth <= p.clientWidth + 2 && t.getBoundingClientRect().right <= document.documentElement.clientWidth + 2) return;
       const cabs = [...t.rows].filter((r) => r.cells.length && [...r.cells].every((c) => c.tagName === 'TH'));
       // 05/11/2026 (dono: "as telas todas responsivas"): o teto era 60 linhas e deixava rolando de lado Engenharia do

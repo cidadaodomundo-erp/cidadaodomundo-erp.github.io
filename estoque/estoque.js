@@ -1416,7 +1416,7 @@ async function estLojaDaTela(alvo, reentrar) {
         apontar ou conferir o estoque. Escolha a loja:
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${(LOJA_INFO.lojas || []).filter((l) => l !== LOJA_REDE_EST)
           .map((l) => `<button class="preset-btn active" onclick="estEscolherLoja('${trEscH(l)}')">${trEscH(lojaNome(l))}</button>`).join('')}</div></div>`
-    : `<div class="contexto" style="border-color:var(--farol-fora);">Sem loja cadastrada para este login — fale com o Neto.</div>`;
+    : `<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>`;
   return null;
 }
 const LOJA_REDE_EST = 'REDE';
@@ -4935,7 +4935,13 @@ async function entrarReqPedir() {
     REQ.lider = (Array.isArray(lid) ? lid : []).find((x) => x.unidade === u) || null;
     REQ.manda = rm.ok ? !!(await rm.json()) : false;
     REQ.unidade = u;
-    if (!REQ.praca) REQ.praca = REQ.lider ? REQ.lider.setor : '';
+    // 18/11/2026 (dono 14:25: "liberar as requisições ... nos usuários da Flavia e Yaimar"): quem pede e não é líder
+    // (Yaimar, Flávia no salão; Alejo, Gabriel, João Pedro no delivery) acha a praça pelo banco; sem ela, vale o setor do líder
+    if (!REQ.praca) {
+      let v = null;
+      try { const mp = await trRpcSeguro('est_requisicao_minha_praca', { p_unidade: u }); v = mp.ok ? await mp.json() : null; } catch (e) { v = null; }
+      REQ.praca = v || (REQ.lider ? REQ.lider.setor : '');
+    }
     await reqMinhasCarregar();
     reqPedirDesenhar();
   } catch (e) {

@@ -179,7 +179,7 @@ function vaDesenhar() {
   if (!el) return;
   const loja = lojaAtual();
   if (!loja) {
-    el.innerHTML = `<h1>Vendas agora</h1><div class="contexto" style="margin-top:12px;">${LOJA_INFO ? 'Sem loja cadastrada — fale com o Neto.' : '✗ Não consegui ler a sua loja. <button class="preset-btn" onclick="vaLer()">Tentar de novo</button>'}</div>`;
+    el.innerHTML = `<h1>Vendas agora</h1><div class="contexto" style="margin-top:12px;">${LOJA_INFO ? 'Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.' : '✗ Não consegui ler a sua loja. <button class="preset-btn" onclick="vaLer()">Tentar de novo</button>'}</div>`;
     return;
   }
   const cab = (lojas) => {

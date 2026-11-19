@@ -2615,7 +2615,10 @@ function renderModuloContestacoes() {
   const aguardando = bloco('AGUARDANDO');
   const aprovadas  = bloco('APROVADA');
   const reprovadas = bloco('REPROVADA');
-  const perdidas   = bloco('PRAZO_PASSOU').filter(r => !contestPortalBloqueia(r));
+  // 18/11/2026 22:34 e 22:40 (dono: "pode tirar essas da tela" / "só tira da tela, não precisa deixar nada no rodapé"): prazo
+  // perdido de pedido ANTES de 30/10/2026 (quando a fila passou a vir da API) sai da tela, sem menção. De 30/10 em diante continua.
+  const CONTEST_API_DESDE = '2026-10-30';
+  const perdidas   = bloco('PRAZO_PASSOU').filter(r => !contestPortalBloqueia(r) && String(r.data_hora_pedido || '').slice(0, 10) >= CONTEST_API_DESDE);
   const naoContest = bloco('NAO_CONTESTAVEL');
   // Cancelamento sem hora de cancelamento na API: fica fora dos blocos em vez de virar falso "prazo perdido".
   const semDado    = bloco('SEM_DADO');

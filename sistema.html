@@ -267,7 +267,7 @@
 
 <script src="casca/menu.js?v=20261117t"></script>
 <script src="casca/paginas.js?v=20261118usu"></script>
-<script src="casca/modulos.js?v=20261118usu"></script>
+<script src="casca/modulos.js?v=20261118jun"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
 <script src="casca/busca.js?v=20261118usu"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
@@ -338,8 +338,9 @@ function setoresDe(sobra) {
 // tela do agrupamento Operação das lojas com integração pendente (sem rota em casca/paginas.js, mesmo que o arquivo exista): sem botão ativo, nunca abre a moldura
 // do painel antigo (dashboard.html virou redirecionamento e, numa moldura, só mostra "esta tela mudou de lugar")
 function semPagina(k) {
+  // 18/11/2026: as telas do Fabio saíram da "Operação das lojas" para os módulos; a tela dele sem página (Cozinha, TVs) segue sem botão
   const it = ITENS[k], o = MODULOS.find((m) => m.id === 'outras');
-  return !!(it && o && o.acompanhar.includes(k) && !it.link && !JUNCOES[k] && !PAGINAS[k]);
+  return !!(it && ((o && o.acompanhar.includes(k)) || it.origem === 'fabio') && !it.link && !JUNCOES[k] && !PAGINAS[k]);
 }
 let MODULO_ATUAL = null, ABA_ATUAL = 'lancar';
 function telasDo(m, aba) { return (m[aba] || []).filter((k) => ITENS[k] && alvoMenu(k)); }
@@ -442,7 +443,7 @@ const TELAS_POR_LOJA = new Set(window.CASCA_TELAS_POR_LOJA || []);
 function desenharLoja() {
   const v = $('vendo');
   if (!LOJA_INFO) { v.innerHTML = ''; return; }                       // o banco não respondeu: não inventa loja
-  if (!LOJA_INFO.lojas.length) { v.innerHTML = '<span class="sem">sem loja cadastrada — fale com o Neto</span>'; return; }
+  if (!LOJA_INFO.lojas.length) { v.innerHTML = '<span class="sem">sem loja liberada — toque em Ajuda</span>'; return; }
   const atual = lojaAtual();
   v.innerHTML = LOJA_INFO.travado
     ? `<span class="rot">📍 Vendo:</span> <b>${esc(lojaNome(atual))}</b>`
@@ -711,9 +712,12 @@ function abrir(chave, deDentro) {
   const it = ITENS[chave];
   if (!it || !visivel(chave)) { inicio(); return; }
   // link: outra aba, sem referência à casca e sem levar token (12/11/2026: + noreferrer)
-  if (it.link) { window.open(it.link, '_blank', 'noopener,noreferrer'); return; }
+  // 18/11/2026 (foco na entrega, lista de telas sem uso): o link e as telas do portal do Fabio (origem fabio) não gravam o uso
+  // sozinhas — a casca grava ao abrir, senão a tela aparece como "nunca usada" sem ter sido medida
+  if (it.link) { registrarUsoCasca(chave); window.open(it.link, '_blank', 'noopener,noreferrer'); return; }
   if (semPagina(chave)) { inicio(); abrirModulo('outras'); return; }   // integração pendente (sem rota): mostra o agrupamento, com o aviso
   ATUAL = chave;
+  if (it.origem === 'fabio' && !deDentro) registrarUsoCasca(chave);
   $('titulo').textContent = it.icone + ' ' + it.rotulo;
   atualizarFaixaLoja();
   history.replaceState(null, '', '#' + chave);

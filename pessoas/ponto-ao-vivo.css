@@ -23,10 +23,12 @@
 #view-pao .pao-expl { color: var(--tx-3, #555); font-size: .88em; }
 #view-pao .pao-alerta { color: var(--farol-perto, #8a5a00); font-size: .88em; margin-top: 2px; }
 #view-pao .pao-lido { color: var(--tx-3, #888); font-size: .8em; }
+#view-pao .pao-rolar { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Celular: a MESMA lista do PC (uma linha por pessoa). Letra menor, colunas sem quebrar, nome fixo à esquerda ao arrastar. */
 @media (max-width: 700px) {
-  #view-pao .pao-tab thead { display: none; }
-  #view-pao .pao-tab td { display: block; border: 0; padding: 2px 8px; }
-  #view-pao .pao-tab td::before { content: attr(data-rot) ': '; font-weight: 600; }
-  #view-pao .pao-tab tr { display: block; border-bottom: 1px solid var(--line, #ddd); padding: 6px 0; }
+  #view-pao .pao-tab { font-size: .8em; width: max-content; min-width: 100%; }
+  #view-pao .pao-tab th, #view-pao .pao-tab td { padding: 4px 6px; white-space: nowrap; }
+  #view-pao .pao-tab td.pao-alertas { white-space: normal; min-width: 220px; max-width: 280px; }
+  #view-pao .pao-tab th:first-child, #view-pao .pao-tab td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg, #fff); white-space: normal; min-width: 110px; max-width: 130px; font-weight: 600; }
+  #view-pao .pao-tab td.pao-alertas .pao-expl, #view-pao .pao-tab td.pao-alertas .pao-lido { display: none; }   /* explicação longa fica só no PC; os avisos CONFERIR continuam */
 }
-
