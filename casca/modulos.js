@@ -41,6 +41,7 @@ window.CASCA_MODULOS_CFG = {
 // decidindo cada tela"; livro chat-frente-telas/respostas/menu-ordenado-pela-juncao): as telas do Fabio saem da "Operação das lojas"
 // e entram nos módulos propostos em juncao-telas.html (Entrega e Salão novos). TODAS continuam no menu: juntar e tirar só depois da
 // decisão do Fabio, tela a tela. As chaves não mudam (acessos e links seguem valendo).
+// 19/11/2026 15:20: Clientes do iFood, Resumos semanais e Telas do painel fora do menu (dono); o deploy anterior falhou no GitHub.
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
     lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora', 'reuniao'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
