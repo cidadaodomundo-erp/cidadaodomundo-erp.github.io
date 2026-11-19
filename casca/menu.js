@@ -493,6 +493,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "temperaturas",
+    "rotulo": "Temperaturas das câmaras",
+    "icone": "🌡️",
+    "origem": "fabio"
+   },
+   {
     "chave": "prestadores",
     "rotulo": "Quem conserta",
     "icone": "🧰",

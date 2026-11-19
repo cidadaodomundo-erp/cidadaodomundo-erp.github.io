@@ -2628,7 +2628,7 @@ function renderModuloEvolucao() {
 // todos os modulos devem bater". Ate aqui a view somava so o realizado (sem as
 // contas a pagar do mes) sobre a receita que caiu na conta, e a tela dizia por
 // escrito que o numero nao era o da DRE; em setembro a Agua Verde aparecia com
-// R$ 413 mil de lucro. Agora a view e' uma PROJECAO de vw_fin_resultado_fato, a
+// um lucro muito acima do da DRE. Agora a view e' uma PROJECAO de vw_fin_resultado_fato, a
 // mesma conta do modulo DRE: o lucro daqui bate com o resultado de la ao centavo.
 // Nao volte a somar receita ou despesa nesta tela — a conta mora num lugar so.
 // ------------------------------------------------------------------
@@ -2850,7 +2850,7 @@ function renderLucroUni() {
     ${seletorPeriodo}
 
     <div class="hero" style="border-color:${pctBenef >= 30 ? 'var(--farol-perto)' : 'var(--farol-ok)'};">
-      <div class="hero-lbl" title="O benefício é comissão que o iFood deixou de cobrar, já diluída na receita; acaba quando os R$ 500 mil forem consumidos.">De cada real de lucro da rede, quanto veio do benefício do iFood</div>
+      <div class="hero-lbl" title="O benefício é comissão que o iFood deixou de cobrar, já diluída na receita; acaba quando o valor combinado com o iFood for consumido.">De cada real de lucro da rede, quanto veio do benefício do iFood</div>
       <div class="hero-val">${pct(pctBenef)}%</div>
       <div class="hero-delta" style="color:var(--tx-3);">
         ${rs(lucroRede)} de lucro · ${rs(benefRede)} de benefício · ${rs(semBenRede)} seriam o lucro pagando comissão cheia</div>
@@ -5628,9 +5628,9 @@ const DRE_TIPO_ROTULO = { 'PESSOAL': 'SALÁRIOS, ENCARGOS E BENEFÍCIOS', 'PRO L
   'MATERIA PRIMA': 'MATÉRIA-PRIMA', 'USO E CONSUMO': 'EMBALAGENS, DESCARTÁVEIS, GÁS E USO' };
 
 // ---------------------------------------------------------------
-// Farol do beneficio de R$ 500 mil do iFood (aplicado da fila em 16/08/2026).
+// Farol do beneficio do iFood (valor combinado) (aplicado da fila em 16/08/2026).
 // O iFood isentou a comissao de 9,5% nas lojas que nao pagam comissao (12 ate 05/10/2026, 11 depois) ate somar
-// R$ 500 mil. Que loja entra na conta mora no banco: beneficio_ifood_loja_fora + vw_beneficio_ifood_pedido.
+// o valor combinado. Que loja entra na conta mora no banco: beneficio_ifood_loja_fora + vw_beneficio_ifood_pedido.
 // Quando acabar, os 9,5% voltam de uma vez — o painel avisa antes.
 // Fonte: vw_beneficio_ifood_farol (uma linha) e vw_beneficio_ifood_semana.
 let BENEF_FAROL = null;   // { f, semanas }
@@ -5685,7 +5685,7 @@ function blocoBeneficioIfood({ f, semanas }) {
   // Compacto por padrao (arrumacao de 16/08 a pedido do dono): barra + uma linha
   // de leitura sempre visiveis; cards, explicacao e semanas dobram num <details>.
   return `
-  <div class="section-label">Isenção de comissão do iFood — quanto dos R$ 500 mil já foi usado (estimativa)${rgSub(RG_VENDA)}</div>
+  <div class="section-label">Isenção de comissão do iFood — quanto do valor combinado já foi usado (estimativa)${rgSub(RG_VENDA)}</div>
   ${barra}
   <div class="caption-label" style="text-align:center;">
     <b style="color:${cor};">${pctB.toLocaleString('pt-BR')}% usado (estimativa)</b> ·
@@ -5698,7 +5698,7 @@ function blocoBeneficioIfood({ f, semanas }) {
     <div class="cards" style="margin-top:10px;">
       <div class="card" style="border:1px solid ${cor};">
         <div style="font-size:26px; font-weight:700; color:${cor};">${pctB.toLocaleString('pt-BR')}%</div>
-        <div style="font-size:12px; color:#a5a49a;">dos R$ 500 mil já usados (estimativa)</div>
+        <div style="font-size:12px; color:#a5a49a;">do valor combinado já usados (estimativa)</div>
       </div>
       <div class="card">
         <div style="font-size:26px; font-weight:700;">${reais(f.restante)}</div>
@@ -5714,12 +5714,12 @@ function blocoBeneficioIfood({ f, semanas }) {
       </div>
     </div>
     <div class="caption-label">
-      O iFood deixou de cobrar a comissão de 9,5% em 11 lojas, até somar R$ 500 mil.
+      O iFood deixou de cobrar a comissão de 9,5% em 11 lojas, até somar o valor combinado.
       Loja que paga comissão fica fora da conta: as do Boqueirão, a Comida Brasileira AV e,
       desde 06/10/2026, a Marmita da Jane (antiga Veganete Água Verde), que passou a usar a
       entrega do iFood — nesse plano os 9,5% voltam a ser cobrados.
       A data se move com o volume: <b>vender mais consome o benefício mais rápido</b>.
-      <b>Esta barra é uma estimativa de quanto o iFood já usou dos R$ 500 mil:</b> 9,5% da venda de
+      <b>Esta barra é uma estimativa de quanto o iFood já usou do valor combinado:</b> 9,5% da venda de
       cada pedido (itens + entrega − desconto que a loja banca), do jeito que o iFood cobra a comissão
       nas lojas que pagam, desde 02/04/2026. <b>Não é o que foi enviado para a XP:</b> até 04/10/2026 o
       envio foi calculado sobre o valor que o iFood depositou, que dá uns 12% a menos, e não será refeito
@@ -6721,7 +6721,7 @@ async function projCarregar() {
   }
   PROJ_ATACADO_RECEBER = (atacadoReceber || []).map(r => ({ ...r, valor: Number(r.valor), dias_atraso: Number(r.dias_atraso) }));
   PROJ_BENEF = { sem: benefSem || [], xp: benefXp || [], cobr: benefCobr || [] };
-  // o ritmo do bonus (o mesmo numero do aviso dos R$ 500 mil) estima a semana que ainda nao fechou
+  // o ritmo do bonus (o mesmo numero do aviso do beneficio) estima a semana que ainda nao fechou
   const [farolBonus, comPag, bonusPrev, receitaPrev, foraMediaRegra, provMensal, foraMediaDia] = await Promise.all([
     consultarTudo('vw_beneficio_ifood_farol?select=ritmo_semanal,restante').catch(() => []),
     consultarTudo('vw_comissao_atacado_pagamento?select=semana_ini,pagamento,pessoa,devido,pago,lancado_em,saiu_banco_em,diferenca,situacao,ajuste').catch(() => null),
@@ -8156,7 +8156,7 @@ function blocoSaldoDiaADia() {
 // NAO calcula bonus: le o que a tela ja baixa. FATO = semana fechada e ainda nao enviada
 // (vw_beneficio_xp_pendente, coluna falta): sai na quarta do repasse dela ou, se essa ja passou,
 // na proxima quarta. ESTIMATIVA = a semana em curso e as seguintes, pelo ritmo_semanal de
-// vw_beneficio_ifood_farol (o numero do aviso dos R$ 500 mil) — ou o que a semana ja apurou, se
+// vw_beneficio_ifood_farol (o numero do aviso do beneficio) — ou o que a semana ja apurou, se
 // for maior — ate acabar o `restante` da isencao (quando ela acaba, o bonus para de sair).
 // ------------------------------------------------------------------
 function projBonusQuartas(hojeIso, horizonte) {

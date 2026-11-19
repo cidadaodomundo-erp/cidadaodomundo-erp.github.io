@@ -268,9 +268,9 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261117t"></script>
-<script src="casca/paginas.js?v=20261118usu"></script>
-<script src="casca/modulos.js?v=20261118jun"></script>
+<script src="casca/menu.js?v=20261119tmp"></script>
+<script src="casca/paginas.js?v=20261119tmp"></script>
+<script src="casca/modulos.js?v=20261119tmp"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
 <script src="casca/busca.js?v=20261118usu"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
@@ -509,6 +509,8 @@ function visivel(chave) {
   // 17/11/2026: Ponto dos taxas (QR) abre para quem vê Taxas e Freelas; o banco confere o papel (DONO, FINANCEIRO, FILIAL ou pessoal)
   if (chave === 'taxaponto') return visivel('freelas');
   if (chave === 'avalsalao') return visivel('salao');
+  // 19/11/2026 (Organizador 00:03): Temperaturas das câmaras (tela do Fabio) abre para quem vê a Produção (Apontar produção)
+  if (chave === 'temperaturas') return visivel('producao');
   // 13/11/2026: o Seguro de vida (RH) abre para quem vê Cargos e salários e vê pessoal (sem chave nova no painel_acesso)
   if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');
   // 13/11/2026: Compra no cartão abre para todo login; o banco decide o que cada um vê (fin_cartao_meus_cartoes: filial só o cartão da loja)

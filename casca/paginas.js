@@ -116,6 +116,7 @@ window.CASCA_PAGINAS = {
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
   freelas: 'freelas/index.html?v=20261116a',        // 16/11/2026: Taxas e Freelas (consulta + loja de cada freela)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
+  temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
   manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
   prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
