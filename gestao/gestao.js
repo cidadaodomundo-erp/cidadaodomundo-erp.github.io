@@ -800,7 +800,7 @@ async function concbFormEnsinar(d) {
     // OFX traz; quem ensina confere e, se precisar, troca.
     + campo('ensNome', 'Nome no banco', 'ex.: GUSTAVO KOVACS BELETATO')
     + campo('ensDoc', 'CPF/CNPJ (com ele a regra casa pelo número, não pela grafia)',
-        'ex.: 385.789.238-20 — deixe vazio se não houver')
+        'ex.: 000.000.000-00 — deixe vazio se não houver')
     + campo('ensQue', 'O que é', 'ex.: compra de tinta para manutenção')
     + campo('ensDesc', 'Descrição no Saipos (o histórico a digitar)', 'ex.: TINTAS VERGINIA')
     // TIPO DE LANCAMENTO primeiro: e ele que decide se a tela pergunta contas
@@ -917,7 +917,7 @@ async function concbFormEnsinar(d) {
     const nomeBanco = document.getElementById('ensNome').value.trim().toUpperCase();
     // O documento vai para a regra ESCRITO COMO O BANCO ESCREVE (pontos, barra e
     // traco): o aplicar_licoes usa o texto como padrao, e so digitos nao casariam
-    // com "385.789.238-20" no memo. Quem digita so numeros nao precisa saber disso.
+    // com "000.000.000-00" no memo. Quem digita so numeros nao precisa saber disso.
     const dig = document.getElementById('ensDoc').value.replace(/\D/g, '');
     if (dig && dig.length !== 11 && dig.length !== 14) {
       avisoAcao('atencao', 'CPF tem 11 números e CNPJ tem 14: confira ou deixe o campo vazio.');
@@ -1050,7 +1050,7 @@ async function concbDesmarcar(conta, fitid) {
 // O MEMO do Itau empilha tres coisas: o tipo da operacao, o historico curto do
 // formato antigo (nome cortado em 13 letras colado na data) e o nome completo com
 // CPF. Ex.: "PIX RECEBIDO PIX TRANSF LEONARD16/08 LEONARDO ALMEIDA DE OLIVEIRA
-// 064.607.109-29". Ler fiel esta certo — guardamos assim —, mas na tela isso vira
+// 000.000.000-00". Ler fiel esta certo — guardamos assim —, mas na tela isso vira
 // ruido e o corte de 54 caracteres ainda cortava no meio do nome.
 // Aqui e SO exibicao: o memo cru continua intacto no banco.
 function memoLimpo(memo) {
