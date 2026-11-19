@@ -48,6 +48,7 @@ window.CASCA_PAGINAS = {
   // atividades: saiu do menu em 12/11/2026 (dono 16:55); #atividades abre a agenda no bloco Equipe (sistema.html, abrir)
   agenda: 'agenda/index.html',
   biblioteca: 'biblioteca/index.html',
+  estudos: 'estudos.html',   // 19/11/2026: Estudos do Neto (cópia dos artefatos; só Neto e Fabio, artefato_copia)
   usuarios: 'usuarios/index.html',   // 18/11/2026: Usuários do painel (só o dono; criar, editar, senha, telas)   // 18/11/2026: Biblioteca — guias, estudos e dossiês de um clique (painel_biblioteca)
   desperdicio: 'desperdicio/index.html',   // 18/11/2026: Desperdício — perdas dos últimos 30 dias (vw_est_perda, só leitura)
   regras: 'regras/index.html',   // 16/11/2026: Regras em vigor (só o dono; vw_regras_em_vigor)
@@ -117,6 +118,7 @@ window.CASCA_PAGINAS = {
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
   freelas: 'freelas/index.html?v=20261116a',        // 16/11/2026: Taxas e Freelas (consulta + loja de cada freela)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
+  temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
   manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
   prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
@@ -135,7 +137,7 @@ window.CASCA_PAGINAS = {
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
 // 07/11/2026 (auditoria lote 1, resultado-33): 'atividades' é por pessoa, não por loja — sai de POR_LOJA e vem para cá.
-window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras', 'biblioteca', 'usuarios',
+window.CASCA_TELAS_SEM_LOJA = ['plano', 'telas', 'rotinas', 'atividades', 'pseguro', 'cartao', 'compliance', 'regras', 'biblioteca', 'estudos', 'usuarios',
   'prestadores',    // Quem conserta é um diretório geral (o cadastro de prestadores não tem loja)
   'mercadolivre'];  // 17/11/2026: cada pedido de compra escolhe a loja de entrega na própria tela (o banco filtra pelas lojas do login)
 

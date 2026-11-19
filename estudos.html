@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Estudos do Neto</title>
+<!-- ESTUDOS DO NETO (qui 19/11/2026, chat Telas do painel; dono pelo Organizador 15:49: "liberar todos os artefatos pro Fabio
+     ver, naquele esquema que já fizemos"). Cópia dos artefatos do claude.ai, só Neto e Fabio (login + RLS pode_ver_plano).
+     O conteúdo NÃO fica neste arquivo (o repositório é público): mora no banco, em artefato_copia, e chega pelo login.
+     Cada cópia abre num iframe sandbox (sem acesso ao login do painel). SQL: script/sql/artefato_copia_2026_11_19.sql -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC; --anda:#8A5A00; --anda-fundo:#FBF0DC; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20; --anda:#E8B55A; --anda-fundo:#2E2415; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20; --anda:#E8B55A; --anda-fundo:#2E2415; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:1000px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  h2 { font-size:.8rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mudo); margin:1.6rem 0 .5rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .barra { display:flex; gap:8px; flex-wrap:wrap; align-items:center; position:sticky; top:0; background:var(--fundo); padding:8px 0; z-index:2; }
+  .barra input { flex:1 1 240px; padding:8px 10px; border:1px solid var(--forte); border-radius:4px; background:var(--papel); color:var(--tinta); font:inherit; }
+  .bt { background:var(--papel); color:var(--tinta); border:1px solid var(--forte); border-radius:4px; padding:5px 12px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .bt.on { background:var(--tinta); color:var(--fundo); border-color:var(--tinta); }
+  .lista { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+  .card { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; cursor:pointer; text-align:left; font:inherit; color:inherit; }
+  .card:hover { border-color:var(--acento); }
+  .card b { display:block; }
+  .card span { font-size:.8rem; color:var(--mudo); }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .nota { font-size:.82rem; color:var(--mudo); }
+  .ver { position:fixed; inset:0; background:var(--fundo); display:flex; flex-direction:column; z-index:5; }
+  .ver .topo { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 16px; border-bottom:1px solid var(--linha); background:var(--papel); }
+  .ver .topo b { flex:1 1 200px; }
+  .ver .aviso { padding:6px 16px; background:var(--anda-fundo); color:var(--anda); font-size:.85rem; }
+  .ver iframe { flex:1; width:100%; border:0; background:#fff; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<div id="ver"></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app'), ver = document.getElementById('ver');
+const D = { itens: [], busca: '', assunto: 'todos' };
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const H = () => ({ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${sessaoValida().access_token}` });
+const dataBR = d => d ? new Date(d.length === 10 ? d + 'T12:00:00' : d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', timeZone:'America/Sao_Paulo' }) : '—';
+const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Estudos do Neto</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome (ex.: fabio)"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:((t) => { t = String(t || '').trim(); return !t || t.includes('@') ? t : semAcento(t).replace(/\s+/g, '') + '@cidadaodomundo.com.br'; })(document.getElementById('e').value), password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+async function carregar() {
+  if (!sessaoValida()) return telaLogin();
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/artefato_copia?select=id,titulo,assunto,atualizado,copiado_em&order=atualizado.desc`, { headers:H() });
+  if (r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  D.itens = r.ok ? await r.json() : [];
+  if (!D.itens.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (a página é só do Neto e do Fabio).</p>
+    <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  desenhar();
+  const q = new URLSearchParams(location.search).get('abrir'); if (q) abrir(q);
+}
+function desenhar() {
+  const assuntos = [...new Set(D.itens.map(x => x.assunto))].sort((a, b) => a.localeCompare(b, 'pt'));
+  const b = semAcento(D.busca);
+  const vis = D.itens.filter(x => (D.assunto === 'todos' || x.assunto === D.assunto) && (!b || semAcento(x.titulo + ' ' + x.assunto).includes(b)));
+  const grupos = assuntos.filter(a => vis.some(x => x.assunto === a));
+  const copia = D.itens.reduce((m, x) => x.copiado_em > m ? x.copiado_em : m, '');
+  app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · só Neto e Fabio</p><h1>Estudos do Neto</h1>
+    <p class="lede">As páginas de trabalho que o Neto montou com o Claude: estudos, fechamentos, cardápio, bases. ${D.itens.length} páginas, copiadas em ${dataBR(copia)}. O original continua com o Neto; aqui é só leitura.</p>
+    <div class="barra"><input id="q" placeholder="buscar pelo nome ou assunto" value="${esc(D.busca)}">
+      <button class="bt ${D.assunto === 'todos' ? 'on' : ''}" data-a="todos">Todos (${D.itens.length})</button>
+      ${assuntos.map(a => `<button class="bt ${D.assunto === a ? 'on' : ''}" data-a="${esc(a)}">${esc(a)} (${D.itens.filter(x => x.assunto === a).length})</button>`).join('')}</div>
+    ${grupos.length ? grupos.map(a => `<h2>${esc(a)}</h2><div class="lista">${vis.filter(x => x.assunto === a).map(x =>
+      `<button class="card" data-id="${esc(x.id)}"><b>${esc(x.titulo)}</b><span>atualizado em ${dataBR(x.atualizado)}</span></button>`).join('')}</div>`).join('')
+      : '<p class="vazio">Nada com esse nome.</p>'}
+    <p class="nota" style="margin-top:2rem">Algumas páginas antigas tinham botões que gravavam respostas no claude.ai; aqui eles não gravam nada.</p>`;
+  const q = document.getElementById('q');
+  q.oninput = () => { D.busca = q.value; const p = q.selectionStart; desenhar(); const n = document.getElementById('q'); n.focus(); n.setSelectionRange(p, p); };
+  app.querySelectorAll('[data-a]').forEach(el => el.onclick = () => { D.assunto = el.dataset.a; desenhar(); });
+  app.querySelectorAll('[data-id]').forEach(el => el.onclick = () => abrir(el.dataset.id));
+}
+async function abrir(id) {
+  const x = D.itens.find(i => i.id === id); if (!x) return;
+  ver.innerHTML = `<div class="ver"><div class="topo"><b>${esc(x.titulo)}</b><button class="sair" id="fechar">← voltar à lista</button></div>
+    <div class="aviso">Cópia de ${dataBR(x.copiado_em)} (o original foi atualizado em ${dataBR(x.atualizado)}); o original continua com o Neto.</div>
+    <p class="vazio" style="padding:16px" id="carr">Abrindo…</p></div>`;
+  document.getElementById('fechar').onclick = fechar;
+  history.replaceState(null, '', '?abrir=' + encodeURIComponent(id));
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/artefato_copia?select=html&id=eq.${encodeURIComponent(id)}`, { headers:H() });
+  const d = r.ok ? await r.json() : [];
+  const c = document.getElementById('carr'); if (!c) return;
+  if (!d.length) { c.outerHTML = '<p class="erro" style="padding:16px">✗ Não consegui abrir esta página. Volte à lista e tente de novo.</p>'; return; }
+  const f = document.createElement('iframe');
+  f.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');   // sem allow-same-origin: a cópia não enxerga o login
+  f.setAttribute('title', x.titulo);
+  f.srcdoc = d[0].html;
+  c.replaceWith(f);
+}
+function fechar() { ver.innerHTML = ''; history.replaceState(null, '', location.pathname); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && ver.innerHTML) fechar(); });
+carregar();
+</script>
+</body>
+</html>

@@ -1493,6 +1493,7 @@ function cgAbaCusto() {
   const ex = linhas.filter(c => c.fora_do_cadastro);
   let h = cgSelMesCusto(meses, mes) + cgFiltroUnidade(CARGOS.conf) + `
     ${F.semSetor ? `<div style="margin:0 0 8px;"><button type="button" class="preset-btn active" onclick="CARGOS_F.semSetor=false;renderModuloCargos()">só quem está sem setor ✕</button></div>` : ''}
+    <div style="font-size:12px; color:var(--tx-4); margin:0 0 8px;">pela competência: o mês trabalhado, não o dia do pagamento</div>
     <div class="cards">
       <div class="card blue"><div class="card-lbl">Custo da folha no mês</div><div class="card-val">${cgR0(total)}</div><div class="card-pct">${prev ? 'ainda com provisões do Saipos' : 'tudo pago'}</div></div>
       <div class="card neutral"><div class="card-lbl">Pessoas com lançamento</div><div class="card-val">${linhas.length}</div><div class="card-pct">${ex.length ? `${ex.length} fora do cadastro (ex-funcionários)` : 'todas no cadastro'}</div></div>
@@ -1526,6 +1527,7 @@ function cgAbaSetor() {
   const soma = (k) => cgR(linhas.reduce((s, x) => s + cgN(x[k]), 0));
   return cgSelMesCusto(meses, mes) + cgFiltroUnidade(CARGOS.conf) + `
     ${sem > 0.5 ? `<div class="contexto" style="border-color:var(--farol-perto);cursor:pointer;" onclick="CARGOS_F.semSetor=true;CARGOS_F.aba='custo';renderModuloCargos()">${cgR0(sem)} sem setor neste mês — <u>ver quem</u></div>` : ''}
+    <div style="font-size:12px; color:var(--tx-4); margin:0 0 8px;">pela competência: o mês trabalhado, não o dia do pagamento</div>
     <div id="tabelaCgSetor" style="overflow-x:auto;"><table>
       <thead><tr><th>Loja</th><th title="é o setor de cada pessoa no cadastro que reparte a folha entre os canais em Resultado por canal">Setor</th><th style="text-align:right;">Pessoas</th><th style="text-align:right;">Salário</th><th style="text-align:right;">VT e VA</th><th style="text-align:right;">Outros diretos</th><th style="text-align:right;">Rateados</th><th style="text-align:right;">Total</th><th style="text-align:right;">% da loja</th></tr></thead>
       <tbody>${linhas.map(s => `<tr${s.setor === 'SEM SETOR' ? ` style="cursor:pointer;color:var(--farol-perto);${F.realceSemSetor ? 'outline:2px solid var(--farol-perto);' : ''}" onclick="CARGOS_F.semSetor=true;CARGOS_F.aba='custo';renderModuloCargos()" title="ver quem está sem setor"` : ''}><td>${cgEsc(s.unidade)}</td><td>${cgEsc(s.setor)}</td><td style="text-align:right;">${cgN(s.pessoas)}</td>

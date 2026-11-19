@@ -195,7 +195,7 @@ function renderModuloRateio() {
   const pill = (m) => `<button onclick="rateioMargem(${m})" style="font:inherit; font-size:12px; padding:3px 10px; border-radius:999px; cursor:pointer; border:1px solid ${Math.abs(m - RATEIO_MARGEM) < 0.001 ? 'var(--brand)' : 'var(--line)'}; background:${Math.abs(m - RATEIO_MARGEM) < 0.001 ? 'var(--brand)' : 'var(--surface)'}; color:var(--tx-1);">${Math.round(100 * m)}%</button>`;
   const plPct = plDe(RATEIO_CANAL);
   const precoBloco = temPreco ? `
-    <div class="section-label">Preço alvo · ${nome[RATEIO_CANAL] || RATEIO_CANAL} — comissão cheia, pró-labore pago e o lucro que você escolher</div>
+    <div class="section-label">Preço alvo · ${nome[RATEIO_CANAL] || RATEIO_CANAL} — comissão cheia, pró-labore pago e o lucro que você escolher<span style="display:block; color:var(--tx-4); font-weight:normal; font-size:12px; text-transform:none; letter-spacing:0; margin-top:3px;">pela data da venda / da nota (competência)</span></div>
     <div class="contexto" title="${plPct > 0.0005 ? `Pró-labore da loja (${pc(plPct)}) já descontado. ` : ''}Clique num produto para abrir a conta. Lucro abaixo de ${pctM}% em âmbar; negativo, vermelho.">Lucro desejado: ${[0.05, 0.10, 0.15, 0.20].map(pill).join(' ')} &nbsp;·&nbsp; preço alvo = ficha × ${mult || '—'}</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0 6px;">
       <span style="font-size:12px; color:var(--tx-3);">ordenar:</span>
@@ -210,7 +210,7 @@ function renderModuloRateio() {
     <div id="tabelaRateioPreco"></div>` : '';
 
   alvo.innerHTML = `
-    <h2 style="margin-top:0;">Preço alvo por produto <span style="font-size:13px; font-weight:400; color:var(--tx-3);">${mesNome(de)} a ${mesNome(ate)}</span></h2>
+    <h2 style="margin-top:0;">Preço alvo por produto <span style="font-size:13px; font-weight:400; color:var(--tx-3);">pela data da venda / da nota (competência) · ${mesNome(de)} a ${mesNome(ate)}</span></h2>
     ${rateioBarraUnidades()}
     <div class="contexto" title="O custo de operar cada canal vira um markup sobre o custo da ficha; a matéria-prima entra pela ficha. Leitura cheia: comissão de 9,5% do iFood, que o benefício zera até dez/26–jan/27 — é por ela que se precifica. Venda por canal, horário e dia: Evolução de vendas.">Cartões: de cada R$ 100 vendidos, quanto vai para operar o canal (comissão cheia). Clique no canal.${canais.some(c => porCanal[c].provisorio) ? ' <span style="color:var(--tx-3);">Parte da folha ainda cai na proporção geral (nomes sem setor).</span>' : ''}</div>
     ${(RATEIO.semCriterio || []).length ? `<div class="contexto" style="border-color:var(--brand);"><b>Conta nova sem regra de rateio</b> — está caindo em "por vendas" sem ninguém ter decidido: ${RATEIO.semCriterio.map(r => `${String(r.subtipo).toLowerCase()} (${reais(r.valor_3m)} em 3 meses)`).join(' · ')}. Precisa de regra de rateio.</div>` : ''}
@@ -544,7 +544,7 @@ function renderModuloEngcard() {
   const unCortesia = cortesia.reduce((s,a) => s + a.un, 0);
 
   alvo.innerHTML = `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Engenharia de cardápio — Água Verde</div>
+    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Engenharia de cardápio — Água Verde<span style="display:block; color:var(--tx-4); font-weight:normal; font-size:12px; text-transform:none; letter-spacing:0; margin-top:3px;">pela data da venda (competência)</span></div>
     <div class="caption-label" style="text-align:center;">Corte pela média: <b>${Math.round(unMedio).toLocaleString('pt-BR')} un.</b> por item e <b>R$ ${fmt(mgUnMedio)}</b> de margem sobre ingredientes por unidade.</div>
     <div style="text-align:center; margin:10px 0;">
       ${[30, 60, 90].map(d => `<button class="preset-btn ${ENGCARD_DIAS === d ? 'active' : ''}"

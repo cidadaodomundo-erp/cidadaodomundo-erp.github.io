@@ -167,6 +167,7 @@ function desenhar() {
     <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio</p>
     <h1>Entrega ao Fabio</h1>
     <p class="lede">Tudo o que o Neto combinou entregar, onde está no painel e quem opera hoje. O estado vem direto do sistema. Em cada item, diga se recebeu ou se falta algo.</p>
+    <p class="lede">Os estudos e páginas de trabalho do Neto estão em <a href="estudos.html"><b>Estudos do Neto</b></a> (cópia de 19/11, só Neto e Fabio).</p>
     ${souDono() ? `<p class="leitura">${fabio.length ? `O Fabio abriu esta página ${fabio.length} ${fabio.length === 1 ? 'vez' : 'vezes'} · a última em ${esc(quandoBR(fabio[0].quando))}` : 'O Fabio ainda não abriu esta página.'}</p>` : ''}
     <div class="placar"><div class="ok"><b>${ent} de ${I.length}</b><span>entregues</span></div><div class="anda"><b>${anda}</b><span>em andamento</span></div>${falta ? `<div class="falta"><b>${falta}</b><span>falta</span></div>` : ''}<div><b>${okF.size}</b><span>que o Fabio já deu ok</span></div></div>
     ${grupos.filter(g => g[1].length).map(([t, L]) => `<h2>${t}</h2>${L.map(card).join('')}`).join('')}

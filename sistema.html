@@ -57,7 +57,10 @@
     --tx-1:#fff; --tx-2:#c3c2b7; --tx-3:#a5a49a; --tx-5:#82817a; --tx-6:#6b6a61;
     --brand:#c8102e; --farol-fora:#ff6b6b;
     --marca-amarelo:#f6c63e; --marca-laranja:#ee8a3c; --marca-laranja-q:#e2622b;
+    --marca-fabio:#5fb3c9;   /* 18/11/2026: o ponto das telas da operação (Fabio) no menu, só para Neto e Fabio */
   }
+  .fab-marca { color:var(--marca-fabio); font-size:10px; margin-left:5px; }
+  .fab-legenda { font-size:11px; color:var(--tx-5); padding:8px 12px 2px; }
   /* SIMULAÇÃO DO VISUAL CLARO (dono 07/11 04:01): só com ?tema=proposta. A barra lateral fica ESCURA (dono, 03/09: a moldura
      que ele quer manter); o resto clareia. Mesmas cores do tema .papel do nucleo.css. */
   html.tema-proposta { --bg:#f6f5f1; --surface:#fff; --surface-2:#efede6; --zebra:#f6f5f1;
@@ -265,11 +268,11 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261117t"></script>
-<script src="casca/paginas.js?v=20261118usu"></script>
-<script src="casca/modulos.js?v=20261118jun"></script>
+<script src="casca/menu.js?v=20261119tmp"></script>
+<script src="casca/paginas.js?v=20261119est"></script>
+<script src="casca/modulos.js?v=20261119est"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
-<script src="casca/busca.js?v=20261118usu"></script>
+<script src="casca/busca.js?v=20261119est"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -294,7 +297,9 @@ SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i);
 // 16/11/2026 (Fábio): 'prh' (Gestão do RH) sai da Operação das lojas porque o módulo Pessoas já cobre; 'encomendas' sai (sem uso).
 // O endereço #prh / #encomendas continua abrindo.
 // 16/11/2026 (Fábio): 'peventos' sai do menu: virou o modo "Todos da loja" da Consulta de ponto.
-const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas', 'peventos']);
+// 19/11/2026 (dono, pelo Organizador: "pode seguir com tudo"): Clientes do iFood, Resumos semanais e Telas do painel saem do menu
+// (só o Neto usava); as páginas continuam abrindo pelo endereço.
+const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas', 'peventos', 'clientes', 'relatorios', 'telas']);
 ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
 // MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51: "gostei do menu, pode aplicar"): nomes e telas extras do menu novo vêm de
 // casca/modulos.js (CASCA_MODULOS_CFG). O ?menu=proposta da simulação continua abrindo, com este mesmo menu (alias).
@@ -476,6 +481,7 @@ const SO_PESSOAL = new Set(['macertos', 'pcartao']);
 const SO_PESSOAL_E_CADASTRO = new Set(['peventos']);
 let VE_CADASTRA = null;
 let VE_PESSOAL = null;
+let VE_PLANO = null;   // 18/11/2026: Neto e Fabio (pode_ver_plano) veem a marca das telas da operação no menu
 // tela só de DONO e FINANCEIRO
 const SO_GESTAO = new Set(['lojaempresas']);
 // 02/11/2026 (dono): Controle das atividades é só do dono; a view também só devolve linhas a este login
@@ -505,6 +511,8 @@ function visivel(chave) {
   // 17/11/2026: Ponto dos taxas (QR) abre para quem vê Taxas e Freelas; o banco confere o papel (DONO, FINANCEIRO, FILIAL ou pessoal)
   if (chave === 'taxaponto') return visivel('freelas');
   if (chave === 'avalsalao') return visivel('salao');
+  // 19/11/2026 (Organizador 00:03): Temperaturas das câmaras (tela do Fabio) abre para quem vê a Produção (Apontar produção)
+  if (chave === 'temperaturas') return visivel('producao');
   // 13/11/2026: o Seguro de vida (RH) abre para quem vê Cargos e salários e vê pessoal (sem chave nova no painel_acesso)
   if (chave === 'pseguro') return VE_PESSOAL !== false && visivel('cargos');
   // 13/11/2026: Compra no cartão abre para todo login; o banco decide o que cada um vê (fin_cartao_meus_cartoes: filial só o cartão da loja)
@@ -513,6 +521,8 @@ function visivel(chave) {
   if (chave === 'compliance') return true;
   // 18/11/2026: Biblioteca abre para todo login; a RLS de painel_biblioteca mostra a cada um só o que é dele
   if (chave === 'biblioteca') return true;
+  // 19/11/2026 (dono pelo Organizador 15:51): Estudos do Neto só para quem vê o plano (Neto e Fabio); a RLS de artefato_copia confere de novo
+  if (chave === 'estudos') return VE_PLANO === true;
   // 16/11/2026: Código que falhou no Saipos usa a MESMA permissão das Fichas técnicas (sem chave nova no painel_acesso); o banco filtra a filial
   if (chave === 'saiposcod') return visivel('fichas');
   // 17/11/2026: Notas que chegaram — quem vê a contagem do estoque ou o teto de compras; o banco confere o papel ao gravar
@@ -543,16 +553,21 @@ function desenharMenu() {
   let h = '';
   if (!MOD_CFG.hojeNoModulo) h += SO_NA_CASCA.filter((i) => visivel(i.chave)).map((i) =>
     `<button class="mi${i.chave === ATUAL ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${sinalHtml(SINAIS[i.chave])}</button>`).join('');
+  // 18/11/2026 (dono: "minha agenda acho que poderia ficar solta no topo do menu"): primeiro item, fora dos grupos, com o sinal
+  // de pendências; vale para todo login (cada um tem a sua)
+  if (ITENS.agenda && visivel('agenda')) { const a = ITENS.agenda;
+    h += `<button class="mi${ATUAL === 'agenda' ? ' on' : ''}" type="button" data-chave="agenda"><span class="ic">${esc(a.icone)}</span>${esc(a.rotulo)}${sinalHtml(SINAIS.agenda)}</button>`; }
+  const marcaFab = (i) => VE_PLANO === true && i.origem === 'fabio' ? '<span class="fab-marca" title="tela da operação (Fabio)">●</span>' : '';
   // 22/10/2026: o menu segue os MÓDULOS do formato A (o mesmo agrupamento dos cartões do Início)
   MODULOS.forEach((g) => {
-    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => MOD_CFG.hojeNoModulo || k !== 'hoje').map((k) => Object.assign({ chave: k }, ITENS[k]));
+    const itens = [...telasDo(g, 'lancar'), ...telasDo(g, 'acompanhar')].filter((k) => (MOD_CFG.hojeNoModulo || k !== 'hoje') && k !== 'agenda').map((k) => Object.assign({ chave: k }, ITENS[k]));
     if (!itens.length) return;
     const tem = itens.some((i) => emItem(i.chave));
     const aberto = tem || GRUPOS_ABERTOS[g.id] || PODE;   // acesso restrito: tudo aberto, são poucas telas
     h += `<button class="grp${aberto ? ' aberto' : ''}" type="button" data-grupo="${esc(g.id)}" aria-expanded="${aberto ? 'true' : 'false'}">${esc(g.nome)}${aberto ? '' : sinalHtml(itens.reduce((a, i) => a + (SINAIS[i.chave] || 0), 0))}<span class="seta">▶</span></button>`;
     const botao = (i) => semPagina(i.chave)
-      ? `<button class="mi" type="button" disabled title="Integração pendente: acesso ainda não conectado nesta casca"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}<span class="obs">integração pendente</span></button>`
-      : `<button class="mi${emItem(i.chave) ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${sinalHtml(SINAIS[i.chave])}</button>`;
+      ? `<button class="mi" type="button" disabled title="Integração pendente: acesso ainda não conectado nesta casca"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${marcaFab(i)}<span class="obs">integração pendente</span></button>`
+      : `<button class="mi${emItem(i.chave) ? ' on' : ''}" type="button" data-chave="${esc(i.chave)}"><span class="ic">${esc(i.icone)}</span>${esc(i.rotulo)}${i.link ? ' ↗' : ''}${marcaFab(i)}${sinalHtml(SINAIS[i.chave])}</button>`;
     // 12/11/2026: o agrupamento Operação das lojas mostra as telas por setor (mesmas telas, mesma ordem dentro do setor)
     const corpo = g.setores
       ? g.setores.map((s) => { const ks = s.chaves.filter((k) => itens.some((i) => i.chave === k));
@@ -560,6 +575,7 @@ function desenharMenu() {
       : itens.map(botao).join('');
     h += '<div class="itens">' + corpo + '</div>';
   });
+  if (VE_PLANO === true) h += '<div class="fab-legenda"><span class="fab-marca" style="margin:0 4px 0 0;">●</span>telas da operação (Fabio)</div>';
   $('menu').innerHTML = h;
   $('miInicio').classList.toggle('on', ATUAL === null);
   desenharAbasJuncao();
@@ -912,6 +928,13 @@ async function carregarVePessoal() {
     return r.ok ? (await r.json()) === true : null;
   } catch (e) { return null; }
 }
+async function carregarVePlano() {   // 18/11/2026 (dono: "uma indicação de cor no que for tela do Fabio"): a marca só para quem vê o plano
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/pode_ver_plano', {
+      method: 'POST', headers: Object.assign(cabecalho(), { 'Content-Type': 'application/json' }), body: '{}' });
+    return r.ok ? (await r.json()) === true : null;
+  } catch (e) { return null; }
+}
 async function carregarPodeCadastrar() {   // mesma rpc que a tela já usa; só a casca passa a guardar o valor
   try {
     const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/pode_cadastrar_pessoal', {
@@ -995,7 +1018,7 @@ temaAplicar(document.documentElement.classList.contains('tema-proposta') ? 'clar
 async function montar() {
   $('quem').textContent = (sessao() || {}).email || '';
   temaDoLogin();
-  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE, VE_CADASTRA] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe(), carregarPodeCadastrar()]);
+  [PODE, DESC, , VE_PESSOAL, VE_GESTAO, VE_EQUIPE, VE_CADASTRA, VE_PLANO] = await Promise.all([carregarAcesso(), carregarDescricoes(), lojaCarregar(), carregarVePessoal(), carregarVeGestao(), carregarVeEquipe(), carregarPodeCadastrar(), carregarVePlano()]);
   desenharLoja();
   // 02/11/2026 (dono): Pagamento fora da folha virou aba de Cálculos da folha; o link antigo cai nela
   const [pedido, abaPedida] = decodeURIComponent(location.hash.replace('#', '')).replace(/^forafolha$/, 'pcalc/fora').replace(/^plano$/, 'agenda/desenvolvimentos').replace(/^atividades$/, 'agenda/atividades').split('/');

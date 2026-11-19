@@ -512,6 +512,7 @@ async function trTelaPedido(unidadeEscolhida) {
   // ilha em si e ligada no MODULO inteiro por trRenderOperacao (titulo, abas e
   // tela juntos, como no modelo aprovado), so enquanto a tela de pedido esta ativa
   alvo.innerHTML = `
+    <div id="trTetoFaixa"></div>
     <div class="caption-label">Pedido para <b>${unidade}</b>${origemPedido ? (origemPedido === 'FORNECEDOR'
         ? ' · <b style="color:var(--info);">🛒 FORNECEDOR</b> (a Rita compra e entrega — sem cobrança)'
         : ' · <b style="color:var(--brand);">🏭 PRODUÇÃO CIDADÃO</b>')
@@ -546,6 +547,7 @@ async function trTelaPedido(unidadeEscolhida) {
   trAvulsoN = 0;
   window._trPedidoPendente = null;   // tela nova: o que esta aberto no banco aparece no aviso do alto
   trPedidoSoma();
+  trTetoFaixaPreencher(unidade);
   trGuia();
 }
 
@@ -704,6 +706,7 @@ function trRevisarPedido() {
   box.hidden = false;
   box.innerHTML = `<b>Você está pedindo para ${window._trPedidoUnidade}:</b>
     <div style="margin:6px 0; font-size:12.5px; line-height:1.6;">${trPedidoLinhasTxt(escolhidos, avulsos, true).join('<br>')}</div>
+    ${trTetoCabeAntesHtml(window._trPedidoUnidade)}
     <button id="trPedidoBtnEnviar" class="preset-btn tr-btn-cheio" onclick="trCriarPedido()">Está certo — enviar pedido</button>
     <button id="trPedidoBtnVoltar" class="preset-btn" onclick="trResumoFecha()">voltar e corrigir</button>
     <div id="trPedidoErro" style="margin-top:12px; padding-top:10px; border-top:2px solid var(--brand); color:var(--brand);" hidden></div>`;
@@ -1036,10 +1039,12 @@ function trPedidoEnviadoTela(p) {
         <button class="preset-btn" style="padding:12px 16px;" onclick="trEditarPedido(${id})">✏️ Esqueci um item — corrigir este pedido</button>
       </div>
       <div class="tr-det" style="margin-top:10px; font-size:12.5px;">Dá para corrigir até a separação começar. Para acompanhar o pedido: aba ✅ Conferência.</div>
+      <div id="trTetoPedidoUsa"></div>
       <div class="tr-secao">O que foi pedido</div>
       <div style="font-size:13px; line-height:1.7;">${p.linhas.join('<br>')}</div>
     </div>`;
   trSobeAte(document.getElementById('trPedidoEnviado'));
+  trTetoPedidoUsa(id, p.unidade);
 }
 // O quadro no alto da tela de corrigir, logo depois de salvar (trSalvarEdicao)
 function trEditSalvoHtml(id, unidade, aviso) {
@@ -1231,7 +1236,7 @@ async function trEditarPedido(id, aviso) {
       + (x.emb2_fator ? ' ou ' + x.emb2_nome + ' de ' + trEmbDesc({ un_medida: x.un_medida, emb_fator: x.emb2_fator }) : '');
   });
   alvo.innerHTML = `
-    ${trEditSalvoHtml(id, lista.unidade, aviso)}
+    ${trEditSalvoHtml(id, lista.unidade, aviso)}${trTetoCorteHtml(id, aviso)}
     <div class="caption-label"><button class="preset-btn" onclick="trListaAberta=${id}; trTelaSeparacao();">← lista</button>
       Editando a lista <b>#${id}</b> · ${lista.unidade} — corrija as quantidades (<b>0 tira o item</b>), preencha
       os que faltam na grade de baixo e <b>salve uma vez só</b>. Linha mexida ganha o selo ✏️.</div>
@@ -1903,7 +1908,7 @@ async function trTelaSeparacao() {
   // valor só para quem vê valores, linha de total e a legenda do excluir em uma linha (o confirm já explica)
   const statusTxt = { SOLICITADA: 'pedida', SEPARADA: 'separada', ENVIADA: 'enviada', RECEBIDA: 'recebida', FECHADA: 'fechada' };
   const veValor = TR_OP.veValores !== false;
-  alvo.innerHTML = (fila.length ? `
+  alvo.innerHTML = '<div id="trTetoFaixa"></div><div id="trTetoAlerta"></div>' + (fila.length ? `
     <div id="tabelaTrOpFila"><table>
       <tr><th>Lista</th><th>Filial</th><th>Pedida em</th><th title="Dias corridos desde o pedido. A partir de 2 dias avisa; de 3 em diante aponta.">Parada há</th><th>Status</th><th>Separados</th>${veValor ? '<th>Valor estimado</th>' : ''}<th>Ação</th></tr>
       ${fila.map(l => `<tr>
@@ -1919,7 +1924,167 @@ async function trTelaSeparacao() {
     </table></div>
     <div class="caption-label">Excluir: só pedido lançado errado, até separada.</div>` :
     '<div class="contexto">Fila vazia — nenhum pedido aguardando separação. 🎉</div>') + trPesoAlertaHtml(alerta);
+  trTetoFaixaPreencher(trFilialVista());
+  trTetoAlertaPreencher();
   trGuia();
+}
+
+// ---- TETO DE COMPRAS NAS LISTAS (dono, 19/11/2026: "podemos colocar o mesmo teto de compras nas listas") ----
+// Só AHU e SÃO BRAZ (o Boqueirão não tem teto). Mesmo número do módulo Teto de compra; quem faz a conta é o banco:
+// vw_tr_teto_lista (faixa), vw_tr_teto_linha (valor do pedido enviado), vw_tr_teto_alerta(+_itens) (a Rita aprova ou
+// corta antes de separar — NÃO bloqueia a separação), vw_tr_teto_fechamento (Listas · Financeiro). A filial só vê o dela.
+const TR_TETO_UNIDADES = ['AHU', 'SÃO BRAZ'];
+const TR_TETO_SIT = {
+  'DENTRO':         { txt: 'dentro do teto', cor: 'var(--farol-ok)' },
+  'ACIMA DO RITMO': { txt: 'acima do ritmo', cor: 'var(--farol-perto)' },
+  'ACIMA DO TETO':  { txt: 'acima do teto',  cor: 'var(--farol-fora)' },
+  'DENTRO DO TETO': { txt: 'dentro do teto', cor: 'var(--farol-ok)' },
+};
+function trTetoSit(sit) { return TR_TETO_SIT[sit] || { txt: String(sit || '').toLowerCase(), cor: 'var(--tx-3)' }; }
+function trTetoPct(v) { return v == null ? '—' : trNum(v, 1) + '%'; }
+async function trTetoLer(unidade) {
+  try {
+    const r = await trFetch('vw_tr_teto_lista?order=unidade' + (unidade ? '&unidade=eq.' + encodeURIComponent(unidade) : ''));
+    if (!r.ok) return [];
+    const linhas = await r.json();
+    window._trTetoCache = window._trTetoCache || {};
+    linhas.forEach(t => { window._trTetoCache[t.unidade] = t; });
+    return linhas;
+  } catch (e) { return []; }
+}
+function trTetoFaixaHtml(t) {
+  const s = trTetoSit(t.situacao);
+  const ve = !TR_OP || TR_OP.veValores !== false;
+  const ritmo = t.situacao === 'ACIMA DO RITMO' ? ` <span class="tr-det">(o mês correu ${trTetoPct(t.mes_corrido_pct)})</span>` : '';
+  const corpo = ve
+    ? `já saiu <b>R$ ${fmt(Number(t.usado) || 0)}</b> (${trTetoPct(t.usado_pct)})${ritmo} · pedido ainda não separado R$ ${fmt(Number(t.pedido_nao_separado) || 0)} · `
+      + `<b style="color:${Number(t.cabe) < 0 ? 'var(--farol-fora)' : 'inherit'};">${Number(t.cabe) < 0 ? 'passou R$ ' + fmt(-Number(t.cabe)) : 'cabe R$ ' + fmt(Number(t.cabe) || 0)}</b>`
+    : `já saiu ${trTetoPct(t.usado_pct)} do teto${ritmo}`;
+  return `<div class="tr-teto-faixa contexto" data-unidade="${trEscH(t.unidade)}" data-situacao="${trEscH(t.situacao)}" style="text-align:left; margin:6px 0; padding:8px 12px; border-left:5px solid ${s.cor}; font-size:13px;">
+    <b>Teto de compras de ${trMesNome(t.mes)}${TR_OP && TR_OP.unidade ? '' : ' · ' + trEscH(t.unidade)}:</b>${ve ? ` R$ ${fmt(Number(t.teto) || 0)} ·` : ''} ${corpo}
+    · <b style="color:${s.cor};">${s.txt}</b></div>`;
+}
+// a faixa do alto (montagem do pedido e separação); unidade nula = as filiais com teto que o login vê
+async function trTetoFaixaPreencher(unidade, idAlvo = 'trTetoFaixa') {
+  if (unidade && !TR_TETO_UNIDADES.includes(unidade)) return;
+  const linhas = await trTetoLer(unidade);
+  const el = document.getElementById(idAlvo);
+  if (el) el.innerHTML = linhas.map(trTetoFaixaHtml).join('');
+}
+// no resumo antes de enviar: quanto ainda cabe (o valor do pedido na conta do teto sai depois de gravado)
+function trTetoCabeAntesHtml(unidade) {
+  const t = (window._trTetoCache || {})[unidade];
+  if (!t || !TR_TETO_UNIDADES.includes(unidade) || (TR_OP && TR_OP.veValores === false)) return '';
+  const s = trTetoSit(t.situacao);
+  return `<div id="trTetoCabe" style="margin:6px 0 10px; font-size:13px;">Teto de compras de ${trMesNome(t.mes)}: <b style="color:${s.cor};">${Number(t.cabe) < 0 ? 'já passou R$ ' + fmt(-Number(t.cabe)) : 'cabe R$ ' + fmt(Number(t.cabe) || 0)}</b>
+    <span class="tr-det">— quanto este pedido usa aparece logo depois de enviado.</span></div>`;
+}
+// depois de enviado: "este pedido usa R$ X; depois dele cabe R$ Y" (vw_tr_teto_linha + vw_tr_teto_lista)
+async function trTetoPedidoUsa(id, unidade) {
+  if (!TR_TETO_UNIDADES.includes(unidade) || (TR_OP && TR_OP.veValores === false)) return;
+  try {
+    const [rl, linhas] = await Promise.all([trFetch(`vw_tr_teto_linha?id_lista=eq.${id}&select=valor`), trTetoLer(unidade)]);
+    if (!rl.ok) return;
+    const usa = (await rl.json()).reduce((a, l) => a + (Number(l.valor) || 0), 0);
+    const t = linhas.find(x => x.unidade === unidade);
+    const el = document.getElementById('trTetoPedidoUsa');
+    if (!el || !t) return;
+    const s = trTetoSit(t.situacao);
+    el.innerHTML = `<div style="margin-top:10px; padding:8px 12px; border-left:5px solid ${s.cor};">Teto de compras: este pedido usa <b>R$ ${fmt(usa)}</b>; ${Number(t.cabe) < 0
+      ? `com ele o mês <b style="color:${s.cor};">passa do teto em R$ ${fmt(-Number(t.cabe))}</b> — a Água Verde confere antes de separar.`
+      : `depois dele ainda cabe <b style="color:${s.cor};">R$ ${fmt(Number(t.cabe) || 0)}</b> no mês.`}</div>`;
+  } catch (e) {}
+}
+function trTetoDiaHora(c) {
+  if (!c) return '';
+  const d = new Date(c);
+  return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às');
+}
+// O ALERTA DA RITA (papel DONO/SEPARACAO), no alto da fila de separação: lista ainda não separada que passa do teto
+async function trTetoAlertaPreencher() {
+  if (!TR_OP || !['DONO', 'SEPARACAO'].includes(TR_OP.papel)) return;
+  let alertas = [];
+  try {
+    const r = await trFetch('vw_tr_teto_alerta?order=id_lista' + trFiltroVista('&'));
+    if (!r.ok) return;
+    alertas = await r.json();
+  } catch (e) { return; }
+  const el = document.getElementById('trTetoAlerta');
+  if (!el) return;
+  if (!alertas.length) { el.innerHTML = ''; return; }
+  let itens = [];
+  try {
+    const ri = await trFetch(`vw_tr_teto_alerta_itens?id_lista=in.(${alertas.map(a => a.id_lista).join(',')})&select=id_lista,item,qtd_solicitada,valor,media_semana_8sem`);
+    if (ri.ok) itens = await ri.json();
+  } catch (e) {}
+  const falta = alertas.filter(a => !a.decisao).length;
+  el.innerHTML = `<div class="section-label tr-secao" style="margin-top:6px;">Antes de separar — lista acima do teto${falta ? ` <span style="color:var(--farol-fora);">(${falta} falta aprovar)</span>` : ''}</div>
+    <div class="caption-label">Aprove como está ou corte as quantidades. Não trava a separação: só registra quem decidiu.</div>
+    ${alertas.map(a => {
+      const its = itens.filter(i => i.id_lista === a.id_lista).sort((x, y) => (Number(y.valor) || 0) - (Number(x.valor) || 0));
+      const nAlto = its.filter(i => Number(i.media_semana_8sem) > 0 && Number(i.qtd_solicitada) > 2 * Number(i.media_semana_8sem)).length;
+      const decidido = a.decisao
+        ? `<span class="tr-tag" style="color:var(--farol-ok);">${a.decisao === 'APROVADA' ? '✓ aprovada' : '✂ cortada'} por ${trEscH(a.decidido_por || '')} ${trTetoDiaHora(a.decidido_em)}</span>`
+        : `<b style="color:var(--farol-fora);">falta aprovar</b>`;
+      return `<div class="contexto tr-teto-alerta" data-id="${a.id_lista}" style="text-align:left; margin:8px 0; padding:10px 14px; border-left:5px solid ${a.decisao ? 'var(--farol-ok)' : 'var(--farol-fora)'};">
+        <div><b>Lista #${a.id_lista}</b> · ${trEscH(a.unidade)} · pedida ${a.data_pedido ? trDiaMes(a.data_pedido) : '—'} · ${decidido}</div>
+        <div style="margin-top:4px; font-size:13px;">Lista R$ <b>${fmt(Number(a.valor_lista) || 0)}</b> · cabia R$ ${fmt(Math.max(Number(a.cabia) || 0, 0))} · <b style="color:var(--farol-fora);">passa do teto R$ ${fmt(Number(a.passa_do_teto) || 0)}</b></div>
+        ${its.length ? `<details style="margin-top:6px;"${a.decisao ? '' : ' open'}><summary style="cursor:pointer; font-size:12.5px;">${its.length} ${its.length === 1 ? 'item' : 'itens'}, do mais caro ao mais barato${nAlto ? ` · <b style="color:var(--farol-fora);">${nAlto} acima de 2× a média</b>` : ''}</summary>
+          <table style="margin-top:6px; font-size:12.5px;"><tr><th>Item</th><th>Pedido</th><th title="média por semana das 8 semanas antes deste pedido">Média/semana</th><th>Valor</th></tr>
+          ${its.map(i => {
+            const q = Number(i.qtd_solicitada) || 0, m = Number(i.media_semana_8sem) || 0, alto = m > 0 && q > 2 * m;
+            return `<tr${alto ? ' class="tr-teto-alto" style="color:var(--farol-fora); font-weight:700;"' : ''}><td>${trEscH(i.item)}</td><td>${trNum(q, 3)}${alto ? ` (${trNum(q / m, 1)}× a média)` : ''}</td><td>${m ? trNum(m, 3) : '—'}</td><td>R$ ${fmt(Number(i.valor) || 0)}</td></tr>`;
+          }).join('')}</table></details>` : ''}
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="preset-btn" style="border-color:var(--farol-ok);" onclick="trTetoDecidir(${a.id_lista}, 'APROVADA')">✓ aprovar como está</button>
+          <button class="preset-btn" style="border-color:var(--farol-perto);" onclick="trTetoCortar(${a.id_lista})">✂ cortar — corrigir quantidades</button>
+        </div></div>`;
+    }).join('')}`;
+}
+// cortar: a Rita corrige as quantidades na tela de corrigir que já existe e, salvo, grava "cortada"
+function trTetoCortar(id) { window._trTetoCorte = id; trListaAberta = null; trEditarPedido(id); }
+function trTetoCorteHtml(id, aviso) {
+  if (window._trTetoCorte !== id) return '';
+  const salvo = aviso && aviso.salvo && aviso.mudou;
+  return `<div class="contexto" style="text-align:left; margin:8px 0; padding:10px 14px; border-left:5px solid var(--farol-perto);">
+    ${salvo ? `<b>✂ Corte do teto:</b> quantidades salvas. Agora grave a decisão.
+      <div style="margin-top:8px;"><button class="preset-btn tr-btn-cheio" onclick="trTetoDecidir(${id}, 'CORTADA')">✂ gravar lista #${id} como cortada</button></div>`
+    : `<b>✂ Corte do teto da lista #${id}:</b> diminua as quantidades abaixo e salve; depois aparece aqui o botão de gravar como cortada.`}
+    <button class="preset-btn" style="margin-top:6px;" onclick="window._trTetoCorte=null; trTelaSet('separacao')">desistir do corte</button></div>`;
+}
+async function trTetoDecidir(id, decisao) {
+  const verbo = decisao === 'APROVADA' ? 'aprovada' : 'cortada';
+  avisoAcao('enviando', `Gravando a lista #${id} como ${verbo}…`);
+  const r = await trRpcSeguro('tr_teto_aprovar', { p_id: id, p_decisao: decisao, p_obs: null });
+  if (!r.ok) {
+    const msg = await trErroDe(r);
+    // cortou tanto que a lista já cabe no teto: o alerta sumiu sozinho — é o resultado que se queria
+    if (decisao === 'CORTADA' && /não está acima do teto/i.test(msg)) {
+      avisoAcao('ok', `✓ Lista #${id} cortada: agora cabe no teto — às ${avisoHora()}.`);
+    } else {
+      return avisoAcao('erro', `✗ A lista #${id} NÃO foi gravada como ${verbo}: ${msg}`, () => trTetoDecidir(id, decisao));
+    }
+  } else {
+    avisoAcao('ok', `✓ Lista #${id} ${verbo} acima do teto — chegou às ${avisoHora()}.`);
+  }
+  window._trTetoCorte = null;
+  trTelaSet('separacao');
+}
+// o selo ao abrir a separação: acima do teto sem decisão não trava, só avisa
+async function trTetoSeloPreencher(lista) {
+  if (!lista || lista.status !== 'SOLICITADA' || !TR_TETO_UNIDADES.includes(lista.unidade)) return;
+  try {
+    const r = await trFetch(`vw_tr_teto_alerta?id_lista=eq.${lista.id}`);
+    if (!r.ok) return;
+    const a = (await r.json())[0];
+    const el = document.getElementById('trTetoSelo');
+    if (!a || !el) return;
+    el.innerHTML = a.decisao
+      ? `<span class="tr-tag" style="color:var(--farol-ok);">acima do teto — ${a.decisao === 'APROVADA' ? 'aprovada' : 'cortada'} por ${trEscH(a.decidido_por || '')}</span>`
+      : `<span class="tr-tag tr-teto-selo" style="color:var(--farol-fora); font-weight:700;">⚠ acima do teto — falta aprovar</span>
+         <span class="tr-det" style="font-size:12px;">passa R$ ${fmt(Number(a.passa_do_teto) || 0)} · dá para separar mesmo assim</span>`
+        + (['DONO', 'SEPARACAO'].includes(TR_OP.papel) ? ` <button class="preset-btn" onclick="trTetoDecidir(${lista.id}, 'APROVADA')">✓ aprovar</button> <button class="preset-btn" onclick="trTetoCortar(${lista.id})">✂ cortar</button>` : '');
+  } catch (e) {}
 }
 
 // exclusao de lista lancada errada (dono, 04/09/2026): so ate SEPARADA — a
@@ -1987,6 +2152,7 @@ async function trAbrirSeparacao(id) {
   });
   window._trItensSep = itens; window._trListaSep = lista; window._trEmbMapaSep = mapa;
   alvo.innerHTML = `
+    <div id="trTetoFaixa"></div><div id="trTetoSelo" style="margin:4px 0;"></div>
     <div class="caption-label"><button class="preset-btn" onclick="trListaAberta=null; trTelaSeparacao();">← fila</button>
       Lista <b>#${id}</b> · ${lista.unidade} · status <b>${lista.status}</b>
       <button class="preset-btn" style="margin-left:8px;" onclick="trImprimirSeparacao(${id})">🖨️ Gerar PDF</button>
@@ -2019,6 +2185,8 @@ async function trAbrirSeparacao(id) {
       gera a cobrança do frete (desmarcado = outro portador, sem frete).</div>`;
   // acende o que ja abre fora do combinado (separacao salva antes) e o lembrete do item pesado
   itens.forEach((i, idx) => { if (i._cont) trSepAviso(idx); });
+  // 19/11/2026: o teto da filial e o selo "acima do teto — falta aprovar" (só avisa, não trava a separação)
+  trTetoFaixaPreencher(lista.unidade); trTetoSeloPreencher(lista);
 }
 
 // A contagem mudou: o peso acompanha (contagem x peso combinado) enquanto for o
@@ -3074,6 +3242,10 @@ async function trFechGeral() {
     return;
   }
   const linhas = await r.json();
+  // 19/11/2026 (teto de compras nas listas): lista ÷ venda contra teto ÷ venda; a foto do teto começa em nov/26
+  let tetoFech = [];
+  try { const rt = await trFetch(`vw_tr_teto_fechamento?mes=eq.${mes}-01&select=unidade,lista_pct_venda,teto_pct_venda,situacao`); if (rt.ok) tetoFech = await rt.json(); } catch (e) {}
+  if (window._trFechMesSel !== mes) return;
   const filiais = [...new Set([...unidadesRegra, ...linhas.map(x => x.unidade)])].filter(Boolean);
   window._trFechGeral = { mes, filiais, linhas };
   const nu = (v) => Number(v) || 0;
@@ -3101,6 +3273,8 @@ async function trFechGeral() {
         ${comValor ? linha('Royalty', nu(x.royalty) ? `R$ ${fmt(nu(x.royalty))}` : '—') : ''}
         ${comValor && nu(x.ajustes) ? linha('Ajustes', `R$ ${fmt(nu(x.ajustes))}`) : ''}
         ${comValor && x.origem === 'COBRANCA' && x.cobranca_status !== 'EM VALIDACAO' ? linha('Já pago · falta', `R$ ${fmt(nu(x.valor_pago))} · <b>R$ ${fmt(nu(x.saldo))}</b>`) : ''}
+        ${(() => { const t = tetoFech.find(f => f.unidade === u); if (!t) return ''; const ts = trTetoSit(t.situacao);
+          return `<div class="tr-teto-fech" style="display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--line);"><span>Lista ÷ venda: <b>${trTetoPct(t.lista_pct_venda)}</b> · teto: ${trTetoPct(t.teto_pct_venda)}</span><b style="color:${ts.cor}; white-space:nowrap;">${ts.txt}</b></div>`; })()}
       </div>
       ${(x.trava || []).length ? `<div style="margin-top:8px; font-size:12.5px; color:var(--farol-fora);"><b>O que trava:</b>${x.trava.map(t => '<br>• ' + trEscH(t)).join('')}</div>` : ''}
       ${comValor && nu(x.valor_itens_abertas) ? `<div style="margin-top:6px; font-size:12.5px; color:var(--farol-perto);">R$ ${fmt(nu(x.valor_itens_abertas))} dos itens vêm de lista ainda não conferida — pode mudar.</div>` : ''}

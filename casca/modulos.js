@@ -27,6 +27,7 @@ window.CASCA_MODULOS_CFG = {
     desperdicio: { rotulo: 'Desperdício', icone: '🗑️' },   // 18/11: sobras, queimados e pedidos jogados fora (vw_est_perda)
     regras: { rotulo: 'Regras em vigor', icone: '✅' },
     biblioteca: { rotulo: 'Biblioteca', icone: '📚' },
+    estudos: { rotulo: 'Estudos', icone: '🗂️' },   // 19/11: cópia dos artefatos do Neto, só Neto e Fabio (pode_ver_plano)
     usuarios: { rotulo: 'Usuários do painel', icone: '🔑' },   // 18/11: criar login, senha e telas de cada um (só o dono, #1093)   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
     motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
   // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
@@ -42,16 +43,17 @@ window.CASCA_MODULOS_CFG = {
 // decidindo cada tela"; livro chat-frente-telas/respostas/menu-ordenado-pela-juncao): as telas do Fabio saem da "Operação das lojas"
 // e entram nos módulos propostos em juncao-telas.html (Entrega e Salão novos). TODAS continuam no menu: juntar e tirar só depois da
 // decisão do Fabio, tela a tela. As chaves não mudam (acessos e links seguem valendo).
+// 19/11/2026 15:20: Clientes do iFood, Resumos semanais e Telas do painel fora do menu (dono); o deploy anterior falhou no GitHub.
 window.CASCA_MODULOS = [
   { id: 'agora', nome: 'Agora', icone: '📍',
-    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'regras', 'compliance', 'vendasagora', 'reuniao'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
+    lancar: [], acompanhar: ['hoje', 'agenda', 'biblioteca', 'estudos', 'regras', 'compliance', 'vendasagora', 'reuniao'] },   // 16/11: Regras em vigor (só o dono)   // 12/11 16:55: o Controle das atividades virou o bloco Equipe da agenda   // 12/11 16:39: o Plano (Em desenvolvimento) entrou na agenda   // 07/11: Esta semana virou a "Semana em curso" da Hoje
   { id: 'dinheiro', nome: 'Dinheiro', icone: '💰',
     lancar: ['contaspagar', 'contasreceber', 'concbanco', 'caixa', 'cartao', 'reembolsos', 'pagarmoto', 'motoboys'],
     acompanhar: ['projecao', 'fluxo', 'rede'] },
   { id: 'resultado', nome: 'Resultado', icone: '📊',
     lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
-    lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete'] },
+    lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'site', 'frete'] },
   { id: 'entrega', nome: 'Entrega', icone: '🏍️',   // 18/11: as telas do delivery do Fabio + as nossas que a junção propõe juntar nelas
     lancar: [], acompanhar: ['delivery', 'atrasos', 'chegada', 'escalaclima', 'motodocs', 'pausadosdel', 'avaldel', 'atendimento', 'link:portal-qualidade', 'cozinha', 'tvs'] },
   { id: 'salao', nome: 'Salão', icone: '🍽️',
@@ -60,7 +62,7 @@ window.CASCA_MODULOS = [
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao', 'desperdicio'] },
   { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto', 'mercadolivre'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
-    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist', 'manutencao', 'prestadores'] },   // o ciclo, na ordem (dono, 27/10)
+    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist', 'temperaturas', 'manutencao', 'prestadores'] },   // o ciclo, na ordem (dono, 27/10)
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
   { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio', 'saiposcod'] },
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
@@ -69,7 +71,7 @@ window.CASCA_MODULOS = [
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: ['usuarios'], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios'] },
+    lancar: ['usuarios'], acompanhar: ['rotinas', 'conciliacao'] },
 ];
 
 
