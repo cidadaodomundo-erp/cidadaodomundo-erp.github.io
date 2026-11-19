@@ -41,7 +41,8 @@
   .bt.sim { border-color:var(--ok); color:var(--ok); font-weight:600; } .bt.nao { border-color:var(--acento); color:var(--acento); font-weight:600; }
   .bt.cheio { background:var(--acento); color:#fff; border-color:var(--acento); }
   .item { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; margin-bottom:8px; }
-  .item.JUNTAR { border-left:4px solid var(--azul); } .item.TIRAR { border-left:4px solid var(--acento); } .item.MANTER { border-left:4px solid var(--ok); }
+  .item.JUNTAR { border-left:4px solid var(--azul); }
+  .item.pausada { border-left:4px solid var(--forte); opacity:.75; } .tag.pausada { background:var(--alt); color:var(--mudo); } .item.TIRAR { border-left:4px solid var(--acento); } .item.MANTER { border-left:4px solid var(--ok); }
   .topo { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
   .tit { font-weight:600; }
   .tag { font-size:.7rem; font-weight:700; padding:1px 8px; border-radius:999px; background:var(--alt); color:var(--mudo); }
@@ -169,7 +170,7 @@ function card(x) {
     <dl class="grade"><dt>${cat === 'rotina' ? 'O que faz' : cat === 'tela' ? 'O que mostra' : 'O que é'}</dt><dd>${esc(x.o)}</dd>${cat === 'artefato' ? '' : `<dt>${cat === 'rotina' ? (x.de === 'Fabio' ? 'Onde grava' : 'Para que serve') : cat === 'portal' ? 'Uso' : 'Acessos em 30 dias'}</dt><dd>${usos}</dd>`}<dt>${cat === 'tela' ? 'Funciona hoje' : cat === 'rotina' ? 'Onde e como vai' : cat === 'artefato' ? 'Tipo' : cat === 'portal' ? 'Situação' : 'Tipo e última mudança'}</dt><dd>${esc(x.ok)}</dd>
       ${x.par && x.par.n && x.par.n !== 'nenhuma' ? `<dt>Parecida do outro lado</dt><dd>${esc(x.par.n)}${x.par.num && x.par.num !== '—' ? '<br>' + esc(x.par.num) : ''}</dd>` : ''}</dl>
     <div class="prop"><b>Proposta: ${x.p}</b> — ${esc(x.pt)}${x.ng && x.ng !== '—' && x.p !== 'TIRAR' ? ` <span class="nota">· grupo: ${esc(x.ng)}</span>` : ''}</div>
-    ${x.sem_decisao ? '<div class="nota" style="margin-top:6px;">Fora da decisão: ' + (x.p === 'JÁ TIRADA DO SITE' ? 'já resolvida por segurança.' : 'página do plano Neto–Fabio, fica até a entrega fechar.') + '</div>' : blocoResposta(x)}</div>`;
+    ${x.sem_decisao ? '<div class="nota" style="margin-top:6px;">Fora da decisão: ' + (x.p === 'JÁ TIRADA DO SITE' ? 'já resolvida por segurança.' : x.cls === 'pausada' ? 'o dono já decidiu em 19/11 (foco na entrega); volta quando a entrega fechar.' : /TIRADA DO MENU/.test(x.p) ? 'o dono já tirou do menu em 19/11.' : 'página do plano Neto–Fabio, fica até a entrega fechar.') + '</div>' : blocoResposta(x)}</div>`;
 }
 // o menu novo: a proposta onde o Fabio disse sim; o menu de hoje onde ele disse não; "outro" mostra o texto; sem resposta, proposta em cinza
 function menuNovo() {
