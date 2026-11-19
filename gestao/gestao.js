@@ -4907,6 +4907,25 @@ function fxSemCalc(w) {
     compras, compMP, compUC, enviadas, recebidas, margem: fat + outras - compras - custoIfood };
 }
 
+// 18/11/2026 ~23:20 (Financeiro; dono pediu para hoje): o bloco 5 lê o PRÓPRIO Fluxo projetado (FXL), o mesmo número da tela Fluxo:
+// sobra até domingo = saldo_final do domingo; as partes = a composição de HOJE a DOMINGO por origem. O Fluxo já sabe do que caiu
+// no banco sem lançamento (EXTRATO: na AV, o repasse do iFood), do pago no Saipos depois do extrato e do feriado (sem cartão).
+const FX_VENDA_ORIG = ['MEDIA', 'PROVISAO_RECEITA'];
+function fxCaixaFluxo(u, fim) {
+  if (!FXL || !FXL.dias || !FXL.dias.length || !FXL.dias[0].unidades[u]) return null;
+  const iFim = FXL.dias.findIndex(d => d.dia === fim);
+  if (iFim < 0) return null;
+  const comp = FXL.dias.slice(0, iFim + 1).flatMap(d => d.unidades[u].composicao || []);
+  const sinal = c => c.lado === 'RECEBER' ? c.valor : -c.valor;
+  const net = (orig) => comp.filter(c => c.origem === orig).reduce((t, c) => t + sinal(c), 0);
+  const resto = comp.filter(c => c.origem !== 'EXTRATO' && c.origem !== 'SAIPOS_PAGO');
+  return { partida: FXL.dias[0].unidades[u].saldo_inicial, extrato: net('EXTRATO'), saiposPago: net('SAIPOS_PAGO'),
+    vendas: resto.filter(c => c.lado === 'RECEBER' && FX_VENDA_ORIG.includes(c.origem)).reduce((t, c) => t + c.valor, 0),
+    recTit: resto.filter(c => c.lado === 'RECEBER' && !FX_VENDA_ORIG.includes(c.origem)).reduce((t, c) => t + c.valor, 0),
+    pagar: resto.filter(c => c.lado === 'PAGAR').reduce((t, c) => t + c.valor, 0),
+    sobra: FXL.dias[iFim].unidades[u].saldo_final };
+}
+
 function fxCaixaLoja(u) {
   const cx = FX_S.caixa.filter(r => r.unidade === u);
   const cofre = fxSoma(cx.filter(r => r.tipo === 'COFRE'), 'saldo');
@@ -4931,7 +4950,10 @@ function fxCaixaLoja(u) {
   const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : mediaSem * diasRest / 7, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
   // o que esta loja recebe de OUTRA loja da Rede ate domingo: conta para ela, nao para a soma da Rede (07/10/2026)
   const recEntre = fxSoma(receberAte.filter(projEntreLojas), 'credito');
-  return { u, banco, cofre, dataPartida: F ? F.dataPartida : null, recLanc, recEntre, esperado, pagar, vencidas: fxSoma(venc, 'debito'), nVenc: venc.length, pagarProx: fxSoma(pagarProx, 'debito'), sobra: banco + cofre + recLanc + esperado - pagar, diasRest, mediaSem, fim };
+  const base = { u, banco, cofre, dataPartida: F ? F.dataPartida : null, recLanc, recEntre, esperado, pagar, vencidas: fxSoma(venc, 'debito'), nVenc: venc.length, pagarProx: fxSoma(pagarProx, 'debito'), sobra: banco + cofre + recLanc + esperado - pagar, diasRest, mediaSem, fim, fluxo: null };
+  const x = fxCaixaFluxo(u, fim);
+  if (x) Object.assign(base, { fluxo: x, recLanc: x.recTit, esperado: x.vendas, pagar: x.pagar, sobra: x.sobra });
+  return base;
 }
 
 function renderSemana() {
@@ -5003,18 +5025,25 @@ function renderSemana() {
     <div class="fx-tile"><div class="fx-rotulo">Sobra, semana a semana</div><div class="fx-valor" style="font-size:20px">${SEM.slice(-3).map(w => fxMil(S[w].margem).replace('R$ ', '')).join(' · ')}</div><div class="fx-extra">últimas três semanas</div>${fxSpark(serieM, rots, fxMil)}<div class="fx-extra" style="margin-top:8px">Melhor: ${fxSemRot(SEM[serieM.indexOf(Math.max(...serieM))])} (${fxMil(Math.max(...serieM))}). Pior: ${fxSemRot(SEM[serieM.indexOf(Math.min(...serieM))])} (${fxMil(Math.min(...serieM))}).</div></div></div>`;
   // 5 caixa
   const us = fxLojas(), cxs = us.map(fxCaixaLoja), fim = cxs[0].fim;
-  h += `<div class="fx-secao"><h3>5. O caixa desta semana</h3><span>pelo caixa: o que entra e sai do banco até domingo · hoje ${fxDM(FX_S.hoje)} · semana de ${fxDM(FX_S.segAtual)} a ${fxDM(fim)} · saldo do banco = o do Fluxo projetado</span></div><div class="fx-tiles">`;
+  h += `<div class="fx-secao"><h3>5. O caixa desta semana</h3><span>pelo caixa: o que entra e sai do banco até domingo${cxs.every(c => c.fluxo) ? ', o mesmo número do Fluxo projetado' : ' · estimativa (o Fluxo projetado não carregou)'} · hoje ${fxDM(FX_S.hoje)} · semana de ${fxDM(FX_S.segAtual)} a ${fxDM(fim)} · saldo do banco = o do Fluxo projetado</span></div><div class="fx-tiles">`;
   cxs.forEach(c => { const nome = lojaNome(c.u);
     h += `<div class="fx-caixa"><h4>${nome}</h4><ul>
       <li><span>Nas contas do banco<small>${c.dataPartida ? `fim de ${fxDM(c.dataPartida)}, último extrato completo — o mesmo do Fluxo projetado` : 'pelo último extrato importado'}</small></span><b>${fxMil(c.banco)}</b></li>
       <li><span>No cofre</span><b>${fxMil(c.cofre)}</b></li>
+      ${c.fluxo && Math.abs(c.fluxo.extrato) > 0.5 ? `<li><span>Já caiu no banco, falta lançar<small>no extrato e ainda sem título no Saipos${c.u === 'AGUA VERDE' ? ' (inclui o repasse do iFood)' : ''}</small></span><b>${c.fluxo.extrato >= 0 ? '+' : '−'} ${fxMil(Math.abs(c.fluxo.extrato))}</b></li>` : ''}
+      ${c.fluxo && Math.abs(c.fluxo.saiposPago) > 0.5 ? `<li><span>Pago no Saipos depois do extrato</span><b>${c.fluxo.saiposPago >= 0 ? '+' : '−'} ${fxMil(Math.abs(c.fluxo.saiposPago))}</b></li>` : ''}
       <li><span>A receber até domingo, já lançado</span><b>+ ${fxMil(c.recLanc)}</b></li>
-      <li><span>Vendas que ainda devem cair no banco até domingo<small>média de cada dia da semana nas 4 últimas · ${c.diasRest} dia(s)</small></span><b>+ ${fxMil(c.esperado)}</b></li>
+      <li><span>Vendas que ainda devem cair no banco até domingo<small>${c.fluxo ? 'as do Fluxo projetado: média de cada dia, sem banco nos feriados' : `estimativa: média de cada dia da semana nas 4 últimas · ${c.diasRest} dia(s)`}</small></span><b>+ ${fxMil(c.esperado)}</b></li>
       <li><span>A pagar até domingo<small>${c.nVenc ? `inclui ${c.nVenc} conta(s) vencida(s): ${fxMil(c.vencidas)}` : 'nenhuma vencida'}</small></span><b>− ${fxMil(c.pagar)}</b></li>
       <li class="res ${c.sobra >= 0 ? 'pos' : 'neg'}"><span>${c.sobra >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(c.sobra))}</b></li></ul>
       <div class="fx-mandar">${c.u !== 'AGUA VERDE' ? (c.sobra > 0 ? `Pode mandar para a Água Verde esta semana: <b>até ${fxMil(c.sobra)}</b>` : `Não pode mandar nada esta semana — faltam ${fxMil(Math.abs(c.sobra))}`) : `Próxima semana já tem <b>${fxMil(c.pagarProx)}</b> a pagar lançados.`}</div></div>`; });
-  if (us.length > 1) { const entreL = cxs.reduce((s, c) => s + (c.recEntre || 0), 0); const sT = cxs.reduce((s, c) => s + c.sobra, 0) - entreL;
-    h += `<div class="fx-caixa"><h4>Rede</h4><ul><li><span>Banco + cofres<small>saldo inicial do Fluxo projetado</small></span><b>${fxMil(cxs.reduce((s, c) => s + c.banco + c.cofre, 0))}</b></li><li><span>A receber até domingo (lançado + vendas esperadas)${entreL > 0.005 ? `<small>sem ${fxMil(entreL)} que a Água Verde recebe das filiais</small>` : ''}</span><b>+ ${fxMil(cxs.reduce((s, c) => s + c.recLanc + c.esperado, 0) - entreL)}</b></li><li><span>A pagar até domingo</span><b>− ${fxMil(cxs.reduce((s, c) => s + c.pagar, 0))}</b></li><li class="res ${sT >= 0 ? 'pos' : 'neg'}"><span>${sT >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(sT))}</b></li></ul><div class="fx-mandar">Filiais podem mandar para a AV: <b>${fxMil(cxs.filter(c => c.u !== 'AGUA VERDE' && c.sobra > 0).reduce((s, c) => s + c.sobra, 0))}</b> · próxima semana a pagar na rede: <b>${fxMil(cxs.reduce((s, c) => s + c.pagarProx, 0))}</b></div></div>`; }
+  // com o Fluxo, a Rede é a conta REDE dele (o que uma loja paga à outra já se anula); sem ele, a soma das lojas menos o entre lojas
+  const fxRede = cxs.every(c => c.fluxo) ? fxCaixaFluxo('REDE', fim) : null;
+  if (us.length > 1) { const entreL = fxRede ? 0 : cxs.reduce((s, c) => s + (c.recEntre || 0), 0); const sT = fxRede ? fxRede.sobra : cxs.reduce((s, c) => s + c.sobra, 0) - entreL;
+    if (fxRede) h += `<div class="fx-caixa"><h4>Rede</h4><ul><li><span>Banco + cofres<small>saldo inicial do Fluxo projetado</small></span><b>${fxMil(fxRede.partida)}</b></li>`
+      + (Math.abs(fxRede.extrato + fxRede.saiposPago) > 0.5 ? `<li><span>Já caiu no banco ou foi pago depois do extrato<small>ainda sem lançamento no Saipos</small></span><b>${fxRede.extrato + fxRede.saiposPago >= 0 ? '+' : '−'} ${fxMil(Math.abs(fxRede.extrato + fxRede.saiposPago))}</b></li>` : '')
+      + `<li><span>A receber até domingo (lançado + vendas)<small>sem o que uma loja recebe da outra</small></span><b>+ ${fxMil(fxRede.recTit + fxRede.vendas)}</b></li><li><span>A pagar até domingo</span><b>− ${fxMil(fxRede.pagar)}</b></li><li class="res ${sT >= 0 ? 'pos' : 'neg'}"><span>${sT >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(sT))}</b></li></ul><div class="fx-mandar">Filiais podem mandar para a AV: <b>${fxMil(cxs.filter(c => c.u !== 'AGUA VERDE' && c.sobra > 0).reduce((s, c) => s + c.sobra, 0))}</b> · próxima semana a pagar na rede: <b>${fxMil(cxs.reduce((s, c) => s + c.pagarProx, 0))}</b></div></div>`;
+    else h += `<div class="fx-caixa"><h4>Rede</h4><ul><li><span>Banco + cofres<small>saldo inicial do Fluxo projetado</small></span><b>${fxMil(cxs.reduce((s, c) => s + c.banco + c.cofre, 0))}</b></li><li><span>A receber até domingo (lançado + vendas esperadas)${entreL > 0.005 ? `<small>sem ${fxMil(entreL)} que a Água Verde recebe das filiais</small>` : ''}</span><b>+ ${fxMil(cxs.reduce((s, c) => s + c.recLanc + c.esperado, 0) - entreL)}</b></li><li><span>A pagar até domingo</span><b>− ${fxMil(cxs.reduce((s, c) => s + c.pagar, 0))}</b></li><li class="res ${sT >= 0 ? 'pos' : 'neg'}"><span>${sT >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(sT))}</b></li></ul><div class="fx-mandar">Filiais podem mandar para a AV: <b>${fxMil(cxs.filter(c => c.u !== 'AGUA VERDE' && c.sobra > 0).reduce((s, c) => s + c.sobra, 0))}</b> · próxima semana a pagar na rede: <b>${fxMil(cxs.reduce((s, c) => s + c.pagarProx, 0))}</b></div></div>`; }
   h += '</div><div class="fx-nota" title="&quot;Vendas que ainda devem cair&quot; soma a média de cada dia da semana (de hoje a domingo) do que caiu nas contas nas últimas 4 semanas: o repasse do iFood entra na quarta, não espalhado. Conta a pagar só aparece se está lançada no Saipos.">Caixa do dia a dia: sem XP, Participações e cartões de crédito.</div>';
   // 6 despesas
   const L = fxLojas(), at = FX_S.despesas.filter(r => r.semana === W && L.includes(r.unidade));
