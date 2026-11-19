@@ -2615,12 +2615,10 @@ function renderModuloContestacoes() {
   const aguardando = bloco('AGUARDANDO');
   const aprovadas  = bloco('APROVADA');
   const reprovadas = bloco('REPROVADA');
-  // 18/11/2026 22:34 (dono: "pode tirar essas da tela"): prazo perdido de pedido ANTES de 30/10/2026 (quando a fila passou a vir
-  // da API) sai da fila e dos totais; fica só no rodapé recolhido. De 30/10 em diante continua: é alarme de verdade.
+  // 18/11/2026 22:34 e 22:40 (dono: "pode tirar essas da tela" / "só tira da tela, não precisa deixar nada no rodapé"): prazo
+  // perdido de pedido ANTES de 30/10/2026 (quando a fila passou a vir da API) sai da tela, sem menção. De 30/10 em diante continua.
   const CONTEST_API_DESDE = '2026-10-30';
-  const perdidasTodas = bloco('PRAZO_PASSOU').filter(r => !contestPortalBloqueia(r));
-  const perdidasAntigas = perdidasTodas.filter(r => String(r.data_hora_pedido || '').slice(0, 10) < CONTEST_API_DESDE);
-  const perdidas   = perdidasTodas.filter(r => String(r.data_hora_pedido || '').slice(0, 10) >= CONTEST_API_DESDE);
+  const perdidas   = bloco('PRAZO_PASSOU').filter(r => !contestPortalBloqueia(r) && String(r.data_hora_pedido || '').slice(0, 10) >= CONTEST_API_DESDE);
   const naoContest = bloco('NAO_CONTESTAVEL');
   // Cancelamento sem hora de cancelamento na API: fica fora dos blocos em vez de virar falso "prazo perdido".
   const semDado    = bloco('SEM_DADO');
@@ -2700,9 +2698,7 @@ function renderModuloContestacoes() {
   <div class="caption-label" style="text-align:center;">Não dá mais para contestar: escaparam R$ ${fmt(soma(perdidas))}, contra R$ ${fmt(soma(aprovadas))} recuperados nas aprovadas.</div>` : ''}
 
   <div class="caption-label" style="text-align:center; margin-top:14px;">${naoContest.length ? `Outros ${naoContest.length} cancelamento(s) (R$ ${fmt(soma(naoContest))}) têm motivo que o iFood nunca deixou contestar.` : ''}
-  ${semDado.length ? `<br>${semDado.length} cancelamento(s) sem a hora do cancelamento ficam fora dos blocos — não são prazo perdido.` : ''}</div>
-  ${perdidasAntigas.length ? `<details class="detalhes-extra" style="margin-top:10px;"><summary>${perdidasAntigas.length} perdidas em outubro (R$ ${fmt(soma(perdidasAntigas))}), antes da fila pela API — não recuperáveis</summary>
-    <div id="tabelaContestPerdAntigas">${grade(perdidasAntigas, colQuem)}</div></details>` : ''}`;
+  ${semDado.length ? `<br>${semDado.length} cancelamento(s) sem a hora do cancelamento ficam fora dos blocos — não são prazo perdido.` : ''}</div>`;
 }
 
 // ------------------------------------------------------------------
