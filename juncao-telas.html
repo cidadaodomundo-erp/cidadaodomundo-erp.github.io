@@ -145,11 +145,11 @@ const decisao = k => D.resp.find(x => x.tela === k && x.quem !== EMAIL_DONO);
 const comentario = k => D.resp.find(x => x.tela === k && x.quem === EMAIL_DONO);
 const ehTela = x => (x.cat || 'tela') === 'tela';
 const semUso = x => ehTela(x) && x.u_total === 0 || (x.u_total != null && !String(x.u_pessoas || '').split('·').some(p => p.trim() && !p.trim().startsWith('neto ')));
-const repetida = x => ehTela(x) && x.par && x.par.a && x.par.a !== 'não';
+const repetida = x => (ehTela(x) || x.cat === 'rotina') && x.par && x.par.a && x.par.a !== 'não';
 function filtradas() {
   return TELAS.filter(x => D.filtro === 'todas' || (D.filtro === 'neto' && ehTela(x) && x.de === 'Neto') || (D.filtro === 'fabio' && ehTela(x) && x.de === 'Fabio')
     || (D.filtro === 'repetidas' && repetida(x)) || (D.filtro === 'semuso' && semUso(x)) || (D.filtro === 'abertas' && !x.sem_decisao && !decisao(x.k))
-    || (D.filtro === 'paginas' && x.cat === 'pagina') || (D.filtro === 'artefatos' && x.cat === 'artefato') || (D.filtro === 'rotinas' && x.cat === 'rotina'));
+    || (D.filtro === 'paginas' && x.cat === 'pagina') || (D.filtro === 'portal' && x.cat === 'portal') || (D.filtro === 'artefatos' && x.cat === 'artefato') || (D.filtro === 'rotinas' && x.cat === 'rotina'));
 }
 const dito = (r, quem) => r ? `<div class="dito"><b class="${r.resposta}">${r.resposta === 'sim' ? 'Sim' : r.resposta === 'nao' ? 'Não' : 'Outro'}</b>${r.texto ? ' — ' + esc(r.texto) : ''} <span class="nota">· ${esc(usuario(r.quem))} ${esc(quandoBR(r.criado_em))}</span></div>` : `<div class="nota">${quem}</div>`;
 function blocoResposta(x) {
@@ -165,8 +165,8 @@ function card(x) {
   const usos = x.u_total == null ? esc(x.u_pessoas || 'não medido') : x.u_total === 0 ? 'nenhum' : `${x.u_total}${x.u_pessoas ? ' · ' + esc(x.u_pessoas) : ''}`;
   const cls = x.cls || x.p, cat = x.cat || 'tela';
   const lk = cat === 'artefato' ? (souDono() ? x.link : '') : x.link;
-  return `<div class="item ${cls}"><div class="topo"><span class="tit">${lk ? `<a href="${esc(lk)}" target="_blank" rel="noopener">${esc(x.t)}</a>` : esc(x.t)}${cat === 'artefato' && !souDono() ? ' <span class="nota">(só o Neto abre)</span>' : ''}${x.de === 'Fabio' ? ' <span class="fab-marca" title="tela da operação (Fabio)">●</span>' : ''}</span>${cat === 'tela' || cat === 'pagina' ? `<span class="tag ${x.de === 'Fabio' ? 'fabio' : ''}">${x.de === 'Fabio' ? 'do Fabio' : 'do Neto'}</span>` : ''}<span class="tag ${cls}">${esc(x.p)}</span></div>
-    <dl class="grade"><dt>${cat === 'rotina' ? 'O que faz' : cat === 'tela' ? 'O que mostra' : 'O que é'}</dt><dd>${esc(x.o)}</dd>${cat === 'artefato' ? '' : `<dt>${cat === 'rotina' ? 'Para que serve' : 'Acessos em 30 dias'}</dt><dd>${usos}</dd>`}<dt>${cat === 'tela' ? 'Funciona hoje' : cat === 'rotina' ? 'Onde e como vai' : cat === 'artefato' ? 'Tipo' : 'Tipo e última mudança'}</dt><dd>${esc(x.ok)}</dd>
+  return `<div class="item ${cls}"><div class="topo"><span class="tit">${lk ? `<a href="${esc(lk)}" target="_blank" rel="noopener">${esc(x.t)}</a>` : esc(x.t)}${cat === 'artefato' && !souDono() ? ' <span class="nota">(só o Neto abre)</span>' : ''}${x.de === 'Fabio' ? ' <span class="fab-marca" title="tela da operação (Fabio)">●</span>' : ''}</span>${cat === 'tela' || cat === 'pagina' ? `<span class="tag ${x.de === 'Fabio' ? 'fabio' : ''}">${x.de === 'Fabio' ? 'do Fabio' : 'do Neto'}</span>` : cat === 'rotina' ? `<span class="tag ${x.de === 'Fabio' ? 'fabio' : ''}">${x.de === 'Fabio' ? 'robô do Fabio' : 'rotina do Neto'}</span>` : ''}<span class="tag ${cls}">${esc(x.p)}</span></div>
+    <dl class="grade"><dt>${cat === 'rotina' ? 'O que faz' : cat === 'tela' ? 'O que mostra' : 'O que é'}</dt><dd>${esc(x.o)}</dd>${cat === 'artefato' ? '' : `<dt>${cat === 'rotina' ? (x.de === 'Fabio' ? 'Onde grava' : 'Para que serve') : cat === 'portal' ? 'Uso' : 'Acessos em 30 dias'}</dt><dd>${usos}</dd>`}<dt>${cat === 'tela' ? 'Funciona hoje' : cat === 'rotina' ? 'Onde e como vai' : cat === 'artefato' ? 'Tipo' : cat === 'portal' ? 'Situação' : 'Tipo e última mudança'}</dt><dd>${esc(x.ok)}</dd>
       ${x.par && x.par.n && x.par.n !== 'nenhuma' ? `<dt>Parecida do outro lado</dt><dd>${esc(x.par.n)}${x.par.num && x.par.num !== '—' ? '<br>' + esc(x.par.num) : ''}</dd>` : ''}</dl>
     <div class="prop"><b>Proposta: ${x.p}</b> — ${esc(x.pt)}${x.ng && x.ng !== '—' && x.p !== 'TIRAR' ? ` <span class="nota">· grupo: ${esc(x.ng)}</span>` : ''}</div>
     ${x.sem_decisao ? '<div class="nota" style="margin-top:6px;">Fora da decisão: ' + (x.p === 'JÁ TIRADA DO SITE' ? 'já resolvida por segurança.' : 'página do plano Neto–Fabio, fica até a entrega fechar.') + '</div>' : blocoResposta(x)}</div>`;
@@ -190,7 +190,8 @@ function menuNovo() {
 const NOTA_GRUPO = {
   'Páginas avulsas (fora do menu)': 'Páginas publicadas que não estão no menu. Arquivar = sai do site e fica no histórico. As 7 que tinham número da empresa aberto já saíram (18/11, segurança).',
   'Artefatos do claude.ai': 'Páginas de trabalho do Claude: privadas, só o Neto abre. A maioria fica como histórico (não roda, não custa, nada a fazer). As pessoais ficaram fora desta lista. Artefatos do Fabio: só ele vê; ele lista os que quiser manter.',
-  'Rotinas (robôs)': 'Os robôs que rodam sozinhos no computador da loja. Os robôs ficam com o Fabio: ele decide manter, pausar ou desligar. Nada é desligado antes da decisão.',
+  'Rotinas (robôs)': 'Os robôs do Neto (computador da loja) e os do Fabio (● no nome), com os pares que fazem a mesma coisa no filtro Repetidas. Os robôs ficam com o Fabio: ele decide manter, pausar ou desligar. Nada é desligado antes da decisão.',
+  'Portal antigo do Fabio': 'As páginas do portal antigo (cidadaodomundo.github.io): se já migraram para este painel, se ainda precisam migrar ou se podem ser arquivadas. O portal só desliga quando a última que precisa migrar estiver aqui.',
 };
 function parecidas(x) {
   const txt = String((x.par && x.par.n) || '').toLowerCase();
@@ -213,12 +214,12 @@ function desenhar() {
   const L = filtradas(), s = sessao() || {};
   const F = [['todas', `Tudo (${TELAS.length})`], ['neto', `Telas do Neto (${TELAS.filter(x => ehTela(x) && x.de === 'Neto').length})`], ['fabio', `Telas do Fabio (${TELAS.filter(x => ehTela(x) && x.de === 'Fabio').length})`],
              ['repetidas', `Repetidas (${TELAS.filter(repetida).length})`], ['semuso', `Sem uso (${TELAS.filter(semUso).length})`],
-             ['paginas', `Páginas avulsas (${nc('pagina')})`], ['artefatos', `Artefatos (${nc('artefato')})`], ['rotinas', `Rotinas (${nc('rotina')})`], ['abertas', `Sem decisão (${comDec.length - dec})`]];
+             ['paginas', `Páginas avulsas (${nc('pagina')})`], ['artefatos', `Artefatos (${nc('artefato')})`], ['rotinas', `Rotinas e robôs (${nc('rotina')})`], ['portal', `Portal antigo (${nc('portal')})`], ['abertas', `Sem decisão (${comDec.length - dec})`]];
   app.innerHTML = `
     <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio · medido em ${esc(MEDIDO)}</p>
     <h1>Junção das telas</h1>
     <p class="lede">Todas as telas do painel, as do Neto e as do Fabio: o que cada uma mostra, quantas vezes foi aberta em 30 dias, se funciona e a tela parecida do outro lado. O painel fica com o Cidadão, então <b>quem decide é o Fabio</b>: Sim aceita a proposta, Não deixa como está, Outro diz o que fazer. O Neto comenta ao lado. Regra de 03/11: dinheiro no painel do Neto, operação no do Fabio. O menu só muda depois das respostas.</p>
-    <div class="placar"><div><b>${dec} de ${comDec.length}</b><span>decididas pelo Fabio</span></div><div><b>${nc('tela')}</b><span>telas (juntar ${n('JUNTAR')} · tirar ${n('TIRAR')} · manter ${n('MANTER')})</span></div><div><b>${nc('pagina')}</b><span>páginas avulsas</span></div><div><b>${nc('artefato')}</b><span>artefatos</span></div><div><b>${nc('rotina')}</b><span>rotinas</span></div></div>
+    <div class="placar"><div><b>${dec} de ${comDec.length}</b><span>decididas pelo Fabio</span></div><div><b>${nc('tela')}</b><span>telas (juntar ${n('JUNTAR')} · tirar ${n('TIRAR')} · manter ${n('MANTER')})</span></div><div><b>${nc('pagina')}</b><span>páginas avulsas</span></div><div><b>${nc('artefato')}</b><span>artefatos</span></div><div><b>${nc('rotina')}</b><span>rotinas e robôs</span></div><div><b>${nc('portal')}</b><span>páginas do portal antigo</span></div></div>
     <div class="filtros">${F.map(([k, t]) => `<button class="bt${D.filtro === k ? ' on' : ''}" onclick="D.filtro='${k}';desenhar()">${t}</button>`).join('')}</div>
     ${D.filtro === 'repetidas' ? pares(L) : (GRUPOS.map(g => { const l = L.filter(x => x.g === g); return l.length ? `<h3>${esc(g)} · ${l.length}</h3>${NOTA_GRUPO[g] ? `<p class="nota">${NOTA_GRUPO[g]}</p>` : ''}${l.map(card).join('')}` : ''; }).join('') || '<p class="vazio">Nenhuma tela neste filtro.</p>')}
     <h2>O menu novo, com todos os grupos</h2>
