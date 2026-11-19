@@ -3541,7 +3541,8 @@ function renderHoje() {
     const rotMetaRes = pctsRes.length === 1 ? 'a receita que dá ' + pctsRes[0].toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% de resultado' : 'a receita que dá a meta de resultado';
     const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ' + ddmm(ontemIso) + ' e previsão até o fim do mês</div>' +
       '<div id="tabelaHojeRumoMes" class="cel-cartao"><table><tr><th>Loja</th>' +
-      '<th>Vendido até ' + ddmm(ontemIso) + sub('caixa das lojas · ' + um(corrido) + '% do mês já passou') + '</th>' +
+      // 18/11/2026 (Financeiro, auditoria de regime): é a venda pela data do turno (competência), não o banco
+      '<th>Vendido até ' + ddmm(ontemIso) + sub('venda pela data do turno (competência) · ' + um(corrido) + '% do mês já passou') + '</th>' +
       '<th>Previsto no mês' + sub('no ritmo das últimas 4 semanas') + '</th>' +
       '<th>Meta do mês' + sub(rotMetaRes) + '</th>' +
       '<th>CMO estimado' + sub('meta até ' + (mPess ? um(mPess.meta) : '—') + '% · escala e horas') + '</th>' +
@@ -7427,7 +7428,7 @@ function sobraFilialHtml() {
       <div class="card-val">${sobraR(p.sai_da_filial)}</div><div class="card-pct">${p.travado ? 'um PIX só, desta filial' : 'previsão: o valor fecha na quarta'}</div></div>`).join('')}</div>` : '';
   return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
-    <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th>Lucro</th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
+    <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro<br><span style="font-weight:normal;font-size:11px;">repassado por PIX (caixa) — não é o resultado do mês</span></th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
     <tbody>${linhas}</tbody></table></div></details></div>`;
 }
 // hoje em Curitiba (AAAA-MM-DD), para o farol: quarta que já passou com título faltando = vermelho
