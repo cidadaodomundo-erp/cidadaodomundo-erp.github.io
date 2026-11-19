@@ -225,7 +225,7 @@ function tabletHtml({ menu, modo, csrf, base, mesaFixa = null, pagarAntes = fals
   for (const [a, b] of trocas) html = html.replace(a, b);
   const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa, pagarAntes }))}</script>\n<script type="application/json" id="dados">`;
   html = html.replace('<script type="application/json" id="dados">', cfg);
-  const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.qr + "\n" + base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
+  const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.qr + "\n" + base.cartao + "\n" + base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
   for (const [k, v] of Object.entries(subst)) html = html.split(k).join(v);
   return html;
 }
@@ -246,6 +246,7 @@ function baseEstatica() {
     app: readFileSync(join(APP, "src", "app.js"), "utf8"),
     envio: readFileSync(join(APP, "src", "envio.js"), "utf8"),
     qr: readFileSync(join(TOTEM_APP, "public", "vendor", "qrcode.js"), "utf8"),
+    cartao: readFileSync(join(APP, "src", "cartao-sim.js"), "utf8"),
   };
 }
 
@@ -292,7 +293,8 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
   const pagarHtml = readFileSync(join(PUBLIC, "pagar.html"), "utf8")
     .replace("{{FONTES}}", base.fontesCss)
     .replace("{{CFG}}", JSON.stringify({ csrf }))
-    .replace("{{JS}}", readFileSync(join(PUBLIC, "pagar.js"), "utf8"));
+    .replace("{{CSS}}", readFileSync(join(APP, "src", "style.css"), "utf8").split("/* simulacao do cartao/carteira */")[1] ?? "")
+    .replace("{{JS}}", readFileSync(join(APP, "src", "cartao-sim.js"), "utf8") + "\n" + readFileSync(join(PUBLIC, "pagar.js"), "utf8"));
 
   let fila = Promise.resolve();
   const serial = (fn) => { const p = fila.then(fn); fila = p.then(() => {}, () => {}); return p; };

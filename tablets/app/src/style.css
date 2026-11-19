@@ -192,3 +192,14 @@ textarea{width:100%;border-radius:10px;border:1px solid var(--linha);padding:10p
 .passo-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#E0A81C;color:var(--preto);font-size:15px}
 .nota-previa{font-size:14px}
 .pag-facil{font-size:18px;font-weight:600;margin:4px 0 6px}
+
+/* simulacao do cartao/carteira */
+.csim{display:grid;gap:10px}
+.csim-tag{background:#fff3c4;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;margin:0}
+.csim-tit{margin:0;font-size:20px}
+.csim-total{font-family:"Cubano","Barlow",sans-serif;font-size:30px;margin:0}
+.csim-campo{display:grid;gap:4px;font-size:14px;font-weight:600}
+.csim-campo{min-width:0}
+.csim-campo input{width:100%;box-sizing:border-box;min-width:0;min-height:52px;font:18px Barlow,sans-serif;border:1px solid #bbb;border-radius:10px;padding:0 12px;background:#fff}
+.csim-linha{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.csim-pagar{min-height:56px;font-size:18px}

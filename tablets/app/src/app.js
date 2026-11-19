@@ -678,7 +678,8 @@
     svg.appendChild(path);
     return svg;
   }
-  const FORMAS_PAG = [["pix", "Pix"], ["applepay", "Apple Pay"], ["googlepay", "Google Pay"], ["credito", "Crédito"], ["debito", "Débito"]];
+  // No tablet so o Pix: Apple Pay e Google Pay sao do celular do cliente (pelo QR). Digitar cartao nao e oferecido aqui.
+  const FORMAS_PAG = [["pix", "Pagar com Pix aqui"]];
   let dlgPag = null;
   function telaPagamento(res) {
     if (!dlgPag) { dlgPag = el("dialog"); dlgPag.id = "dlgPag"; document.body.appendChild(dlgPag); }
@@ -686,15 +687,15 @@
     const box = el("div", "pag");
     box.appendChild(el("h2", "cubano", "PAGAR A RODADA"));
     box.appendChild(el("p", "pag-total cubano", reais(res.totalCentavos)));
-    box.appendChild(el("p", "pag-facil", "Falta pouco! Pague como preferir: aponte a câmera do celular para o QR Code ou toque numa opção aqui no tablet."));
+    box.appendChild(el("p", "pag-facil", "Falta pouco! Aponte a câmera do celular para o QR Code e pague com Apple Pay, Google Pay ou Pix."));
     box.appendChild(el("p", "pequeno", `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. Pagou, a cozinha já começa. TESTE: nada é cobrado.`));
     const cols = el("div", "pag-cols");
     const qrBox = el("div", "pag-qr");
     const qr = desenharQr(`${location.origin}/pagar?t=${res.token}`);
     if (qr) qrBox.appendChild(qr);
-    qrBox.appendChild(el("p", "pequeno", "Pague pelo celular: aponte a câmera para o QR Code."));
+    qrBox.appendChild(el("p", "pequeno", "Abra a câmera do celular, aponte aqui e toque no link. Um toque no Apple Pay ou Google Pay e pronto."));
     const botoes = el("div", "pag-formas");
-    botoes.appendChild(el("p", "pequeno", "Ou pague aqui no tablet:"));
+    botoes.appendChild(el("p", "pequeno", "Sem celular por perto? Pague com Pix aqui:"));
     for (const [forma, nome] of FORMAS_PAG) { const b = el("button", "btn prim", nome); b.type = "button"; b.dataset.forma = forma; botoes.appendChild(b); }
     const recusa = el("button", "btn sec", "Simular recusado (teste)"); recusa.type = "button"; recusa.dataset.forma = "credito"; recusa.dataset.recusar = "1";
     botoes.appendChild(recusa);
@@ -714,8 +715,14 @@
       };
       botoes.addEventListener("click", async (ev) => {
         const b = ev.target.closest("button");
-        if (!b || ocupado) return;
+        if (!b || ocupado || b.closest(".csim")) return;
         ocupado = true;
+        // Cartao/carteira: mostra o passo que o cliente faz no pagamento real (simulado; nada e enviado).
+        if (!b.dataset.recusar && window.CDMCartaoSim && b.dataset.forma !== "pix") {
+          st.textContent = "";
+          const feito = await window.CDMCartaoSim.abrir(botoes, { forma: b.dataset.forma, totalCentavos: res.totalCentavos });
+          if (!feito) { ocupado = false; return; }
+        }
         for (const x of botoes.querySelectorAll("button")) x.disabled = true;
         st.textContent = "Processando o pagamento…";
         const j = await ENVIO.simularPagamento(res.token, b.dataset.forma, b.dataset.recusar ? "recusado" : "aprovado");
