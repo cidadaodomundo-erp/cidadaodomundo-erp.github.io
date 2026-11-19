@@ -4,6 +4,14 @@
 // Fluxo projetado e Taxas da maquininha. Quem carrega: o painel antigo e docs/gestao/index.html. Lê o núcleo e o
 // canal.js (a Esta semana usa avaliações e negociações). Quem mexe: o chat "Telas do painel".
 
+// 18/11/2026 (dono, pelo Financeiro): o REGIME vai no subtítulo cinza de cada bloco de dinheiro (competência × caixa),
+// como na "A semana". Só rótulo: nenhum número muda. Auditoria: contexto/auditoria-regime-telas-2026-11-18.md
+const RG_COMP = 'pela data da venda / da nota (competência)';
+const RG_VENDA = 'pela data da venda (competência)';
+const RG_NOTA = 'pela data da nota (competência)';
+const RG_CAIXA = 'pelo caixa: o que entra e sai do banco';
+function rgSub(t) { return `<span class="rg-sub" style="display:block; color:var(--tx-4); font-weight:normal; font-size:12px; text-transform:none; letter-spacing:0; margin-top:3px;">${t}</span>`; }
+
 // Busca TODAS as linhas de uma tabela/view, paginando (o Supabase limita
 // a 1000 linhas por consulta), para funcionar mesmo quando o volume de
 // pedidos crescer (junho, julho, ...).
@@ -2835,7 +2843,7 @@ function renderLucroUni() {
   alvo.innerHTML = `
     ${plcCabecalhoQuebra('lucrouni')}
     <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">
-      Lucro por unidade${ctxLoja ? ' · ' + un(ctxLoja) : ''} · ${fechados.length === 1 ? mesTxt(fechados[0]) : mesTxt(fechados[0]) + ' a ' + mesTxt(fechados[fechados.length - 1])}</div>
+      Lucro por unidade${ctxLoja ? ' · ' + un(ctxLoja) : ''} · ${fechados.length === 1 ? mesTxt(fechados[0]) : mesTxt(fechados[0]) + ' a ' + mesTxt(fechados[fechados.length - 1])}${rgSub(RG_COMP)}</div>
     <div class="contexto">É a <a href="javascript:void(0)" onclick="mostrarModulo('dre')" style="color:var(--tx-3);">DRE</a> resumida por loja: o lucro daqui é o resultado de lá, mês a mês, e quanto dele é benefício do iFood.</div>
     ${semListaMeses.length ? `<div class="contexto" style="border-color:var(--amber-2);">Lista das filiais de ${semListaMeses.map(mesTxt).join(', ')} ainda em revisão: o lucro <b>por loja</b> desse mês pode mudar até ela fechar. O da rede não muda.</div>` : ''}
 
@@ -2854,7 +2862,7 @@ function renderLucroUni() {
 
     <div class="cards cards-3">${cardsUni}</div>
 
-    <div class="section-label">Mês a mês</div>
+    <div class="section-label">Mês a mês${rgSub(RG_COMP)}</div>
     <div id="tabelaLucroUni"><table>
       <thead><tr><th>Mês</th><th>Unidade</th><th>Receita</th><th title="O que a filial comprou da Água Verde no mês, pela lista fechada; a mesma lista entra como receita da Água Verde. O repasse além disso é lucro subindo para a XP e não é receita de ninguém.">Mercadoria da AV</th>
         <th>Lucro</th><th>Benefício iFood</th><th>Lucro sem o benefício</th><th>% do lucro</th></tr></thead>
@@ -2862,7 +2870,7 @@ function renderLucroUni() {
         && (!ctxLoja || r.unidade === ctxLoja)).map(linhaTab).join('')}</tbody>
     </table></div>
 
-    <div class="section-label">O que sobrou em caixa, e por quê</div>
+    <div class="section-label">O que sobrou em caixa, e por quê${rgSub(RG_CAIXA + ' · o cartão Lucro do período, ' + RG_COMP)}</div>
     <div class="cards cards-3">
       <div class="card blue">
         <div class="card-lbl">XP · reserva${ctxLoja ? ' (da rede)' : ''}</div>
@@ -3381,7 +3389,7 @@ function renderHoje() {
     // vezes passa batido por quem está lendo").
     // 07/11/2026 (dono): a Esta semana entrou aqui — este bloco e' a "semana em curso"; o detalhe do iFood fica no Resumo do canal
     b2 = '<div class="section-label" id="hojeSemana">' + (V.emCurso ? 'Semana em curso' : 'Semana passada') + ' · venda · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + ' · todos os canais · ' +
-      diaRot(V.iniIso) + ' a ' + diaRot(V.fimIso) + '</div>' +
+      diaRot(V.iniIso) + ' a ' + diaRot(V.fimIso) + rgSub(RG_VENDA) + '</div>' +
       '<div id="tabelaHojeVenda"><table><tr><th>Loja</th><th>Venda</th><th title="Os mesmos dias da semana anterior">vs semana anterior</th><th>Pedidos</th></tr>' +
       V.linhas.filter(l => !finVazio() || l.u === finVazio()).map(l => linha(l.nome, l.a, l.ca, l.cb,
         [l.atrasada ? 'dados até ' + ddmm(l.ate) : '', l.fora.length ? 'variação sem ' + l.fora.map(diaRot).join(', ') + ' (fechada numa das semanas)' : ''].filter(Boolean).join(' · '))).join('') +
@@ -3435,7 +3443,7 @@ function renderHoje() {
       hm(HOJE_FRESCOR && HOJE_FRESCOR.extrato_em) + ' · contas a pagar (Saipos) ' + hm(HOJE_FRESCOR && HOJE_FRESCOR.lancamentos_em) +
       ' · conferido ' + hm(HOJE_CONFERIDO) +
       ' <button class="preset-btn" onclick="hojeAtualizarAgora(true)" title="Ler o caixa de novo agora">↻ atualizar agora</button></div>';
-    b3 = '<div class="section-label">Caixa · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + '</div>' + finSoRede() + frescor + '<div class="cards">' +
+    b3 = '<div class="section-label">Caixa · ' + (finVazio() ? lojaNome(finVazio()) : 'Rede e lojas') + rgSub(RG_CAIXA) + '</div>' + finSoRede() + frescor + '<div class="cards">' +
       '<div class="card blue"><div class="card-lbl">' + (P.doFluxo ? 'Caixa hoje · saldo inicial' : 'Caixa operacional hoje') + '</div><div class="card-val">R$ ' + fmt(P.caixaOper) + '</div>' +
         '<div class="card-pct">' + (P.doFluxo ? 'fim de ' + ddmm(P.dataExtrato) + ' (último extrato completo) · o mesmo do Fluxo projetado'
           : P.temAncora && P.dataExtrato ? 'extrato do banco de ' + ddmm(P.dataExtrato) : 'pelo Saipos') + '</div></div>' +
@@ -3539,7 +3547,7 @@ function renderHoje() {
     const mPess = plcMeta('PESSOAL', [ult]);
     const pctsRes = [...new Set(cols.filter(c => c.u !== 'REDE').map(c => metaPctLoja(c.u)).filter(p => p !== null))];
     const rotMetaRes = pctsRes.length === 1 ? 'a receita que dá ' + pctsRes[0].toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% de resultado' : 'a receita que dá a meta de resultado';
-    const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ' + ddmm(ontemIso) + ' e previsão até o fim do mês</div>' +
+    const t1 = '<div class="section-label">' + nomeMes(mesIni) + ' · mês em andamento · realizado até ' + ddmm(ontemIso) + ' e previsão até o fim do mês' + rgSub(RG_COMP) + '</div>' +
       '<div id="tabelaHojeRumoMes" class="cel-cartao"><table><tr><th>Loja</th>' +
       // 18/11/2026 (Financeiro, auditoria de regime): é a venda pela data do turno (competência), não o banco
       '<th>Vendido até ' + ddmm(ontemIso) + sub('venda pela data do turno (competência) · ' + um(corrido) + '% do mês já passou') + '</th>' +
@@ -3560,7 +3568,7 @@ function renderHoje() {
     const M = { CUSTO: plcMeta('CUSTO', [ult]), PESSOAL: mPess, VENDA: plcMeta('VENDA', [ult]), ADMIN: plcMeta('ADMIN', [ult]), RESULTADO: plcMeta('RESULTADO', [ult]) };
     const cabM = (rot, k, acao) => '<th>' + rot + sub((M[k] ? (M[k].sentido === 'abaixo' ? 'até ' : 'a partir de ') + um(M[k].meta) + '%' : '') + (acao ? ' · ' + acao : '')) + '</th>';
     const celM = (v, k) => v === null || v === undefined ? '—' : (M[k] ? farol(um(v) + '%', v, M[k].meta, M[k].sentido) : um(v) + '%');
-    const t2 = '<div class="section-label">' + nomeMes(ult) + ' · último mês fechado · % da receita, a mesma conta da DRE</div>' +
+    const t2 = '<div class="section-label">' + nomeMes(ult) + ' · último mês fechado · % da receita, a mesma conta da DRE' + rgSub(RG_COMP) + '</div>' +
       '<div id="tabelaHojeRumoFechado" class="cel-cartao"><table><tr><th>Loja</th>' +
       cabM('CMV', 'CUSTO', 'compras e fichas') + cabM('CMO', 'PESSOAL', 'escala') + cabM('Despesas de venda', 'VENDA', 'entrega e anúncios') +
       cabM('Administrativas', 'ADMIN', 'contratos da casa') + cabM('Resultado final', 'RESULTADO', 'o que sobrou') + '</tr>' +
@@ -4547,7 +4555,7 @@ function renderPlacar() {
       </table></div>` : '';
 
     quebra = `<div class="contexto" style="border-color:var(--brand);">
-        <b>Abrindo ${t.rot}</b> — ${atual.rot}. <button class="preset-btn" onclick="plcAbrir('${t.id}')">fechar</button>
+        <b>Abrindo ${t.rot}</b> — ${atual.rot} · ${t.id === 'caixa' ? RG_CAIXA : (t.id === 'ped' || t.id === 'fat') ? RG_VENDA : RG_COMP}. <button class="preset-btn" onclick="plcAbrir('${t.id}')">fechar</button>
       </div>
       <div class="section-label" title="A mesma conta do cartão, uma loja de cada vez; mostra sempre as três, qualquer que seja a loja do topo.">Por loja · as três</div>
       ${tabLoja}
@@ -4569,7 +4577,7 @@ function renderPlacar() {
   const plcCel = matchMedia('(max-width:760px)').matches;
   const plcAvisos = seletorLojaFin();
   alvo.innerHTML = plcAbasHtml() + `
-    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">O Placar — ${nomeLojaFin()} · ${atual.rot}</div>
+    <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">O Placar — ${nomeLojaFin()} · ${atual.rot}${rgSub(RG_COMP + ' · o cartão Caixa, ' + RG_CAIXA)}</div>
     <div class="caption-label cel-esconde" style="text-align:center;">Contra o período anterior e contra a meta. <b>Clique num número para abrir.</b></div>
     ${plcCel ? '' : plcAvisos}
     <div class="periodo-presets" style="margin-top:10px;">${segGrao}</div>
@@ -4580,10 +4588,10 @@ function renderPlacar() {
     ${A.temFato ? '' : `<div class="contexto" style="border-color:var(--amber-2);">Custo dos canais neste período é vendido − recebido, não cobrança a cobrança.</div>`}
     <div class="fx-tiles">${cartoes}</div>
     ${plcCel ? plcAvisos : ''}
-    ${lojaFin() === 'REDE' && plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
+    ${lojaFin() === 'REDE' && plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}${rgSub(RG_COMP + ' · a coluna Caixa, ' + RG_CAIXA)}</div>
     <div id="tabelaPlacarLado" class="plc-lado-cel"><table><tr><th>Em R$</th>${[...FX_TODAS, 'REDE'].map((u) => `<th>${u === 'REDE' ? 'Rede' : lojaNome(u)}</th>`).join('')}</tr>
       ${PLC_TILES.map((t) => `<tr><td>${t.rot}</td>${[...FX_TODAS, 'REDE'].map((u) => { const ag = u === 'REDE' ? A : plcComLoja(u, () => plcAgrega(atual.meses)); return `<td>${String(fmtDe(t, valorDe(t, ag))).replace('R$ ', '')}</td>`; }).join('')}</tr>`).join('')}</table></div>` : ''}
-    ${lojaFin() === 'REDE' && !plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}</div>
+    ${lojaFin() === 'REDE' && !plcCel ? `<div class="section-label">Lado a lado · ${atual.rot}${rgSub(RG_COMP + ' · a coluna Caixa, ' + RG_CAIXA)}</div>
     <div id="tabelaPlacarLado" style="overflow-x:auto;"><table><tr><th>Loja</th>${PLC_TILES.map((t) => `<th>${t.rot}</th>`).join('')}</tr>
       ${FX_TODAS.map((u) => { const ag = plcComLoja(u, () => plcAgrega(atual.meses)); return `<tr><td>${lojaNome(u)}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, ag))}</td>`).join('')}</tr>`; }).join('')}
       <tr class="liq"><td>${lojaNome('REDE')}</td>${PLC_TILES.map((t) => `<td>${fmtDe(t, valorDe(t, A))}</td>`).join('')}</tr></table></div>` : ''}
@@ -4622,7 +4630,7 @@ function renderFechamento() {
     ${fxSeg('fxMes', meses.map(m => [m, fxMesRot(m)]), mes)}</div>`;
   // 1. quanto vendeu
   const maior = serie.reduce((m, x) => x.recBruta > m.recBruta ? x : m, serie[0]);
-  h += `<div class="fx-secao"><h3>1. Quanto vendeu</h3><span>venda cheia: caixa das lojas + promoção paga pela loja</span></div><div class="fx-tiles">`
+  h += `<div class="fx-secao"><h3>1. Quanto vendeu</h3><span>${RG_VENDA} · venda cheia: caixa das lojas (PDV) + promoção paga pela loja</span></div><div class="fx-tiles">`
     + fxTile('Vendas do mês', a.recBruta, j ? fxVar(a.recBruta, j.recBruta, rotAnt) : '', `${j ? `${fxMesRot(ant)}: ${fxMil(j.recBruta)} · ` : ''}maior mês: ${fxMesRot(maior.mes)}, ${fxMil(maior.recBruta)}`, fxSpark(serie.map(x => x.recBruta), rots, fxMil),
       `<ul class="fx-lista">${Object.entries(a.canais).sort((x, y) => y[1] - x[1]).filter(([, v]) => v >= 1).map(([c, v]) => `<li><span>${c}</span><b>${fxMil(v)} · ${fxPct1(v / a.recBruta * 100)}</b></li>`).join('')}</ul>`)
     + fxTile('Pedidos', fxInt(a.pedidos), j ? fxVar(a.pedidos, j.pedidos, rotAnt) : '', j ? `${fxMesRot(ant)}: ${fxInt(j.pedidos)} pedidos` : '', fxSpark(serie.map(x => x.pedidos), rots, fxInt))
@@ -4650,7 +4658,7 @@ function renderFechamento() {
   // aparece com o sinal do dinheiro: + quando entrou, − quando o mes teve rendimento negativo.
   const reaisB = (id, v) => id === 'REND' ? (v > 0.5 ? '−R$ ' : '+R$ ') + Math.abs(Math.round(v)) : reais(v);
   let somaArr = 0;
-  h += `<div class="fx-secao"><h3>2. De cada R$ 100 que entraram, para onde foram</h3><span>${fxMesLongo(mes)}${ant ? `, com ${fxMesLongo(ant)} ao lado` : ''}</span></div><div class="fx-cem">`;
+  h += `<div class="fx-secao"><h3>2. De cada R$ 100 que entraram, para onde foram</h3><span>${RG_COMP} · ${fxMesLongo(mes)}${ant ? `, com ${fxMesLongo(ant)} ao lado` : ''}</span></div><div class="fx-cem">`;
   // QUAL BALDE ESTA MAIS LONGE DA META. A ordem das linhas nao muda (ela e' o tamanho do
   // balde, e trocar por distancia esconderia o maior gasto); o que entra e' uma marca na
   // linha. A distancia e' medida CONTRA A PROPRIA META, senao Mercadoria (meta perto de
@@ -4706,7 +4714,7 @@ function renderFechamento() {
       ? comp.concat([{ k: FX_RESTO_ROT[FX_BALDE] || 'outros lançamentos deste balde', v: resto }])
       : comp;
     const totComp = linhasComp.reduce((s, c) => s + c.v, 0);
-    h += `<div class="fx-secao"><h3>Do que é feito: ${bSel[1]}</h3><span>${fxMesLongo(mes)} de ${mes.slice(0, 4)} · ${nomeLojaFin()}</span></div>
+    h += `<div class="fx-secao"><h3>Do que é feito: ${bSel[1]}</h3><span>${RG_COMP} · ${fxMesLongo(mes)} de ${mes.slice(0, 4)} · ${nomeLojaFin()}</span></div>
       <div class="contexto" style="border-color:var(--brand);">
         <b>${bSel[1]}</b> — ${fxMil(totComp)} no mês, R$ ${Math.round(bSel[3])} de cada R$ 100 que entraram.
         <button class="preset-btn active" onclick="fxAbrirBalde('${FX_BALDE}')">${bSel[1]} ✕</button>
@@ -4724,7 +4732,7 @@ function renderFechamento() {
   }
   // 3. quanto sobrou
   const serieRes = serie.map(x => x.resultado);
-  h += `<div class="fx-secao"><h3>3. Quanto sobrou</h3><span>o resultado do mês</span></div><div class="fx-duas">
+  h += `<div class="fx-secao"><h3>3. Quanto sobrou</h3><span>${RG_COMP} · o resultado do mês</span></div><div class="fx-duas">
     <div class="fx-destaque"><div class="fx-rotulo">Sobrou em ${fxMesLongo(mes)}</div><div class="fx-valor-g${a.resultado < 0 ? ' neg' : ''}">${fxMil(a.resultado)}</div>
       <p>De cada R$ 100 que entraram, sobraram <b>R$ ${Math.round(cem(a.resultado))}</b>. A meta é R$ ${M.RESULTADO ? M.RESULTADO.meta : '—'} ou mais — ${fxPill(fs)}</p>
       ${j ? `<p>Em ${fxMesLongo(ant)} sobraram <b>${fxMil(j.resultado)}</b> (R$ ${Math.round(j.base ? j.resultado / j.base * 100 : 0)} de cada 100). O que sobrou ${fxVar(a.resultado, j.resultado, rotAnt)}.</p>` : ''}
@@ -4732,7 +4740,7 @@ function renderFechamento() {
     <div class="fx-tile"><div class="fx-rotulo">Quanto sobrou, mês a mês</div><div class="fx-valor" style="font-size:20px">${serie.slice(-3).map(x => fxMil(x.resultado).replace('R$ ', '')).join(' · ')}</div><div class="fx-extra">últimos três meses</div>${fxSpark(serieRes, rots, fxMil)}<div class="fx-extra" style="margin-top:8px">Melhor mês: ${rots[serieRes.indexOf(Math.max(...serieRes))]} (${fxMil(Math.max(...serieRes))}). Pior: ${rots[serieRes.indexOf(Math.min(...serieRes))]} (${fxMil(Math.min(...serieRes))}).</div></div></div>`;
   // 4. caixa
   const p = fxPonte(mes);
-  h += `<div class="fx-secao"><h3>4. E no caixa?</h3><span>o dinheiro de verdade nas contas e cofres do dia a dia</span></div>`;
+  h += `<div class="fx-secao"><h3>4. E no caixa?</h3><span>${RG_CAIXA} · o dinheiro de verdade nas contas e cofres do dia a dia</span></div>`;
   if (p) {
     // 12/09/2026: este rotulo dizia "o resultado da secao 3" e mostrava OUTRO numero
     // (ago/AV: 96,6 mil na secao 3 contra 60,4 mil aqui), porque a secao 3 migrou
@@ -5445,7 +5453,7 @@ function renderModuloDFC() {
   alvo.innerHTML = plcCabecalhoQuebra('fluxo') + seletorLojaFin() + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Fluxo de Caixa — ${nomeLojaFin()}</div>
   <div class="caption-label" style="text-align:center;" title="Clique nas linhas com ▶ para abrir o detalhe.">
-    Caixa realizado mês a mês, todos os canais da loja escolhida no topo.
+    Pelo caixa: o que entra e sai do banco · realizado mês a mês, todos os canais da loja escolhida no topo.
   </div>
   ${iSel >= 0 ? `<div class="contexto" style="border-color:var(--brand);">
     <b>Filtrando:</b>
@@ -5479,7 +5487,7 @@ function renderModuloDFC() {
       ${corpo}
     </table>
   </div>
-  <div class="section-label">De onde vem e para onde vai o dinheiro${iSel >= 0 ? ' — ' + rotuloMes(meses[iSel]) : ''}</div>
+  <div class="section-label">De onde vem e para onde vai o dinheiro${iSel >= 0 ? ' — ' + rotuloMes(meses[iSel]) : ''}${rgSub(RG_CAIXA)}</div>
   <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;">
     <div><div class="caption-label">Entradas por origem</div>
       <div style="height:${Math.max(200, entradasPorSub.length * 30)}px;">
@@ -5565,8 +5573,8 @@ function renderModuloDFC() {
 // Modulo DRE — demonstrativo de resultado gerencial da Agua Verde.
 // Mesma base do DFC (fin_lancamentos), reorganizada em formato DRE:
 // receita liquida, custo, lucro bruto, despesas por funcao, EBITDA e
-// resultado. E' regime de caixa gerencial (nao e' a DRE contabil):
-// receita quando o dinheiro entra, despesa de cartao no ciclo da fatura.
+// resultado. E' regime de COMPETENCIA gerencial (nao e' a DRE contabil): receita pela
+// data da venda (turno), despesa pela data da nota (mes_dre); o caixa mora no DFC (corrigido 18/11/2026).
 // Cada celula traz R$ + analise vertical (AV, % da receita liquida) e
 // horizontal (AH, variacao vs mes anterior). As linhas estruturais tem
 // farol contra as metas de fin_metas_dre (editavel no banco, sem deploy).
@@ -5677,7 +5685,7 @@ function blocoBeneficioIfood({ f, semanas }) {
   // Compacto por padrao (arrumacao de 16/08 a pedido do dono): barra + uma linha
   // de leitura sempre visiveis; cards, explicacao e semanas dobram num <details>.
   return `
-  <div class="section-label">Isenção de comissão do iFood — quanto dos R$ 500 mil já foi usado (estimativa)</div>
+  <div class="section-label">Isenção de comissão do iFood — quanto dos R$ 500 mil já foi usado (estimativa)${rgSub(RG_VENDA)}</div>
   ${barra}
   <div class="caption-label" style="text-align:center;">
     <b style="color:${cor};">${pctB.toLocaleString('pt-BR')}% usado (estimativa)</b> ·
@@ -6278,7 +6286,7 @@ function renderModuloDRE() {
       // CADA linha da tabela, os cards por grupo viraram eco. Ficam so os tres
       // que a tabela NAO tem: Prime Cost, ponto de equilibrio e a manchete.
       fechHtml = `
-      <div class="section-label">Fechamento de ${rotuloMes(meses[iF])}${DRE_MES_FIXO === meses[iF] ? ' — mês fixado no clique' : ' — último mês fechado do período escolhido'}</div>
+      <div class="section-label">Fechamento de ${rotuloMes(meses[iF])}${DRE_MES_FIXO === meses[iF] ? ' — mês fixado no clique' : ' — último mês fechado do período escolhido'}${rgSub(RG_COMP)}</div>
       <div class="cards cards-3">
         <div class="card ${resultado[iF] >= 0 ? 'pos' : 'neg'}"><div class="card-lbl">Resultado líquido do mês</div><div class="card-val">R$ ${fmt(resultado[iF])}</div>
           ${statusDe(resPct, metaMes('RESULTADO', iF))}${varRS(resultado)}</div>
@@ -6298,7 +6306,7 @@ function renderModuloDRE() {
   ${blocoBeneficioIfood(BENEF_FAROL || { f: null, semanas: [] })}
   <div class="section-label">DRE Gerencial — ${nomeLojaFin()}</div>
   <div class="caption-label" style="text-align:center;" title="Receitas = venda cheia por canal (caixa das lojas + promoção paga pela loja). % sobre tudo que entrou (venda cheia + atacado, listas das filiais, Boqueirão); ▲▼ = vs mês anterior. Na Água Verde a mercadoria inclui o comprado para as listas e o atacado; nas filiais, a lista paga à AV está na linha Mercadorias AV. Na Rede a lista entre lojas não entra. Cor só quando a linha está fora da meta (âmbar perto, vermelho longe).">
-    Venda cheia por canal · despesas por competência · % sobre tudo que entrou · ▶ abre o detalhe.
+    Pela data da venda / da nota (competência) · venda cheia por canal · % sobre tudo que entrou · ▶ abre o detalhe.
   </div>
   <div class="periodo-presets" style="margin-top:14px; display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
     <button class="preset-btn ${drePeriodo === 'ano' ? 'active' : ''}" onclick="drePeriodoSet('ano')">Ano completo</button>
@@ -7332,18 +7340,18 @@ function renderContasPagar() {
   const comissao = CP.temMotor ? semTitulo(blocoComissaoAtacado()) : '';
   const bonus = CP.temMotor ? semTitulo(blocoBeneficio()) : '';
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contas a pagar — o que pagar hoje e nos próximos dias · ${cpNomeLoja()}</div>
+  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contas a pagar — o que pagar hoje e nos próximos dias · ${cpNomeLoja()}${rgSub(RG_CAIXA)}</div>
   ${cpBarra()}
   ${cpCartoes('PAGAR')}
   ${CP.temMotor ? (FXL ? `<div id="cpHojeWrap">${cpHojeLimpo()}</div>` : `<div id="projCaixaWrap">${blocoCaixaDoDia()}</div>`) : ''}
-  <div class="section-label">Todas as contas a pagar</div>
+  <div class="section-label">Todas as contas a pagar${rgSub(RG_CAIXA)}</div>
   ${cpTabela('PAGAR')}
   ${(() => {
     // 12/11/2026 (usabilidade 07/11, T1/T3): a lista do que pagar sobe para logo depois dos cartões; "os próximos dias"
     // e "as 5 maiores" (planejamento, não o pagar de hoje) ficam num recolhido "Planejar a semana", a um clique
     const plano = cpProximosDias() + cpMaioresAteAperto();
     const f = CP.filtros.PAGAR;
-    return plano ? `<details class="detalhes-extra"${f.faixa ? ' open' : ''}><summary>Planejar a semana — os próximos dias por grupo de conta e as maiores contas</summary>${plano}</details>` : '';
+    return plano ? `<details class="detalhes-extra"${f.faixa ? ' open' : ''}><summary>Planejar a semana — os próximos dias por grupo de conta e as maiores contas <span style="color:var(--tx-4); font-weight:normal;">· ${RG_CAIXA}</span></summary>${plano}</details>` : '';
   })()}
   ${comissao ? `<details class="detalhes-extra"><summary>Comissão do atacado — ${(() => { const pend = (PROJ_COM_PAG || []).filter(x => ['EM_ABERTO', 'PAGO_DIFERENTE', 'PAGO_SEM_BANCO'].includes(x.situacao)).length;
         return !PROJ_COM_PAG ? 'o valor da semana para lançar no Saipos' : pend ? `<span style="color:var(--amber-2);">${pend} pendência${pend > 1 ? 's' : ''}</span>` : '<span style="color:var(--farol-ok);">✓ tudo pago até a última semana fechada</span>'; })()}</summary>${comissao}</details>` : ''}
@@ -7423,10 +7431,10 @@ function sobraFilialHtml() {
   }).join('');
   const hoje = sobraHoje(), prox = (SOBRA.plano.map((p) => String(p.quarta)).filter((d) => d >= hoje).sort()[0]) || null;
   const daQuarta = prox ? SOBRA.plano.filter((p) => String(p.quarta) === prox && Number(p.sai_da_filial) > 0) : [];
-  const pix = daQuarta.length ? `<div class="section-label" style="text-align:left;margin-top:18px;">PIX das filiais para a Água Verde · ${prox === hoje ? 'hoje' : 'quarta'} ${agDmSobra(prox)}</div>
+  const pix = daQuarta.length ? `<div class="section-label" style="text-align:left;margin-top:18px;">PIX das filiais para a Água Verde · ${prox === hoje ? 'hoje' : 'quarta'} ${agDmSobra(prox)}${rgSub(RG_CAIXA)}</div>
     <div class="cards">${daQuarta.map((p) => `<div class="card"><div class="card-lbl">${nome[p.sigla] || trEscH(p.sigla)} → Água Verde</div>
       <div class="card-val">${sobraR(p.sai_da_filial)}</div><div class="card-pct">${p.travado ? 'um PIX só, desta filial' : 'previsão: o valor fecha na quarta'}</div></div>`).join('')}</div>` : '';
-  return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
+  return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta <span style="color:var(--tx-4); font-weight:normal;">· ${RG_CAIXA}</span>${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
     <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro<br><span style="font-weight:normal;font-size:11px;">repassado por PIX (caixa) — não é o resultado do mês</span></th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
     <tbody>${linhas}</tbody></table></div></details></div>`;
@@ -7572,7 +7580,7 @@ function renderContasReceber() {
       if (x) det = fxlComposicao(x.itens[Number(j)], `${r === '__fora' ? 'Filiais pagam à Água Verde' : r} · ${rotJ[Number(j)]}`);
     }
     tabela = `
-    <div class="section-label">O que vai entrar, de onde</div>
+    <div class="section-label">O que vai entrar, de onde${rgSub(RG_CAIXA)}</div>
     <div id="tabelaCrOrigem"><table>
       <thead><tr><th>De onde</th>${rotJ.map(r => `<th>${r}</th>`).join('')}<th>Como sabemos</th></tr></thead>
       <tbody>${ordem.map(([r, x]) => `<tr><td><b>${r}</b></td>${x.v.map((v, j) => cel(`${r.replace(/'/g, '')}|${j}`, v)).join('')}
@@ -7603,7 +7611,7 @@ function renderContasReceber() {
           <div class="card-pct">listas e bônus já cobrados · ${CP.loja === 'AGUA VERDE' ? 'já está no "Entra"' : 'na Rede não conta: só troca de bolso'}</div></div>`}
     </div>`;
     tabela = `
-    <div class="section-label">O que vai entrar, de onde</div>
+    <div class="section-label">O que vai entrar, de onde${rgSub(RG_CAIXA)}</div>
     <div id="tabelaCrOrigem"><table>
       <thead><tr><th>De onde</th>${rotJ.map(r => `<th>${r}</th>`).join('')}<th>Como sabemos</th></tr></thead>
       <tbody>${ordem.map(([rot, x]) => `<tr><td><b>${rot}</b></td>${x.v.map(v => `<td>${cpMil(v)}</td>`).join('')}
@@ -7624,7 +7632,7 @@ function renderContasReceber() {
   });
   const quem = Object.entries(porQuem).sort((a, b) => b[1].v - a[1].v);
   const blocoAtraso = `
-  <div class="section-label">Quem está atrasado</div>
+  <div class="section-label">Quem está atrasado${rgSub(RG_CAIXA)}</div>
   ${quem.length ? `<div id="tabelaCrAtraso"><table>
     <thead><tr><th>De quem</th><th>Valor</th><th>Títulos</th><th>Venceu em</th><th>Onde cobrar</th></tr></thead>
     <tbody>${quem.map(([k, g]) => { const og = CP_ORIGEM[g.origem] || { rot: g.origem, baixa: '—' };
@@ -7633,12 +7641,12 @@ function renderContasReceber() {
       <td style="text-align:left;">${og.tela ? `<a href="javascript:void(0)" style="color:var(--brand);" onclick="${og.aba ? `sessionStorage.setItem('pesAbaPedida','${og.aba}');` : ''}mostrarModulo('${og.tela}')">${og.baixa} ›</a>` : og.baixa}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="contexto" style="border-color:var(--farol-ok);">Ninguém atrasado. ✔</div>'}`;
   alvo.innerHTML = `
-  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contas a receber — o que vai entrar, de quem, e quem está atrasado · ${cpNomeLoja()}</div>
+  <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Contas a receber — o que vai entrar, de quem, e quem está atrasado · ${cpNomeLoja()}${rgSub(RG_CAIXA)}</div>
   ${cpBarra()}
   ${topo}
   ${tabela}
   ${blocoAtraso}
-  <div class="section-label">Todos os títulos a receber</div>
+  <div class="section-label">Todos os títulos a receber${rgSub(RG_CAIXA)}</div>
   ${cpCartoes('RECEBER')}
   ${cpTabela('RECEBER')}`;
   // 12/11/2026 (lote 3 dinheiro-16): saiu a legenda "Aqui só o que tem título…" — a coluna "Como sabemos" da tabela de
@@ -7663,7 +7671,7 @@ function blocoAtacadoReceber() {
   const lidoEm = L.reduce((m, r) => r.capturado_em > m ? r.capturado_em : m, '');
   const dd = (s) => s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '';
   return `
-  <div class="section-label">Atacado — a receber e inadimplência (portal do ePadoca)</div>
+  <div class="section-label">Atacado — a receber e inadimplência (portal do ePadoca)${rgSub(RG_CAIXA)}</div>
   <div class="caption-label" style="text-align:center;">Boletos do atacado em aberto no portal do ePadoca, por vencimento. Prazo padrão 7 dias (Quermesse Bom Retiro 7/14).
     Os boletos já estão somados no fluxo dia a dia acima, no dia em que o dinheiro cai na conta: vencimento + 2 dias (o tempo do repasse; fim de semana e feriado passam para o dia útil seguinte).
     Boleto pago que ainda não caiu continua no fluxo como "pago, aguardando repasse". Ficam de fora os boletos já dados como perda ou pagos por fora do portal —
@@ -8908,7 +8916,7 @@ function blocoFluxoLimpo() {
   const lk = (k, v, cor) => `<a href="javascript:void(0)" data-fxl="1" onclick="fxlAbrir('${k}')" style="color:${cor || 'inherit'}; text-decoration:underline dotted;" title="ver o que compõe">${mil(v)}</a>`;
   const corHoje = corTokenA('--info', 0.22), cor7 = corTokenA('--amber-2', 0.22);
   // ---- o quadro: por loja, hoje e 7 dias ----
-  let h = `<div class="section-label">Caixa de hoje — ${dm(d0.dia)}</div>
+  let h = `<div class="section-label">Caixa de hoje — ${dm(d0.dia)}${rgSub(RG_CAIXA)}</div>
     <div id="tabelaFxlQuadro" style="overflow-x:auto;"><table><thead>
       <tr><th rowspan="2">Loja</th><th rowspan="2" title="bancos + cofre no fim do último dia com extrato completo de cada conta; o que o Saipos mostra pago ou recebido depois disso entra em hoje">Saldo inicial</th><th colspan="3" style="background:${corHoje}; text-align:center;">Hoje</th>
         <th colspan="3" style="background:${cor7}; text-align:center;">Até ${dm(d7.dia)} (7 dias)</th></tr>
@@ -8954,7 +8962,7 @@ function blocoFluxoLimpo() {
   const u = lojaFin();
   const nomeU = lojaNome(u);
   const diasTab = FXL.dias.slice(0, Math.min(FXL.dias.length, fxlDiasAte() + 1));
-  h += `<div class="section-label">Dia a dia até ${dm(diasTab[diasTab.length - 1].dia)} — ${nomeU}</div>
+  h += `<div class="section-label">Dia a dia até ${dm(diasTab[diasTab.length - 1].dia)} — ${nomeU}${rgSub(RG_CAIXA)}</div>
     <div id="tabelaFxlDias" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Saldo inicial</th><th>A receber</th><th>A pagar</th><th>Saldo final</th></tr></thead><tbody>`;
   diasTab.forEach((d, i) => {
     const x = d.unidades[u];
@@ -9151,7 +9159,7 @@ function renderModuloProjecao() {
   const somaMedias = subsOrdenados.reduce((a, x) => a + x.media, 0);
   console.assert(Math.abs(somaMedias - mediaSemana) < 0.05, 'media por subtipo nao fecha com a da projecao');
   const composicaoSub = `
-    <div class="section-label">De onde vem a entrada projetada — por tipo de receita</div>
+    <div class="section-label">De onde vem a entrada projetada — por tipo de receita${rgSub(RG_CAIXA)}</div>
     <div class="caption-label" style="text-align:center;">As mesmas 4 semanas que alimentam a média da projeção,
       abertas tipo a tipo — para conferir se as médias e as classificações fazem sentido. Recebimentos
       que <b>caíram na conta</b>, não vendas.</div>
@@ -9193,7 +9201,7 @@ function renderModuloProjecao() {
     porGrupo[r.tipo] = (porGrupo[r.tipo] || 0) + r.debito;
   });
   const resumoPagar = Object.entries(porGrupo).sort((a, b) => b[1] - a[1]);
-  const blocoPagar = `<div class="section-label">O que tem para pagar (por grupo)</div>
+  const blocoPagar = `<div class="section-label">O que tem para pagar (por grupo)${rgSub(RG_CAIXA)}</div>
    <div class="contexto" style="text-align:left;">
      ${resumoPagar.map(([g, v]) => `<div style="display:flex; justify-content:space-between; padding:3px 0;">
         <span>${g}</span><b>R$ ${fmt(v)}</b></div>`).join('')}
@@ -9212,10 +9220,10 @@ function renderModuloProjecao() {
       <div class="card-lbl">${rot}</div><div class="card-val"${cls === '' && estilo ? ` style="color:${corMenor};"` : ''}>${val}</div><div class="card-pct">${sub}</div></div>`;
   alvo.innerHTML = plcCabecalhoQuebra('projecao') + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Fluxo projetado</div>
-  <div class="caption-label" style="text-align:center;">Quanto tem, o que sai e o que entra, por loja e na Rede.</div>
+  <div class="caption-label" style="text-align:center;">Pelo caixa: o que entra e sai do banco · quanto tem, o que sai e o que entra, por loja e na Rede.</div>
   ${FXL ? `<div id="fxlWrap">${blocoFluxoLimpo()}</div><div id="projDiaWrap" style="display:none;"></div>` : FXL_ERRO ? `<div class="contexto" id="fxlErro" style="text-align:left; border-color:var(--farol-fora);">✗ O Fluxo não carregou: ${FXL_ERRO}. <button class="preset-btn" onclick="fxlTentarDeNovo()">Tentar de novo</button></div><div id="projDiaWrap" style="display:none;"></div>` : `${blocoCaixaHoje()}
   <div id="projDiaWrap">${blocoSaldoDiaADia()}</div>`}
-  <div class="section-label">${FXL ? `Saldo final de cada dia — próximos ${FXL.dias.length - 1} dias` : `Os próximos ${HORIZONTE} dias`}</div>
+  <div class="section-label">${FXL ? `Saldo final de cada dia — próximos ${FXL.dias.length - 1} dias` : `Os próximos ${HORIZONTE} dias`}${rgSub(RG_CAIXA)}</div>
   <div style="height:260px; margin:6px 0 14px;"><canvas id="chartProjecao"></canvas></div>
   <div class="caption-label" style="text-align:left;">${FXL ? 'Os mesmos números da tabela, da loja escolhida acima. Ponto amarelo: dia em que sai bônus para a XP; vermelho: saldo negativo. Clique num dia para ir à linha dele.' : 'Clique num dia do gráfico para abrir as contas dele na tabela acima (até a segunda quarta-feira).'}</div>
 `;
@@ -9484,7 +9492,7 @@ function renderModuloDespesas() {
   alvo.innerHTML = plcCabecalhoQuebra('despesas') + seletorLojaFin() + `
   <div class="section-label" style="border-top:none; margin-top:0; padding-top:0;">Análise de Despesas — ${nomeLojaFin()}</div>
   <div class="caption-label" style="text-align:center;">
-    Vermelho = gastou mais que ${mesesSel.length > 1 ? 'o período anterior do mesmo tamanho' : 'a média dos meses anteriores'}. Inclui investimento, que o Placar deixa de fora.
+    Pela data da nota (competência) · vermelho = gastou mais que ${mesesSel.length > 1 ? 'o período anterior do mesmo tamanho' : 'a média dos meses anteriores'}. Inclui investimento, que o Placar deixa de fora.
   </div>
   <div class="periodo-presets" style="margin-top:10px;">
     ${meses.map(m => `<button class="preset-btn ${!ctx && despMes === m ? 'active' : ''}" onclick="despMesSet('${m}')">${rotuloMes(m)}${m === mesCorrente ? ' ·' : ''}</button>`).join('')}
@@ -9505,7 +9513,7 @@ function renderModuloDespesas() {
       <div class="card-pct">com NF lançada no Saipos</div></div>
   </div>
   ${variacoes.length ? `
-  <div class="section-label">O que saiu do padrão</div>
+  <div class="section-label">O que saiu do padrão${rgSub(RG_NOTA)}</div>
   <div class="contexto" style="text-align:left;">
     ${variacoes.map(([s, v, m, d]) => `
       <div onclick="despIrPara('${encodeURIComponent(s)}')" title="abrir este grupo no detalhe abaixo" style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #34332f; cursor:pointer;">
@@ -9514,7 +9522,7 @@ function renderModuloDespesas() {
       </div>`).join('')}
     <div style="font-size:11px; color:#6e7681; margin-top:6px;">Diferença entre o período e a média dos meses anteriores (acima de R$ 500).</div>
   </div>` : ''}
-  <div class="section-label">Detalhe por grupo → categoria → fornecedor</div>
+  <div class="section-label">Detalhe por grupo → categoria → fornecedor${rgSub(RG_NOTA)}</div>
   <div id="tabelaDespesas">
     <table>
       <tr><th></th><th>Valor · % do total</th><th>vs média dos meses anteriores</th></tr>
@@ -9522,7 +9530,7 @@ function renderModuloDespesas() {
       <tr class="dfc-resultado"><td>TOTAL</td><td>${fmt(-totalPeriodo)}<span class="dre-av">100%</span></td><td>${totalMediaAnt !== null ? varia(totalPeriodo, totalMediaAnt) : ''}</td></tr>
     </table>
   </div>
-  <div class="section-label">Top fornecedores ${ctx ? rotPer : (despMes === 'ano' ? 'do ano' : 'de ' + rotuloMes(despMes))}</div>
+  <div class="section-label">Top fornecedores ${ctx ? rotPer : (despMes === 'ano' ? 'do ano' : 'de ' + rotuloMes(despMes))}${rgSub(RG_NOTA)}</div>
   <div style="height:${Math.max(220, topForn.length * 26)}px;"><canvas id="chartFornecedores"></canvas></div>
   <div class="caption-label">Fornecedor vem do cadastro da NF no Saipos; folha, impostos e taxas caem em "(sem fornecedor)"
   no detalhe e ficam fora do ranking. Inclui contas a pagar já lançadas (competência), então o mês corrente cresce até fechar.</div>`;
