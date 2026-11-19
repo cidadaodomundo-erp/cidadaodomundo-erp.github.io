@@ -3124,6 +3124,7 @@ async function entrarHoje() {
     hojeLerFrescor().catch(() => {}),
     hojeLerFilas().catch(e => { erros.filas = e.message; }),
     consultarTudo(`vw_ticket_canal_dia?select=dia,unidade,canal,pedidos,faturamento,promo_ok&dia=gte.${fxSomaDias(trHoje(), -21)}`).then(r => { HOJE_TK = r; }).catch(() => { HOJE_TK = null; }),
+    consultarTudo('compra_orcamento_foto?select=mes,unidade,usado_pct,mes_corrido_pct,situacao,falta_comprar,notas_ate,calculado_em&grupo=eq.TOTAL&order=mes.desc').then(r => { HOJE_TETO = r; }).catch(() => { HOJE_TETO = null; }),
   ]);
   HOJE_ERROS = erros;
   HOJE_CONFERIDO = new Date();
@@ -3191,6 +3192,7 @@ function hojeLigarRelogio() {
 // faturamento (venda cheia, com a promoção da loja no iFood) ÷ pedidos, por canal, de vw_ticket_canal_dia. Compara os mesmos
 // dias da semana anterior, só nos dias em que a loja abriu nas duas (§C3).
 let HOJE_TK = null;
+let HOJE_TETO = null;   // 18/11/2026: o teto de compra do mês (compra_orcamento_foto, grupo TOTAL), a mesma fonte da tela Teto de compra
 function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variação do renderHoje
   if (!HOJE_TK || !HOJE_TK.length) return '';
   const so = finVazio(), menos7 = (s) => fxSomaDias(s, -7);
@@ -3276,6 +3278,23 @@ function hojeFeriadoNota(V) {
   return '<div class="caption-label" style="text-align:center; color:var(--farol-perto);">Feriado na comparação: ' +
     achou.map(d => rot(d) + ' (' + F[d] + ')' + (d >= V.iniIso ? '' : ', na semana anterior')).join(' · ') +
     ' — a diferença vem em boa parte dele.</div>';
+}
+
+// 18/11/2026 23:11 (dono: "o que falta pro CMV do dia no Hoje na Rede?"): a coluna mostra o teto de compra do mês, da mesma foto
+// da tela Teto de compra. Foto com mais de 1 dia = "desatualizado"; "notas até" porque a loja pode estar com notas atrasadas.
+function hojeTetoCel(u, sub) {
+  if (!Array.isArray(HOJE_TETO) || !HOJE_TETO.length) return '<span style="color:var(--tx-5);">sem a foto do teto</span>';
+  const sem = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const mes = HOJE_TETO[0].mes, r = HOJE_TETO.find(x => x.mes === mes && sem(x.unidade) === sem(u));
+  if (!r) return '—';
+  const dm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—';
+  const pct = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
+  const calc = String(r.calculado_em || '').slice(0, 10), velha = calc && fxSomaDias(calc, 1) < trHoje();
+  const cor = r.situacao === 'DENTRO' ? 'var(--farol-ok)' : 'var(--farol-fora)';
+  return '<span style="cursor:pointer;" title="abre o Teto de compra · foto de ' + dm(calc) + '" onclick="mostrarModulo(\'comprateto\')">'
+    + '<span style="color:' + cor + '; font-weight:700;">● usou ' + pct(r.usado_pct) + ' do teto</span> · mês corrido ' + pct(r.mes_corrido_pct)
+    + sub('falta comprar ' + fxMil(Number(r.falta_comprar || 0)) + ' · notas até ' + dm(r.notas_ate) + (velha ? ' · <b style="color:var(--farol-perto);">desatualizado (' + dm(calc) + ')</b>' : ''))
+    + '</span>';
 }
 
 function renderHoje() {
@@ -3521,7 +3540,7 @@ function renderHoje() {
         farol(mil1(c.receitaPrev), c.receitaPrev, c.meta, 'acima') + (c.outrasMes > 500 ? sub('inclui ' + mil1(c.outrasMes) + ' de listas e atacado') : ''),
         c.meta ? mil1(c.meta) : '—',
         mPess ? farol(um(c.cmoEst) + '%', c.cmoEst, mPess.meta, mPess.sentido) : um(c.cmoEst) + '%',
-        '<span style="color:var(--tx-5);">em construção</span>',
+        hojeTetoCel(c.u, sub),
       ])).join('') + '</table></div>';
 
     // ---- tabela 2: o ultimo mes fechado ----
