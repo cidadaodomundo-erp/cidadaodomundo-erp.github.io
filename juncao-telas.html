@@ -90,7 +90,7 @@ const MEDIDO = 'qua 18/11/2026, noite';
 // Todas as telas do menu de hoje, na ordem do menu (de: Neto ou Fabio). Medido; ver o comentário do alto.
 // 19/11/2026: os dados do estudo NÃO ficam neste arquivo (o repositório do painel é público): moram no banco, em
 // juncao_dados (RLS pode_ver_plano = Neto e Fabio), e chegam no carregar().
-let TELAS = [], GRUPOS = [], USO = [];
+let TELAS = [], GRUPOS = [], USO = [], AVISOS = {};
 // a lista de logins e a proposta por cargo também vêm do banco (juncao_dados)
 let LOGINS = [];
 
@@ -137,7 +137,7 @@ async function carregar() {
   D.resp = r.ok ? await r.json() : [];
   const dd = rd.ok ? await rd.json() : [];
   if (!dd.length) { app.innerHTML = '<p class="erro">✗ Não consegui ler os dados do estudo. <button class="sair" onclick="carregar()">tentar de novo</button></p>'; return; }
-  TELAS = dd[0].dados.telas || []; GRUPOS = dd[0].dados.grupos || []; USO = dd[0].dados.uso || []; LOGINS = dd[0].dados.logins || [];
+  TELAS = dd[0].dados.telas || []; GRUPOS = dd[0].dados.grupos || []; USO = dd[0].dados.uso || []; LOGINS = dd[0].dados.logins || []; AVISOS = dd[0].dados.avisos || {};
   desenhar();
 }
 // decisão = a última resposta de quem não é o dono (o Fabio); comentário = a última do dono
@@ -221,7 +221,7 @@ function desenhar() {
     <p class="lede">Todas as telas do painel, as do Neto e as do Fabio: o que cada uma mostra, quantas vezes foi aberta em 30 dias, se funciona e a tela parecida do outro lado. O painel fica com o Cidadão, então <b>quem decide é o Fabio</b>: Sim aceita a proposta, Não deixa como está, Outro diz o que fazer. O Neto comenta ao lado. Regra de 03/11: dinheiro no painel do Neto, operação no do Fabio. O menu só muda depois das respostas.</p>
     <div class="placar"><div><b>${dec} de ${comDec.length}</b><span>decididas pelo Fabio</span></div><div><b>${nc('tela')}</b><span>telas (juntar ${n('JUNTAR')} · tirar ${n('TIRAR')} · manter ${n('MANTER')})</span></div><div><b>${nc('pagina')}</b><span>páginas avulsas</span></div><div><b>${nc('artefato')}</b><span>artefatos</span></div><div><b>${nc('rotina')}</b><span>rotinas e robôs</span></div><div><b>${nc('portal')}</b><span>páginas do portal antigo</span></div></div>
     <div class="filtros">${F.map(([k, t]) => `<button class="bt${D.filtro === k ? ' on' : ''}" onclick="D.filtro='${k}';desenhar()">${t}</button>`).join('')}</div>
-    ${D.filtro === 'repetidas' ? pares(L) : (GRUPOS.map(g => { const l = L.filter(x => x.g === g); return l.length ? `<h3>${esc(g)} · ${l.length}</h3>${NOTA_GRUPO[g] ? `<p class="nota">${NOTA_GRUPO[g]}</p>` : ''}${l.map(card).join('')}` : ''; }).join('') || '<p class="vazio">Nenhuma tela neste filtro.</p>')}
+    ${D.filtro === 'repetidas' ? pares(L) : (GRUPOS.map(g => { const l = L.filter(x => x.g === g); return l.length ? `<h3>${esc(g)} · ${l.length}</h3>${NOTA_GRUPO[g] ? `<p class="nota">${NOTA_GRUPO[g]}</p>` : ''}${AVISOS[g] ? `<div class="item TIRAR" style="font-size:.88rem;">${AVISOS[g]}</div>` : ''}${l.map(card).join('')}` : ''; }).join('') || '<p class="vazio">Nenhuma tela neste filtro.</p>')}
     <h2>O menu novo, com todos os grupos</h2>
     <p class="nota">Muda conforme as respostas: em negrito o que o Fabio já decidiu; em cinza a proposta ainda sem resposta; riscado o que sai.</p>
     <div class="menu">${menuNovo()}</div>
