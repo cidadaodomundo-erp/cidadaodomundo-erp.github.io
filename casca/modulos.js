@@ -50,7 +50,7 @@ window.CASCA_MODULOS = [
   { id: 'resultado', nome: 'Resultado', icone: '📊',
     lancar: [], acompanhar: ['placar', 'semana', 'dre',   /* 07/11: Fechamento virou aba do Placar */ 'indicadores', 'evolucao', 'lucrouni', 'despesas'] },
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
-    lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'clientes', 'site', 'frete'] },
+    lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'site', 'frete'] },
   { id: 'entrega', nome: 'Entrega', icone: '🏍️',   // 18/11: as telas do delivery do Fabio + as nossas que a junção propõe juntar nelas
     lancar: [], acompanhar: ['delivery', 'atrasos', 'chegada', 'escalaclima', 'motodocs', 'pausadosdel', 'avaldel', 'atendimento', 'link:portal-qualidade', 'cozinha', 'tvs'] },
   { id: 'salao', nome: 'Salão', icone: '🍽️',
@@ -68,7 +68,7 @@ window.CASCA_MODULOS = [
   // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
   { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: ['usuarios'], acompanhar: ['rotinas', 'telas', 'conciliacao', 'relatorios'] },
+    lancar: ['usuarios'], acompanhar: ['rotinas', 'conciliacao'] },
 ];
 
 
