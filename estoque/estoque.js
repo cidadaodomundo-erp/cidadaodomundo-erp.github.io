@@ -3854,8 +3854,8 @@ function prdEtapasHtml(o) {
     const g = trEscH(JSON.stringify(gravar));
     const acao = !e || !e.iniciada_em ? `<button class="preset-btn${destaque ? ' active' : ''} est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${g}, 'INICIAR')">Iniciar</button>`
       : correndo ? `<button class="preset-btn active est-ciclo" onclick="prdEtapaMarcar(${o.id}, ${n}, ${g}, 'FECHAR')">Encerrar</button>` : '<span style="color:var(--farol-ok);">✓ feita</span>';
-    const bd = destaque ? 'background:var(--surface-2); box-shadow:inset 3px 0 0 var(--brand);' : '';
-    return `<tr style="${bd}"><td>${destaque ? '▶ ' : ''}${trEscH(nome)}</td><td style="color:var(--tx-4);">${dias && dias.length ? trEscH(dias.join(', ')) : '—'}</td>`
+    const bd = destaque ? 'box-shadow:inset 4px 0 0 var(--brand);' : '';
+    return `<tr style="${bd}"><td style="${destaque ? 'font-weight:800;' : ''}">${destaque ? '▶ ' : ''}${trEscH(nome)}</td><td style="color:var(--tx-4);">${dias && dias.length ? trEscH(dias.join(', ')) : '—'}</td>`
       + `<td style="font-size:12.5px;">${sit}</td><td style="white-space:nowrap; font-variant-numeric:tabular-nums;">${tempo}</td><td style="white-space:nowrap;">${acao}</td></tr>`;
   };
   let h = `<div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--p-line, var(--line));"><b>Etapas</b>
