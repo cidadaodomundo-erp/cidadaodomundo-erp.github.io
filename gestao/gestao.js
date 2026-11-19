@@ -4822,7 +4822,7 @@ async function entrarSemana() {
     alvo.innerHTML = '<div class="contexto">Carregando a semana...</div>';
     const hoje = fxHojeSP(), segAtual = fxSegunda(hoje);
     const desde = fxSomaDias(segAtual, -7 * 12);
-    const [vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras, custoSem] = await Promise.all([
+    const [vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras, custoSem, recDia] = await Promise.all([
       consultarTudo(`vw_sem_vendas?select=*&semana=gte.${desde}`), consultarTudo(`vw_sem_itens?select=*&semana=gte.${desde}`),
       consultarTudo(`mv_sem_ifood?select=*&semana=gte.${desde}`), consultarTudo(`mv_sem_anuncios?select=*&semana=gte.${desde}`),
       consultarTudo(`vw_sem_funil?select=*&semana=gte.${desde}`), consultarTudo(`vw_sem_compras?select=*&semana=gte.${desde}`),
@@ -4834,6 +4834,9 @@ async function entrarSemana() {
       consultarTudo(`vw_fin_outras_receitas_semana?select=*&semana=gte.${desde}`).catch(() => null),
       // 17/11/2026 (auditoria resultado-19; Financeiro f80226d): o custo do iFood da semana pela mesma regra da vw_canal_custo_mes
       consultarTudo(`vw_canal_custo_semana?select=semana,unidade,promo_loja,taxas,anuncios,fretes&semana=gte.${desde}`).catch(() => null),
+      // 18/11/2026 (Financeiro, dono 22:56 "a caixa dessa semana está somando venda de competência na projeção?"): o que cai no banco
+      // em cada dia da semana, média das 4 últimas (sem atacado nem receita entre lojas)
+      consultarTudo('vw_sem_recebido_dia?select=unidade,dia_semana,media_4sem').catch(() => null),
     ]);
     // Meta de mercadoria: DADO, nao constante. Ate 12/09/2026 esta tela tinha
     // META_CMV = 35 escrito no codigo enquanto fin_metas_dre ja dizia 34,5 e
@@ -4843,7 +4846,7 @@ async function entrarSemana() {
       consultarTudo('fin_metas_dre?select=chave,sentido,pct_meta'),
       consultarTudo('fin_metas_dre_mes?select=chave,mes,pct_meta').catch(() => []),
     ]);
-    FX_S = { hoje, segAtual, vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, caixa, contas, parcial, outras, custoSem,
+    FX_S = { hoje, segAtual, vendas, itens, ifood, anuncios, funil, compras, listas, despesas, recebido, recDia, caixa, contas, parcial, outras, custoSem,
              metasGerais, metasMes: metasMes || [] };
     // 07/11/2026 (auditoria resultado-17, dinheiro-0): o saldo de hoje vem do Fluxo projetado (fxlResumo)
     if (!FXL) await fxlCarregar();
@@ -4901,7 +4904,12 @@ function fxCaixaLoja(u) {
   const rec4 = FX_S.recebido.filter(r => r.unidade === u && semanas4.includes(r.semana));
   const mediaSem = rec4.length ? fxSoma(rec4, 'recebido') / rec4.length : 0;
   const diasRest = Math.max(0, Math.round((new Date(fim + 'T12:00:00') - new Date(FX_S.hoje + 'T12:00:00')) / 86400000) + 1);
-  const esperado = mediaSem * diasRest / 7, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
+  // 18/11/2026 (Financeiro): o que ainda deve cair = soma da média de CADA dia da semana, de hoje até domingo (1 = segunda … 7 =
+  // domingo; hoje entra porque o saldo de partida é o fim do último dia com extrato). Antes: média da semana × dias ÷ 7, que
+  // espalhava o repasse do iFood (cai só na quarta) e somava o atacado duas vezes (AV quinta a domingo: 91 mil × 14,3 mil certo).
+  const dowHoje = ((new Date(FX_S.hoje + 'T12:00:00').getDay() + 6) % 7) + 1;
+  const recDiaU = (FX_S.recDia || []).filter(r => r.unidade === u && Number(r.dia_semana) >= dowHoje);
+  const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : mediaSem * diasRest / 7, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
   // o que esta loja recebe de OUTRA loja da Rede ate domingo: conta para ela, nao para a soma da Rede (07/10/2026)
   const recEntre = fxSoma(receberAte.filter(projEntreLojas), 'credito');
   return { u, banco, cofre, dataPartida: F ? F.dataPartida : null, recLanc, recEntre, esperado, pagar, vencidas: fxSoma(venc, 'debito'), nVenc: venc.length, pagarProx: fxSoma(pagarProx, 'debito'), sobra: banco + cofre + recLanc + esperado - pagar, diasRest, mediaSem, fim };
@@ -4934,7 +4942,7 @@ function renderSemana() {
     ${fxSeg('fxSem', fechadas.map(w => [w, fxDM(w)]), W)}</div>`;
   // 1
   const conv = a.visitas ? a.concluidos / a.visitas * 100 : null, convJ = j && j.visitas ? j.concluidos / j.visitas * 100 : null;
-  h += `<div class="fx-secao"><h3>1. Quanto vendeu</h3><span>venda cheia: caixa das lojas (PDV) + promoções pagas pela loja no iFood, sem cancelados</span></div><div class="fx-tiles">`
+  h += `<div class="fx-secao"><h3>1. Quanto vendeu</h3><span>pela data da venda e da nota (competência) · venda cheia: caixa das lojas (PDV) + promoções pagas pela loja no iFood, sem cancelados</span></div><div class="fx-tiles">`
     + fxTile('Vendas da semana', a.fat, j ? fxVar(a.fat, j.fat, ra) : '', j ? `semana anterior: ${fxMil(j.fat)}` : '', fxSpark(SEM.map(w => S[w].fat), rots, fxMil), `<ul class="fx-lista">${Object.entries(a.canais).sort((x, y) => y[1] - x[1]).filter(([, v]) => v >= 1).map(([c, v]) => `<li><span>${c}</span><b>${fxMil(v)} · ${fxPct1(v / a.fat * 100)}</b></li>`).join('')}</ul>`)
     + fxTile('Pedidos', fxInt(a.ped), j ? fxVar(a.ped, j.ped, ra) : '', j ? `semana anterior: ${fxInt(j.ped)}` : '', fxSpark(SEM.map(w => S[w].ped), rots, fxInt))
     + fxTile('Itens vendidos', fxInt(a.it), j ? fxVar(a.it, j.it, ra) : '', a.ped ? `${(a.it / a.ped).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} itens por pedido` : '', fxSpark(SEM.map(w => S[w].it), rots, fxInt))
@@ -4946,7 +4954,7 @@ function renderSemana() {
   // 17/11/2026 (auditoria resultado-19): "de cada R$ 100" divide pela venda do iFood COM a entrega (a do Canal e da DRE),
   // não pelos itens do export — eram dois valores de venda iFood na mesma tela
   const cemIf = a.ifVenda ? a.custoIfood / a.ifVenda * 100 : 0, cemIfJ = j && j.ifVenda ? j.custoIfood / j.ifVenda * 100 : null;
-  h += `<div class="fx-secao"><h3>2. O que o iFood custou</h3><span>${a.doCanal ? 'pela conciliação do iFood, a mesma conta do Placar e da DRE' : 'pelo export do iFood + anúncios do extrato (a conciliação desta semana ainda não chegou)'}</span></div><div class="fx-tiles">`
+  h += `<div class="fx-secao"><h3>2. O que o iFood custou</h3><span>pela data da venda e da nota (competência) · ${a.doCanal ? 'pela conciliação do iFood, a mesma conta do Placar e da DRE' : 'pelo export do iFood + anúncios do extrato (a conciliação desta semana ainda não chegou)'}</span></div><div class="fx-tiles">`
     + fxTile('Custo iFood da semana', a.custoIfood, j ? fxVar(a.custoIfood, j.custoIfood, ra) : '', `de cada R$ 100 vendidos no iFood, <b>R$ ${Math.round(cemIf)}</b> ficaram com o iFood${cemIfJ !== null ? ` (anterior: R$ ${Math.round(cemIfJ)})` : ''}`, fxSpark(SEM.map(w => S[w].ifVenda ? S[w].custoIfood / S[w].ifVenda * 100 : 0), rots, v => 'R$ ' + v.toFixed(0)),
       `<ul class="fx-lista"><li><span>promoções pagas pela loja</span><b>${fxMil(a.promoLoja)}</b></li><li><span>comissão e taxas</span><b>${fxMil(a.taxas)}</b></li><li><span>anúncios</span><b>${fxMil(a.anuncios)}</b></li>${a.fretesSD > 0.5 ? `<li><span>entregas sob demanda</span><b>${fxMil(a.fretesSD)}</b></li>` : ''}</ul>`)
     + fxTile('Venda no iFood', a.ifVenda, j ? fxVar(a.ifVenda, j.ifVenda, ra) : '', `${fxInt(a.ifPed)} pedidos entregues`, fxSpark(SEM.map(w => S[w].ifVenda), rots, fxMil))
@@ -4957,7 +4965,7 @@ function renderSemana() {
   // 3
   const p = cmvPct(W), pj = j ? cmvPct(ANT) : null, p4 = cmv4(W), fC = fxFarol(p4, META_CMV, 'abaixo');
   const parcial = FX_S.parcial.filter(r => fxLojas().includes(r.unidade)); const pv = fxSoma(parcial, 'vendas'), pc = fxSoma(parcial, 'compras');
-  h += `<div class="fx-secao"><h3>3. Mercadoria (CMV de compras)</h3><span>notas de mercadoria emitidas na semana ÷ ${semOutras ? 'vendas da semana' : 'o que entrou (vendas + atacado e outras receitas), como na DRE'}</span></div><div class="fx-tiles">`
+  h += `<div class="fx-secao"><h3>3. Mercadoria (CMV de compras)</h3><span>pela data da venda e da nota (competência) · notas de mercadoria emitidas na semana ÷ ${semOutras ? 'vendas da semana' : 'o que entrou (vendas + atacado e outras receitas), como na DRE'}</span></div><div class="fx-tiles">`
     + fxTile('Mercadoria da semana', a.compras, j ? fxVar(a.compras, j.compras, ra) : '', `notas: insumos ${fxMil(a.compMP)} · uso e consumo ${fxMil(a.compUC)}${a.enviadas ? ` · − ${fxMil(a.enviadas)} mandados às filiais e Boqueirão` : ''}${a.recebidas ? ` · + ${fxMil(a.recebidas)} recebidos da Água Verde` : ''}`, fxSpark(SEM.map(w => S[w].compras), rots, fxMil))
     + fxTile(semOutras ? 'De cada R$ 100 vendidos, mercadoria levou' : 'De cada R$ 100 que entraram, mercadoria levou', 'R$ ' + Math.round(p), pj !== null ? `semana anterior: R$ ${Math.round(pj)}` : '', a.outras > 0.5 ? `entrou ${fxMil(a.entrou)}: vendas ${fxMil(a.fat)} + atacado e outras ${fxMil(a.outras)}` : 'compras oscilam de semana para semana — olhe a média ao lado', fxSpark(SEM.map(w => cmvPct(w)), rots, v => 'R$ ' + v.toFixed(0)))
     // 07/11/2026 (auditoria resultado-15): com a Água Verde na conta, a compra do atacado está no numerador e
@@ -4969,26 +4977,26 @@ function renderSemana() {
   // 4
   const cemM = a.entrou ? a.margem / a.entrou * 100 : 0, serieM = SEM.map(w => S[w].margem);
   // 12/11/2026 (lote 3 resultado-14): "margem" fica só para a margem de contribuição (DRE/Placar); aqui é a sobra
-  h += `<div class="fx-secao"><h3>4. O que sobrou da venda</h3><span>vendas${semOutras ? '' : ' + atacado e outras receitas'} − mercadoria − custo iFood</span></div><div class="fx-duas">
+  h += `<div class="fx-secao"><h3>4. O que sobrou da venda</h3><span>pela data da venda e da nota (competência) · vendas${semOutras ? '' : ' + atacado e outras receitas'} − mercadoria − custo iFood</span></div><div class="fx-duas">
     <div class="fx-destaque"><div class="fx-rotulo">Sobra da semana</div><div class="fx-valor-g${a.margem < 0 ? ' neg' : ''}">${fxMil(a.margem)}</div>
       <p>Vendas ${fxMil(a.fat)}${a.outras > 0.5 ? ` + atacado e outras ${fxMil(a.outras)}` : ''} − mercadoria ${fxMil(a.compras)} − custo iFood ${fxMil(a.custoIfood)}. De cada R$ 100 ${a.outras > 0.5 ? 'que entraram' : 'vendidos'}, <b>R$ ${Math.round(cemM)}</b> ficaram para pagar pessoas, entrega, a casa e sobrar.</p>
       ${j ? `<p>Semana anterior: ${fxMil(j.margem)} (R$ ${Math.round(j.entrou ? j.margem / j.entrou * 100 : 0)} de cada 100). A sobra ${fxVar(a.margem, j.margem, ra)}.</p>` : ''}</div>
     <div class="fx-tile"><div class="fx-rotulo">Sobra, semana a semana</div><div class="fx-valor" style="font-size:20px">${SEM.slice(-3).map(w => fxMil(S[w].margem).replace('R$ ', '')).join(' · ')}</div><div class="fx-extra">últimas três semanas</div>${fxSpark(serieM, rots, fxMil)}<div class="fx-extra" style="margin-top:8px">Melhor: ${fxSemRot(SEM[serieM.indexOf(Math.max(...serieM))])} (${fxMil(Math.max(...serieM))}). Pior: ${fxSemRot(SEM[serieM.indexOf(Math.min(...serieM))])} (${fxMil(Math.min(...serieM))}).</div></div></div>`;
   // 5 caixa
   const us = fxLojas(), cxs = us.map(fxCaixaLoja), fim = cxs[0].fim;
-  h += `<div class="fx-secao"><h3>5. O caixa desta semana</h3><span>hoje ${fxDM(FX_S.hoje)} · semana de ${fxDM(FX_S.segAtual)} a ${fxDM(fim)} · saldo do banco = o do Fluxo projetado</span></div><div class="fx-tiles">`;
+  h += `<div class="fx-secao"><h3>5. O caixa desta semana</h3><span>pelo caixa: o que entra e sai do banco até domingo · hoje ${fxDM(FX_S.hoje)} · semana de ${fxDM(FX_S.segAtual)} a ${fxDM(fim)} · saldo do banco = o do Fluxo projetado</span></div><div class="fx-tiles">`;
   cxs.forEach(c => { const nome = lojaNome(c.u);
     h += `<div class="fx-caixa"><h4>${nome}</h4><ul>
       <li><span>Nas contas do banco<small>${c.dataPartida ? `fim de ${fxDM(c.dataPartida)}, último extrato completo — o mesmo do Fluxo projetado` : 'pelo último extrato importado'}</small></span><b>${fxMil(c.banco)}</b></li>
       <li><span>No cofre</span><b>${fxMil(c.cofre)}</b></li>
       <li><span>A receber até domingo, já lançado</span><b>+ ${fxMil(c.recLanc)}</b></li>
-      <li><span>Vendas que ainda devem cair até domingo<small>${c.diasRest} dias × média das últimas 4 semanas (${fxMil(c.mediaSem)}/semana)</small></span><b>+ ${fxMil(c.esperado)}</b></li>
+      <li><span>Vendas que ainda devem cair no banco até domingo<small>média de cada dia da semana nas 4 últimas · ${c.diasRest} dia(s)</small></span><b>+ ${fxMil(c.esperado)}</b></li>
       <li><span>A pagar até domingo<small>${c.nVenc ? `inclui ${c.nVenc} conta(s) vencida(s): ${fxMil(c.vencidas)}` : 'nenhuma vencida'}</small></span><b>− ${fxMil(c.pagar)}</b></li>
       <li class="res ${c.sobra >= 0 ? 'pos' : 'neg'}"><span>${c.sobra >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(c.sobra))}</b></li></ul>
       <div class="fx-mandar">${c.u !== 'AGUA VERDE' ? (c.sobra > 0 ? `Pode mandar para a Água Verde esta semana: <b>até ${fxMil(c.sobra)}</b>` : `Não pode mandar nada esta semana — faltam ${fxMil(Math.abs(c.sobra))}`) : `Próxima semana já tem <b>${fxMil(c.pagarProx)}</b> a pagar lançados.`}</div></div>`; });
   if (us.length > 1) { const entreL = cxs.reduce((s, c) => s + (c.recEntre || 0), 0); const sT = cxs.reduce((s, c) => s + c.sobra, 0) - entreL;
     h += `<div class="fx-caixa"><h4>Rede</h4><ul><li><span>Banco + cofres<small>saldo inicial do Fluxo projetado</small></span><b>${fxMil(cxs.reduce((s, c) => s + c.banco + c.cofre, 0))}</b></li><li><span>A receber até domingo (lançado + vendas esperadas)${entreL > 0.005 ? `<small>sem ${fxMil(entreL)} que a Água Verde recebe das filiais</small>` : ''}</span><b>+ ${fxMil(cxs.reduce((s, c) => s + c.recLanc + c.esperado, 0) - entreL)}</b></li><li><span>A pagar até domingo</span><b>− ${fxMil(cxs.reduce((s, c) => s + c.pagar, 0))}</b></li><li class="res ${sT >= 0 ? 'pos' : 'neg'}"><span>${sT >= 0 ? 'Vai sobrar' : 'Vai faltar'}</span><b>${fxMil(Math.abs(sT))}</b></li></ul><div class="fx-mandar">Filiais podem mandar para a AV: <b>${fxMil(cxs.filter(c => c.u !== 'AGUA VERDE' && c.sobra > 0).reduce((s, c) => s + c.sobra, 0))}</b> · próxima semana a pagar na rede: <b>${fxMil(cxs.reduce((s, c) => s + c.pagarProx, 0))}</b></div></div>`; }
-  h += '</div><div class="fx-nota" title="&quot;Vendas que ainda devem cair&quot; é a média do que caiu nas contas nas últimas 4 semanas, proporcional aos dias que faltam. Conta a pagar só aparece se está lançada no Saipos.">Caixa do dia a dia: sem XP, Participações e cartões de crédito.</div>';
+  h += '</div><div class="fx-nota" title="&quot;Vendas que ainda devem cair&quot; soma a média de cada dia da semana (de hoje a domingo) do que caiu nas contas nas últimas 4 semanas: o repasse do iFood entra na quarta, não espalhado. Conta a pagar só aparece se está lançada no Saipos.">Caixa do dia a dia: sem XP, Participações e cartões de crédito.</div>';
   // 6 despesas
   const L = fxLojas(), at = FX_S.despesas.filter(r => r.semana === W && L.includes(r.unidade));
   const ws4 = SEM.slice(Math.max(0, iW - 4), iW).length ? fechadas.slice(Math.max(0, iW - 4), iW) : [];
@@ -5016,9 +5024,12 @@ function renderSemana() {
     }
     return t;
   };
-  h += `<div class="fx-secao"><h3>6. Onde o dinheiro foi</h3><span>as despesas que mais fugiram do normal das 4 semanas anteriores, em reais · clique numa categoria para ver as ${SEM.length} semanas dela</span></div><div class="fx-tabela"><table><tr><th>Categoria</th><th>Esta semana</th><th>Normal (média 4 sem.)</th><th class="esq">Leitura</th></tr>`
+  h += `<div class="fx-secao"><h3>6. Onde o dinheiro foi</h3><span>pelo caixa: o que SAIU do banco nesta semana, inclusive notas de semanas anteriores · as despesas que mais fugiram do normal das 4 semanas anteriores, em reais · clique numa categoria para ver as ${SEM.length} semanas dela</span></div><div class="fx-tabela"><table><tr><th>Categoria</th><th>Esta semana</th><th>Normal (média 4 sem.)</th><th class="esq">Leitura</th></tr>`
     + catTop.map(linhaDesp).join('')
-    + `<tr class="tot"><td>Total pago na semana</td><td>${fxMil(totA)}</td><td>${fxMil(totN)}</td><td class="esq">${leitura(totA, totN)}</td></tr></table></div>`;
+    + `<tr class="tot"><td>Total pago na semana</td><td>${fxMil(totA)}</td><td>${fxMil(totN)}</td><td class="esq">${leitura(totA, totN)}</td></tr></table></div>`
+    // 18/11/2026 (dono: "o mercadoria da semana soma 46,8, o que ele representa no quadro onde o dinheiro foi?")
+    + (() => { const merc = at.filter(r => r.tipo === 'MATERIA PRIMA' || r.tipo === 'USO E CONSUMO');
+        return merc.length ? `<div class="fx-nota">Mercadoria paga nesta semana (notas de qualquer data): <b>${fxMil(fxSoma(merc, 'valor'))}</b>. A mercadoria do bloco 3 é a das notas da semana; aqui é o que foi pago.</div>` : ''; })();
   h += `<div class="fx-rodape">Caixa das lojas (Saipos), semanas de segunda a domingo. O Boqueirão fica fora; a mercadoria do atacado ainda está dentro das compras da Água Verde.</div>`;
   alvo.innerHTML = h;
 }
