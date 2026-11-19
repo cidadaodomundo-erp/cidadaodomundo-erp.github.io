@@ -3191,7 +3191,7 @@ function hojeLigarRelogio() {
 // faturamento (venda cheia, com a promoção da loja no iFood) ÷ pedidos, por canal, de vw_ticket_canal_dia. Compara os mesmos
 // dias da semana anterior, só nos dias em que a loja abriu nas duas (§C3).
 let HOJE_TK = null;
-let HOJE_TETO = null;   // 18/11/2026: o teto de compra do mês (compra_orcamento_foto, grupo TOTAL), a mesma fonte da tela Teto de compra
+let HOJE_CMVF = null, HOJE_CMVF_DIA = null, HOJE_CMVF_LENDO = false;   // 18/11/2026: CMV do dia pela ficha (vw_cmv_item_vendido)
 function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variação do renderHoje
   if (!HOJE_TK || !HOJE_TK.length) return '';
   const so = finVazio(), menos7 = (s) => fxSomaDias(s, -7);
@@ -3279,21 +3279,31 @@ function hojeFeriadoNota(V) {
     ' — a diferença vem em boa parte dele.</div>';
 }
 
-// 18/11/2026 23:11 (dono: "o que falta pro CMV do dia no Hoje na Rede?"): a coluna mostra o teto de compra do mês, da mesma foto
-// da tela Teto de compra. Foto com mais de 1 dia = "desatualizado"; "notas até" porque a loja pode estar com notas atrasadas.
-function hojeTetoCel(u, sub) {
-  if (!Array.isArray(HOJE_TETO) || !HOJE_TETO.length) return '<span style="color:var(--tx-5);">sem a foto do teto</span>';
-  const sem = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  const mes = HOJE_TETO[0].mes, r = HOJE_TETO.find(x => x.mes === mes && sem(x.unidade) === sem(u));
-  if (!r) return '—';
-  const dm = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—';
-  const pct = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%';
-  const calc = String(r.calculado_em || '').slice(0, 10), velha = calc && fxSomaDias(calc, 1) < trHoje();
-  const cor = r.situacao === 'DENTRO' ? 'var(--farol-ok)' : 'var(--farol-fora)';
-  return '<span style="cursor:pointer;" title="abre o Teto de compra · foto de ' + dm(calc) + '" onclick="mostrarModulo(\'comprateto\')">'
-    + '<span style="color:' + cor + '; font-weight:700;">● usou ' + pct(r.usado_pct) + ' do teto</span> · mês corrido ' + pct(r.mes_corrido_pct)
-    + sub('falta comprar ' + fxMil(Number(r.falta_comprar || 0)) + ' · notas até ' + dm(r.notas_ate) + (velha ? ' · <b style="color:var(--farol-perto);">desatualizado (' + dm(calc) + ')</b>' : ''))
-    + '</span>';
+// 18/11/2026 23:20 (dono: "Quero assim, gostei"; livro chat-frente-telas/respostas/cmv-do-dia-pela-ficha-ao-lado-das-notas):
+// CMV do dia pela FICHA (teórico) = custo_total ÷ receita de vw_cmv_item_vendido no último dia completo da carga; embaixo, o CMV
+// pelas notas no mês (a mesma conta do Placar/DRE do mês em andamento) e a cobertura das fichas. A view leva 2–4 s por dia:
+// lê depois da tela, sem segurar o resto.
+function hojeCmvFichaLer(dia) {
+  if (HOJE_CMVF_LENDO || HOJE_CMVF_DIA === dia) return;
+  HOJE_CMVF_LENDO = true;
+  consultarTudo(`vw_cmv_item_vendido?select=unidade,custo_total,receita,tem_custo&shift_date=eq.${dia}`)
+    .then(r => { HOJE_CMVF = r; }).catch(() => { HOJE_CMVF = false; })
+    .then(() => { HOJE_CMVF_DIA = dia; HOJE_CMVF_LENDO = false; if (document.getElementById('tabelaHojeRumoMes')) renderHoje(); });
+}
+function hojeCmvFichaCel(us, dia, notasPct, sub) {
+  const dm = (d) => String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+  const um = (v) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const baixo = sub((notasPct != null ? 'pelas notas no mês: ' + um(notasPct) + '%' : 'pelas notas no mês: —'));
+  const tit = 'a distância entre a ficha e as notas é a perda da operação (desperdício, porção, fora da ficha)';
+  if (HOJE_CMVF === null || HOJE_CMVF_DIA !== dia) return '<span style="color:var(--tx-5);" title="' + tit + '">lendo…</span>' + baixo;
+  if (HOJE_CMVF === false) return '<span style="color:var(--tx-5);">não consegui ler</span>' + baixo;
+  const L = HOJE_CMVF.filter(r => us.includes(r.unidade));
+  const rec = L.reduce((t, r) => t + Number(r.receita || 0), 0);
+  if (rec <= 0) return '<span style="color:var(--tx-5);">sem venda em ' + dm(dia) + '</span>' + baixo;
+  const custo = L.reduce((t, r) => t + Number(r.custo_total || 0), 0);
+  const recCob = L.filter(r => r.tem_custo).reduce((t, r) => t + Number(r.receita || 0), 0);
+  return '<span title="' + tit + '"><b>' + um(custo / rec * 100) + '%</b> em ' + dm(dia) + '</span>'
+    + sub((notasPct != null ? 'pelas notas no mês: ' + um(notasPct) + '%' : 'pelas notas no mês: —') + ' · cobertura das fichas ' + Math.round(recCob / rec * 100) + '%');
 }
 
 function renderHoje() {
@@ -3502,11 +3512,13 @@ function renderHoje() {
         u, A, T, ateOntem, outrasMes, receitaPrev,
         cmoEst: receitaPrevDre ? Math.abs(T.grupos.PESSOAL) / tres.length / receitaPrevDre * 100 : null,
         cmv: pct(Math.abs(A.grupos.CUSTO)), cmo: pct(Math.abs(A.grupos.PESSOAL)),
+        cmvNotas: (() => { try { const M = plcAgrega([String(ult).length === 7 ? mesIni.slice(0, 7) : mesIni]); return M && M.base ? Math.abs(M.grupos.CUSTO) / M.base * 100 : null; } catch (e) { return null; } })(),
         venda: pct(Math.abs(A.grupos.VENDA)), admin: pct(Math.abs(A.grupos.ADMIN)), res: pct(A.resultado),
       };
     });
     const L = unid.map(linha);
     const R = linha('REDE');
+    hojeCmvFichaLer(ontemIso);
     const somaBaseLojas = L.reduce((s, l) => s + l.T.base, 0);
     const listaMedia = (somaBaseLojas - R.T.base) / tres.length;
     L.forEach(l => { l.meta = metaLoja(l.u); });
@@ -3533,14 +3545,14 @@ function renderHoje() {
       '<th>Previsto no mês' + sub('no ritmo das últimas 4 semanas') + '</th>' +
       '<th>Meta do mês' + sub(rotMetaRes) + '</th>' +
       '<th>CMO estimado' + sub('meta até ' + (mPess ? um(mPess.meta) : '—') + '% · escala e horas') + '</th>' +
-      '<th>CMV do dia' + sub('orçamento de compra') + '</th></tr>' +
+      '<th title="a distância entre a ficha e as notas é a perda da operação (desperdício, porção, fora da ficha)">CMV do dia' + sub('pela ficha (teórico)') + '</th></tr>' +
       cols.map(c => tr(c, [
         mil1(c.ateOntem),
         farol(mil1(c.receitaPrev), c.receitaPrev, c.meta, 'acima') + (c.outrasMes > 500 ? sub('inclui ' + mil1(c.outrasMes) + ' de listas e atacado') : ''),
         c.meta ? mil1(c.meta) : '—',
         mPess ? farol(um(c.cmoEst) + '%', c.cmoEst, mPess.meta, mPess.sentido) : um(c.cmoEst) + '%',
-        // 18/11/2026 23:13 (dono: "mas CMV e teto de compras não são a mesma coisa"): o teto saiu; a coluna espera o pedido certo
-        '<span style="color:var(--tx-5);">em construção</span>',
+        // 18/11/2026 23:13 (dono: "mas CMV e teto de compras não são a mesma coisa"): o teto saiu; 23:20 entrou o CMV pela ficha
+        hojeCmvFichaCel(c.u === 'REDE' ? unid : [c.u], ontemIso, c.cmvNotas, sub),
       ])).join('') + '</table></div>';
 
     // ---- tabela 2: o ultimo mes fechado ----
