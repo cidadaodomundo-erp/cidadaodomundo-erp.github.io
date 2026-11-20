@@ -80,6 +80,17 @@
   .pm-dif { display:block; font-size:11px; font-weight:700; }
   .pm-det td { white-space:normal; text-align:left; background:var(--surface-2); font-size:12.5px; line-height:1.5; }
   .pm-det ul { margin:4px 0; padding-left:18px; }
+  .pm-tv { max-width:560px; margin:6px 0 10px; padding:10px 12px; border:1px solid var(--line-2); border-radius:10px; background:var(--surface); font-variant-numeric:tabular-nums; }
+  .pm-tv .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; }
+  .pm-tv .bts { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 8px; }
+  .pm-tv .bts button { font:inherit; font-size:12.5px; font-weight:700; padding:5px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; }
+  .pm-tv .bts button.on { background:var(--marca-amarelo, #e0a526); border-color:var(--marca-amarelo, #e0a526); color:#111; }
+  .pm-tv .ln { display:flex; justify-content:space-between; gap:12px; padding:2px 0; font-size:13.5px; }
+  .pm-tv .ln.tot { border-top:1px dashed var(--line-2); margin-top:4px; padding-top:5px; font-weight:700; }
+  .pm-tv .ln.tot b { color:var(--marca-amarelo, #e0a526); }
+  .pm-tv .av { margin-top:8px; padding:7px 10px; border-left:4px solid var(--farol-atencao, #d29922); background:var(--surface-2); border-radius:8px; font-size:12.5px; line-height:1.45; }
+  .pm-tv .av.ok { border-left-color:var(--farol-ok, #2ea043); }
+  .pm-tv .fo { display:block; margin-top:6px; font-size:11px; color:var(--tx-3); line-height:1.4; }
   .pm-nota { font-size:12px; color:var(--tx-3); margin:10px 0 0; line-height:1.5; }
   .pm-vazio { padding:18px; color:var(--tx-3); }
   .pm-regras { font-size:14px; line-height:1.6; }
@@ -233,6 +244,67 @@ function exigirLogin(recado) {
     return '<span class="pm-sim">Sim</span>';
   }
 
+  // 20/11/2026 (Hellen): com 2 turnos, a ficha separa 1º turno, 2º turno e Total, para ver quando ele perde o garantido
+  // e a refeição de um turno e ganha no outro. SÓ MOSTRA: o valor pago continua o da linha (l.pagar).
+  // Corridas de cada turno: n_t1/tx_t1 e n_t2/tx_t2 de pagar_motoboys_dia (entregues antes da entrada do jantar na escala contam no 1º).
+  const TURNO_VER = {};
+  function turnosConta(l) {
+    if (!(l.alm_conta && l.jan_conta) || l.n_t1 == null) return null;
+    const gm = l.garantido_manual, rm = l.rango_manual;
+    const tu = ['alm', 'jan'].map((r, i) => {
+      const ini = l['esc_' + r], fim = l['esc_' + r + '_fim'], h = l['esc_' + r + '_horas'], tar = l['tar_' + r];
+      const patio = l['patio_' + r], atrP = l['atr_real_' + r], col = r === 'alm' ? l.chegada : (l.chegada_jan || null), atrC = l['atraso_' + r];
+      const corta = !!l['corta_' + r];
+      const perde = gm === false ? true : gm === true ? false : corta;
+      const rango = rm === false ? false : rm === true ? true : !corta;
+      const g = (h != null && tar != null) ? Math.round(h * tar * 100) / 100 : (Number(l['piso_' + r]) || null);
+      const n = Number(i ? l.n_t2 : l.n_t1) || 0, v = Number(i ? l.tx_t2 : l.tx_t1) || 0;
+      const paga = (perde || g == null) ? v : Math.max(v, g);
+      return { nome: r === 'alm' ? 'almoço' : 'jantar', ini, fim, h, tar, patio, atrP, col, atrC, corta, perde, rango, g, piso: !(h != null && tar != null), n, v, paga, vale: (!perde && g != null && g > v) ? 'gar' : 'cor' };
+    });
+    const dir = tu.filter((t) => t.rango).length;
+    const lp = Array.isArray(l.lanches_precos) ? l.lanches_precos : [];
+    const ref = Math.round(lp.slice(dir).reduce((a, x) => a + (Number(x) || 0), 0) * 100) / 100;
+    const semPreco = lp.slice(dir).some((x) => x == null);
+    const aj = Number(l.ajustes || 0);
+    const total = Math.round((tu[0].paga + tu[1].paga - ref + aj) * 100) / 100;
+    return { tu, dir, ref, semPreco, aj, total, corte: l.corte_turno, bate: Math.abs(Number(l.tx_t1) + Number(l.tx_t2) - Number(l.taxas || 0)) < 0.01 };
+  }
+  function turnosBox(l, k) {
+    const C = turnosConta(l); if (!C) return '';
+    const a = TURNO_VER[k] || 'tot', tol = DADOS.tolerancia_min;
+    const bt = (id, t) => '<button type="button" data-tv="' + esc(k) + '" data-tva="' + id + '" class="' + (a === id ? 'on' : '') + '">' + t + '</button>';
+    let h = '<div class="pm-tv"><div class="k">Conta separada por turno</div><div class="bts">' + bt('t0', '1º turno') + bt('t1', '2º turno') + bt('tot', 'Total') + '</div>';
+    const ln = (e, d) => '<div class="ln"><span>' + e + '</span><span>' + d + '</span></div>';
+    if (a === 't0' || a === 't1') {
+      const i = a === 't0' ? 0 : 1, t = C.tu[i];
+      h += ln('Combinado (' + t.nome + ')', t.ini ? '<b>' + esc(t.ini) + ' → ' + esc(t.fim || 'sem hora de saída') + '</b>' + (t.h != null ? ' · ' + horasTxt(t.h) : '') : '<span class="pm-tarde">fora da escala</span>');
+      const min = (x) => (Number(x) > 0 ? Number(x) + ' min depois' : Math.abs(Number(x)) + ' min antes');
+      let ch;
+      const hm = (x, d) => { const [a1, a2] = x.split(':'); let t = (+a1 * 60 + +a2 + Number(d)) % 1440; if (t < 0) t += 1440; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+      // A chegada que vale é o MENOR entre o pátio e a 1ª entrega do turno (atr_real_*), a mesma que decide o corte.
+      if (t.patio && t.atrP != null && t.ini) { const h1 = hm(t.ini, t.atrP); ch = '<b>' + esc(h1) + '</b> · ' + min(t.atrP) + ' <span class="pm-fraco">(' + (h1 === t.patio ? 'pátio' : 'pátio ' + esc(t.patio) + ', 1ª coleta ' + esc(h1)) + ')</span> · ' + (t.corta ? '<span class="pm-nao">passou da tolerância de ' + esc(tol) + ' min</span>' : '<span class="pm-sim">dentro da tolerância</span>'); }
+      else if (t.patio) ch = '<b>' + esc(t.patio) + '</b> no pátio · ' + (t.corta ? '<span class="pm-nao">passou da tolerância de ' + esc(tol) + ' min</span>' : '<span class="pm-sim">dentro da tolerância</span>');
+      else ch = (t.col ? '1ª coleta <b>' + esc(t.col) + '</b>' + (t.atrC != null ? ' · ' + min(t.atrC) : '') : '—') + ' · <span class="pm-tarde">sem hora do pátio, não corta</span>';
+      h += ln('Chegou', ch);
+      h += ln('Garantido do turno', t.g == null ? '<span class="pm-tarde">sem valor</span>' : (t.perde ? '<span class="pm-nao">perdeu</span> (' + brl(t.g) + ')' : '<span class="pm-sim">ganhou</span> ' + brl(t.g)) + (t.piso ? ' <span class="pm-fraco">piso do turno</span>' : ''));
+      h += ln('Refeição do turno', t.rango ? '<span class="pm-sim">tem direito</span>' : '<span class="pm-nao">sem direito</span>');
+      h += ln('Corridas ' + (i ? 'a partir das ' : 'antes das ') + esc(C.corte), t.n + ' = <b>' + brl(t.v) + '</b>');
+      h += '<div class="ln tot"><span>Este turno paga</span><span><b>' + brl(t.paga) + '</b> ' + (t.vale === 'gar' ? '(o garantido)' : '(as corridas)') + '</span></div>';
+    } else {
+      C.tu.forEach((t, i) => { h += ln((i ? '2º' : '1º') + ' turno · ' + (t.vale === 'gar' ? 'garantido' : 'corridas') + (t.perde ? ' <span class="pm-nao">(perdeu o garantido)</span>' : ''), brl(t.paga)); });
+      if (C.ref > 0) h += ln('Lanche além do direito (' + C.dir + ' de ' + (Array.isArray(l.lanches_precos) ? l.lanches_precos.length : 0) + ' com direito)', '− ' + brl(C.ref));
+      if (Math.abs(C.aj) > 0.004) h += ln('Acerto à mão' + (l.ajuste_motivos ? ' (' + esc(l.ajuste_motivos) + ')' : ''), (C.aj > 0 ? '+ ' : '− ') + brl(Math.abs(C.aj)));
+      h += '<div class="ln tot"><span>Total pela conta por turno</span><span><b>' + brl(C.total) + '</b></span></div>';
+      if (C.semPreco) h += '<div class="av">Falta o preço de um lanche: não foi cobrado.</div>';
+      if (Math.abs(C.total - Number(l.pagar || 0)) >= 0.01) h += '<div class="av">⚠ A tela hoje paga <b>' + brl(l.pagar) + '</b>, pela conta do dia inteiro. Pela conta por turno daria <b>' + brl(C.total) + '</b> (diferença de ' + brl(Math.abs(C.total - Number(l.pagar || 0))) + '). <b>O valor pago não mudou</b>: mudar a regra é decisão de vocês.</div>';
+      else h += '<div class="av ok">✓ Bate com o valor que a tela paga (' + brl(l.pagar) + ').</div>';
+    }
+    if (!C.bate) h += '<div class="av">⚠ A soma das corridas dos dois turnos não bate com o total das taxas (' + brl(l.taxas) + '): confira antes de pagar.</div>';
+    h += '<span class="fo">escala do Jaison · chegada: hora no pátio da tela Chegada (fila do TrackEat, GPS ou anotado) · corridas: TrackEat; as entregues antes das ' + esc(C.corte) + ' contam no 1º turno · lanche: Saipos, comanda Z Motoboys</span></div>';
+    return h;
+  }
+
   function linhaHtml(l, i) {
     const k = l.loja + '|' + l.id_entregador;
     const tarde = !!l.coleta_tarde;
@@ -266,7 +338,7 @@ function exigirLogin(recado) {
         (horasEsc(l) != null ? ' = ' + horasTxt(horasEsc(l)) + ' combinadas; rodou ' + horasTxt(l.horas) : ''));
       itens.push('Lanches na comanda Z Motoboys: ' + l.lanches + ' (direito: ' + l.direito_refeicoes + ')');
       if (l.reprovadas) itens.push(l.reprovadas + ' corrida(s) reprovada(s) no TrackEat ficaram fora');
-      h += '<tr class="pm-det"><td colspan="15"><ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
+      h += '<tr class="pm-det"><td colspan="15">' + turnosBox(l, k) + '<ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
     }
     return h;
   }
@@ -330,7 +402,7 @@ function exigirLogin(recado) {
     if (!$('painelObra').hidden) $('painelObra').innerHTML = '<div class="pm-aviso info">Esta parte ainda está no portal antigo e vem para cá nos próximos passos.</div>';
   });
   $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); });
-  $('conteudo').addEventListener('click', (ev) => { const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
+  $('conteudo').addEventListener('click', (ev) => { const tv = ev.target.closest('button[data-tva]'); if (tv) { TURNO_VER[tv.dataset.tv] = tv.dataset.tva; desenhar(); return; } const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
   $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };
   $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
   $('dia').onchange = carregar;
