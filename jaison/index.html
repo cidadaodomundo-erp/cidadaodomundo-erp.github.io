@@ -45,6 +45,15 @@
   .numeros { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin:10px 0 6px; }
   .numeros div { background:#151514; border-radius:10px; padding:6px 8px; } .numeros small { color:var(--fraco); font-size:11px; display:block; } .numeros span { font-weight:600; font-size:15px; }
   .numeros .vale { outline:2px solid var(--amarelo); }
+  .turnos { width:100%; border-collapse:collapse; margin:10px 0 4px; font-size:14px; }
+  .turnos th, .turnos td { text-align:left; padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; }
+  .turnos tr:first-child th { border-top:0; color:var(--fraco); font-size:12px; font-weight:600; padding-top:0; }
+  .turnos th { width:22%; } .turnos td small { color:var(--fraco); font-size:11px; }
+  .turnos td em { display:block; font-style:normal; font-size:12px; }
+  .turnos td.bom em { color:var(--verde); } .turnos td.meio em { color:var(--laranja); } .turnos td.ruim, .turnos td.ruim em { color:var(--verm); }
+  .numeros .sim { color:var(--verde); } .numeros .nao { color:var(--verm); font-size:13px; }
+  details.conta { background:none; border:0; border-top:1px dashed var(--line); border-radius:0; padding:8px 0 0; margin-top:8px; }
+  details.conta summary { font-weight:600; font-size:13px; color:var(--fraco); } details.conta li { font-size:13px; margin:3px 0 3px 16px; } details.conta ul { margin:6px 0 0; padding:0; }
   .linha { font-size:13px; color:var(--fraco); margin-top:4px; }
   .motivo { font-size:13px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
   .motivo li { margin:2px 0 2px 16px; } .motivo ul { margin:0; padding:0; }
@@ -132,26 +141,55 @@
   }
   function falha(msg) { app.innerHTML = moldura('<div class="aviso">' + esc(msg) + '</div>'); ligar(); }
 
+  // Minutos do dia, com a madrugada (antes das 05h) contando como depois da meia-noite do mesmo turno.
+  const minDia = (h) => { if (!h) return null; const [a, b] = h.split(':').map(Number); return (a < 5 ? a + 24 : a) * 60 + b; };
+  function turnoLinha(nome, esc, escFim, chegou, ehPatio, rodou, tol) {
+    const escTxt = esc ? esc + (escFim ? ' às ' + escFim : '') : 'fora da escala';
+    let cheg, cls = '';
+    if (!rodou) { cheg = esc ? 'não rodou' : '—'; cls = esc ? 'ruim' : ''; }
+    else if (!chegou) cheg = 'sem registro';
+    else {
+      cheg = chegou + (ehPatio ? ' <small>no pátio</small>' : ' <small>1ª coleta</small>');
+      if (esc) {
+        const d = minDia(chegou) - minDia(esc);
+        if (d > tol) { cls = 'ruim'; cheg += '<em>' + d + ' min atrasado</em>'; }
+        else if (d > 0) { cls = 'meio'; cheg += '<em>' + d + ' min depois</em>'; }
+        else { cls = 'bom'; cheg += '<em>no horário</em>'; }
+      }
+    }
+    return '<tr><th>' + nome + '</th><td>' + esc_(escTxt) + '</td><td class="' + cls + '">' + cheg + '</td></tr>';
+  }
+  const esc_ = (s) => esc(s);
   function cartao(l) {
-    const vale = Number(l.garantido || 0) > Number(l.taxas || 0) ? 'g' : 't';
+    const tol = Number((DADOS && DADOS.tolerancia_min) || 15);
     const motivos = String(l.detalhe || '').split(' · ').filter(Boolean);
-    const esc1 = l.esc_alm ? 'almoço ' + l.esc_alm + (l.esc_alm_fim ? '–' + l.esc_alm_fim : '') : '';
-    const esc2 = l.esc_jan ? 'jantar ' + l.esc_jan + (l.esc_jan_fim ? '–' + l.esc_jan_fim : '') : '';
+    const sai = minDia(l.saida), ch = minDia(l.chegada);
+    const rodouAlm = ch != null && ch < 15 * 60;
+    const rodouJan = (ch != null && ch >= 15 * 60) || !!l.chegada_jan || (sai != null && sai >= 19 * 60);
+    const chegAlm = l.patio_alm || (rodouAlm ? l.chegada : null);
+    const chegJan = l.patio_jan || l.chegada_jan || (!rodouAlm ? l.chegada : null);
+    let linhas = '';
+    if (l.esc_alm || rodouAlm) linhas += turnoLinha('Almoço', l.esc_alm, l.esc_alm_fim, chegAlm, !!l.patio_alm, rodouAlm, tol);
+    // Almoço e jantar emendados na escala (fim do almoço = início do jantar) e rodou no almoço: ele já estava na loja.
+    const emendou = !l.patio_jan && rodouAlm && rodouJan && l.esc_alm_fim && l.esc_jan && minDia(l.esc_alm_fim) >= minDia(l.esc_jan);
+    if (emendou) linhas += '<tr><th>Jantar</th><td>' + esc(l.esc_jan + (l.esc_jan_fim ? ' às ' + l.esc_jan_fim : '')) + '</td><td class="bom">emendou<em>já estava desde o almoço</em></td></tr>';
+    else if (l.esc_jan || rodouJan) linhas += turnoLinha('Jantar', l.esc_jan, l.esc_jan_fim, chegJan, !!l.patio_jan, rodouJan, tol);
+    const temGar = Number(l.garantido || 0) > 0;
+    const garVence = temGar && Number(l.garantido) > Number(l.taxas || 0);
+    const semGar = l.corta_dia ? 'perdeu por atraso' : 'não tem';
     return '<div class="cartao' + (l.corta_dia ? ' corta' : '') + '">' +
-      '<div class="c1"><div><div class="nome">' + esc(l.nome) +
-        (l.corta_dia ? '<span class="selo corta">perdeu o garantido</span>' : '') + (l.conferir ? '<span class="selo conf">conferir</span>' : '') + '</div>' +
-        '<div class="loja">' + esc(l.loja) + ' · rodou ' + esc(l.chegada || '—') + ' às ' + esc(l.saida || '—') + '</div></div>' +
-        '<div class="recebe"><b>' + brl(l.pagar) + '</b><small>a receber</small></div></div>' +
+      '<div class="c1"><div><div class="nome">' + esc(l.nome) + (l.conferir ? '<span class="selo conf">conferir</span>' : '') + '</div>' +
+        '<div class="loja">' + esc(l.loja) + ' · saiu ' + esc(l.saida || '—') + '</div></div>' +
+        '<div class="recebe"><b>' + brl(l.pagar) + '</b><small>vai ganhar</small></div></div>' +
+      '<table class="turnos"><tr><th></th><th>Escala</th><th>Chegou</th></tr>' + linhas + '</table>' +
       '<div class="numeros">' +
-        '<div class="' + (vale === 'g' ? 'vale' : '') + '"><small>Garantido</small><span>' + brl0(l.garantido) + '</span></div>' +
-        '<div class="' + (vale === 't' ? 'vale' : '') + '"><small>Taxas (' + Number(l.entregas || 0) + ' ent.)</small><span>' + brl0(l.taxas) + '</span></div>' +
-        '<div><small>Refeição</small><span>' + (Number(l.cobrar_refeicao) ? '− ' + brl0(l.cobrar_refeicao) : 'R$ 0') + '</span></div>' +
+        '<div><small>Corridas</small><span>' + Number(l.entregas || 0) + '</span></div>' +
+        '<div class="' + (garVence ? 'vale' : '') + '"><small>Garantido</small><span class="' + (temGar ? 'sim' : 'nao') + '">' + (temGar ? 'Sim · ' + brl0(l.garantido) : 'Não · ' + semGar) + '</span></div>' +
+        '<div class="' + (!garVence ? 'vale' : '') + '"><small>Taxas</small><span>' + brl0(l.taxas) + '</span></div>' +
       '</div>' +
-      '<div class="linha">Vale o maior entre garantido e taxas (marcado em amarelo).' +
-        (Number(l.ajustes) ? ' Acerto à mão: ' + brl0(l.ajustes) + '.' : '') + '</div>' +
-      ((esc1 || esc2) ? '<div class="linha">Escala: ' + esc([esc1, esc2].filter(Boolean).join(' · ')) + '</div>' : '<div class="linha">Fora da escala.</div>') +
-      '<div class="linha">Garantido: ' + horasTxt(l.horas_garantido) + ' · refeições de direito: ' + Number(l.direito_refeicoes || 0) + ', comeu ' + Number(l.lanches || 0) + '</div>' +
-      (motivos.length ? '<div class="motivo"><ul>' + motivos.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>' : '') +
+      (Number(l.cobrar_refeicao) ? '<div class="linha">Refeição a mais descontada: − ' + brl0(l.cobrar_refeicao) + '</div>' : '') +
+      (Number(l.ajustes) ? '<div class="linha">Acerto à mão: ' + brl0(l.ajustes) + '</div>' : '') +
+      (motivos.length ? '<details class="conta"><summary>Ver a conta</summary><ul>' + motivos.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></details>' : '') +
       '</div>';
   }
 
@@ -174,8 +212,10 @@
     const tot = linhas.reduce((a, l) => { a.p += Number(l.pagar || 0); a.e += Number(l.entregas || 0); return a; }, { p: 0, e: 0 });
     const f = DADOS.fontes || {};
     const conferir = linhas.filter((l) => l.conferir).length;
+    const semPatio = linhas.length && !linhas.some((l) => l.patio_alm || l.patio_jan);
     const corpo = !linhas.length ? '<div class="vazio">Nenhum motoboy rodou neste dia' + (LOJA === 'todas' ? '' : ' nesta loja') + '.</div>' :
       '<div class="total"><div><b>' + linhas.length + '</b><small>motoboys</small></div><div><b>' + tot.e + '</b><small>entregas</small></div><div><b>' + brl(tot.p) + '</b><small>a receber</small></div></div>' +
+      (semPatio ? '<div class="aviso">A hora no pátio não foi registrada neste dia. “Chegou” mostra a 1ª coleta no TrackEat, que pode ser depois da chegada de verdade.</div>' : '') +
       (conferir ? '<div class="aviso">' + conferir + ' com “conferir”: a conta pode mudar depois que o escritório olhar.</div>' : '') +
       linhas.map(cartao).join('');
     app.innerHTML = moldura('<div class="fonte">Entregas do TrackEat carregadas em ' + esc(f.trackeat_carregado_em || '—') + ' · escala gravada em ' + esc(f.escala_gravada_em || '—') + ' · consultado ' + esc(DADOS.agora || '') + '</div>' + corpo + regras());
