@@ -55,6 +55,14 @@
   .numeros .sim { color:var(--verde); } .numeros .nao { color:var(--verm); font-size:13px; }
   details.conta { background:none; border:0; border-top:1px dashed var(--line); border-radius:0; padding:8px 0 0; margin-top:8px; }
   details.conta summary { font-weight:600; font-size:13px; color:var(--fraco); } details.conta li { font-size:13px; margin:3px 0 3px 16px; } details.conta ul { margin:6px 0 0; padding:0; }
+  details.clima { margin:0 0 12px; padding:10px 12px; }
+  details.clima table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+  details.clima th, details.clima td { text-align:left; padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; }
+  details.clima tr:first-child th { border-top:0; color:var(--fraco); font-size:12px; }
+  .cl-s { white-space:nowrap; } .cl-chuva { color:#7cc4ff; font-weight:600; }
+  .cl-fer { display:block; color:var(--amarelo); font-size:11px; font-weight:600; }
+  tr.cl-dest th, tr.cl-dest td { background:#2a2410; }
+  .cl-pe { color:var(--fraco); font-size:12px; margin-top:6px; }
   .linha { font-size:13px; color:var(--fraco); margin-top:4px; }
   .motivo { font-size:13px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
   .motivo li { margin:2px 0 2px 16px; } .motivo ul { margin:0; padding:0; }
@@ -105,6 +113,45 @@
     };
   }
 
+
+  // PREVISÃO DO TEMPO (20/11/2026, pedido do Fábio): Open-Meteo direto do navegador, sem robô, mesma fonte da tela Escala e Clima.
+  const METEO = 'https://api.open-meteo.com/v1/forecast?latitude=-25.43&longitude=-49.27&hourly=precipitation,precipitation_probability&forecast_days=7&timezone=America%2FSao_Paulo';
+  const FERIADOS = { '2026-11-20': 'Consciência Negra', '2026-12-25': 'Natal', '2027-01-01': 'Ano Novo', '2027-02-09': 'Carnaval',
+    '2027-03-26': 'Sexta-feira Santa', '2027-04-21': 'Tiradentes', '2027-05-01': 'Dia do Trabalho', '2027-05-27': 'Corpus Christi',
+    '2027-09-07': 'Independência', '2027-09-08': 'N. Sra. da Luz (Curitiba)', '2027-10-12': 'N. Sra. Aparecida', '2027-11-02': 'Finados',
+    '2027-11-15': 'Proclamação da República', '2027-11-20': 'Consciência Negra', '2027-12-25': 'Natal' };
+  let CLIMA = null;
+  async function lerClima() {
+    if (CLIMA) return CLIMA;
+    try {
+      const j = await (await fetch(METEO)).json(); const h = j.hourly || {}; const m = {};
+      (h.time || []).forEach((t, i) => {
+        const d = t.slice(0, 10), hr = +t.slice(11, 13), k = hr >= 11 && hr < 15 ? 'alm' : hr >= 18 && hr < 24 ? 'jan' : null;
+        if (!k) return; const o = (m[d] = m[d] || {}), x = (o[k] = o[k] || { mm: 0, p: 0 });
+        x.mm += Number(h.precipitation[i]) || 0; x.p = Math.max(x.p, Number(h.precipitation_probability[i]) || 0);
+      });
+      CLIMA = m;
+    } catch (e) { CLIMA = {}; }
+    return CLIMA;
+  }
+  function chuva(x) {
+    if (!x) return '<span class="cl-s">—</span>';
+    const mm = Math.round(x.mm * 10) / 10, ic = mm >= 5 ? '🌧️' : mm >= 1 || x.p >= 60 ? '🌦️' : '☀️';
+    return '<span class="cl-s' + (mm >= 1 || x.p >= 60 ? ' cl-chuva' : '') + '">' + ic + ' ' + x.p + '%' + (mm >= 0.1 ? ' · ' + String(mm).replace('.', ',') + 'mm' : '') + '</span>';
+  }
+  function climaHtml() {
+    if (!CLIMA || !Object.keys(CLIMA).length) return '';
+    const hoje = hojeSP(); const dias = Object.keys(CLIMA).filter((d) => d >= hoje).slice(0, 5);
+    const lin = dias.map((d) => {
+      const amanha = somaDias(d, 1), fer = FERIADOS[d], vesp = FERIADOS[amanha];
+      const nome = d === hoje ? 'Hoje' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7);
+      const tag = fer ? '<span class="cl-fer">feriado: ' + esc(fer) + '</span>' : vesp ? '<span class="cl-fer">véspera de feriado (' + esc(vesp) + ')</span>' : '';
+      return '<tr class="' + (fer || vesp ? 'cl-dest' : '') + '"><th>' + esc(nome) + tag + '</th><td>' + chuva(CLIMA[d].alm) + '</td><td>' + chuva(CLIMA[d].jan) + '</td></tr>';
+    }).join('');
+    return '<details class="clima" open><summary>🌦️ Previsão de chuva</summary><table><tr><th></th><th>Almoço</th><th>Jantar</th></tr>' + lin +
+      '</table><div class="cl-pe">Chance de chuva e milímetros em Curitiba (Open-Meteo). Dia de chuva e véspera de feriado pedem mais motoboys.</div></details>';
+  }
+
   function moldura(conteudo) {
     const ontem = somaDias(hojeSP(), -1);
     const d = new Date(DIA + 'T12:00:00');
@@ -116,7 +163,7 @@
       '<input type="date" id="iDia" value="' + DIA + '" max="' + hojeSP() + '" aria-label="Escolher o dia"></div>' +
       '<button id="bDepois" aria-label="Próximo dia"' + (DIA >= hojeSP() ? ' disabled' : '') + '>›</button></div>' +
       (lojas.length > 2 ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === LOJA ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
-      conteudo;
+      climaHtml() + conteudo;
   }
   function ligar() {
     const q = (id) => document.getElementById(id);
@@ -130,6 +177,7 @@
   async function carregar() {
     if (!rmbSessao()) { telaLogin(''); return; }
     const seq = ++SEQ; DADOS = null;
+    if (!CLIMA) lerClima().then(() => { if (seq === SEQ && DADOS) desenhar(); });
     app.innerHTML = moldura('<div class="vazio">Carregando o dia…</div>'); ligar();
     await rmbGarantirTokenValido();
     let r;
