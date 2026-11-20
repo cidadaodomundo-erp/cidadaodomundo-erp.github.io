@@ -7,3 +7,4 @@
   - `pode_ver_garantido()`: dono, quem vê pessoal, ou e-mail em `rmb_config` chave `emails_garantido` (começa vazia).
   - `garantido_motoboys_dia(dia)`: só garantido, taxas, refeição, a receber, escala e motivo. Sem chave Pix, sem id.
 - Não grava nada. Hora no pátio vem só das tabelas do ERP (`chegada_fila`, `chegada_presenca`); a tela Pagar motoboys também usa a chegada do portal antigo, então o corte por atraso pode aparecer lá e não aqui.
+- 20/11 (pedido do Fábio): cada motoboy mostra, por turno, a escala combinada, a hora que chegou (pátio ou, sem pátio, 1ª coleta) e o atraso; garantido Sim/Não; corridas; quanto vai ganhar. Função ganhou corta_alm/jan, atraso_*, chegada_jan, saida_alm.
