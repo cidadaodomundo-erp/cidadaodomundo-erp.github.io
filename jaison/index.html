@@ -51,6 +51,7 @@
   .turnos th { width:22%; } .turnos td small { color:var(--fraco); font-size:11px; }
   .turnos td em { display:block; font-style:normal; font-size:12px; }
   .turnos td.bom em { color:var(--verde); } .turnos td.meio em { color:var(--laranja); } .turnos td.ruim, .turnos td.ruim em { color:var(--verm); }
+  .turnos td.semfila { color:var(--fraco); font-size:13px; } .turnos td em.cinza { color:var(--fraco); }
   .numeros .sim { color:var(--verde); } .numeros .nao { color:var(--verm); font-size:13px; }
   details.conta { background:none; border:0; border-top:1px dashed var(--line); border-radius:0; padding:8px 0 0; margin-top:8px; }
   details.conta summary { font-weight:600; font-size:13px; color:var(--fraco); } details.conta li { font-size:13px; margin:3px 0 3px 16px; } details.conta ul { margin:6px 0 0; padding:0; }
@@ -147,9 +148,9 @@
     const escTxt = esc ? esc + (escFim ? ' às ' + escFim : '') : 'fora da escala';
     let cheg, cls = '';
     if (!rodou) { cheg = esc ? 'não rodou' : '—'; cls = esc ? 'ruim' : ''; }
-    else if (!chegou) cheg = 'sem registro';
+    else if (!ehPatio) { cheg = 'sem registro na fila' + (chegou ? '<em class="cinza">1ª coleta ' + chegou + '</em>' : ''); cls = 'semfila'; }
     else {
-      cheg = chegou + (ehPatio ? ' <small>no pátio</small>' : ' <small>1ª coleta</small>');
+      cheg = chegou;
       if (esc) {
         const d = minDia(chegou) - minDia(esc);
         if (d > tol) { cls = 'ruim'; cheg += '<em>' + d + ' min atrasado</em>'; }
@@ -181,7 +182,7 @@
       '<div class="c1"><div><div class="nome">' + esc(l.nome) + (l.conferir ? '<span class="selo conf">conferir</span>' : '') + '</div>' +
         '<div class="loja">' + esc(l.loja) + ' · saiu ' + esc(l.saida || '—') + '</div></div>' +
         '<div class="recebe"><b>' + brl(l.pagar) + '</b><small>vai ganhar</small></div></div>' +
-      '<table class="turnos"><tr><th></th><th>Escala</th><th>Chegou</th></tr>' + linhas + '</table>' +
+      '<table class="turnos"><tr><th></th><th>Escala</th><th>Chegou na fila</th></tr>' + linhas + '</table>' +
       '<div class="numeros">' +
         '<div><small>Corridas</small><span>' + Number(l.entregas || 0) + '</span></div>' +
         '<div class="' + (garVence ? 'vale' : '') + '"><small>Garantido</small><span class="' + (temGar ? 'sim' : 'nao') + '">' + (temGar ? 'Sim · ' + brl0(l.garantido) : 'Não · ' + semGar) + '</span></div>' +
@@ -214,8 +215,8 @@
     const conferir = linhas.filter((l) => l.conferir).length;
     const semPatio = linhas.length && !linhas.some((l) => l.patio_alm || l.patio_jan);
     const corpo = !linhas.length ? '<div class="vazio">Nenhum motoboy rodou neste dia' + (LOJA === 'todas' ? '' : ' nesta loja') + '.</div>' :
-      '<div class="total"><div><b>' + linhas.length + '</b><small>motoboys</small></div><div><b>' + tot.e + '</b><small>entregas</small></div><div><b>' + brl(tot.p) + '</b><small>a receber</small></div></div>' +
-      (semPatio ? '<div class="aviso">A hora no pátio não foi registrada neste dia. “Chegou” mostra a 1ª coleta no TrackEat, que pode ser depois da chegada de verdade.</div>' : '') +
+      '<div class="total"><div><b>' + linhas.length + '</b><small>motoboys</small></div><div><b>' + tot.e + '</b><small>corridas</small></div><div><b>' + brl(tot.p) + '</b><small>a receber</small></div></div>' +
+      (semPatio ? '<div class="aviso">A chegada na fila ainda não aparece nesta tela. Embaixo de cada turno vai a 1ª coleta no TrackEat só como referência; ela não conta como chegada.</div>' : '') +
       (conferir ? '<div class="aviso">' + conferir + ' com “conferir”: a conta pode mudar depois que o escritório olhar.</div>' : '') +
       linhas.map(cartao).join('');
     app.innerHTML = moldura('<div class="fonte">Entregas do TrackEat carregadas em ' + esc(f.trackeat_carregado_em || '—') + ' · escala gravada em ' + esc(f.escala_gravada_em || '—') + ' · consultado ' + esc(DADOS.agora || '') + '</div>' + corpo + regras());
