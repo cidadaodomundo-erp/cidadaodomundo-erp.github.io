@@ -3,6 +3,7 @@
 --   1) pedido do robô de cotação (compra_cotacao)  ->  2) compra feita no ML (fin_cartao_compra, gravada pelo leitor de pedidos)
 --   3) chegada: quando o pedido do ML fica "Entregue", nasce um aviso (compra_aviso) para o WhatsApp avisar que chegou.
 -- E dá à tela Mercado Livre a aba Histórico (compra_ml_historico): o que foi comprado e quanto foi gasto, por mês e por loja.
+-- APLICADO no ERP em 21/11/2026 ~16h35 (migração compras_ml_fluxo_unico_21_11).
 -- Só dados da empresa. Nada do banco pessoal. Desfazer: compras-ml-fluxo-unico-desfazer.sql
 begin;
 
@@ -89,8 +90,7 @@ begin
   return new;
 end $$;
 
-drop trigger if exists compra_ml_ao_gravar on public.fin_cartao_compra;
-create trigger compra_ml_ao_gravar before insert or update of detalhe, situacao, descricao on public.fin_cartao_compra
+create or replace trigger compra_ml_ao_gravar before insert or update of detalhe, situacao, descricao on public.fin_cartao_compra
   for each row execute function public.compra_ml_ao_gravar();
 
 -- marca a chegada do que já está entregue hoje (sem aviso: é histórico)
