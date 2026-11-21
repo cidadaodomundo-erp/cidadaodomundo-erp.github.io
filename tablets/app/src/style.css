@@ -175,6 +175,61 @@ textarea{width:100%;border-radius:10px;border:1px solid var(--linha);padding:10p
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
+/* ===== visual totem (21/11): fundo preto da casa, fotos grandes, categorias com foto, ouro so no botao de pedir ===== */
+:root{--preto:#F4EBDD;--creme:#111;--papel:#1b1a17;--linha:#38332b;--mudo:#b8ae9d;--erro:#ff8a7a;--casa:#0b0b0b;--cartao:#1f1d1a;--ouro:#E0A81C;--rail:150px;--fita:92px}
+body{background:var(--creme);color:var(--preto)}
+.faixa-demo{background:#2a2620;color:#f4ebdd}
+.topo,.comanda-topo{background:var(--casa);color:#f4ebdd;border-bottom:1px solid #222}
+.logo{height:48px;width:48px}
+.mesa-btn{border-color:#f4ebdd;color:#f4ebdd}
+.mesa-dica{color:#f4ebdd}
+.busca input{background:#1f1d1a;color:#f4ebdd;border-color:#3a352d}
+.abertura h1{font-size:34px;color:#fff;letter-spacing:.04em}
+#categorias{background:var(--creme);border-bottom:1px solid var(--linha);gap:8px;padding:10px 12px}
+#categorias button{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;min-width:84px;max-width:96px;min-height:0;padding:6px 4px 8px;border:0;border-radius:16px;color:#d9d0c1;font-size:12.5px;font-weight:700;line-height:1.1;text-align:center;white-space:normal}
+#categorias button img{width:56px;height:56px;border-radius:50%;object-fit:cover;background:#2a2620;flex:none}
+#categorias button[aria-current="true"]{background:#f4ebdd;color:#111;border-bottom-color:transparent}
+#lista h2{color:#fff;font-family:"Cubano","Barlow",sans-serif;font-weight:400;font-size:22px;letter-spacing:.05em;margin:30px 0 14px}
+.grade{gap:16px}
+.card{background:var(--cartao);border-radius:20px;overflow:hidden;border:1px solid #2c2924}
+.card .foto{border-radius:0;aspect-ratio:1/1;background:#2a2620}
+.card .mais{width:48px;height:48px;background:#fff;color:#111;font-size:28px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.card .info{padding:12px 14px 14px;display:flex;flex-direction:column;flex:1}
+.card .nome{font-size:17px;color:#fff}
+.card .desc{color:var(--mudo)}
+.card .preco{margin-top:auto;padding-top:10px;font-size:20px;font-weight:800;color:#fff}
+.card:active{transform:scale(.98)}
+#comanda{background:var(--papel);border-left-color:#222}
+.comanda-rodape{background:var(--papel)}
+.rodada{background:#24221e}
+.msg:not(:empty){background:#24221e}
+.linha-item .acoes button{background:#24221e}
+textarea{background:#24221e;color:#f4ebdd;border-color:var(--linha)}
+.dlg-simples input{background:#24221e;color:#f4ebdd;border-color:#6d6555}
+.dp-fechar{background:#f4ebdd;color:#111}
+.dp-foto{aspect-ratio:4/3;max-height:340px}
+.dp-titulo{font-family:"Cubano","Barlow",sans-serif;font-weight:400;letter-spacing:.04em;text-transform:uppercase;font-size:30px;color:#fff}
+.obrig{background:#f4ebdd;color:#111}
+dialog{background:var(--papel);color:var(--preto);border:1px solid #2c2924}
+.dlg-rodape{background:var(--papel)}
+/* o ouro: so no botao que faz o pedido andar */
+.btn.cta,#dpAdicionar,.barra .btn,#dcSim,#dlgNome .btn.prim{background:var(--ouro);color:#111;border-color:var(--ouro);font-weight:800;font-size:17px;border-radius:14px}
+.btn.cta:disabled{background:#3a352d;border-color:#3a352d;color:#8d8576;opacity:1}
+.barra{background:rgba(11,11,11,.96);border-top:1px solid #222}
+.barra .btn{min-height:60px}
+@media (min-width:960px){
+  #categorias{flex-direction:column;align-items:stretch;gap:6px;padding:16px 10px;border-bottom:0;border-right:1px solid var(--linha)}
+  #categorias button{max-width:none;width:100%;border-left:0;border-radius:18px;padding:10px 6px;font-size:13px}
+  #categorias button img{width:72px;height:72px}
+  #categorias button[aria-current="true"]{background:#f4ebdd}
+}
+@media (max-width:640px){
+  .abertura h1{font-size:26px}
+  .card .nome{font-size:15px}
+  .card .preco{font-size:17px}
+  .card .info{padding:10px 12px 12px}
+}
+
 /* pagamento antes da cozinha */
 #dlgPag{width:min(860px,96vw)}
 .pag{padding:20px 24px;overflow:auto}
@@ -190,7 +245,7 @@ textarea{width:100%;border-radius:10px;border:1px solid var(--linha);padding:10p
 /* pedir e facil */
 .passos-facil{list-style:none;display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0;padding:0}
 .passos-facil li{display:flex;align-items:center;gap:8px;background:var(--preto);color:var(--creme);border-radius:999px;padding:6px 14px 6px 6px;font-weight:600;font-size:15px}
-.passo-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#E0A81C;color:var(--preto);font-size:15px}
+.passo-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#111;color:#f4ebdd;font-size:15px}
 .nota-previa{font-size:14px}
 .pag-facil{font-size:18px;font-weight:600;margin:4px 0 6px}
 

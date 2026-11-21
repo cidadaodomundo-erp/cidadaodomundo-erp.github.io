@@ -53,7 +53,10 @@
     const nav = $("categorias");
     nav.textContent = "";
     for (const c of menu.categorias) {
-      const b = el("button", "", c.nome);
+      const b = el("button", "");
+      const capa = menu.produtos.find((p) => String(p.categoria) === String(c.id) && menu.fotos[p.id]);
+      if (capa) { const im = el("img"); im.src = menu.fotos[capa.id]; im.alt = ""; im.loading = "lazy"; b.appendChild(im); }
+      b.appendChild(el("span", "", c.nome));
       b.type = "button";
       b.dataset.cat = String(c.id);
       b.addEventListener("click", () => {
@@ -385,7 +388,9 @@
 
     // barra (tablet vertical / telas estreitas)
     const qtd = estado.carrinho.reduce((s, l) => s + l.quantidade, 0);
-    $("btnAbrirSheet").textContent = `Comanda · ${rotulo.toLowerCase()} · carrinho ${qtd} ${qtd === 1 ? "item" : "itens"} ${reais(tc)} · registrado ${reais(C.totalComanda(estado))}`;
+    $("btnAbrirSheet").textContent = FACIL
+      ? (qtd ? `VER MEU PEDIDO · ${qtd} ${qtd === 1 ? "item" : "itens"} · ${reais(tc)}` : `${rotulo.toUpperCase()} · TOQUE NA FOTO PARA PEDIR`)
+      : `Comanda · ${rotulo.toLowerCase()} · carrinho ${qtd} ${qtd === 1 ? "item" : "itens"} ${reais(tc)} · registrado ${reais(C.totalComanda(estado))}`;
   }
 
   const simInfo = el("p", "pequeno");

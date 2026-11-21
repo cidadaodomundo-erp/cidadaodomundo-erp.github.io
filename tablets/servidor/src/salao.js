@@ -240,6 +240,7 @@ function tabletHtml({ menu, modo, csrf, base, mesaFixa = null, pagarAntes = fals
     ["Tablet de mesa (DEMONSTRAÇÃO)", "Tablet de mesa (TESTE)"],
     ["Sem conexão · sem envio real", pixReal ? "Pix da loja" : "Teste · nada é cobrado"],
     ["Chamar atendente (simulado)", "Chamar atendente"],
+    ["Total da comanda (teste)", pixReal ? "Total já pago" : "Total da comanda (teste)"],
     ["Pedir conta (simulado)", "Pedir conta"],
     ["Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.", pixReal ? "Pede confirmação, mostra o Pix e, com o Pix conferido, envia a rodada para a cozinha." : "Pede confirmação e envia a rodada para a cozinha de teste. Nada é cobrado."],
   ];
