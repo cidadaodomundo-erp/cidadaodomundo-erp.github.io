@@ -45,6 +45,27 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PREPARO = ["NOVO", "PREPARANDO", "PRONTO", "ENTREGUE"];
 const FOTO = /^\/fotos\/p(\d{1,8})\.webp$/;
 
+// Pix "copia e cola" estatico (BR Code do Banco Central) com valor fixo. Nao confirma sozinho: a equipe confere no app do banco.
+const semAcento = (t, max) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9 .\-]/g, "").trim().toUpperCase().slice(0, max);
+export function crc16(txt) {
+  let c = 0xffff;
+  for (const b of Buffer.from(txt, "utf8")) { c ^= b << 8; for (let i = 0; i < 8; i++) c = c & 0x8000 ? ((c << 1) ^ 0x1021) & 0xffff : (c << 1) & 0xffff; }
+  return c.toString(16).toUpperCase().padStart(4, "0");
+}
+export function lerPixConfig(o) {
+  if (!o) return null;
+  const chave = String(o.chave ?? "").trim(), nome = semAcento(o.nome, 25), cidade = semAcento(o.cidade, 15);
+  if (!chave || chave.length > 77 || !nome || !cidade) throw new ErroConector("PIX_INVALIDO", "Configuração do Pix incompleta (chave, nome e cidade).");
+  return { chave, nome, cidade };
+}
+export function pixCopiaECola(cfg, valorCentavos, txid) {
+  const f = (id, v) => id + String(v.length).padStart(2, "0") + v;
+  const tx = String(txid ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 25) || "***";
+  const corpo = f("00", "01") + f("26", f("00", "br.gov.bcb.pix") + f("01", cfg.chave)) + f("52", "0000") + f("53", "986")
+    + f("54", (valorCentavos / 100).toFixed(2)) + f("58", "BR") + f("59", cfg.nome) + f("60", cfg.cidade) + f("62", f("05", tx)) + "6304";
+  return corpo + crc16(corpo);
+}
+
 export class ErroSalao extends Error {
   constructor(status, mensagem) { super(mensagem); this.status = status; }
 }
@@ -257,7 +278,8 @@ const CSP = "default-src 'none'; img-src 'self' data:; font-src data:; style-src
 // modo: "local" (cozinha de teste apenas) | "saipos" (cozinha + loja TESTE do Saipos; exige envPath).
 // statePath: arquivo de estado (padrao: tablets/servidor/dados/salao-estado.json no local; ao lado do .env privado no saipos).
 // hosts: lista de "ip:porta" aceitos no cabecalho Host (padrao: 127.0.0.1/localhost na porta).
-export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET", pin, envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [], pagarAntes = false } = {}) {
+export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET", pin, envPath, fetchImpl = globalThis.fetch, timeoutMs, gamaPath, fotosDir, statePath, agora = () => new Date(), hostsExtras = [], pagarAntes = false, pix = null } = {}) {
+  const pixCfg = pagarAntes ? lerPixConfig(pix) : null;
   if (!["local", "saipos"].includes(modo)) throw new ErroConector("MODO_INVALIDO", "Modo inválido.");
   if (!["TICKET", "TABLE"].includes(modoSaipos)) throw new ErroConector("MODO_INVALIDO", "Modo do Saipos inválido.");
   if (typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) throw new ErroConector("PIN_INVALIDO", "Senha da equipe deve ter de 4 a 8 números.");
@@ -451,12 +473,24 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
     if (!r) throw new ErroSalao(404, "Pagamento não encontrado.");
     return r;
   };
+  const txidPix = (r) => `${r.ocupacao.modalidade === "mesa" ? "MESA" + r.ocupacao.mesa : "CMD" + r.ocupacao.comanda}R${r.numero}${r.pagamento.token.slice(0, 4).toUpperCase()}`;
   function verPagamento(t) {
     const r = porToken(t);
     return { ok: true, estado: r.pagamento.estado, forma: r.pagamento.forma, totalCentavos: r.totalCentavos, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, nome: r.nome ?? null,
-      itens: r.itens.map((i) => ({ quantidade: i.quantidade, nome: i.nome })), simulado: true, rodada: r.pagamento.estado === "aprovado" ? respostaRodada(r) : null };
+      itens: r.itens.map((i) => ({ quantidade: i.quantidade, nome: i.nome })), simulado: !pixCfg, rodada: r.pagamento.estado === "aprovado" ? respostaRodada(r) : null,
+      pix: pixCfg && ["aguardando", "recusado"].includes(r.pagamento.estado) ? { copiaECola: pixCopiaECola(pixCfg, r.totalCentavos, txidPix(r)), recebedor: pixCfg.nome } : null };
+  }
+  async function confirmarPix(corpo, daCozinha) {
+    if (!pixCfg) throw new ErroSalao(404, "Pix da loja não está ligado.");
+    if (!daCozinha) throw new ErroSalao(401, "Digite a senha da equipe.");
+    if (!so(corpo, ["token"])) throw bad("Pedido inválido.");
+    return aprovar({ token: corpo.token, forma: "pix", resultado: "aprovado" });
   }
   async function simularPagamento(corpo) {
+    if (pixCfg) throw new ErroSalao(403, "Pague com o Pix pelo QR Code. A equipe confirma o Pix e o pedido vai para a cozinha.");
+    return aprovar(corpo);
+  }
+  async function aprovar(corpo) {
     if (!so(corpo, ["token", "forma", "resultado"]) || !(corpo.forma in FORMAS_PAGAMENTO) || !["aprovado", "recusado"].includes(corpo.resultado)) throw bad("Pagamento inválido.");
     const r = porToken(corpo.token);
     const p = r.pagamento;
@@ -587,6 +621,8 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       modo, agora: agora().toISOString(),
       rodadas: ativos.map(pub), entregues: entregues.map(pub).reverse(),
       mesas: mesasAbertas(),
+      pix: pixCfg ? estado.rodadas.filter((r) => r.pagamento && ["aguardando", "recusado"].includes(r.pagamento.estado))
+        .map((r) => ({ token: r.pagamento.token, rotulo: rotuloOcupacao(r.ocupacao), numero: r.numero, nome: r.nome ?? null, totalCentavos: r.totalCentavos, criadoEm: r.criadoEm, txid: txidPix(r) })) : [],
       avisos: estado.avisos.filter((a) => !a.visto).map((a) => ({ id: a.id, tipo: a.tipo, rotulo: rotuloOcupacao(a.ocupacao), em: a.em })),
     };
   }
@@ -662,6 +698,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       if (url.pathname === "/api/equipe/pin") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin, ip); return enviar(200, { ok: true }); }
       if (url.pathname === "/api/cozinha/entrar") { if (!so(corpo, ["pin"])) throw bad("Pedido inválido."); conferirPin(corpo.pin, ip); return enviar(200, { ok: true, token: estado.cozinhaToken }); }
       if (url.pathname === "/api/cozinha/mesa/fechar") return enviar(200, await serial(() => fecharMesa(corpo, ip, ehCozinha(req))));
+      if (url.pathname === "/api/cozinha/pix/confirmar") return enviar(200, await serial(() => confirmarPix(corpo, ehCozinha(req))));
       if (url.pathname.startsWith("/api/cozinha/") && !ehCozinha(req)) return enviar(401, { ok: false, mensagem: "Digite a senha da equipe." });
       if ((m = /^\/api\/cozinha\/rodada\/([0-9a-f-]{36})\/(preparando|pronto|entregue)$/.exec(url.pathname))) return enviar(200, await serial(() => acaoCozinha(m[1], m[2])));
       if ((m = /^\/api\/cozinha\/aviso\/([0-9a-f-]{36})\/visto$/.exec(url.pathname))) return enviar(200, await serial(() => avisoVisto(m[1])));
@@ -672,7 +709,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
       return enviar(500, { ok: false, mensagem: "Erro interno. A rodada pode não ter sido registrada; confira na cozinha." });
     }
   });
-  server.salao = { pagarAntes, estado, caminhoEstado, permitidos, cardapio, modoSaipos, esperarSaipos, cozinhaToken: estado.cozinhaToken };
+  server.salao = { pagarAntes, pixLigado: !!pixCfg, estado, caminhoEstado, permitidos, cardapio, modoSaipos, esperarSaipos, cozinhaToken: estado.cozinhaToken };
   return server;
 }
 

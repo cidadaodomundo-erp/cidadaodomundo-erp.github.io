@@ -40,6 +40,7 @@ h3{margin:16px 16px 0;font-weight:400}
 .mesa strong{font-size:18px}
 #pin{width:110px;min-height:40px;border-radius:8px;border:1px solid #bbb;padding:0 8px;font:16px Barlow,sans-serif}
 #pinErro{color:#ffb4a8;font-size:14px}
+.pixc{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#e7f6ec;border:2px solid #1f8a4c;border-radius:12px;padding:12px 14px;margin:0 0 10px}.pixc strong{font-size:1.15em}
 </style>
 </head>
 <body>
@@ -51,6 +52,7 @@ h3{margin:16px 16px 0;font-weight:400}
   <span id="login"><label style="font-size:14px">Senha da equipe <input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label> <button id="entrar" type="button">Entrar</button></span>
   <span id="pinErro" role="alert"></span>
 </header>
+<div id="pix"></div>
 <div id="avisos" aria-live="assertive"></div>
 <main id="lista"></main>
 <h3 class="cubano">CONTAS ABERTAS</h3>

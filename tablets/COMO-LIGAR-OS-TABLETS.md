@@ -36,3 +36,14 @@ Nada aqui cobra dinheiro. O pedido vai para a tela da cozinha de teste e, se voc
 - Tablet diz "Sem conexão": confira o Wi-Fi e se a janela preta continua aberta. O carrinho não se perde; toque em Confirmar de novo (não duplica).
 - Computador reiniciou: dê dois cliques no atalho de novo. Os tablets continuam funcionando sem recarregar.
 - Esqueceu a senha: ela fica em `tablets/servidor/dados/pin-equipe.txt` nesse computador.
+
+## Pix da loja (QR com o valor, a equipe confirma)
+
+1. Na pasta `tablets/servidor/dados/`, crie o arquivo `pix.json` com a chave Pix oficial da loja:
+   `{"chave": "CNPJ ou chave da loja", "nome": "CIDADAO DO MUNDO", "cidade": "CURITIBA"}`
+2. Ligue o servidor do salão como sempre. Ele avisa: "Pix da loja LIGADO".
+3. No tablet, ao pagar, aparece o QR do Pix já com o valor da rodada.
+4. Na tela da cozinha aparece "PIX A CONFERIR". A equipe confere no app do banco e toca em **Pix recebido**. Só então a rodada vai para a cozinha.
+
+Este Pix não confirma sozinho: quem garante que o dinheiro entrou é a equipe. A confirmação automática precisa da API do banco ou do e.Rede.
+Sem o arquivo `pix.json`, o pagamento continua simulado.

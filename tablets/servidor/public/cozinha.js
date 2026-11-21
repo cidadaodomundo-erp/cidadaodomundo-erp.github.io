@@ -20,7 +20,7 @@
     try { localStorage.removeItem(CHAVE_TOKEN); } catch { /* ok */ }
     $("login").hidden = false;
     $("pinErro").textContent = texto || "Digite a senha da equipe e toque em Entrar.";
-    for (const id of ["avisos", "lista", "mesas"]) $(id).textContent = "";
+    for (const id of ["pix", "avisos", "lista", "mesas"]) $(id).textContent = "";
     $("entregues").textContent = "";
   }
   async function entrar() {
@@ -83,7 +83,22 @@
     return c;
   }
 
+  function pixRecebido(x) {
+    if (!confirm(`Confirme no app do banco: chegou um Pix de ${reais(x.totalCentavos)} (${x.rotulo}${x.nome ? " · " + x.nome : ""})? Só toque em OK se o dinheiro já entrou.`)) return;
+    acao("/api/cozinha/pix/confirmar", { token: x.token });
+  }
   function pintar(d) {
+    const px = $("pix");
+    px.textContent = "";
+    for (const x of d.pix || []) {
+      const c = el("div", "pixc");
+      const t = el("div");
+      t.append(el("strong", "", `PIX A CONFERIR · ${x.rotulo}${x.nome ? " · " + x.nome : ""} · ${reais(x.totalCentavos)}`),
+        el("div", "meta", `Rodada ${x.numero} · desde ${hora(x.criadoEm)} · identificador ${x.txid}. Confira no app do banco antes de confirmar.`));
+      const b = el("button", "", "Pix recebido"); b.type = "button";
+      b.addEventListener("click", () => pixRecebido(x));
+      c.append(t, b); px.appendChild(c);
+    }
     const av = $("avisos");
     av.textContent = "";
     for (const a of d.avisos) {

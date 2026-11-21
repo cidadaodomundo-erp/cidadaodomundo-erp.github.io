@@ -32,9 +32,13 @@ if (!Number.isInteger(porta) || porta < 1024 || porta > 65535) { console.error("
 if (sandbox && !process.env.CONNECTOR_ENV_PATH) { console.error("Para --sandbox defina CONNECTOR_ENV_PATH (configuração privada da loja TESTE). Nada foi iniciado."); process.exit(2); }
 
 const ips = rede ? ipsDaRede() : [];
+// Pix da loja (chave oficial): arquivo dados/pix.json com {"chave": "...", "nome": "...", "cidade": "CURITIBA"}. Sem o arquivo, o pagamento continua simulado.
+const arqPix = join(DADOS, "pix.json");
+let pix = null;
+if (existsSync(arqPix)) { try { pix = JSON.parse(readFileSync(arqPix, "utf8")); } catch { console.error("dados/pix.json com erro de digitação. Nada foi iniciado."); process.exit(2); } }
 let server;
 try {
-  server = await criarServidorSalao({ modo: sandbox ? "saipos" : "local", modoSaipos: args.includes("--saipos-mesa") ? "TABLE" : "TICKET", pagarAntes: !args.includes("--pagar-na-saida"), pin: lerPin(), envPath: process.env.CONNECTOR_ENV_PATH, hostsExtras: ips });
+  server = await criarServidorSalao({ modo: sandbox ? "saipos" : "local", modoSaipos: args.includes("--saipos-mesa") ? "TABLE" : "TICKET", pagarAntes: !args.includes("--pagar-na-saida"), pix, pin: lerPin(), envPath: process.env.CONNECTOR_ENV_PATH, hostsExtras: ips });
 } catch (e) {
   console.error(e?.codigo ? `Não iniciou: ${e.codigo} - ${e.message}` : "Não iniciou: falha inesperada.");
   process.exit(1);
@@ -42,6 +46,7 @@ try {
 server.listen(porta, rede ? "0.0.0.0" : "127.0.0.1", () => {
   console.log(`Servidor do salão (TESTE${sandbox ? ` + Saipos loja TESTE, ${server.salao.modoSaipos === "TABLE" ? "na MESA" : "como ficha"}` : ", sem Saipos"}) ligado.`);
   console.log(server.salao.pagarAntes ? "  Pagamento: o cliente paga no tablet ou no celular ANTES; só então a rodada vai para a cozinha (TESTE: simulado, nada é cobrado)." : "  Pagamento: no fim, na conta (como hoje).");
+  if (server.salao.pixLigado) console.log("  Pix da loja LIGADO: o tablet mostra o QR do Pix com o valor; a equipe confere no app do banco e toca em 'Pix recebido' na tela da cozinha.");
   console.log(`  Senha da equipe: ${lerPin()}  (6 números: entrar na cozinha, trocar a mesa e fechar a conta)`);
   console.log(`  Tablet:  http://127.0.0.1:${porta}/tablet`);
   console.log(`  Cozinha: http://127.0.0.1:${porta}/cozinha`);

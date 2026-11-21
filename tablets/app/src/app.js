@@ -681,24 +681,36 @@
   // No tablet so o Pix: Apple Pay e Google Pay sao do celular do cliente (pelo QR). Digitar cartao nao e oferecido aqui.
   const FORMAS_PAG = [["pix", "Pagar com Pix aqui"]];
   let dlgPag = null;
-  function telaPagamento(res) {
+  async function telaPagamento(res) {
+    const info = await ENVIO.pagamento(res.token);
+    const pix = info && info.pix ? info.pix : null; // Pix da loja (QR com valor; a equipe confirma)
     if (!dlgPag) { dlgPag = el("dialog"); dlgPag.id = "dlgPag"; document.body.appendChild(dlgPag); }
     dlgPag.textContent = "";
     const box = el("div", "pag");
     box.appendChild(el("h2", "cubano", "PAGAR A RODADA"));
     box.appendChild(el("p", "pag-total cubano", reais(res.totalCentavos)));
-    box.appendChild(el("p", "pag-facil", "Falta pouco! Aponte a câmera do celular para o QR Code e pague com Apple Pay, Google Pay ou Pix."));
-    box.appendChild(el("p", "pequeno", `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. Pagou, a cozinha já começa. TESTE: nada é cobrado.`));
+    box.appendChild(el("p", "pag-facil", pix ? "Falta pouco! Abra o app do seu banco, escolha Pix e leia este QR Code. O valor já vem preenchido."
+      : "Falta pouco! Aponte a câmera do celular para o QR Code e pague com Apple Pay, Google Pay ou Pix."));
+    box.appendChild(el("p", "pequeno", pix ? `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. Recebedor: ${pix.recebedor}. Assim que a equipe confirmar o Pix, o pedido vai para a cozinha.`
+      : `${C.rotuloOcupacao(estado)} · rodada ${estado.rodadas.length + 1}. Pagou, a cozinha já começa. TESTE: nada é cobrado.`));
     const cols = el("div", "pag-cols");
     const qrBox = el("div", "pag-qr");
-    const qr = desenharQr(`${location.origin}/pagar?t=${res.token}`);
+    const qr = desenharQr(pix ? pix.copiaECola : `${location.origin}/pagar?t=${res.token}`);
     if (qr) qrBox.appendChild(qr);
-    qrBox.appendChild(el("p", "pequeno", "Abra a câmera do celular, aponte aqui e toque no link. Um toque no Apple Pay ou Google Pay e pronto."));
+    qrBox.appendChild(el("p", "pequeno", pix ? "Pix com o valor certo. Não precisa digitar nada." : "Abra a câmera do celular, aponte aqui e toque no link. Um toque no Apple Pay ou Google Pay e pronto."));
     const botoes = el("div", "pag-formas");
     botoes.appendChild(el("p", "pequeno", "Sem celular por perto? Pague com Pix aqui:"));
     for (const [forma, nome] of FORMAS_PAG) { const b = el("button", "btn prim", nome); b.type = "button"; b.dataset.forma = forma; botoes.appendChild(b); }
     const recusa = el("button", "btn sec", "Simular recusado (teste)"); recusa.type = "button"; recusa.dataset.forma = "credito"; recusa.dataset.recusar = "1";
     botoes.appendChild(recusa);
+    if (pix) {
+      botoes.textContent = "";
+      botoes.appendChild(el("p", "pequeno", "Pagando pelo mesmo celular? Copie o código Pix e cole no app do banco:"));
+      const cc = el("textarea", "pix-cc"); cc.readOnly = true; cc.rows = 4; cc.value = pix.copiaECola; cc.setAttribute("aria-label", "Pix copia e cola");
+      const copiar = el("button", "btn sec", "Copiar código Pix"); copiar.type = "button";
+      copiar.addEventListener("click", async () => { try { await navigator.clipboard.writeText(pix.copiaECola); copiar.textContent = "Copiado!"; } catch { cc.select(); } });
+      botoes.append(cc, copiar, el("p", "aviso", "Pagou? Aguarde aqui: a equipe confere o Pix e o pedido segue sozinho para a cozinha."));
+    }
     cols.append(qrBox, botoes);
     const st = el("p", "aviso pag-status"); st.setAttribute("role", "status");
     const cancelar = el("button", "btn sec", "Cancelar pagamento"); cancelar.type = "button";

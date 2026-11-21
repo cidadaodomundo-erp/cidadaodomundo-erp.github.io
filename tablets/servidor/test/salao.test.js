@@ -6,7 +6,7 @@ import http from "node:http";
 import { mkdtemp, writeFile, readFile, rm, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { criarServidorSalao, notaSaipos, lerNome, SENHA_INICIAL, STATUS, COD_STORE_TESTE, FORMAS_PAGAMENTO } from "../src/salao.js";
+import { criarServidorSalao, notaSaipos, lerNome, pixCopiaECola, crc16, lerPixConfig, SENHA_INICIAL, STATUS, COD_STORE_TESTE, FORMAS_PAGAMENTO } from "../src/salao.js";
 import { dtoFixtureV2, catalogoHmlV2, mapaFixtureV2, itemBurger, itemCerveja, TOTAL_REFERENCIA, AS_12H, AS_01H } from "../../../totem/app/test/fixture-cardapio.js";
 
 const SEGREDO = "FAKE-SECRET-aaaa1111";
@@ -39,7 +39,7 @@ function criarFetch({ ordem } = {}) {
 }
 
 const PIN = "4321";
-async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos = "TICKET", pagarAntes = false } = {}) {
+async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos = "TICKET", pagarAntes = false, pix = null } = {}) {
   if (!dir) {
     dir = await mkdtemp(join(tmpdir(), "salao-test-"));
     dirs.push(dir);
@@ -57,7 +57,7 @@ async function subir({ modo = "local", inicio = AS_12H, ordem, dir, modoSaipos =
   const f = criarFetch({ ordem });
   const server = await criarServidorSalao({
     modo, modoSaipos, pin: PIN, envPath: modo === "saipos" ? join(dir, "priv", ".env") : undefined, fetchImpl: f, timeoutMs: 300,
-    gamaPath: join(dir, "gama.json"), fotosDir: join(dir, "fotos"), statePath: modo === "local" ? join(dir, "estado.json") : undefined, agora: () => relogio.t, pagarAntes,
+    gamaPath: join(dir, "gama.json"), fotosDir: join(dir, "fotos"), statePath: modo === "local" ? join(dir, "estado.json") : undefined, agora: () => relogio.t, pagarAntes, pix,
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   servers.push(server);
@@ -402,4 +402,34 @@ test("primeiro nome de quem pediu: vai para a cozinha, a pagina do celular e a f
   assert.equal(p.rodadas[0].nome, "João");
   assert.deepEqual(p.mesas[0].nomes, ["João"]);
   assert.equal(JSON.parse(s.f.pedidos()[0].corpo).items[0].notes, "TESTE MESA 7 R1 JOÃO | sem picles");
+});
+
+test("Pix da loja: QR com valor; cliente nao se aprova sozinho; so a equipe confirma e entao vai para a cozinha", async () => {
+  // exemplo oficial do manual do BR Code (Banco Central)
+  assert.equal(crc16("00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***6304"), "1D3D");
+  const cfg = lerPixConfig({ chave: "12345678000199", nome: "Cidadão do Mundo Burgers", cidade: "Curitiba" });
+  assert.deepEqual(cfg, { chave: "12345678000199", nome: "CIDADAO DO MUNDO BURGERS", cidade: "CURITIBA" });
+  const cc = pixCopiaECola(cfg, 3399, "MESA7R1AB12");
+  assert.ok(cc.startsWith("00020126360014br.gov.bcb.pix011412345678000199520400005303986540533.995802BR5924CIDADAO DO MUNDO BURGERS6008CURITIBA6215") && cc.includes("0511MESA7R1AB12"));
+  assert.equal(cc.slice(-4), crc16(cc.slice(0, -4)));
+  assert.throws(() => lerPixConfig({ chave: "", nome: "x", cidade: "y" }));
+
+  const s = await subir({ pagarAntes: true, pix: { chave: "12345678000199", nome: "Cidadao do Mundo", cidade: "Curitiba" } });
+  const r = await post(s, "/api/rodada", rodada(95, [itemCerveja()]));
+  const t = r.json.pagamento.token;
+  const v = await chamar(s.porta, { caminho: `/api/pagamento?t=${t}` });
+  assert.ok(v.json.pix.copiaECola.includes("br.gov.bcb.pix") && v.json.pix.copiaECola.includes("5802BR"));
+  assert.equal(v.json.simulado, false);
+  assert.equal((await post(s, "/api/pagamento/simular", { token: t, forma: "pix", resultado: "aprovado" })).status, 403, "cliente nao aprova sozinho");
+  assert.equal((await post(s, "/api/cozinha/pix/confirmar", { token: t })).status, 401, "sem senha da equipe nao confirma");
+  const p = await painelDe(s);
+  assert.equal(p.json.rodadas.length, 0, "nao foi para a cozinha antes do Pix");
+  assert.equal(p.json.pix.length, 1);
+  assert.equal(p.json.pix[0].token, t);
+  const ok = await postC(s, "/api/cozinha/pix/confirmar", { token: t });
+  assert.equal(ok.json.estado, "aprovado");
+  const p2 = await painelDe(s);
+  assert.equal(p2.json.rodadas.length, 1);
+  assert.equal(p2.json.pix.length, 0);
+  assert.equal((await chamar(s.porta, { caminho: `/api/pagamento?t=${t}` })).json.pix, null);
 });
