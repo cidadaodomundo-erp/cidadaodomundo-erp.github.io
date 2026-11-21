@@ -93,6 +93,8 @@
   .esc-f label { display:block; font-size:13px; color:var(--fraco); margin:10px 0 4px; } .esc-f select, .esc-f input { width:100%; height:46px; border-radius:12px; border:1px solid var(--line); background:#151514; color:var(--tx); font-size:16px; padding:0 10px; }
   .esc-f .dois { display:flex; gap:8px; } .esc-f .dois > div { flex:1; }
   .esc-f button.salvar { width:100%; height:50px; margin-top:14px; border:0; border-radius:12px; background:var(--amarelo); color:#111; font-weight:800; font-size:17px; }
+  .esc-acoes { display:flex; gap:8px; margin:12px 0 4px; } .esc-acoes button { flex:1; min-height:46px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:14px; font-weight:600; padding:6px; }
+  .esc-acoes button.conf { background:var(--amarelo); color:#111; }
   .ok { background:#12301c; border:1px solid #1f5a33; color:#9be3b3; border-radius:12px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
   #btnAjuda { display:none !important; }   /* a Ajuda geral do portal não serve para esta tela */
 </style>
@@ -341,7 +343,8 @@
       '<input id="eNome" placeholder="Nome do motoboy" style="display:none;margin-top:8px">' +
       '<div class="dois"><div><label for="eIni">Entrada</label><input id="eIni" type="time" value="18:00"></div><div><label for="eFim">Saída</label><input id="eFim" type="time" value="23:59"></div></div>' +
       '<button class="salvar" type="submit">Salvar na escala</button><div class="erro" id="eErro"></div></form>';
-    app.innerHTML = moldura((RECADO ? '<div class="ok">' + esc(RECADO) + '</div>' : '') +
+    const acoes = '<div class="esc-acoes">' + (podeMexer ? '<button id="bCopiaSem">🔁 Copiar a semana passada</button>' : '') + '<button id="bZap">📲 Copiar para o WhatsApp</button></div>';
+    app.innerHTML = moldura((RECADO ? '<div class="ok">' + esc(RECADO) + '</div>' : '') + acoes +
       (ls.length ? '' : '<div class="aviso">Ainda não tem escala da ' + esc(LOJAE) + ' neste dia.</div>') + bloco + form +
       '<div class="fonte">A escala do WhatsApp continua chegando sozinha a cada 5 minutos. O que você muda aqui fica valendo por cima dela e já entra no garantido.</div>');
     ligar();
@@ -352,6 +355,27 @@
         await mexer({ p_turno: b.dataset.t, p_nome: b.dataset.n, p_id: null, p_inicio: null, p_fim: null, p_acao: 'tirar' }, b.dataset.n + ' saiu da escala.');
       };
     });
+    document.getElementById('bZap').onclick = async (ev) => {
+      const dd = new Date(DIAE + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+      const txt = '*Escala ' + LOJAE + ' — ' + dd + '*\n' + TURNOS.map(([k, nome]) => {
+        const x = ls.filter((l) => l.turno === k);
+        return '\n*' + nome + '*\n' + (x.length ? x.map((l) => '• ' + l.nome + ' — ' + l.inicio + (l.fim ? ' às ' + l.fim : '')).join('\n') : '• ninguém');
+      }).join('\n') + '\n\nChegar no horário: até 15 min de atraso mantém o garantido e a refeição.';
+      try { await navigator.clipboard.writeText(txt); ev.target.textContent = '✅ Copiado! Cole no grupo'; }
+      catch (e) { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); ev.target.textContent = '✅ Copiado! Cole no grupo'; }
+    };
+    const bc = document.getElementById('bCopiaSem');
+    if (bc) bc.onclick = async () => {
+      const fim = somaDias(DIAE, 6);
+      if (!bc.classList.contains('conf')) { bc.classList.add('conf'); bc.textContent = 'Confirmar: ' + DIAE.slice(8, 10) + '/' + DIAE.slice(5, 7) + ' a ' + fim.slice(8, 10) + '/' + fim.slice(5, 7); return; }
+      bc.disabled = true; bc.textContent = 'Copiando…';
+      await rmbGarantirTokenValido();
+      let r; try { r = await trRpc('escala_copiar_semana', { p_inicio: DIAE, p_loja: LOJAE }); } catch (e) { falha('Sem internet agora. Nada foi mudado.'); return; }
+      if (!r.ok) { RECADO = ''; const m = await trErroDe(r); await carregarEscala(); const er = document.getElementById('eErro'); if (er) { er.textContent = 'Não copiou: ' + m; er.style.display = 'block'; } return; }
+      const j = await r.json();
+      RECADO = '✅ Copiei ' + j.copiados + ' lugar' + (j.copiados === 1 ? '' : 'es') + ' da semana passada para ' + LOJAE + '.' + (j.dias_que_ja_tinham ? ' ' + j.dias_que_ja_tinham + ' dia(s) já tinham escala e ficaram como estavam.' : '');
+      await carregarEscala();
+    };
     const f = document.getElementById('fEsc'); if (!f) return;
     const sel = document.getElementById('eMoto'), nome = document.getElementById('eNome'), tur = document.getElementById('eTurno');
     sel.onchange = () => { nome.style.display = sel.value === 'outro' ? '' : 'none'; };
