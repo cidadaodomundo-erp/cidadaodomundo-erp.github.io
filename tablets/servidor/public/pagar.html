@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pagar a rodada — Cidadão do Mundo (TESTE)</title>
+<style>
+{{FONTES}}
+:root{--preto:#111;--creme:#F4EBDD;--amarelo:#E0A81C;--verde:#2f7d4a;--vermelho:#b3261e;--cinza:#6b6257}
+*{box-sizing:border-box}
+body{margin:0;background:var(--creme);color:var(--preto);font:17px/1.4 Barlow,system-ui,sans-serif}
+.cubano{font-family:Cubano,Barlow,sans-serif;letter-spacing:.02em;font-weight:400}
+.faixa{background:var(--amarelo);text-align:center;font-weight:600;padding:6px 12px;font-size:14px}
+header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--preto);color:var(--creme)}
+header img{width:44px;height:44px}
+header h1{margin:0;font-size:20px}
+main{max-width:480px;margin:0 auto;padding:16px}
+.total{font-size:34px;margin:6px 0 2px}
+.itens{color:var(--cinza);font-size:15px;margin:0 0 16px;padding-left:18px}
+.formas{display:grid;gap:10px}
+button{font:600 18px Barlow,sans-serif;min-height:56px;border-radius:12px;border:0;cursor:pointer;background:var(--preto);color:var(--creme);width:100%}
+button.sec{background:#e7dfd2;color:var(--preto);min-height:44px;font-size:15px}
+button:disabled{opacity:.5}
+#resultado{margin-top:16px;padding:14px;border-radius:12px;font-weight:600;font-size:18px}
+#resultado.ok{background:#d9f2df}#resultado.erro{background:#ffe1dc}
+.nota{color:var(--cinza);font-size:13px;margin-top:18px}
+.btn{border-radius:12px;border:1px solid #111;font:600 17px Barlow,sans-serif;width:100%}.btn.prim{background:#111;color:#F4EBDD}.btn.sec{background:transparent;color:#111}.aviso{color:#b3261e;font-weight:600;margin:0}
+.link-discreto{background:none!important;color:#6b6257!important;text-decoration:underline;font-weight:400!important;font-size:14px!important;min-height:40px!important}
+{{CSS}}
+</style>
+</head>
+<body>
+<div class="faixa">PAGAMENTO DE TESTE — nada é cobrado</div>
+<header><img src="/marca/logo-cdm.png" alt=""><h1 class="cubano">CIDADÃO DO MUNDO</h1></header>
+<main>
+  <p id="titulo">Carregando…</p>
+  <p class="total cubano" id="total"></p>
+  <p style="font-weight:600;margin:0 0 6px">É rápido: escolha como pagar e pronto. O pedido vai direto para a cozinha.</p>
+  <ul class="itens" id="itens"></ul>
+  <div class="formas" id="formas"></div>
+  <div id="resultado" role="status" hidden></div>
+  <p class="nota">Teste: os botões simulam o pagamento. Com o e.Rede liberado, esta tela vira o pagamento de verdade (Pix, cartão, Apple Pay e Google Pay).</p>
+</main>
+<script type="application/json" id="cfg">{{CFG}}</script>
+<script>
+{{JS}}
+</script>
+</body>
+</html>

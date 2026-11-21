@@ -1,0 +1,107 @@
+{
+  "consultadoEm": "2026-11-11T04:42:27.768Z",
+  "sha256": "97b2ff1a9e299a644995ecdf33cc21115cdead71124d1653e533c3d8bf48616c",
+  "totalProdutosSnapshot": 93,
+  "produtos": [
+    {
+      "id": 146,
+      "nome": "Michael Schumacher",
+      "categoria": "Burgers Clássicos",
+      "variacoes": [
+        "Unidade: 34.99"
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ]
+    },
+    {
+      "id": 150,
+      "nome": "Jesse Pinkman",
+      "categoria": "Burgers Especiais",
+      "variacoes": [
+        "Unidade: 34.99"
+      ],
+      "grupos": [
+        4,
+        5,
+        13
+      ]
+    },
+    {
+      "id": 255,
+      "nome": "Avela Porter Way Beer. Contém Glúten",
+      "categoria": "Cervejas e chopes",
+      "variacoes": [
+        "300ml: 9.00",
+        "500ml: 15.00",
+        "1lt: 28.00"
+      ],
+      "grupos": []
+    },
+    {
+      "id": 161,
+      "nome": "UFO Burger Salada",
+      "categoria": "UFO Burgers",
+      "variacoes": [
+        "Unidade: 39.99"
+      ],
+      "grupos": [
+        4,
+        5,
+        30
+      ]
+    },
+    {
+      "id": 199,
+      "nome": "1/2 Costelinha Suína Barbecue",
+      "categoria": "Carnes Defumadas",
+      "variacoes": [
+        "Unidade: 44.99"
+      ],
+      "grupos": [
+        14,
+        33
+      ]
+    },
+    {
+      "id": 205,
+      "nome": "Churrasco + acompanhamentos.",
+      "categoria": "Churrasco",
+      "variacoes": [
+        "T-bone (file De Igreja) 2 Pessoas: 127.99",
+        "Alcatra (orelha De Elefante) 3 Pessoas: 167.99"
+      ],
+      "grupos": [
+        5,
+        14,
+        33,
+        34,
+        35
+      ]
+    },
+    {
+      "id": 167,
+      "nome": "Porção individual de batata frita",
+      "categoria": "Porções",
+      "variacoes": [
+        "Unidade: 14.99"
+      ],
+      "grupos": [
+        5
+      ]
+    },
+    {
+      "id": 196,
+      "nome": "Canja de galinha",
+      "categoria": "Caldos",
+      "variacoes": [
+        "Unidade: 27.99"
+      ],
+      "grupos": [
+        21
+      ]
+    }
+  ]
+}
