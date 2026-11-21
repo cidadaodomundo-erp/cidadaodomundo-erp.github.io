@@ -362,7 +362,6 @@ function desenhar() {
   document.querySelectorAll('#filtros .ml-btn').forEach((b) => b.classList.toggle('on', b.dataset.f === FILTRO));
   if (FILTRO === 'historico') { desenharHistorico(); return; }
   const lista = filtrar(Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []);
-  document.querySelectorAll('#filtros .ml-btn').forEach((b) => b.classList.toggle('on', b.dataset.f === FILTRO));
   document.getElementById('conteudo').innerHTML = lista.length
     ? '<div class="ml-lista">' + lista.map(pedido).join('') + '</div>'
     : '<div class="ml-vazio">' + (FILTRO === 'abertas' ? 'Nenhum pedido em aberto. Escreva o produto acima para buscar preços.' : 'Nada aqui nos últimos 60 dias.') + '</div>';

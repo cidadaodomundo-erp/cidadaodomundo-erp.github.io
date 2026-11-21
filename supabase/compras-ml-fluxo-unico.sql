@@ -92,6 +92,7 @@ end $$;
 
 create or replace trigger compra_ml_ao_gravar before insert or update of detalhe, situacao, descricao on public.fin_cartao_compra
   for each row execute function public.compra_ml_ao_gravar();
+revoke all on function public.compra_ml_loja(jsonb), public.compra_palavras(text), public.compra_ml_ao_gravar() from public, anon, authenticated;
 
 -- marca a chegada do que já está entregue hoje (sem aviso: é histórico)
 update public.fin_cartao_compra set entregue_em = coalesce(entregue_em, criado_em)
