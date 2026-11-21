@@ -225,9 +225,16 @@ dialog{background:var(--papel);color:var(--preto);border:1px solid #2c2924}
 }
 @media (max-width:640px){
   .abertura h1{font-size:26px}
-  .card .nome{font-size:15px}
-  .card .preco{font-size:17px}
-  .card .info{padding:10px 12px 12px}
+  /* celular: 3 por linha, foto menor e nitida (como os apps de fast food) */
+  .grade{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important}
+  .card{border-radius:14px}
+  .card .foto{aspect-ratio:1/1}
+  .card .mais{width:32px;height:32px;font-size:20px;right:6px;bottom:6px}
+  .card .info{padding:8px 8px 10px}
+  .card .nome{font-size:13px;line-height:1.15}
+  .card .desc{display:none}
+  .card .preco{font-size:14px;padding-top:6px}
+  #lista h2{font-size:18px;margin:22px 0 10px}
 }
 
 /* pagamento antes da cozinha */
