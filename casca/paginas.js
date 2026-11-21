@@ -131,7 +131,7 @@ window.CASCA_PAGINAS = {
   taxaponto: 'taxa/painel.html?v=20261117a',   // 17/11/2026: Ponto dos taxas pelo QR (erp_taxa_ponto_ler, taxa_qr_codigo_da_semana)
   avaldel: 'avaliacoes/index.html?modo=delivery&v=20261116a',     // 16/11/2026: Avaliações do dia do Delivery (iFood; Accon sem avaliações no sistema)
   avalsalao: 'avaliacoes/index.html?modo=salao&v=20261116a',      // 16/11/2026: Avaliações do dia do Salão (Google, API oficial)
-  mercadolivre: 'mercadolivre/index.html?v=20261117a',            // 17/11/2026: Compras · Mercado Livre (cotação; robô de Compras no Escritório 2; nada é comprado sozinho)
+  mercadolivre: 'mercadolivre/index.html?v=20261121h',            // 17/11/2026: Compras · Mercado Livre (cotação; robô de Compras no Escritório 2; nada é comprado sozinho). 21/11: aba Histórico
 };
 
 // 05/11/2026: telas que não têm loja nenhuma — a casca esconde o seletor "Vendo" (dono, 23/10, no Plano)
