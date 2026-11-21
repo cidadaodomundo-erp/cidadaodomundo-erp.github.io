@@ -14,3 +14,5 @@
 - Cartão: o garantido mostra só Sim / Não e uma linha com o motivo (até 15 min de atraso: tem garantido e refeição).
 - Aba Escala: o Jaison põe e tira motoboy, até 30 dias à frente. Banco ERP: `escala_dia(p_dia)`, `escala_mexer(...)` (só quem passa em `pode_ver_garantido()`), tabela `escala_ajuste` (guarda quem mexeu) e `escala_aplicar_ajustes(dias)`, que `chegada_copia_receber` chama depois de cada cópia automática, para o ajuste não se perder.
 - Cópia automática: robô `erp-chegada-copia` no banco pessoal (a cada 5 min, 10h–2h) manda fila, pátio e escala (sem observações). Cópia de segurança da escala: `_bkp_motoboy_escala_20_11_jaison` (1647 linhas).
+
+- 21/11 noite: botões "Copiar a semana passada" (`escala_copiar_semana(p_inicio, p_loja)`: copia a semana anterior só para os dias sem escala) e "Copiar para o WhatsApp" (texto do dia pronto para colar no grupo). Ajustes da tela dos últimos 8 dias são reaplicados a cada cópia automática.
