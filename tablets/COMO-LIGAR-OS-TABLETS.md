@@ -39,6 +39,10 @@ Nada aqui cobra dinheiro. O pedido vai para a tela da cozinha de teste e, se voc
 
 ## Pix da loja (QR com o valor, a equipe confirma)
 
+**Água Verde: dê dois cliques em `LIGAR-SALAO-PIX-AGUA-VERDE.bat`.** Usa a chave CNPJ 32.620.507/0001-34 (confirmada pelo Fábio em 21/11/2026). Outras lojas entram em `servidor/pix-lojas.json`.
+
+Outra forma (qualquer chave):
+
 1. Na pasta `tablets/servidor/dados/`, crie o arquivo `pix.json` com a chave Pix oficial da loja:
    `{"chave": "CNPJ ou chave da loja", "nome": "CIDADAO DO MUNDO", "cidade": "CURITIBA"}`
 2. Ligue o servidor do salão como sempre. Ele avisa: "Pix da loja LIGADO".

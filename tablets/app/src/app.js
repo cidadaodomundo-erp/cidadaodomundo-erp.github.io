@@ -42,6 +42,7 @@
   }
   $("notaPrevia").textContent = FACIL
     ? "Pedir aqui é fácil: sem fila e sem esperar o garçom. Você escolhe, confirma e a gente leva até a mesa."
+    : ENVIO && ENVIO.pixReal ? "Pedir aqui é fácil: você escolhe, paga com Pix e a gente leva até a mesa."
     : ENVIO
     ? `Cardápio do totem (cópia de ${menu.meta.consultaData}): ${menu.meta.amostra} itens. MODO TESTE: ${ENVIO.modo === "saipos" ? "a rodada vai para a cozinha de teste e para a loja TESTE do Saipos" : "a rodada vai para a tela da cozinha de teste"}; nada é cobrado.`
     : `Protótipo de mesas — amostra do totem; cardápio do salão ainda não importado. ${menu.meta.amostra} de ${menu.meta.totalProdutosSnapshot} itens (consulta ${menu.meta.consultaData}); preços de teste, não oficiais.`;
@@ -316,9 +317,9 @@
     $("mesaTxt").textContent = rotulo;
     $("btnMesa").setAttribute("aria-label", `${rotulo}. Alterar ocupação`);
     $("ocupacaoInfo").textContent = estado.modalidade === "mesa"
-      ? `Ocupação: mesa ${estado.mesa}. ${ENVIO ? "Modo teste: as rodadas vão para a cozinha de teste; nada é cobrado." : "Simulada: nada é enviado ao Saipos nem à cozinha."}`
+      ? `Ocupação: mesa ${estado.mesa}. ${ENVIO ? (ENVIO.pixReal ? "Pague cada rodada com Pix; a equipe confere e leva até a mesa." : "Modo teste: as rodadas vão para a cozinha de teste; nada é cobrado.") : "Simulada: nada é enviado ao Saipos nem à cozinha."}`
       : estado.comanda
-        ? `Ocupação: cartão/comanda ${estado.comanda} (identificador da comanda, não é pagamento). ${ENVIO ? "Modo teste: as rodadas vão para a cozinha de teste; nada é cobrado." : "Simulada: nada é enviado ao Saipos nem à cozinha."}`
+        ? `Ocupação: cartão/comanda ${estado.comanda} (identificador da comanda, não é pagamento). ${ENVIO ? (ENVIO.pixReal ? "Pague cada rodada com Pix; a equipe confere e leva até a mesa." : "Modo teste: as rodadas vão para a cozinha de teste; nada é cobrado.") : "Simulada: nada é enviado ao Saipos nem à cozinha."}`
         : "Cartão/comanda ainda não definido: toque no botão do topo e confirme o identificador antes de registrar.";
     // carrinho
     const caixa = $("itens");
@@ -405,7 +406,7 @@
         if (nome === null) { msg("Tudo bem, o carrinho continua aqui. Quando quiser, toque em Confirmar."); return; }
       }
       const ok = FACIL ? await confirmar(`TUDO CERTO, ${nome.toLocaleUpperCase("pt-BR")}?`,
-        `${qtd} ${qtd === 1 ? "item" : "itens"}, ${reais(C.totalCarrinho(ix, estado))}, para a ${C.rotuloOcupacao(estado).toLowerCase()}. ${ENVIO.pagarAntes ? "Agora é só pagar e a cozinha começa na hora." : "Confirme e a cozinha começa na hora."} (Teste: nada é cobrado.)`,
+        `${qtd} ${qtd === 1 ? "item" : "itens"}, ${reais(C.totalCarrinho(ix, estado))}, para a ${C.rotuloOcupacao(estado).toLowerCase()}. ${ENVIO.pagarAntes ? "Agora é só pagar e a cozinha começa na hora." : "Confirme e a cozinha começa na hora."}${ENVIO.pixReal ? "" : " (Teste: nada é cobrado.)"}`,
         ENVIO.pagarAntes ? "Sim, ir para o pagamento" : "Sim, enviar à cozinha")
       : await confirmar("REGISTRAR PEDIDO",
         `Registrar rodada ${estado.rodadas.length + 1} em ${C.rotuloOcupacao(estado).toLowerCase()}: ${qtd} ${qtd === 1 ? "item" : "itens"}, ${reais(C.totalCarrinho(ix, estado))}? Depois de registrada, a mesa/comanda não pode mais ser trocada até fechar a comanda. ${ENVIO ? "A rodada vai para a cozinha de teste. Nada é cobrado." : "Demonstração: nada é enviado à cozinha."}`,

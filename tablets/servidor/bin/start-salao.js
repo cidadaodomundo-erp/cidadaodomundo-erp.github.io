@@ -35,6 +35,12 @@ const ips = rede ? ipsDaRede() : [];
 // Pix da loja (chave oficial): arquivo dados/pix.json com {"chave": "...", "nome": "...", "cidade": "CURITIBA"}. Sem o arquivo, o pagamento continua simulado.
 const arqPix = join(DADOS, "pix.json");
 let pix = null;
+const iPix = args.indexOf("--pix");
+if (iPix >= 0) {
+  const lojas = JSON.parse(readFileSync(join(DADOS, "..", "pix-lojas.json"), "utf8"));
+  pix = lojas[args[iPix + 1]] ?? null;
+  if (!pix) { console.error(`Loja do Pix desconhecida: ${args[iPix + 1]}. Use: ${Object.keys(lojas).join(", ")}. Nada foi iniciado.`); process.exit(2); }
+}
 if (existsSync(arqPix)) { try { pix = JSON.parse(readFileSync(arqPix, "utf8")); } catch { console.error("dados/pix.json com erro de digitação. Nada foi iniciado."); process.exit(2); } }
 let server;
 try {

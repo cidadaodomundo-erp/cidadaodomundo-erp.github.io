@@ -63,6 +63,7 @@
   window.CDMEnvio = {
     modo: cfg.modo,
     pagarAntes: cfg.pagarAntes === true,
+    pixReal: cfg.pixReal === true,
     async pagamento(token) {
       try { const r = await getJson(`/api/pagamento?t=${encodeURIComponent(token)}`); return r.status === 200 ? r.json : null; } catch { return null; }
     },

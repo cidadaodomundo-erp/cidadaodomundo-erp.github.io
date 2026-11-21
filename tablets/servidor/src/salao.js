@@ -229,22 +229,22 @@ async function iniciarSaipos({ envPath, fetchImpl, timeoutMs }) {
 
 // ---------- paginas ----------
 
-function tabletHtml({ menu, modo, csrf, base, mesaFixa = null, pagarAntes = false }) {
+function tabletHtml({ menu, modo, csrf, base, mesaFixa = null, pagarAntes = false, pixReal = false }) {
   let html = readFileSync(join(APP, "src", "index.template.html"), "utf8");
   const dados = { ...menu, fotos: Object.fromEntries(menu.produtos.map((p) => [p.id, `/fotos/p${p.id}.webp`])) };
   const seguro = (s) => s.replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-  const faixa = modo === "saipos" ? "MODO TESTE — pedidos vão para a cozinha de teste e para a loja TESTE do Saipos" : "MODO TESTE — pedidos vão para a tela da cozinha de teste";
+  const faixa = pixReal ? "PIX DE VERDADE — o pagamento cai na conta da loja; a equipe confere e o pedido vai para a cozinha" : modo === "saipos" ? "MODO TESTE — pedidos vão para a cozinha de teste e para a loja TESTE do Saipos" : "MODO TESTE — pedidos vão para a tela da cozinha de teste";
   const trocas = [
     [/<meta http-equiv="Content-Security-Policy"[^>]*>/, ""], // CSP vem no cabecalho HTTP (permite falar so com este servidor)
     ["DEMONSTRAÇÃO — pedidos não chegam à cozinha", faixa],
     ["Tablet de mesa (DEMONSTRAÇÃO)", "Tablet de mesa (TESTE)"],
-    ["Sem conexão · sem envio real", "Teste · nada é cobrado"],
+    ["Sem conexão · sem envio real", pixReal ? "Pix da loja" : "Teste · nada é cobrado"],
     ["Chamar atendente (simulado)", "Chamar atendente"],
     ["Pedir conta (simulado)", "Pedir conta"],
-    ["Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.", "Pede confirmação e envia a rodada para a cozinha de teste. Nada é cobrado."],
+    ["Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.", pixReal ? "Pede confirmação, mostra o Pix e, com o Pix conferido, envia a rodada para a cozinha." : "Pede confirmação e envia a rodada para a cozinha de teste. Nada é cobrado."],
   ];
   for (const [a, b] of trocas) html = html.replace(a, b);
-  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa, pagarAntes }))}</script>\n<script type="application/json" id="dados">`;
+  const cfg = `<script type="application/json" id="cfgEnvio">${seguro(JSON.stringify({ modo, csrf, mesaFixa, pagarAntes, pixReal }))}</script>\n<script type="application/json" id="dados">`;
   html = html.replace('<script type="application/json" id="dados">', cfg);
   const subst = { "{{CSS}}": base.css, "{{CORE}}": base.core, "{{APP}}": base.qr + "\n" + base.cartao + "\n" + base.envio + "\n" + base.app, "{{DADOS}}": seguro(JSON.stringify(dados)), "{{LOGO}}": "/marca/logo-cdm.png" };
   for (const [k, v] of Object.entries(subst)) html = html.split(k).join(v);
@@ -330,13 +330,13 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
         mensagem: `aguardando pagamento (${C.reais(r.totalCentavos)}). A rodada só vai para a cozinha depois do pagamento aprovado.`,
         pagamento: { estado: r.pagamento.estado, token: r.pagamento.token } };
     }
-    const pago = r.pagamento ? `Pagamento aprovado (teste, ${FORMAS_PAGAMENTO[r.pagamento.forma]}). ` : "";
+    const pago = r.pagamento ? (pixCfg ? "Pagamento aprovado: Pix conferido pela equipe. " : `Pagamento aprovado (teste, ${FORMAS_PAGAMENTO[r.pagamento.forma]}). `) : "";
     const fim = (x) => ({ ...x, mensagem: pago + x.mensagem, pagamento: r.pagamento ? { estado: "aprovado", forma: r.pagamento.forma } : undefined });
     return fim(respostaBase(r));
   }
   function respostaBase(r) {
     let status = STATUS.local;
-    let mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}). Nada foi cobrado.`;
+    let mensagem = pixCfg ? `na cozinha (${C.reais(r.totalCentavos)}).` : `na cozinha de teste (${C.reais(r.totalCentavos)}). Nada foi cobrado.`;
     if (r.saipos && ["reservado", "enviando"].includes(r.saipos.estado)) { status = STATUS.enviando; mensagem = `na cozinha de teste (${C.reais(r.totalCentavos)}); enviando ao Saipos de teste. Nada foi cobrado.`; }
     else if (r.saipos) {
       if (r.saipos.estado === "aceito") { status = STATUS.saipos; mensagem = `na cozinha e na loja TESTE do Saipos, ficha ${r.saipos.senha} (${C.reais(r.totalCentavos)}). Nada foi cobrado.`; }
@@ -659,7 +659,7 @@ export async function criarServidorSalao({ modo = "local", modoSaipos = "TICKET"
         if (url.pathname === "/" || url.pathname === "/tablet") {
           const mesaFixa = url.searchParams.has("mesa") ? C.normalizarMesa(url.searchParams.get("mesa")) : null;
           if (url.searchParams.has("mesa") && mesaFixa === null) return enviar(400, "Mesa inválida no endereço (use /tablet?mesa=1 a 150).", "text/plain; charset=utf-8");
-          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa, pagarAntes }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
+          return enviar(200, tabletHtml({ menu: menuDisponivel(cardapio, agora(), permitidos), modo, csrf, base, mesaFixa, pagarAntes, pixReal: !!pixCfg }), "text/html; charset=utf-8", { "Content-Security-Policy": CSP });
         }
         if (url.pathname === "/api/pagamento") return enviar(200, verPagamento(url.searchParams.get("t")));
         if (url.pathname === "/pagar") { porToken(url.searchParams.get("t")); return enviar(200, pagarHtml, "text/html; charset=utf-8", { "Content-Security-Policy": CSP }); }
