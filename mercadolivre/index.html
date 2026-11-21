@@ -13,7 +13,9 @@
 <!-- COMPRAS · MERCADO LIVRE (17/11/2026, pedido do Fábio: "achar o melhor preço das compras da Rita").
      Quem pede: escreve o produto ou cola o link do ML aqui, ou manda no WhatsApp 1602 começando com "compra".
      O robô de Compras (Escritório 2) lê o site público do Mercado Livre e grava as ofertas (supabase/compras-mercadolivre.sql).
-     Nada é comprado por aqui: "Comprei esta" só registra a decisão. Nenhuma mensagem sai pelo WhatsApp. -->
+     Nada é comprado por aqui: "Comprei esta" só registra a decisão. Nenhuma mensagem sai pelo WhatsApp.
+     21/11/2026: aba "Histórico · gastos" (compra_ml_historico, supabase/compras-ml-fluxo-unico.sql): compras do ML, gasto por mês e loja,
+     entrega lida do próprio pedido do ML; compra casada sozinha com o pedido do robô. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -72,6 +74,15 @@
   .ml-acoes { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
   .ml-nota { font-size:12px; opacity:.75; margin:12px 0 0; line-height:1.5; }
   .ml-vazio { padding:14px; opacity:.75; }
+  .ml-hist-tab { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 14px; }
+  .ml-hist-tab th, .ml-hist-tab td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .ml-hist-tab td.n, .ml-hist-tab th.n { text-align:right; white-space:nowrap; }
+  .ml-hist-tab tr.tot td { font-weight:800; }
+  .ml-hist h2 { font-size:15px; margin:14px 0 4px; }
+  .ml-ent { font-size:11px; font-weight:700; padding:1px 8px; border-radius:20px; border:1px solid var(--line-2); white-space:nowrap; }
+  .ml-ent.ok { color:var(--farol-ok, #3fb950); border-color:var(--farol-ok, #3fb950); }
+  .ml-ent.vai { color:var(--farol-perto, #e0a33a); border-color:var(--farol-perto, #e0a33a); }
+  .ml-ent.ruim { color:var(--farol-fora, #ff6b6b); border-color:var(--farol-fora, #ff6b6b); }
   @media (max-width:560px) {
     .ml-of { grid-template-columns:44px 1fr; }
     .ml-of img, .ml-of .semimg { width:44px; height:44px; }
@@ -108,6 +119,7 @@
       <button type="button" class="ml-btn peq" data-f="comprado">Compradas</button>
       <button type="button" class="ml-btn peq" data-f="descartado">Descartadas</button>
       <button type="button" class="ml-btn peq" data-f="todas">Todas</button>
+      <button type="button" class="ml-btn peq" data-f="historico">Histórico · gastos</button>
     </div>
     <div id="erroMsg" class="ml-msg erro" style="display:none;"></div>
     <div id="conteudo"><div class="ml-vazio">Carregando…</div></div>
@@ -291,10 +303,65 @@ function pedido(p) {
   '</div>';
 }
 
+// HISTÓRICO (21/11/2026): o que foi comprado no ML e quanto foi gasto. Fonte: lista de compras no cartão do ERP
+// (fin_cartao_compra, gravada pelo leitor de pedidos do ML), via compra_ml_historico. A entrega vem do próprio pedido do ML.
+let HIST = null;
+async function carregarHistorico() {
+  const el = document.getElementById('conteudo');
+  el.innerHTML = '<div class="ml-vazio">Carregando o histórico…</div>';
+  let r; try { r = await trRpcSeguro('compra_ml_historico', { p_dias: 365 }); } catch (e) { r = null; }
+  if (!r) { mostrarErro('Sem conexão com o servidor.'); return; }
+  if (r.status === 401) { exigirLogin('Entre de novo para ver o histórico.'); return; }
+  if (!r.ok) { mostrarErro(r.status === 404 ? 'O histórico ainda não está ligado no servidor.' : 'Não foi possível carregar o histórico. ' + await trErroDe(r)); return; }
+  try { HIST = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (FILTRO === 'historico') desenharHistorico();
+}
+const MES = (m) => { const [a, n] = String(m).split('-'); return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][Number(n) - 1] + '/' + a; };
+const dia = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—';
+function selEntrega(c) {
+  const e = String(c.estado || '');
+  if (c.situacao === 'CANCELADA' || /reembols/i.test(e)) return '<span class="ml-ent ruim">' + esc(e || 'cancelada') + '</span>';
+  if (e === 'Entregue') return '<span class="ml-ent ok">Chegou' + (c.entregue_em ? ' · ' + esc(quando(c.entregue_em).slice(0, 5)) : '') + '</span>';
+  if (/atras/i.test(e)) return '<span class="ml-ent ruim">' + esc(e) + '</span>';
+  return '<span class="ml-ent vai">' + esc(e || 'sem notícia') + '</span>';
+}
+function desenharHistorico() {
+  const el = document.getElementById('conteudo');
+  if (!HIST) { carregarHistorico(); return; }
+  const compras = Array.isArray(HIST.compras) ? HIST.compras : [];
+  const meses = Array.isArray(HIST.por_mes) ? HIST.por_mes : [];
+  const lojas = [...new Set(meses.map((m) => m.loja))].sort();
+  const porMes = {};
+  meses.forEach((m) => { (porMes[m.mes] = porMes[m.mes] || {})[m.loja] = m; });
+  const ordem = Object.keys(porMes).sort().reverse();
+  const carga = HIST.leitor_ultima_carga;
+  const velho = minutosDesde(carga) > 36 * 60;
+  let h = '<div class="ml-hist">';
+  h += '<div class="ml-robo">Leitor de pedidos do Mercado Livre: última leitura em <b>' + esc(quando(carga)) + '</b>' +
+       (velho ? ' <span class="ml-velho">· dado velho: compras depois disso ainda não aparecem</span>' : '') + '.</div>';
+  h += '<h2>Quanto foi gasto</h2><table class="ml-hist-tab"><tr><th>Mês</th>' + lojas.map((l) => '<th class="n">' + esc(NOME_LOJA[l] || l) + '</th>').join('') + '<th class="n">Total</th></tr>';
+  let geral = 0;
+  ordem.forEach((m) => {
+    let t = 0;
+    h += '<tr><td>' + esc(MES(m)) + '</td>' + lojas.map((l) => { const x = porMes[m][l]; if (x) t += Number(x.total); return '<td class="n">' + (x ? brl(x.total) + ' <small>(' + x.n + ')</small>' : '—') + '</td>'; }).join('') + '<td class="n"><b>' + brl(t) + '</b></td></tr>';
+    geral += t;
+  });
+  h += '<tr class="tot"><td>Total</td>' + lojas.map(() => '<td></td>').join('') + '<td class="n">' + brl(geral) + '</td></tr></table>';
+  h += '<h2>O que foi comprado</h2>';
+  h += compras.length ? '<table class="ml-hist-tab"><tr><th>Dia</th><th>Produto</th><th>Loja</th><th>Entrega</th><th class="n">Valor</th></tr>' +
+    compras.map((c) => '<tr><td>' + esc(dia(c.data)) + '</td><td>' + esc(c.descricao || '') +
+      (c.cotacao_id ? ' <span class="ml-tag mesmo">pedido #' + Number(c.cotacao_id) + '</span>' : '') +
+      (c.tem_nf ? ' <span class="ml-tag">nota ok</span>' : '') + (c.obs ? '<br><small>' + esc(c.obs) + '</small>' : '') + '</td><td>' + esc(NOME_LOJA[c.loja] || c.loja || '') + '</td><td>' + selEntrega(c) + '</td><td class="n">' + brl(c.valor) + (Number(c.parcelas) > 1 ? '<br><small>' + Number(c.parcelas) + 'x</small>' : '') + '</td></tr>').join('') +
+    '</table>' : '<div class="ml-vazio">Nenhuma compra do Mercado Livre registrada ainda.</div>';
+  h += '</div>';
+  el.innerHTML = h;
+}
+
 function desenhar() {
   desenharRobo(DADOS.robo);
-  const lista = filtrar(Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []);
   document.querySelectorAll('#filtros .ml-btn').forEach((b) => b.classList.toggle('on', b.dataset.f === FILTRO));
+  if (FILTRO === 'historico') { desenharHistorico(); return; }
+  const lista = filtrar(Array.isArray(DADOS.pedidos) ? DADOS.pedidos : []);
   document.getElementById('conteudo').innerHTML = lista.length
     ? '<div class="ml-lista">' + lista.map(pedido).join('') + '</div>'
     : '<div class="ml-vazio">' + (FILTRO === 'abertas' ? 'Nenhum pedido em aberto. Escreva o produto acima para buscar preços.' : 'Nada aqui nos últimos 60 dias.') + '</div>';
@@ -332,7 +399,7 @@ document.getElementById('btnPedir').addEventListener('click', pedir);
 document.getElementById('fTexto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) pedir(); });
 document.getElementById('filtros').addEventListener('click', (e) => {
   const b = e.target.closest('[data-f]'); if (!b) return;
-  FILTRO = b.dataset.f; if (DADOS) desenhar();
+  FILTRO = b.dataset.f; document.getElementById('erroMsg').style.display = 'none'; if (DADOS) desenhar();
 });
 document.getElementById('conteudo').addEventListener('click', (e) => {
   const b = e.target.closest('[data-acao]'); if (!b) return;
@@ -346,7 +413,7 @@ else {
   avisarCasca({ tipo: 'casca-modulo', nome: TELA });
   (async () => { await lojasPermitidas(); carregar(); })();
 }
-window.reentrarTela = () => { SEM_MUDAR = 0; carregar(); };
+window.reentrarTela = () => { SEM_MUDAR = 0; HIST = null; carregar(); };
 </script>
 </body>
 </html>
