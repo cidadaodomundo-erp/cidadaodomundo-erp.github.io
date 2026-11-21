@@ -79,6 +79,21 @@
   .login button { width:100%; height:50px; margin-top:18px; border:0; border-radius:12px; background:var(--amarelo); color:#111; font-weight:800; font-size:17px; }
   .erro { color:var(--verm); font-size:14px; margin-top:10px; display:none; }
   .dica { color:var(--fraco); font-size:13px; margin-top:14px; }
+  .modos { display:flex; gap:6px; margin-bottom:10px; } .modos button { flex:1; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:15px; font-weight:600; }
+  .modos button.on { background:var(--amarelo); color:#111; border-color:var(--amarelo); }
+  .cl-dia { border-top:1px solid var(--line); padding:8px 0; } .cl-dia:first-of-type { border-top:0; }
+  .cl-dia b { font-size:15px; } .cl-per { display:flex; gap:6px; margin:6px 0 4px; } .cl-per div { flex:1; background:#151514; border-radius:10px; padding:5px 7px; font-size:12px; }
+  .cl-per span { display:block; font-weight:700; font-size:13px; } .cl-dificil span { color:var(--verm); } .cl-atencao span { color:var(--laranja); } .cl-facil span { color:var(--verde); }
+  .cl-ordem { font-size:14px; font-weight:600; color:#ffd59a; margin-top:4px; } .cl-ok { font-size:13px; color:var(--verde); margin-top:4px; }
+  .gar-ok { color:var(--verde); font-size:13px; margin-top:6px; } .gar-nao { color:var(--verm); font-size:13px; margin-top:6px; }
+  .esc-t { font-weight:700; margin:12px 0 6px; } .esc-l { display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:6px; }
+  .esc-l small { display:block; color:var(--fraco); font-size:12px; } .esc-l button { border:1px solid var(--line); background:#151514; color:var(--verm); border-radius:10px; padding:8px 12px; font-size:14px; }
+  .esc-l button.conf { background:var(--verm); color:#fff; border-color:var(--verm); }
+  .esc-f { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:14px; }
+  .esc-f label { display:block; font-size:13px; color:var(--fraco); margin:10px 0 4px; } .esc-f select, .esc-f input { width:100%; height:46px; border-radius:12px; border:1px solid var(--line); background:#151514; color:var(--tx); font-size:16px; padding:0 10px; }
+  .esc-f .dois { display:flex; gap:8px; } .esc-f .dois > div { flex:1; }
+  .esc-f button.salvar { width:100%; height:50px; margin-top:14px; border:0; border-radius:12px; background:var(--amarelo); color:#111; font-weight:800; font-size:17px; }
+  .ok { background:#12301c; border:1px solid #1f5a33; color:#9be3b3; border-radius:12px; padding:10px 12px; font-size:14px; margin-bottom:10px; }
   #btnAjuda { display:none !important; }   /* a Ajuda geral do portal não serve para esta tela */
 </style>
 </head>
@@ -95,7 +110,8 @@
   const hojeSP = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   const somaDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
   const horasTxt = (h) => { if (h == null) return '—'; const m = Math.round(Number(h) * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : ''); };
-  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0;
+  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = 'garantido', DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, RECADO = '';
+  const maxDia = () => MODO === 'escala' ? somaDias(hojeSP(), 30) : hojeSP();
   window.exigirLogin = () => telaLogin('Sua sessão venceu. Entre de novo.');
 
   function telaLogin(recado) {
@@ -120,64 +136,84 @@
     '2027-03-26': 'Sexta-feira Santa', '2027-04-21': 'Tiradentes', '2027-05-01': 'Dia do Trabalho', '2027-05-27': 'Corpus Christi',
     '2027-09-07': 'Independência', '2027-09-08': 'N. Sra. da Luz (Curitiba)', '2027-10-12': 'N. Sra. Aparecida', '2027-11-02': 'Finados',
     '2027-11-15': 'Proclamação da República', '2027-11-20': 'Consciência Negra', '2027-12-25': 'Natal' };
+  // Por hora: { 'AAAA-MM-DD': [{h, p, mm}, ...] }. Hora difícil = chance de 60% ou mais com 0,5 mm ou mais.
   let CLIMA = null;
   async function lerClima() {
     if (CLIMA) return CLIMA;
     try {
       const j = await (await fetch(METEO)).json(); const h = j.hourly || {}; const m = {};
-      (h.time || []).forEach((t, i) => {
-        const d = t.slice(0, 10), hr = +t.slice(11, 13), k = hr >= 11 && hr < 15 ? 'alm' : hr >= 18 && hr < 24 ? 'jan' : null;
-        if (!k) return; const o = (m[d] = m[d] || {}), x = (o[k] = o[k] || { mm: 0, p: 0 });
-        x.mm += Number(h.precipitation[i]) || 0; x.p = Math.max(x.p, Number(h.precipitation_probability[i]) || 0);
-      });
+      (h.time || []).forEach((t, i) => { const d = t.slice(0, 10); (m[d] = m[d] || []).push({ h: +t.slice(11, 13), p: Number(h.precipitation_probability[i]) || 0, mm: Number(h.precipitation[i]) || 0 }); });
       CLIMA = m;
     } catch (e) { CLIMA = {}; }
     return CLIMA;
   }
-  function chuva(x) {
-    if (!x) return '<span class="cl-s">—</span>';
-    const mm = Math.round(x.mm * 10) / 10, ic = mm >= 5 ? '🌧️' : mm >= 1 || x.p >= 60 ? '🌦️' : '☀️';
-    return '<span class="cl-s' + (mm >= 1 || x.p >= 60 ? ' cl-chuva' : '') + '">' + ic + ' ' + x.p + '%' + (mm >= 0.1 ? ' · ' + String(mm).replace('.', ',') + 'mm' : '') + '</span>';
+  const nivel = (x) => (x.p >= 60 && x.mm >= 0.5) || x.mm >= 2 ? 2 : (x.p >= 40 && x.mm >= 0.1) ? 1 : 0;
+  // Junta horas seguidas de chuva em faixas: "19h às 22h".
+  function faixas(hs) {
+    const r = []; hs.forEach((x) => { const u = r[r.length - 1]; if (u && x.h === u.f) u.f = x.h + 1; else r.push({ i: x.h, f: x.h + 1 }); });
+    return r.map((x) => x.i + 'h às ' + (x.f === 24 ? '0h' : x.f + 'h')).join(' e ');
   }
-  function climaHtml() {
+  const PERIODOS = [['Manhã', 6, 12], ['Tarde', 12, 18], ['Noite', 18, 24]];
+  function climaDia(d) {
+    const hs = (CLIMA && CLIMA[d]) || []; if (!hs.length) return '';
+    const per = PERIODOS.map(([nome, i, f]) => {
+      const x = hs.filter((y) => y.h >= i && y.h < f), n = Math.max(0, ...x.map(nivel)), mm = x.reduce((a, y) => a + y.mm, 0);
+      const chuva = x.filter((y) => nivel(y) > 0);
+      return { nome, n, mm, txt: n === 2 ? 'Difícil' : n === 1 ? 'Atenção' : 'Tranquilo', quando: chuva.length ? 'chuva ' + faixas(chuva) : 'sem chuva' };
+    });
+    const ruins = hs.filter((y) => nivel(y) === 2), alm = ruins.some((y) => y.h >= 10 && y.h < 16), jan = ruins.some((y) => y.h >= 17);
+    const amanha = somaDias(d, 1), fer = FERIADOS[d], vesp = FERIADOS[amanha];
+    const nomeDia = (d === hojeSP() ? 'Hoje' : d === somaDias(hojeSP(), 1) ? 'Amanhã' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })) + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7);
+    const ordens = [];
+    if (alm && jan) ordens.push('Vai chover no almoço e no jantar. Chame mais motoboys para os dois turnos.');
+    else if (alm) ordens.push('Vai chover no almoço (' + faixas(ruins.filter((y) => y.h >= 10 && y.h < 16)) + '). Chame mais motoboys para o almoço.');
+    else if (jan) ordens.push('Vai chover no jantar (' + faixas(ruins.filter((y) => y.h >= 17)) + '). Chame mais motoboys para o jantar.');
+    if (fer) ordens.push('Feriado (' + fer + '). Reforce a escala.');
+    else if (vesp) ordens.push('Véspera de feriado (' + vesp + '). Reforce a escala do jantar.');
+    return '<div class="cl-dia"><b>' + esc(nomeDia) + '</b>' + (fer || vesp ? '<span class="cl-fer">' + esc(fer ? 'feriado: ' + fer : 'véspera de feriado: ' + vesp) + '</span>' : '') +
+      '<div class="cl-per">' + per.map((x) => '<div class="' + (x.n === 2 ? 'cl-dificil' : x.n === 1 ? 'cl-atencao' : 'cl-facil') + '">' + x.nome + '<span>' + x.txt + '</span>' + esc(x.quando) + '</div>').join('') + '</div>' +
+      (ordens.length ? ordens.map((o) => '<div class="cl-ordem">👉 ' + esc(o) + '</div>').join('') : '<div class="cl-ok">✅ Sem chuva forte nos turnos. Escala normal.</div>') + '</div>';
+  }
+  function climaHtml(soDia) {
     if (!CLIMA || !Object.keys(CLIMA).length) return '';
-    const hoje = hojeSP(); const dias = Object.keys(CLIMA).filter((d) => d >= hoje).slice(0, 5);
-    const lin = dias.map((d) => {
-      const amanha = somaDias(d, 1), fer = FERIADOS[d], vesp = FERIADOS[amanha];
-      const nome = d === hoje ? 'Hoje' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7);
-      const tag = fer ? '<span class="cl-fer">feriado: ' + esc(fer) + '</span>' : vesp ? '<span class="cl-fer">véspera de feriado (' + esc(vesp) + ')</span>' : '';
-      return '<tr class="' + (fer || vesp ? 'cl-dest' : '') + '"><th>' + esc(nome) + tag + '</th><td>' + chuva(CLIMA[d].alm) + '</td><td>' + chuva(CLIMA[d].jan) + '</td></tr>';
-    }).join('');
-    return '<details class="clima" open><summary>🌦️ Previsão de chuva</summary><table><tr><th></th><th>Almoço</th><th>Jantar</th></tr>' + lin +
-      '</table><div class="cl-pe">Chance de chuva e milímetros em Curitiba (Open-Meteo). Dia de chuva e véspera de feriado pedem mais motoboys.</div></details>';
+    const hoje = hojeSP(); const dias = soDia ? [soDia].filter((d) => CLIMA[d]) : Object.keys(CLIMA).filter((d) => d >= hoje).slice(0, 4);
+    if (!dias.length) return '';
+    return '<details class="clima" open><summary>🌦️ Chuva e o que fazer</summary>' + dias.map(climaDia).join('') +
+      '<div class="cl-pe">Previsão de Curitiba por hora (Open-Meteo), lida agora. Difícil = chance de 60% ou mais e chuva de verdade. Atenção = pode chuviscar.</div></details>';
   }
 
   function moldura(conteudo) {
-    const ontem = somaDias(hojeSP(), -1);
-    const d = new Date(DIA + 'T12:00:00');
+    const dia = MODO === 'escala' ? DIAE : DIA;
+    const d = new Date(dia + 'T12:00:00');
     const sem = d.toLocaleDateString('pt-BR', { weekday: 'long' });
-    const lojas = ['todas'].concat([...new Set((DADOS && DADOS.linhas || []).map((l) => l.loja))]);
-    return '<div class="topo"><h1>🛵 Garantido</h1><button class="sair" id="bSair">Sair</button></div>' +
+    const lojas = MODO === 'escala' ? ['Água Verde', 'Ahú', 'São Braz'] : ['todas'].concat([...new Set((DADOS && DADOS.linhas || []).map((l) => l.loja))]);
+    const lojaAtual = MODO === 'escala' ? LOJAE : LOJA;
+    return '<div class="topo"><h1>🛵 ' + (MODO === 'escala' ? 'Escala' : 'Garantido') + '</h1><button class="sair" id="bSair">Sair</button></div>' +
+      '<div class="modos"><button data-m="garantido" class="' + (MODO === 'garantido' ? 'on' : '') + '">💰 Garantido</button><button data-m="escala" class="' + (MODO === 'escala' ? 'on' : '') + '">📋 Escala</button></div>' +
       '<div class="dia"><button id="bAntes" aria-label="Dia anterior">‹</button>' +
-      '<div class="meio"><b>' + DIA.slice(8, 10) + '/' + DIA.slice(5, 7) + '</b><small>' + esc(sem) + (DIA === hojeSP() ? ' · hoje, ainda rodando' : '') + '</small>' +
-      '<input type="date" id="iDia" value="' + DIA + '" max="' + hojeSP() + '" aria-label="Escolher o dia"></div>' +
-      '<button id="bDepois" aria-label="Próximo dia"' + (DIA >= hojeSP() ? ' disabled' : '') + '>›</button></div>' +
-      (lojas.length > 2 ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === LOJA ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
-      climaHtml() + conteudo;
+      '<div class="meio"><b>' + dia.slice(8, 10) + '/' + dia.slice(5, 7) + '</b><small>' + esc(sem) + (dia === hojeSP() ? ' · hoje' + (MODO === 'garantido' ? ', ainda rodando' : '') : '') + '</small>' +
+      '<input type="date" id="iDia" value="' + dia + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
+      '<button id="bDepois" aria-label="Próximo dia"' + (dia >= maxDia() ? ' disabled' : '') + '>›</button></div>' +
+      (lojas.length > 2 || MODO === 'escala' ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === lojaAtual ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
+      climaHtml(MODO === 'escala' ? DIAE : null) + conteudo;
   }
   function ligar() {
     const q = (id) => document.getElementById(id);
+    const mudaDia = (x) => { if (MODO === 'escala') DIAE = x; else DIA = x; recarregar(); };
+    const dia = () => MODO === 'escala' ? DIAE : DIA;
     q('bSair').onclick = () => { localStorage.removeItem('rmbSessao'); telaLogin(''); };
-    q('bAntes').onclick = () => { DIA = somaDias(DIA, -1); carregar(); };
-    q('bDepois').onclick = () => { if (DIA < hojeSP()) { DIA = somaDias(DIA, 1); carregar(); } };
-    q('iDia').onchange = (e) => { if (e.target.value) { DIA = e.target.value > hojeSP() ? hojeSP() : e.target.value; carregar(); } };
-    document.querySelectorAll('.lojas button').forEach((b) => { b.onclick = () => { LOJA = b.dataset.l; desenhar(); }; });
+    q('bAntes').onclick = () => mudaDia(somaDias(dia(), -1));
+    q('bDepois').onclick = () => { if (dia() < maxDia()) mudaDia(somaDias(dia(), 1)); };
+    q('iDia').onchange = (e) => { if (e.target.value) mudaDia(e.target.value > maxDia() ? maxDia() : e.target.value); };
+    document.querySelectorAll('.lojas button').forEach((b) => { b.onclick = () => { if (MODO === 'escala') { LOJAE = b.dataset.l; RECADO = ''; desenharEscala(); } else { LOJA = b.dataset.l; desenhar(); } }; });
+    document.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { if (MODO !== b.dataset.m) { MODO = b.dataset.m; if (MODO === 'escala' && LOJA !== 'todas') LOJAE = LOJA; RECADO = ''; recarregar(); } }; });
   }
+  const recarregar = () => MODO === 'escala' ? carregarEscala() : carregar();
 
   async function carregar() {
     if (!rmbSessao()) { telaLogin(''); return; }
     const seq = ++SEQ; DADOS = null;
-    if (!CLIMA) lerClima().then(() => { if (seq === SEQ && DADOS) desenhar(); });
+    if (!CLIMA) lerClima().then(() => { if (seq === SEQ && DADOS && MODO === 'garantido') desenhar(); });
     app.innerHTML = moldura('<div class="vazio">Carregando o dia…</div>'); ligar();
     await rmbGarantirTokenValido();
     let r;
@@ -225,17 +261,19 @@
     else if (l.esc_jan || rodouJan) linhas += turnoLinha('Jantar', l.esc_jan, l.esc_jan_fim, chegJan, !!l.patio_jan, rodouJan, tol);
     const temGar = Number(l.garantido || 0) > 0;
     const garVence = temGar && Number(l.garantido) > Number(l.taxas || 0);
-    const semGar = l.corta_dia ? 'perdeu por atraso' : 'não tem';
-    return '<div class="cartao' + (l.corta_dia ? ' corta' : '') + '">' +
+      return '<div class="cartao' + (l.corta_dia ? ' corta' : '') + '">' +
       '<div class="c1"><div><div class="nome">' + esc(l.nome) + (l.conferir ? '<span class="selo conf">conferir</span>' : '') + '</div>' +
         '<div class="loja">' + esc(l.loja) + ' · saiu ' + esc(l.saida || '—') + '</div></div>' +
         '<div class="recebe"><b>' + brl(l.pagar) + '</b><small>vai ganhar</small></div></div>' +
       '<table class="turnos"><tr><th></th><th>Escala</th><th>Chegou na fila</th></tr>' + linhas + '</table>' +
       '<div class="numeros">' +
         '<div><small>Corridas</small><span>' + Number(l.entregas || 0) + '</span></div>' +
-        '<div class="' + (garVence ? 'vale' : '') + '"><small>Garantido</small><span class="' + (temGar ? 'sim' : 'nao') + '">' + (temGar ? 'Sim · ' + brl0(l.garantido) : 'Não · ' + semGar) + '</span></div>' +
+        '<div class="' + (garVence ? 'vale' : '') + '"><small>Garantido</small><span class="' + (temGar ? 'sim' : 'nao') + '">' + (temGar ? 'Sim' : 'Não') + '</span></div>' +
         '<div class="' + (!garVence ? 'vale' : '') + '"><small>Taxas</small><span>' + brl0(l.taxas) + '</span></div>' +
       '</div>' +
+      (temGar ? '<div class="gar-ok">✅ Tem garantido e refeição: chegou até ' + tol + ' min depois do horário da escala.</div>'
+        : l.corta_dia ? '<div class="gar-nao">❌ Sem garantido e sem refeição: chegou mais de ' + tol + ' min atrasado.</div>'
+        : '<div class="gar-nao">❌ Sem garantido: não estava na escala ou rodou menos de 1 hora fora dela. Recebe só as taxas.</div>') +
       (Number(l.cobrar_refeicao) ? '<div class="linha">Refeição a mais descontada: − ' + brl0(l.cobrar_refeicao) + '</div>' : '') +
       (Number(l.ajustes) ? '<div class="linha">Acerto à mão: ' + brl0(l.ajustes) + '</div>' : '') +
       (motivos.length ? '<details class="conta"><summary>Ver a conta</summary><ul>' + motivos.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></details>' : '') +
@@ -269,6 +307,73 @@
       linhas.map(cartao).join('');
     app.innerHTML = moldura('<div class="fonte">Entregas do TrackEat carregadas em ' + esc(f.trackeat_carregado_em || '—') + ' · escala gravada em ' + esc(f.escala_gravada_em || '—') + ' · consultado ' + esc(DADOS.agora || '') + '</div>' + corpo + regras());
     ligar();
+  }
+
+  // ESCALA (21/11/2026, pedido do Fábio): o Jaison põe e tira motoboy. Grava em escala_ajuste no portal novo e vale por cima da cópia automática.
+  async function carregarEscala() {
+    if (!rmbSessao()) { telaLogin(''); return; }
+    const seq = ++SEQ; ESC = null;
+    if (!CLIMA) lerClima().then(() => { if (seq === SEQ && ESC && MODO === 'escala') desenharEscala(); });
+    app.innerHTML = moldura('<div class="vazio">Carregando a escala…</div>'); ligar();
+    await rmbGarantirTokenValido();
+    let r;
+    try { r = await trRpc('escala_dia', { p_dia: DIAE }); } catch (e) { if (seq === SEQ) falha('Sem internet agora. Tente de novo.'); return; }
+    if (seq !== SEQ) return;
+    if (r.status === 401) { localStorage.removeItem('rmbSessao'); telaLogin('Sua sessão venceu. Entre de novo.'); return; }
+    if (!r.ok) { falha(r.status === 403 ? 'Este login ainda não pode mexer na escala. Fale com o Fábio.' : await trErroDe(r)); return; }
+    ESC = await r.json();
+    if (seq === SEQ) desenharEscala();
+  }
+  const TURNOS = [['almoco', 'Almoço'], ['jantar', 'Jantar']];
+  function desenharEscala() {
+    const ls = (ESC.linhas || []).filter((l) => l.loja === LOJAE);
+    const mot = (ESC.motoboys || []).filter((m) => m.loja === LOJAE);
+    const podeMexer = DIAE >= somaDias(hojeSP(), -7);
+    const bloco = TURNOS.map(([k, nome]) => {
+      const x = ls.filter((l) => l.turno === k);
+      return '<div class="esc-t">' + nome + ' · ' + x.length + ' motoboy' + (x.length === 1 ? '' : 's') + '</div>' +
+        (x.length ? x.map((l, i) => '<div class="esc-l"><div><b>' + esc(l.nome) + '</b><small>' + esc(l.inicio + (l.fim ? ' às ' + l.fim : ' · sem hora de saída')) + (l.mexido ? ' · mexido na tela' : '') + (l.id ? '' : ' · sem cadastro no TrackEat') + '</small></div>' +
+          (podeMexer ? '<button data-t="' + k + '" data-n="' + esc(l.nome) + '">Tirar</button>' : '') + '</div>').join('') : '<div class="linha">Ninguém na escala.</div>');
+    }).join('');
+    const form = !podeMexer ? '' : '<form class="esc-f" id="fEsc"><b>➕ Pôr motoboy na escala</b>' +
+      '<label for="eTurno">Turno</label><select id="eTurno"><option value="almoco">Almoço</option><option value="jantar">Jantar</option></select>' +
+      '<label for="eMoto">Motoboy</label><select id="eMoto"><option value="">Escolha…</option>' + mot.map((m) => '<option value="' + m.id + '">' + esc(m.nome) + '</option>').join('') + '<option value="outro">Outro (digitar o nome)</option></select>' +
+      '<input id="eNome" placeholder="Nome do motoboy" style="display:none;margin-top:8px">' +
+      '<div class="dois"><div><label for="eIni">Entrada</label><input id="eIni" type="time" value="18:00"></div><div><label for="eFim">Saída</label><input id="eFim" type="time" value="23:59"></div></div>' +
+      '<button class="salvar" type="submit">Salvar na escala</button><div class="erro" id="eErro"></div></form>';
+    app.innerHTML = moldura((RECADO ? '<div class="ok">' + esc(RECADO) + '</div>' : '') +
+      (ls.length ? '' : '<div class="aviso">Ainda não tem escala da ' + esc(LOJAE) + ' neste dia.</div>') + bloco + form +
+      '<div class="fonte">A escala do WhatsApp continua chegando sozinha a cada 5 minutos. O que você muda aqui fica valendo por cima dela e já entra no garantido.</div>');
+    ligar();
+    document.querySelectorAll('.esc-l button').forEach((b) => {
+      b.onclick = async () => {
+        if (!b.classList.contains('conf')) { b.classList.add('conf'); b.textContent = 'Confirmar'; return; }
+        b.disabled = true; b.textContent = 'Tirando…';
+        await mexer({ p_turno: b.dataset.t, p_nome: b.dataset.n, p_id: null, p_inicio: null, p_fim: null, p_acao: 'tirar' }, b.dataset.n + ' saiu da escala.');
+      };
+    });
+    const f = document.getElementById('fEsc'); if (!f) return;
+    const sel = document.getElementById('eMoto'), nome = document.getElementById('eNome'), tur = document.getElementById('eTurno');
+    sel.onchange = () => { nome.style.display = sel.value === 'outro' ? '' : 'none'; };
+    tur.onchange = () => { const al = tur.value === 'almoco'; document.getElementById('eIni').value = al ? '11:00' : '18:00'; document.getElementById('eFim').value = al ? '15:00' : '23:59'; };
+    tur.value = 'jantar';
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const er = document.getElementById('eErro'); er.style.display = 'none';
+      const id = sel.value && sel.value !== 'outro' ? Number(sel.value) : null;
+      const n = id ? sel.options[sel.selectedIndex].text : nome.value.trim();
+      const ini = document.getElementById('eIni').value, fim = document.getElementById('eFim').value;
+      if (!n || !ini) { er.textContent = 'Escolha o motoboy e a hora de entrada.'; er.style.display = 'block'; return; }
+      const b = f.querySelector('.salvar'); b.disabled = true; b.textContent = 'Salvando…';
+      await mexer({ p_turno: tur.value, p_nome: n, p_id: id, p_inicio: ini, p_fim: fim || null, p_acao: 'por' }, n + ' entrou no ' + (tur.value === 'almoco' ? 'almoço' : 'jantar') + '.');
+    };
+  }
+  async function mexer(arg, ok) {
+    await rmbGarantirTokenValido();
+    let r;
+    try { r = await trRpc('escala_mexer', Object.assign({ p_dia: DIAE, p_loja: LOJAE }, arg)); } catch (e) { RECADO = ''; falha('Sem internet agora. Nada foi mudado. Tente de novo.'); return; }
+    if (!r.ok) { const m = await trErroDe(r); RECADO = ''; await carregarEscala(); const er = document.getElementById('eErro'); if (er) { er.textContent = 'Não salvou: ' + m; er.style.display = 'block'; } return; }
+    RECADO = '✅ ' + ok; DADOS = null; await carregarEscala();
   }
 
   carregar();
