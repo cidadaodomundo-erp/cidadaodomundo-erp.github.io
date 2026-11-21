@@ -212,6 +212,12 @@ textarea{background:#24221e;color:#f4ebdd;border-color:var(--linha)}
 .obrig{background:#f4ebdd;color:#111}
 dialog{background:var(--papel);color:var(--preto);border:1px solid #2c2924}
 .dlg-rodape{background:var(--papel)}
+/* fotos "vivas": aproximacao lenta em todos os lanches (sem peso: e so CSS); desliga com "reduzir movimento" */
+@keyframes respira{0%{transform:scale(1) translateY(0)}100%{transform:scale(1.08) translateY(-1.5%)}}
+.card .moldura{overflow:hidden}
+.card .foto{animation:respira 3s ease-in-out infinite alternate;will-change:transform}
+.card:nth-child(3n+2) .foto{animation-delay:-1s}
+.card:nth-child(3n) .foto{animation-delay:-2s}
 /* o ouro: so no botao que faz o pedido andar */
 .btn.cta,#dpAdicionar,.barra .btn,#dcSim,#dlgNome .btn.prim{background:var(--ouro);color:#111;border-color:var(--ouro);font-weight:800;font-size:17px;border-radius:14px}
 .btn.cta:disabled{background:#3a352d;border-color:#3a352d;color:#8d8576;opacity:1}
