@@ -1,0 +1,15 @@
+{
+  "comentario": "EXEMPLO v2 COM CODIGOS FALSOS. Copie para gama-hml-map.json AO LADO DO .env (fora de outputs/) e troque cada codigoHml pelo codigo REAL exato do catalogo HML. O codigo de complemento e COMPOSTO (codigo da variacao + '.' + id da opcao) e varia por produto/variacao: por isso cada opcao e mapeada por produto+variacao+opcao. Nunca corte nem invente o formato. Sem este arquivo o cardapio abre, mas o envio fica bloqueado.",
+  "schema": "gama-hml-map",
+  "version": 2,
+  "storeUuid": "ef2dc467-a4a8-4734-a4d7-eb3442ff3401",
+  "itens": [
+    { "produto": 145, "variacao": 1, "codigoHml": "EXEMPLO-501", "precoCentavos": 3399 },
+    { "produto": 146, "variacao": 1, "codigoHml": "EXEMPLO-901", "precoCentavos": 3499 }
+  ],
+  "opcoes": [
+    { "produto": 145, "variacao": 1, "opcao": 22, "codigoHml": "EXEMPLO-501.22", "precoCentavos": 1299 },
+    { "produto": 145, "variacao": 1, "opcao": 23, "codigoHml": "EXEMPLO-501.23", "precoCentavos": 1499 }
+  ],
+  "grupos": []
+}

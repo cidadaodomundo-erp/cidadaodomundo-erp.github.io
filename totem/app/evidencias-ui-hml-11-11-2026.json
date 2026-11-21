@@ -1,0 +1,45 @@
+{
+  "data": "2026-11-11",
+  "escopo": "Somente Saipos Cidadão do Mundo - HML [93936]",
+  "origemEnvio": "Clique na tela do aplicativo, não pelo CLI",
+  "pedido": {
+    "orderId": "HML-20261111031827-da8848c9",
+    "senha": 9201,
+    "fichaSaipos": 2,
+    "idSaipos": 936115299,
+    "item": "Diversos",
+    "codigo": "40101353",
+    "quantidade": 1,
+    "total": 0,
+    "pagamentoCodigo": "DIN",
+    "pagamentoValor": 0,
+    "estadoUI": "aceito",
+    "estadoSaiposConferido": "Cozinha"
+  },
+  "testes": {
+    "app": 63,
+    "appPassaram": 63,
+    "hmlNovos": 12,
+    "fetch": "fictício nos testes automáticos"
+  },
+  "conferencias": {
+    "reloadPreservouPedido": true,
+    "totalRegistrosEstadoHml": 1,
+    "botaoReenvioBloqueado": true,
+    "identidadeHmlUI": true,
+    "impressaoAcionada": false,
+    "cobrancaAcionada": false,
+    "prontoAcionadoNaFicha2": false
+  },
+  "limites": [
+    "Apenas um produto de valor zero e quantidade 1 nesta etapa.",
+    "Pagamento real, adicionais, TV e webhooks não ligados.",
+    "O aceite da API não é tratado como prova automática de cozinha; a cozinha foi conferida separadamente na tela do Saipos.",
+    "Ficha 2 permanece em Cozinha na loja HML, marcada como teste.",
+    "O aplicativo não está instalado no totem e o servidor manual foi encerrado."
+  ],
+  "arquivos": [
+    "totem-saipos-enviado-11-11-2026.png",
+    "totem-saipos-cozinha-11-11-2026.png"
+  ]
+}

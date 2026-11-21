@@ -1,0 +1,24 @@
+{
+  "data": "10/11/2026",
+  "ambiente": "Local, sem conexão Saipos e sem cobrança",
+  "testes": {
+    "comando": "node --test",
+    "total": 51,
+    "passaram": 51,
+    "falhas": 0
+  },
+  "tela": {
+    "pedido": "ed9eded6-200b-482d-8b99-8228fb0fd7b6",
+    "senha": "1000",
+    "criado": "2026-11-10T18:41:22.790Z",
+    "pronto": "2026-11-10T18:41:41.668Z",
+    "retirado": "2026-11-10T18:41:58.567Z",
+    "item": "Sanduíche Fictício + Bacon fictício, sem Cebola",
+    "totalFicticioCentavos": 1900
+  },
+  "saipos": {
+    "enviouPedido": false,
+    "acessoTesteConfigurado": false
+  },
+  "servidorDemonstracao": "encerrado após conferência"
+}

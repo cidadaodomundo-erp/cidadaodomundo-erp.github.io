@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Totem — Loja de teste</title>
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<div class="banner">LOJA DE TESTE — NADA É COBRADO — NÃO É PEDIDO REAL</div>
+<h1>Cardápio da loja de teste</h1>
+<p>Loja: <b id="loja">carregando…</b></p>
+<div id="produtos"></div>
+
+<div class="carrinho">
+  <h2>Carrinho</h2>
+  <div id="carrinho">Carregando…</div>
+  <p>Total: <b id="total">—</b></p>
+  <button id="btnEnviar" disabled>Enviar pedido de teste ao Saipos</button>
+  <button id="btnNovo" hidden>Fazer novo pedido de teste</button>
+  <div id="resultado" aria-live="polite"></div>
+</div>
+
+<script src="/saipos.js"></script>
+</body>
+</html>

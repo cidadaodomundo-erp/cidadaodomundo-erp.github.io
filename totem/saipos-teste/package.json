@@ -1,0 +1,13 @@
+{
+  "name": "saipos-teste",
+  "version": "0.1.0",
+  "description": "Conector de ensaio Saipos (loja TESTE/DEV). Preparado, NAO conectado ate o Codex autenticar.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "bin": { "saipos-teste": "bin/saipos-teste.js" },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {}
+}
