@@ -13,7 +13,11 @@
 <!-- DOCUMENTOS DOS MOTOBOYS (17/11/2026). Trazida do portal antigo (motoboys/index.html) com a cara do portal novo.
      Lê e grava só no banco do ERP: erp_motoboys_ler() (fichas, documentos, equipamento, entregas do TrackEat em 30 dias e
      quem rodou sem ficha), erp_motoboy_doc_salvar() e erp_motoboy_equip_salvar(). As três só respondem para o dono e quem
-     cuida do pessoal (pode_ver_pessoal). Não trouxe do antigo: observações livres, avaliação e fotos dos documentos. -->
+     cuida do pessoal (pode_ver_pessoal). Não trouxe do antigo: observações livres, avaliação e fotos dos documentos.
+     22/11/2026 — REDESENHO (pedido do Fábio: "design de acordo com os outros", menos misturado, dizer de onde vêm os dados):
+     tabela por loja no padrão da tela Pagar motoboys (uma linha por motoboy, uma coluna por documento), quadro
+     "De onde vêm os dados" com a data de cada fonte, filtros enxutos (situação + "sem qual item") e detalhe ao clicar na linha,
+     com a data e a origem de cada item. Mesmas funções do banco; nada novo no banco. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -23,54 +27,90 @@
 <style>
   .na-casca body::before { display:none !important; }
   .md-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
-  .md-topo h1 { font-size:22px; margin:0; }
+  .md-topo h1 { font-size:22px; margin:0; letter-spacing:.3px; }
   .md-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
   .md-topo .acoes { margin-left:auto; }
   .md-btn { font:inherit; font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
   .md-btn:hover:not(:disabled) { border-color:var(--brand); }
   .md-btn:disabled { opacity:.45; cursor:default; }
   .md-btn.pri { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
-  .md-totais { display:flex; flex-wrap:wrap; gap:8px 26px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  .md-caixa { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
+  /* resumo */
+  .md-totais { display:flex; flex-wrap:wrap; gap:8px 28px; align-items:flex-end; }
+  .md-totais button { font:inherit; color:inherit; background:none; border:0; padding:0; text-align:left; cursor:pointer; }
   .md-totais .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; }
   .md-totais .v { font-size:22px; font-weight:800; }
+  .md-totais .grande .v { font-size:34px; line-height:1.05; color:var(--farol-fora, #e5534b); }
+  .md-totais .grande.zero .v { color:var(--farol-ok, #3fb950); }
   .md-totais .alerta .v { color:var(--farol-atencao, #d29922); }
-  .md-filtros { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
-  .md-filtros button { font:inherit; font-size:12.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
-  .md-filtros button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
-  .md-filtros button .n { opacity:.75; margin-left:4px; font-weight:700; }
-  .md-busca { font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; min-width:200px; margin:0 0 10px; }
-  .md-lista { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:10px; }
-  .md-card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
-  .md-card.falta { border-left:4px solid var(--farol-fora, #e5534b); }
-  .md-card.ok { border-left:4px solid var(--farol-ok, #3fb950); }
-  .md-card.atencao { border-left:4px solid var(--farol-atencao, #d29922); }
-  .md-card .nome { font-weight:800; font-size:15px; }
-  .md-card .meta { font-size:12px; color:var(--tx-3); margin:2px 0 8px; }
-  .md-chips { display:flex; flex-wrap:wrap; gap:5px; }
-  .md-chip { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid var(--line-2); white-space:nowrap; }
-  .md-chip.ok { background:rgba(63,185,80,.14); border-color:rgba(63,185,80,.5); }
-  .md-chip.falta { background:rgba(229,83,75,.14); border-color:rgba(229,83,75,.55); }
-  .md-chip.atencao, .md-chip.pasta { background:rgba(210,153,34,.14); border-color:rgba(210,153,34,.55); }
-  .md-chip.nao_sei { opacity:.75; border-style:dashed; }
-  .md-pede { font-size:12.5px; margin:8px 0 0; color:var(--farol-fora, #e5534b); font-weight:600; }
-  .md-card .abrir { margin-top:8px; }
-  .md-form { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; display:none; }
-  .md-form.on { display:block; }
-  .md-linha { display:grid; grid-template-columns:80px 1fr; gap:4px 8px; align-items:center; margin:0 0 8px; font-size:13px; }
-  .md-linha .campos { display:flex; flex-wrap:wrap; gap:6px; }
-  .md-linha select, .md-linha input { font:inherit; font-size:13px; padding:4px 6px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; }
-  .md-linha input[type=text] { width:130px; }
-  .md-linha .quando { grid-column:2; font-size:11px; color:var(--tx-3); }
-  .md-msg { font-size:12.5px; margin-top:6px; }
+  .md-totais button:hover .k { color:var(--tx-1); }
+  /* de onde vêm os dados */
+  .md-fontes { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:8px 18px; font-size:12.5px; line-height:1.4; }
+  .md-fontes .t { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; margin:0 0 6px; grid-column:1/-1; }
+  .md-fontes b { display:block; font-size:13px; }
+  .md-fontes span { color:var(--tx-3); }
+  /* filtros */
+  .md-filtros { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:0 0 10px; }
+  .md-abas { display:flex; flex-wrap:wrap; gap:6px; }
+  .md-abas button { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
+  .md-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .md-abas button .n { opacity:.75; margin-left:5px; font-weight:700; }
+  .md-filtros select, .md-busca { font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+  .md-busca { min-width:180px; }
+  .md-filtros .dir { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  /* legenda */
+  .md-legenda { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--tx-3); margin:0 0 4px; }
+  /* tabela por loja (mesmo desenho da tela Pagar motoboys) */
+  .md-loja { margin:16px 0 4px; display:flex; align-items:baseline; gap:10px; border-bottom:2px solid var(--marca-amarelo, #e0a526); padding-bottom:4px; }
+  .md-loja h2 { font-size:17px; margin:0; text-transform:uppercase; letter-spacing:.5px; }
+  .md-loja .meta { margin-left:auto; font-size:12px; color:var(--tx-3); }
+  .md-loja .meta b { color:var(--tx-1); }
+  .md-tab-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-top:8px; }
+  .md-tab { width:100%; min-width:1020px; table-layout:fixed; border-collapse:collapse; font-size:13.5px; }
+  .md-tab col.c-nome { width:200px; } .md-tab col.c-cnh { width:180px; } .md-tab col.c-prot { width:120px; } .md-tab col.c-bau { width:115px; } .md-tab col.c-n { width:80px; }
+  .md-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:9px 8px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--line); }
+  .md-tab td { padding:8px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; overflow:hidden; text-overflow:ellipsis; }
+  .md-tab th.n, .md-tab td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .md-tab td:first-child, .md-tab th:first-child { white-space:normal; min-width:170px; }
+  .md-tab tr.lin { cursor:pointer; }
+  .md-tab tr.lin:hover td { background:var(--surface-2); }
+  .md-tab tr.lin.aberta td, .md-tab tr.lin:hover td:first-child, .md-tab tr.lin.aberta td:first-child { background:var(--surface-2); }
+  .md-nome { font-weight:700; }
+  .md-nome .sinal { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .md-pede { font-size:12px; color:var(--farol-fora, #e5534b); font-weight:600; margin-top:2px; }
+  .md-sub { font-size:11.5px; color:var(--tx-3); }
+  /* bolinha de situação */
+  .st { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; }
+  .st::before { content:''; width:9px; height:9px; border-radius:50%; flex:0 0 9px; background:transparent; border:1.5px dashed var(--tx-3); }
+  .st.ok::before { background:var(--farol-ok, #3fb950); border:0; }
+  .st.pasta::before, .st.atencao::before { background:var(--farol-atencao, #d29922); border:0; }
+  .st.falta::before { background:var(--farol-fora, #e5534b); border:0; }
+  .st.falta { color:var(--farol-fora, #e5534b); font-weight:600; }
+  .st.nao_sei { color:var(--tx-3); }
+  /* detalhe da linha */
+  .md-det td { background:var(--surface-2); padding:10px 12px 14px; white-space:normal; overflow:visible; }
+  .md-det-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
+  .md-item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--surface); font-size:12.5px; line-height:1.45; }
+  .md-item .tit { display:flex; justify-content:space-between; gap:8px; font-weight:700; font-size:13px; margin-bottom:4px; }
+  .md-item .orig { color:var(--tx-3); font-size:11.5px; margin-top:4px; }
+  .md-item select, .md-item input { font:inherit; font-size:13px; padding:4px 6px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; margin:3px 0 0; width:100%; box-sizing:border-box; }
+  .md-det-acoes { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .md-msg { font-size:12.5px; }
   .md-msg.erro { color:var(--farol-fora, #e5534b); }
   .md-msg.ok { color:var(--farol-ok, #3fb950); }
-  .md-sem { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:16px 0 0; }
-  .md-sem h2 { font-size:15px; margin:0 0 6px; }
-  .md-sem table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  .md-sem td, .md-sem th { padding:5px 6px; border-bottom:1px solid var(--line); text-align:left; }
-  .md-sem td.n, .md-sem th.n { text-align:right; }
   .md-nota { font-size:12px; color:var(--tx-3); margin:12px 0 0; line-height:1.5; }
   .md-vazio { padding:18px; opacity:.75; }
+  @media (max-width:640px) {
+    .md-filtros .dir { margin-left:0; width:100%; } .md-busca { flex:1; }
+    /* no celular cada motoboy vira um bloco: nome em cima, os itens embaixo com o nome do item */
+    .md-tab { min-width:0; table-layout:auto; } .md-tab colgroup, .md-tab thead { display:none; }
+    .md-tab, .md-tab tbody, .md-tab tr, .md-tab td { display:block; width:auto; }
+    .md-tab tr.lin { display:flex; flex-wrap:wrap; gap:4px 12px; padding:8px 10px; border-bottom:1px solid var(--line); }
+    .md-tab tr.lin td { border:0; padding:0; overflow:visible; }
+    .md-tab tr.lin td:first-child { width:100%; min-width:0; }
+    .md-tab tr.lin td[data-r]::before { content:attr(data-r); display:block; font-size:10px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.4px; }
+    .md-tab td.n { text-align:left; }
+  }
 </style>
 </head>
 <body>
@@ -83,17 +123,28 @@
       </div>
       <div class="acoes"><button class="md-btn" id="btnAtualizar" type="button">Atualizar</button></div>
     </div>
-    <div id="erroMsg" class="md-msg erro" style="display:none;"></div>
-    <div class="md-totais" id="totais"></div>
-    <div class="md-filtros" id="filtros"></div>
-    <input class="md-busca" id="busca" type="search" placeholder="Procurar pelo nome">
-    <div class="md-lista" id="lista"></div>
-    <div id="semFicha"></div>
+    <div id="erroMsg" class="md-msg erro" style="display:none;margin:0 0 10px;"></div>
+    <div class="md-caixa"><div class="md-totais" id="totais"></div></div>
+    <div class="md-caixa"><div class="md-fontes" id="fontes"></div></div>
+    <div class="md-filtros">
+      <div class="md-abas" id="abas"></div>
+      <div class="dir">
+        <select id="item" title="Ver só quem está sem este item"></select>
+        <input class="md-busca" id="busca" type="search" placeholder="Procurar pelo nome">
+      </div>
+    </div>
+    <div class="md-legenda">
+      <span class="st ok">Conferido</span><span class="st pasta">Na pasta ou para olhar</span>
+      <span class="st falta">Falta</span><span class="st nao_sei">Ninguém marcou ainda</span>
+      <span>· Clique na linha para ver o detalhe e atualizar.</span>
+    </div>
+    <div id="lista"></div>
     <p class="md-nota">
-      <b>Como ler:</b> cada cartão é um motoboy com ficha. As bolinhas mostram MEI, CNH, moto, contrato, Pix, bag térmica e baú.
-      Verde = conferido; amarelo = na pasta ou para olhar; vermelho = falta. CNH vencida conta como falta, e CNH que vence em até 60 dias fica amarela.
-      Entregas = corridas no TrackEat nos últimos 30 dias. "Rodaram sem ficha" = nomes do TrackEat que não casaram com nenhuma ficha
-      (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica aqui para não juntar errado).
+      <b>Regras da tela:</b> CNH vencida conta como falta; CNH que vence em até 60 dias fica amarela.
+      "Precisa pedir algo" = tem pelo menos um item marcado como falta (ou a chave Pix em branco no cadastro).
+      "Falta conferir" = nada marcado como falta, mas algum item ainda não está conferido (na pasta, para olhar ou sem marcação).
+      "Rodaram sem ficha" = nomes do TrackEat dos últimos 30 dias que não casaram com nenhuma ficha
+      (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica lá para não juntar errado).
       Ainda não vieram do portal antigo: fotos dos documentos e a avaliação de cada motoboy.
     </p>
   </div>
@@ -105,16 +156,17 @@
 const TELA = 'motodocs';
 const esc = trEscH;
 const DOCS = [
-  { k: 'mei', nome: 'MEI', ic: '🧾', num: 'CNPJ do MEI' },
-  { k: 'cnh', nome: 'CNH', ic: '🪪', num: 'Categoria (precisa ter A)', validade: true },
-  { k: 'moto', nome: 'Moto', ic: '🏍️', num: 'Placa' },
-  { k: 'contrato', nome: 'Contrato', ic: '📄' },
+  { k: 'mei', nome: 'MEI', num: 'CNPJ do MEI' },
+  { k: 'cnh', nome: 'CNH', num: 'Categoria (precisa ter A)', validade: true },
+  { k: 'moto', nome: 'Moto', num: 'Placa' },
+  { k: 'contrato', nome: 'Contrato' },
 ];
 const SIT = { ok: 'Conferido', pasta: 'Na pasta', atencao: 'Olhar', falta: 'Falta', nao_sei: 'Não sei' };
 const PROT = { bag: 'Bag térmica', vedacao: 'Vedação', nenhuma: 'Sem proteção', nao_sei: 'Não sei' };
 const BAU = { grande: 'Grande', pequeno: 'Pequeno', nao_sei: 'Não sei' };
 const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú', 'BOQUEIRAO': 'Boqueirão', 'BOQUEIRÃO': 'Boqueirão' };
-let DADOS = null, FILTRO = 'pedir', ULTIMA_REQ = 0;
+const ORDEM_LOJA = ['Água Verde', 'São Braz', 'Ahú', 'Boqueirão'];
+let DADOS = null, ABA = 'pedir', ITEM = '', ABERTA = null, ULTIMA_REQ = 0;
 
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
@@ -122,12 +174,9 @@ function exigirLogin(recado) {
   location.href = '../sistema.html';
 }
 function dataFmt(d) { if (!d) return '—'; const [a, m, dd] = String(d).slice(0, 10).split('-'); return dd + '/' + m + '/' + a; }
-function quandoFmt(ts) {
-  if (!ts) return '';
-  return new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-// erp_motoboys_ler() já manda gerado_em e entregas_ate prontos (DD/MM/AAAA HH:MM e DD/MM); só formata se vier no padrão do banco
-function jaPronta(v, fmt) { if (!v) return '—'; return String(v).includes('/') ? String(v) : fmt(v); }
+// erp_motoboys_ler() já manda gerado_em, entregas_ate e os "quando" prontos (DD/MM/AAAA); só formata se vier no padrão do banco
+function jaPronta(v) { if (!v) return ''; return String(v).includes('/') ? String(v) : dataFmt(v); }
+function paraOrdem(br) { const p = String(br || '').split(' ')[0].split('/'); return p.length === 3 ? p[2] + p[1] + p[0] : ''; }
 function diasAte(hoje, d) {
   const p = (s) => { const [a, m, dd] = String(s).slice(0, 10).split('-').map(Number); return Date.UTC(a, m - 1, dd); };
   return Math.round((p(d) - p(hoje)) / 86400000);
@@ -143,26 +192,34 @@ function sitDoc(f, k) {
   }
   return d.situacao;
 }
+function sitPix(f) { return f.pix === true ? 'ok' : f.pix === false ? 'falta' : 'nao_sei'; }
+function sitProt(f) { return f.protecao === 'bag' || f.protecao === 'vedacao' ? 'ok' : f.protecao === 'nenhuma' ? 'falta' : 'nao_sei'; }
+function sitBau(f) { return f.bau && f.bau !== 'nao_sei' ? 'ok' : 'nao_sei'; }
 function faltas(f) {
   const l = DOCS.filter((d) => sitDoc(f, d.k) === 'falta').map((d) => d.nome);
   if (f.pix === false) l.push('chave Pix');
   return l;
 }
 function conferido(f) { return DOCS.every((d) => sitDoc(f, d.k) === 'ok') && f.pix === true; }
+function classe(f) { return faltas(f).length ? 'falta' : conferido(f) ? 'ok' : 'atencao'; }
 
-const FILTROS = [
+// abas = situação geral; o seletor ao lado = "sem qual item"
+const ABAS = [
   ['pedir', 'Precisa pedir algo', (f) => faltas(f).length > 0],
-  ['semcontrato', 'Sem contrato', (f) => sitDoc(f, 'contrato') !== 'ok'],
-  ['comcontrato', 'Com contrato', (f) => sitDoc(f, 'contrato') === 'ok'],
-  ['semmei', 'Sem MEI', (f) => sitDoc(f, 'mei') !== 'ok'],
-  ['cnh', 'CNH não conferida', (f) => sitDoc(f, 'cnh') !== 'ok'],
-  ['moto', 'Moto para conferir', (f) => sitDoc(f, 'moto') !== 'ok'],
+  ['conferir', 'Falta conferir', (f) => !faltas(f).length && !conferido(f)],
+  ['tudo', 'Tudo conferido', conferido],
+  ['todos', 'Todos', () => true],
+];
+const ITENS = [
+  ['', 'Qualquer item', () => true],
+  ['contrato', 'Sem contrato conferido', (f) => sitDoc(f, 'contrato') !== 'ok'],
+  ['mei', 'Sem MEI conferido', (f) => sitDoc(f, 'mei') !== 'ok'],
+  ['cnh', 'Sem CNH conferida', (f) => sitDoc(f, 'cnh') !== 'ok'],
+  ['moto', 'Moto sem conferir', (f) => sitDoc(f, 'moto') !== 'ok'],
   ['pix', 'Pix não confirmado', (f) => f.pix !== true],
   ['bag', 'Sem bag térmica', (f) => f.protecao === 'nenhuma'],
   ['bau', 'Baú sem tamanho', (f) => !f.bau || f.bau === 'nao_sei'],
   ['parado', 'Não rodou em 30 dias', (f) => !f.entregas],
-  ['tudo', 'Tudo conferido', conferido],
-  ['todos', 'Todos', () => true],
 ];
 
 function lojaDaCasca() {
@@ -170,10 +227,13 @@ function lojaDaCasca() {
   if (!l || l === 'REDE') return null;
   return LOJA_NOME[l] || l;
 }
-function fichasVisiveis() {
+function fichasDaLoja() {
   const loja = lojaDaCasca();
-  const q = document.getElementById('busca').value.trim().toLowerCase();
-  return (DADOS.fichas || []).filter((f) => (!loja || f.loja === loja) && (!q || String(f.nome).toLowerCase().includes(q)));
+  return (DADOS.fichas || []).filter((f) => f.ativo !== false && (!loja || f.loja === loja));
+}
+function semFichaDaLoja() {
+  const loja = lojaDaCasca();
+  return (DADOS.sem_ficha || []).filter((s) => !loja || (LOJA_NOME[s.loja] || s.loja) === loja);
 }
 
 async function carregar() {
@@ -195,84 +255,134 @@ function mostrarErro(t) {
   document.getElementById('sub').textContent = '';
 }
 
-function desenhar() {
-  const todas = fichasVisiveis();
-  const ativas = todas.filter((f) => f.ativo !== false);
-  const loja = lojaDaCasca();
-  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + jaPronta(DADOS.gerado_em, quandoFmt) +
-    ' · entregas do TrackEat até ' + jaPronta(DADOS.entregas_ate, dataFmt);
-  const nPedir = ativas.filter((f) => faltas(f).length).length;
-  const sem = (DADOS.sem_ficha || []).filter((s) => !loja || (LOJA_NOME[s.loja] || s.loja) === loja);
-  document.getElementById('totais').innerHTML =
-    tot('Com ficha', ativas.length) + tot('Tudo conferido', ativas.filter(conferido).length) +
-    tot('Precisa pedir algo', nPedir, nPedir > 0) + tot('Rodaram sem ficha', sem.length, sem.length > 0);
+// a data mais recente entre os "quando" das fichas visíveis (documentos ou equipamento)
+function ultimaMarcacao(fichas) {
+  let melhor = '';
+  fichas.forEach((f) => {
+    Object.values(f.docs || {}).forEach((d) => { if (d.quando && paraOrdem(d.quando) > paraOrdem(melhor)) melhor = d.quando; });
+    if (f.equip_quando && paraOrdem(f.equip_quando) > paraOrdem(melhor)) melhor = f.equip_quando;
+  });
+  return melhor;
+}
 
-  document.getElementById('filtros').innerHTML = FILTROS.map(([id, nome, fn]) =>
-    '<button type="button" data-f="' + id + '" class="' + (FILTRO === id ? 'on' : '') + '">' + esc(nome) +
+function desenhar() {
+  const ativas = fichasDaLoja();
+  const sem = semFichaDaLoja();
+  const loja = lojaDaCasca();
+  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + (jaPronta(DADOS.gerado_em) || '—');
+
+  const nPedir = ativas.filter((f) => faltas(f).length).length;
+  const nConf = ativas.filter(conferido).length;
+  document.getElementById('totais').innerHTML =
+    tot('pedir', 'Precisa pedir algo', nPedir, 'grande' + (nPedir ? '' : ' zero')) +
+    tot('todos', 'Motoboys com ficha', ativas.length, '') +
+    tot('tudo', 'Tudo conferido', nConf, '') +
+    tot('conferir', 'Falta conferir', ativas.filter(ABAS[1][2]).length, '') +
+    tot('semficha', 'Rodaram sem ficha', sem.length, sem.length ? 'alerta' : '');
+
+  const ult = ultimaMarcacao(ativas);
+  document.getElementById('fontes').innerHTML = '<div class="t">De onde vêm os dados</div>' +
+    fonte('Documentos, proteção e baú', 'Ficha do motoboy no banco do ERP, marcada à mão pela equipe nesta tela. ' +
+      (ult ? 'Última atualização: ' + esc(ult) + '.' : 'Ninguém marcou nada ainda.')) +
+    fonte('Chave Pix', 'Cadastro do motoboy feito pelo RH. Não se muda aqui; só mostra se a chave está preenchida.') +
+    fonte('Entregas e “rodaram sem ficha”', 'TrackEat, últimos 30 dias. Dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') + '.') +
+    fonte('Consulta', 'Lido do banco do ERP em ' + esc(jaPronta(DADOS.gerado_em) || '—') + '. O botão Atualizar lê de novo.');
+
+  document.getElementById('abas').innerHTML = ABAS.map(([id, nome, fn]) =>
+    '<button type="button" data-a="' + id + '" class="' + (ABA === id ? 'on' : '') + '">' + esc(nome) +
     '<span class="n">' + ativas.filter(fn).length + '</span></button>').join('') +
-    '<button type="button" data-f="semficha" class="' + (FILTRO === 'semficha' ? 'on' : '') + '">Rodaram sem ficha<span class="n">' + sem.length + '</span></button>';
+    '<button type="button" data-a="semficha" class="' + (ABA === 'semficha' ? 'on' : '') + '">Rodaram sem ficha<span class="n">' + sem.length + '</span></button>';
+
+  const base = ativas.filter((ABAS.find((x) => x[0] === ABA) || ABAS[3])[2]);
+  const sel = document.getElementById('item');
+  sel.innerHTML = ITENS.map(([id, nome, fn]) => '<option value="' + id + '"' + (ITEM === id ? ' selected' : '') + '>' +
+    esc(nome) + (id ? ' (' + base.filter(fn).length + ')' : '') + '</option>').join('');
+  sel.disabled = ABA === 'semficha';
 
   const lista = document.getElementById('lista');
-  if (FILTRO === 'semficha') { lista.innerHTML = ''; }
-  else {
-    const fn = (FILTROS.find((x) => x[0] === FILTRO) || FILTROS[0])[2];
-    const mostrar = ativas.filter(fn).sort((a, b) => (b.entregas || 0) - (a.entregas || 0));
-    lista.innerHTML = mostrar.length ? mostrar.map(cartao).join('') : '<div class="md-vazio">Ninguém neste filtro.</div>';
-  }
-  const semEl = document.getElementById('semFicha');
-  semEl.innerHTML = (FILTRO === 'semficha' || FILTRO === 'todos' || FILTRO === 'pedir') && sem.length
-    ? '<div class="md-sem"><h2>Rodaram no TrackEat sem ficha (30 dias)</h2><table><thead><tr><th>Nome no TrackEat</th><th>Loja</th><th class="n">Entregas</th><th>Última</th></tr></thead><tbody>' +
-      sem.map((s) => '<tr><td>' + esc(s.nome) + '</td><td>' + esc(LOJA_NOME[s.loja] || s.loja || '—') + '</td><td class="n">' + esc(s.n) + '</td><td>' + esc(dataFmt(s.ultima)) + '</td></tr>').join('') +
-      '</tbody></table><p class="md-nota">Para tirar alguém daqui, a ficha precisa ser criada no cadastro de motoboys (ainda pelo RH). Nome igual em duas fichas da mesma loja também cai aqui.</p></div>'
-    : '';
+  if (ABA === 'semficha') { lista.innerHTML = tabelaSemFicha(sem); return; }
+  const q = document.getElementById('busca').value.trim().toLowerCase();
+  const fnItem = (ITENS.find((x) => x[0] === ITEM) || ITENS[0])[2];
+  const mostrar = base.filter((f) => fnItem(f) && (!q || String(f.nome).toLowerCase().includes(q)))
+    .sort((a, b) => (b.entregas || 0) - (a.entregas || 0));
+  if (!mostrar.length) { lista.innerHTML = '<div class="md-vazio">Ninguém neste filtro.</div>'; return; }
+  const lojas = [...new Set(mostrar.map((f) => f.loja || '—'))]
+    .sort((a, b) => (ORDEM_LOJA.indexOf(a) + 1 || 99) - (ORDEM_LOJA.indexOf(b) + 1 || 99));
+  lista.innerHTML = lojas.map((l) => {
+    const linhas = mostrar.filter((f) => (f.loja || '—') === l);
+    const nP = linhas.filter((f) => faltas(f).length).length;
+    return '<div class="md-loja"><h2>' + esc(l) + '</h2><div class="meta"><b>' + linhas.length + '</b> motoboy' + (linhas.length > 1 ? 's' : '') +
+      (nP ? ' · <b>' + nP + '</b> com algo a pedir' : '') + '</div></div>' +
+      '<div class="md-tab-wrap"><table class="md-tab"><colgroup><col class="c-nome">' + DOCS.map((d) => '<col' + (d.k === 'cnh' ? ' class="c-cnh"' : '') + '>').join('') +
+      '<col><col class="c-prot"><col class="c-bau"><col class="c-n"></colgroup><thead><tr><th>Motoboy</th>' +
+      DOCS.map((d) => '<th>' + esc(d.nome) + '</th>').join('') +
+      '<th>Pix</th><th>Proteção</th><th>Baú</th><th class="n">Entregas 30d</th></tr></thead><tbody>' +
+      linhas.map(linha).join('') + '</tbody></table></div>';
+  }).join('');
 }
-function tot(k, v, alerta) { return '<div class="' + (alerta ? 'alerta' : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>'; }
+function tot(aba, k, v, cls) {
+  return '<button type="button" data-a="' + aba + '" class="' + cls + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></button>';
+}
+function fonte(t, txt) { return '<div><b>' + esc(t) + '</b><span>' + txt + '</span></div>'; }
+function st(s, txt) { return '<span class="st ' + s + '">' + esc(txt) + '</span>'; }
 
-function cartao(f) {
-  const fl = faltas(f);
-  const classe = fl.length ? 'falta' : conferido(f) ? 'ok' : 'atencao';
-  const chips = DOCS.map((d) => {
+function linha(f) {
+  const fl = faltas(f), c = classe(f);
+  const cor = c === 'falta' ? 'var(--farol-fora, #e5534b)' : c === 'ok' ? 'var(--farol-ok, #3fb950)' : 'var(--farol-atencao, #d29922)';
+  const docs = DOCS.map((d) => {
     const s = sitDoc(f, d.k), doc = (f.docs || {})[d.k] || {};
-    let extra = '';
-    if (d.k === 'cnh' && doc.validade) extra = ' · vence ' + dataFmt(doc.validade);
-    return '<span class="md-chip ' + s + '" title="' + esc(SIT[s] || s) + '">' + d.ic + ' ' + esc(d.nome) + ': ' + esc(SIT[s] || s) + esc(extra) + '</span>';
-  }).join('') +
-    '<span class="md-chip ' + (f.pix === true ? 'ok' : f.pix === false ? 'falta' : 'nao_sei') + '">💸 Pix: ' + (f.pix === true ? 'tem' : f.pix === false ? 'falta' : 'não sei') + '</span>' +
-    '<span class="md-chip ' + (f.protecao === 'bag' || f.protecao === 'vedacao' ? 'ok' : f.protecao === 'nenhuma' ? 'falta' : 'nao_sei') + '">🎒 ' + esc(PROT[f.protecao] || 'Proteção: não sei') + '</span>' +
-    '<span class="md-chip ' + (f.bau && f.bau !== 'nao_sei' ? 'ok' : 'nao_sei') + '">📦 Baú: ' + esc(BAU[f.bau] || 'não sei') + (f.bau_litros ? ' (' + esc(f.bau_litros) + ' L)' : '') + '</span>';
-  return '<div class="md-card ' + classe + '" data-id="' + esc(f.id) + '">' +
-    '<div class="nome">' + esc(f.nome) + '</div>' +
-    '<div class="meta">' + esc(f.loja || '—') + (f.tipo ? ' · ' + esc(f.tipo) : '') + ' · ' + esc(f.entregas || 0) + ' entregas em 30 dias' +
-      (f.ultima ? ' · última ' + esc(dataFmt(f.ultima)) : '') + '</div>' +
-    '<div class="md-chips">' + chips + '</div>' +
-    (fl.length ? '<div class="md-pede">Pedir: ' + esc(fl.join(', ')) + '</div>' : '') +
-    '<button type="button" class="md-btn abrir" data-abrir="' + esc(f.id) + '">Atualizar documentos</button>' +
-    '<div class="md-form" id="form-' + esc(f.id) + '"></div></div>';
+    let txt = SIT[s] || s;
+    if (d.k === 'cnh' && doc.validade) txt += ' · vence ' + dataFmt(doc.validade);
+    return '<td data-r="' + esc(d.nome) + '">' + st(s, txt) + '</td>';
+  }).join('');
+  const aberta = String(ABERTA) === String(f.id);
+  return '<tr class="lin' + (aberta ? ' aberta' : '') + '" data-id="' + esc(f.id) + '"><td><div class="md-nome"><span class="sinal" style="background:' + cor + '"></span>' + esc(f.nome) + '</div>' +
+    '<div class="md-sub">' + (f.tipo ? esc(f.tipo) + ' · ' : '') + (f.ultima ? 'última entrega ' + esc(dataFmt(f.ultima)) : 'sem entrega em 30 dias') + '</div>' +
+    (fl.length ? '<div class="md-pede">Pedir: ' + esc(fl.join(', ')) + '</div>' : '') + '</td>' +
+    docs +
+    '<td data-r="Pix">' + st(sitPix(f), f.pix === true ? 'Tem' : f.pix === false ? 'Falta' : 'Não sei') + '</td>' +
+    '<td data-r="Proteção">' + st(sitProt(f), PROT[f.protecao] || 'Não sei') + '</td>' +
+    '<td data-r="Baú">' + st(sitBau(f), (BAU[f.bau] || 'Não sei') + (f.bau_litros ? ' · ' + f.bau_litros + ' L' : '')) + '</td>' +
+    '<td class="n" data-r="Entregas 30d">' + esc(f.entregas || 0) + '</td></tr>' +
+    (aberta ? '<tr class="md-det"><td colspan="' + (DOCS.length + 5) + '">' + detalhe(f) + '</td></tr>' : '');
 }
 
 function opcoes(mapa, atual) {
   return Object.entries(mapa).map(([k, v]) => '<option value="' + k + '"' + (k === atual ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
 }
-function abrirForm(id) {
-  const f = DADOS.fichas.find((x) => String(x.id) === String(id));
-  const el = document.getElementById('form-' + id);
-  if (!f || !el) return;
-  if (el.classList.contains('on')) { el.classList.remove('on'); return; }
-  el.innerHTML = DOCS.map((d) => {
-    const doc = (f.docs || {})[d.k] || {};
-    return '<div class="md-linha"><b>' + d.ic + ' ' + esc(d.nome) + '</b><div class="campos">' +
-      '<select data-doc="' + d.k + '" data-c="sit">' + opcoes(SIT, doc.situacao || 'nao_sei') + '</select>' +
+function quando(q) { return q ? 'Última atualização: ' + esc(jaPronta(q)) + ' (ficha no ERP).' : 'Ninguém marcou ainda.'; }
+function detalhe(f) {
+  const id = esc(f.id);
+  const itens = DOCS.map((d) => {
+    const doc = (f.docs || {})[d.k] || {}, s = sitDoc(f, d.k);
+    return '<div class="md-item"><div class="tit">' + esc(d.nome) + st(s, SIT[s] || s) + '</div>' +
+      '<select data-doc="' + d.k + '" data-c="sit" aria-label="Situação ' + esc(d.nome) + '">' + opcoes(SIT, doc.situacao || 'nao_sei') + '</select>' +
       (d.num ? '<input type="text" data-doc="' + d.k + '" data-c="num" placeholder="' + esc(d.num) + '" value="' + esc(doc.numero || '') + '">' : '') +
       (d.validade ? '<input type="date" data-doc="' + d.k + '" data-c="val" title="Validade da CNH" value="' + esc(doc.validade || '') + '">' : '') +
-      '</div>' + (doc.quando ? '<div class="quando">atualizado em ' + esc(quandoFmt(doc.quando)) + '</div>' : '') + '</div>';
+      '<div class="orig">' + quando(doc.quando) + '</div></div>';
   }).join('') +
-    '<div class="md-linha"><b>🎒 Proteção</b><div class="campos"><select data-c="prot">' + opcoes(PROT, f.protecao || 'nao_sei') + '</select></div></div>' +
-    '<div class="md-linha"><b>📦 Baú</b><div class="campos"><select data-c="bau">' + opcoes(BAU, f.bau || 'nao_sei') + '</select></div>' +
-      (f.equip_quando ? '<div class="quando">atualizado em ' + esc(quandoFmt(f.equip_quando)) + '</div>' : '') + '</div>' +
-    '<button type="button" class="md-btn pri" data-salvar="' + esc(id) + '">Salvar</button> ' +
-    '<span class="md-msg" id="msg-' + esc(id) + '"></span>' +
-    '<p class="md-nota">O Pix vem do cadastro do motoboy e não se muda aqui.</p>';
-  el.classList.add('on');
+    '<div class="md-item"><div class="tit">Chave Pix' + st(sitPix(f), f.pix === true ? 'Tem' : f.pix === false ? 'Falta' : 'Não sei') + '</div>' +
+      '<div class="orig">Vem do cadastro do motoboy feito pelo RH' + (f.pix == null ? ' (esta ficha não está ligada a um cadastro)' : '') + '. Não se muda aqui.</div></div>' +
+    '<div class="md-item"><div class="tit">Proteção do lanche' + st(sitProt(f), PROT[f.protecao] || 'Não sei') + '</div>' +
+      '<select data-c="prot" aria-label="Proteção">' + opcoes(PROT, f.protecao || 'nao_sei') + '</select>' +
+      '<div class="orig">' + quando(f.equip_quando) + '</div></div>' +
+    '<div class="md-item"><div class="tit">Baú' + st(sitBau(f), BAU[f.bau] || 'Não sei') + '</div>' +
+      '<select data-c="bau" aria-label="Baú">' + opcoes(BAU, f.bau || 'nao_sei') + '</select>' +
+      '<div class="orig">' + (f.bau_litros ? 'Tamanho registrado: ' + esc(f.bau_litros) + ' L. ' : '') + quando(f.equip_quando) + '</div></div>' +
+    '<div class="md-item"><div class="tit">Entregas</div>' + esc(f.entregas || 0) + ' nos últimos 30 dias' +
+      (f.ultima ? '; última em ' + esc(dataFmt(f.ultima)) : '') +
+      '<div class="orig">TrackEat, dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') + '.</div></div>';
+  return '<div class="md-det-grade" id="form-' + id + '">' + itens + '</div>' +
+    '<div class="md-det-acoes"><button type="button" class="md-btn pri" data-salvar="' + id + '">Salvar</button>' +
+    '<button type="button" class="md-btn" data-fechar="1">Fechar</button><span class="md-msg" id="msg-' + id + '"></span></div>';
+}
+
+function tabelaSemFicha(sem) {
+  if (!sem.length) return '<div class="md-vazio">Todo mundo que rodou no TrackEat nos últimos 30 dias tem ficha.</div>';
+  return '<div class="md-tab-wrap"><table class="md-tab"><thead><tr><th>Nome no TrackEat</th><th>Loja</th><th class="n">Entregas 30d</th><th>Última</th></tr></thead><tbody>' +
+    sem.map((s) => '<tr><td>' + esc(s.nome) + '</td><td>' + esc(LOJA_NOME[s.loja] || s.loja || '—') + '</td><td class="n">' + esc(s.n) + '</td><td>' + esc(dataFmt(s.ultima)) + '</td></tr>').join('') +
+    '</tbody></table></div><p class="md-nota">Fonte: TrackEat, últimos 30 dias, dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') +
+    '. Para tirar alguém daqui, a ficha precisa ser criada no cadastro de motoboys (ainda pelo RH). Nome igual em duas fichas da mesma loja também cai aqui.</p>';
 }
 
 async function salvar(id, botao) {
@@ -302,17 +412,21 @@ async function salvar(id, botao) {
   } finally { botao.disabled = false; }
 }
 
-document.getElementById('filtros').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-f]'); if (!b) return;
-  FILTRO = b.dataset.f; desenhar();
-});
+function trocarAba(a) { ABA = a; ABERTA = null; desenhar(); }
+document.getElementById('abas').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) trocarAba(b.dataset.a); });
+document.getElementById('totais').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) trocarAba(b.dataset.a); });
+document.getElementById('item').addEventListener('change', (e) => { ITEM = e.target.value; ABERTA = null; desenhar(); });
 document.getElementById('lista').addEventListener('click', (e) => {
-  const a = e.target.closest('[data-abrir]'); if (a) { abrirForm(a.dataset.abrir); return; }
-  const s = e.target.closest('[data-salvar]'); if (s) salvar(s.dataset.salvar, s);
+  const s = e.target.closest('[data-salvar]'); if (s) { salvar(s.dataset.salvar, s); return; }
+  if (e.target.closest('[data-fechar]')) { ABERTA = null; desenhar(); return; }
+  if (e.target.closest('.md-det')) return;   // clique dentro do detalhe (selects) não fecha
+  const tr = e.target.closest('tr.lin'); if (!tr) return;
+  ABERTA = String(ABERTA) === tr.dataset.id ? null : tr.dataset.id;
+  desenhar();
 });
 document.getElementById('busca').addEventListener('input', () => { if (DADOS) desenhar(); });
 document.getElementById('btnAtualizar').addEventListener('click', carregar);
-if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { if (DADOS) desenhar(); });
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { if (DADOS) { ABERTA = null; desenhar(); } });
 
 if (!rmbSessao()) exigirLogin('Entre para ver os documentos dos motoboys.');
 else {
