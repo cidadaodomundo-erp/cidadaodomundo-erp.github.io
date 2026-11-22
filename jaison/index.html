@@ -116,7 +116,7 @@
   const hojeSP = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   const somaDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
   const horasTxt = (h) => { if (h == null) return '—'; const m = Math.round(Number(h) * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : ''); };
-  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = 'garantido', DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, SUG = null, RECADO = '';
+  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = (location.hash === '#garantido' ? 'garantido' : 'escala'), DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, SUG = null, RECADO = '';
   const maxDia = () => MODO === 'escala' ? somaDias(hojeSP(), 30) : hojeSP();
   window.exigirLogin = () => telaLogin('Sua sessão venceu. Entre de novo.');
 
@@ -242,15 +242,23 @@
     const sem = d.toLocaleDateString('pt-BR', { weekday: 'long' });
     const lojas = MODO === 'escala' ? ['Água Verde', 'Ahú', 'São Braz'] : ['todas'].concat([...new Set((DADOS && DADOS.linhas || []).map((l) => l.loja))]);
     const lojaAtual = MODO === 'escala' ? LOJAE : LOJA;
-    return '<div class="topo"><h1>🛵 ' + (MODO === 'escala' ? 'Escala' : 'Garantido') + '</h1><button class="sair" id="bSair">Sair</button></div>' +
-      '<div class="modos"><button data-m="garantido" class="' + (MODO === 'garantido' ? 'on' : '') + '">💰 Garantido</button><button data-m="escala" class="' + (MODO === 'escala' ? 'on' : '') + '">📋 Escala</button><a href="../delivery/motoboys-documentos.html?v=20261122a">🪪 Documentos</a></div>' +
+    return cabeca() +
       '<div class="dia"><button id="bAntes" aria-label="Dia anterior">‹</button>' +
       '<div class="meio"><b>' + dia.slice(8, 10) + '/' + dia.slice(5, 7) + '</b><small>' + esc(sem) + (dia === hojeSP() ? ' · hoje' + (MODO === 'garantido' ? ', ainda rodando' : '') : '') + '</small>' +
       '<input type="date" id="iDia" value="' + dia + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
       '<button id="bDepois" aria-label="Próximo dia"' + (dia >= maxDia() ? ' disabled' : '') + '>›</button></div>' +
       (lojas.length > 2 || MODO === 'escala' ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === lojaAtual ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
-      climaHtml(MODO === 'escala' ? DIAE : DIA) + conteudo;
+      (MODO === 'escala' ? climaHtml(DIAE) : '') + conteudo;
   }
+  // 22/11/2026 (Fábio): mesma cabeça nas 3 abas, na ordem Escala, Garantido, Documentos. Cada aba mostra só o seu assunto.
+  const ABAS = [['escala', '📋 Escala'], ['garantido', '💰 Garantido'], ['docs', '🪪 Documentos']];
+  function cabeca() {
+    const t = { escala: 'Escala', garantido: 'Garantido', docs: 'Documentos' }[MODO];
+    return '<div class="topo"><h1>🛵 ' + t + '</h1><button class="sair" id="bSair">Sair</button></div>' +
+      '<div class="modos">' + ABAS.map(([k, n]) => '<button data-m="' + k + '" class="' + (MODO === k ? 'on' : '') + '">' + n + '</button>').join('') + '</div>';
+  }
+  // Documentos: abre a tela dos documentos, que com ?de=jaison usa esta mesma cabeça e volta para cá por #escala / #garantido
+  function abrirDocs() { location.href = '../delivery/motoboys-documentos.html?de=jaison'; }
   function ligar() {
     const q = (id) => document.getElementById(id);
     const mudaDia = (x) => { if (MODO === 'escala') DIAE = x; else DIA = x; recarregar(); };
@@ -262,7 +270,7 @@
     document.querySelectorAll('.lojas button').forEach((b) => { b.onclick = () => { if (MODO === 'escala') { LOJAE = b.dataset.l; RECADO = ''; desenharEscala(); } else { LOJA = b.dataset.l; desenhar(); } }; });
     document.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { if (MODO !== b.dataset.m) { MODO = b.dataset.m; if (MODO === 'escala' && LOJA !== 'todas') LOJAE = LOJA; RECADO = ''; recarregar(); } }; });
   }
-  const recarregar = () => MODO === 'escala' ? carregarEscala() : carregar();
+  const recarregar = () => { if (MODO !== 'docs') try { history.replaceState(null, '', '#' + MODO); } catch (e) {} return MODO === 'escala' ? carregarEscala() : MODO === 'docs' ? abrirDocs() : carregar(); };
 
   async function carregar() {
     if (!rmbSessao()) { telaLogin(''); return; }
@@ -454,7 +462,7 @@
     RECADO = '✅ ' + ok; DADOS = null; await carregarEscala();
   }
 
-  carregar();
+  recarregar();
 })();
 </script>
 </body>
