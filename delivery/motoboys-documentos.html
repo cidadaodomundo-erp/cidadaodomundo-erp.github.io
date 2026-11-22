@@ -126,6 +126,8 @@ function quandoFmt(ts) {
   if (!ts) return '';
   return new Date(ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
+// erp_motoboys_ler() já manda gerado_em e entregas_ate prontos (DD/MM/AAAA HH:MM e DD/MM); só formata se vier no padrão do banco
+function jaPronta(v, fmt) { if (!v) return '—'; return String(v).includes('/') ? String(v) : fmt(v); }
 function diasAte(hoje, d) {
   const p = (s) => { const [a, m, dd] = String(s).slice(0, 10).split('-').map(Number); return Date.UTC(a, m - 1, dd); };
   return Math.round((p(d) - p(hoje)) / 86400000);
@@ -197,8 +199,8 @@ function desenhar() {
   const todas = fichasVisiveis();
   const ativas = todas.filter((f) => f.ativo !== false);
   const loja = lojaDaCasca();
-  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + quandoFmt(DADOS.gerado_em) +
-    ' · entregas do TrackEat até ' + dataFmt(DADOS.entregas_ate);
+  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + jaPronta(DADOS.gerado_em, quandoFmt) +
+    ' · entregas do TrackEat até ' + jaPronta(DADOS.entregas_ate, dataFmt);
   const nPedir = ativas.filter((f) => faltas(f).length).length;
   const sem = (DADOS.sem_ficha || []).filter((s) => !loja || (LOJA_NOME[s.loja] || s.loja) === loja);
   document.getElementById('totais').innerHTML =
