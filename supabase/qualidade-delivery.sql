@@ -3,6 +3,8 @@
 --   ifood_pedidos_api   (pedidos do iFood pela API: cancelamentos com motivo, disputas/acordos)
 --   ifood_avaliacoes_api (avaliações do iFood pela API)
 --   dim_lojas            (marca -> unidade)
+--   vw_cartao_entrega_cobranca (22/11, 2a parte: maquininha — entrega paga com cartão/voucher na porta, segundo o Saipos,
+--                        e se a venda apareceu na maquininha da Rede. Já existia no ERP; nenhum robô novo)
 -- NÃO tem no ERP (e esta função não inventa): horário prometido ao cliente (no prazo / atrasos), chamados,
 -- taxa de resposta do chat, maquininha e análise dos entregadores. Nada foi copiado do banco pessoal.
 -- Acesso: só os donos (eh_dono(): Neto e Fábio).
@@ -39,6 +41,10 @@ BEGIN
            (i.resposta_em IS NOT NULL OR coalesce(i.respostas_qtd, 0) > 0 OR i.situacao = 'REPLIED') respondida
     FROM public.ifood_avaliacoes_api i JOIN public.dim_lojas d ON d.id_loja = i.id_loja
     WHERE i.data_avaliacao BETWEEN p_ini AND p_fim AND i.nota IS NOT NULL AND (v_u IS NULL OR d.unidade = v_u)
+  ), mq AS (
+    SELECT c.dia, c.unidade, c.tipo, c.grupo, c.valor, c.entrega, c.entregador, c.cobrado, c.aguardando, c.id_sale
+    FROM public.vw_cartao_entrega_cobranca c
+    WHERE c.dia BETWEEN p_ini AND p_fim AND (v_u IS NULL OR c.unidade = v_u)
   ), chaves AS (
     SELECT unidade, marca FROM p UNION SELECT unidade, marca FROM av
   ), marca AS (
@@ -62,7 +68,23 @@ BEGIN
         'obs', 'Cancelamentos, motivo e negociações vêm do pedido. Não traz a hora prometida ao cliente.'),
       jsonb_build_object('rotulo', 'Avaliações do iFood (API)', 'tabela', 'ifood_avaliacoes_api',
         'lido_em', (SELECT max(lido_em) FROM public.ifood_avaliacoes_api), 'ultimo_dia', (SELECT max(data_avaliacao) FROM public.ifood_avaliacoes_api),
-        'obs', 'O iFood libera a avaliação cerca de 24 horas depois do pedido.')),
+        'obs', 'O iFood libera a avaliação cerca de 24 horas depois do pedido.'),
+      jsonb_build_object('rotulo', 'Maquininha (Rede x Saipos)', 'tabela', 'rede_vendas',
+        'lido_em', (SELECT max(atualizado_em) FROM public.rede_vendas WHERE ambiente = 'producao'),
+        'ultimo_dia', (SELECT max(data_venda) FROM public.rede_vendas WHERE ambiente = 'producao'),
+        'obs', 'Entrega paga com cartão ou vale na porta (Saipos) e se a venda apareceu na maquininha da Rede.')),
+    'maquininha', jsonb_build_object(
+      'lojas', coalesce((SELECT jsonb_agg(x ORDER BY x->>'unidade') FROM (
+         SELECT jsonb_build_object('unidade', unidade, 'entregas', count(*), 'valor', sum(valor),
+           'cobradas', count(*) FILTER (WHERE cobrado), 'valor_cobrado', coalesce(sum(valor) FILTER (WHERE cobrado), 0),
+           'aguardando', count(*) FILTER (WHERE NOT cobrado AND aguardando),
+           'nao_achadas', count(*) FILTER (WHERE NOT cobrado AND NOT aguardando),
+           'valor_nao_achado', coalesce(sum(valor) FILTER (WHERE NOT cobrado AND NOT aguardando), 0)) x
+         FROM mq GROUP BY unidade) s), '[]'::jsonb),
+      'nao_achadas', coalesce((SELECT jsonb_agg(x) FROM (
+         SELECT jsonb_build_object('dia', dia, 'hora', to_char(entrega, 'HH24:MI'), 'unidade', unidade, 'tipo', tipo,
+           'valor', valor, 'entregador', entregador, 'venda', id_sale) x
+         FROM mq WHERE NOT cobrado AND NOT aguardando ORDER BY entrega DESC LIMIT 200) s), '[]'::jsonb)),
     'marcas', coalesce((SELECT jsonb_agg(to_jsonb(m) ORDER BY m.unidade, m.pedidos DESC) FROM marca m), '[]'::jsonb),
     'dias', coalesce((SELECT jsonb_agg(x ORDER BY x->>'dia') FROM (
        SELECT jsonb_build_object('dia', g::date,
