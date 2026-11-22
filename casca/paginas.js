@@ -130,6 +130,7 @@ window.CASCA_PAGINAS = {
   motodocs: 'delivery/motoboys-documentos.html?v=20261122a',   // 17/11/2026: Documentos dos motoboys (erp_motoboys_ler); só quem vê pessoal. 22/11: redesenho
   escalaclima: 'delivery/escala.html?v=20261117a',   // 17/11/2026: Escala e Clima (erp_escala_clima_ler + Open-Meteo), só leitura
   taxaponto: 'taxa/painel.html?v=20261117a',   // 17/11/2026: Ponto dos taxas pelo QR (erp_taxa_ponto_ler, taxa_qr_codigo_da_semana)
+  qualidel: 'delivery/qualidade.html?v=20261122a',   // 22/11/2026 (Fábio): Qualidade e avaliações do Delivery (erp_qualidade_delivery); só os donos
   avaldel: 'avaliacoes/index.html?modo=delivery&v=20261116a',     // 16/11/2026: Avaliações do dia do Delivery (iFood; Accon sem avaliações no sistema)
   avalsalao: 'avaliacoes/index.html?modo=salao&v=20261116a',      // 16/11/2026: Avaliações do dia do Salão (Google, API oficial)
   mercadolivre: 'mercadolivre/index.html?v=20261121h',            // 17/11/2026: Compras · Mercado Livre (cotação; robô de Compras no Escritório 2; nada é comprado sozinho). 21/11: aba Histórico
@@ -150,5 +151,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'avalsalao', 'motodocs', 'garantido', 'escalaclima', 'taxaponto', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'qualidel', 'avalsalao', 'motodocs', 'garantido', 'escalaclima', 'taxaponto', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 
