@@ -12,7 +12,7 @@
 // Nenhum timer, nenhuma leitura de rede, nenhuma escrita neste arquivo.
 window.CASCA_SETORES_FABIO = {
   setores: [
-    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto', 'motodocs', 'escalaclima', 'pausadosdel', 'avaldel'],
+    { id: 'delivery', nome: 'Delivery', icone: '🛵', chaves: ['delivery', 'chegada', 'pagarmoto', 'garantido', 'motodocs', 'escalaclima', 'pausadosdel', 'avaldel'],
       aviso: 'Ainda sem tela: Fila de pedidos e edição da Escala.' },
     { id: 'salao', nome: 'Salão', icone: '🍽️', chaves: ['salao', 'reservas', 'pausados', 'avalsalao'] },
     { id: 'rh', nome: 'RH', icone: '👥', chaves: ['pao', 'pcartao', 'peventos', 'freelas', 'taxaponto'] },
@@ -27,6 +27,7 @@ window.CASCA_SETORES_FABIO = {
     pagarmoto: ['pagar motoboys', 'pagamento motoboy', 'quanto pagar', 'garantido', 'motoboy pix'],
     delivery: ['delivery do dia', 'placar do delivery', 'tempo de entrega', 'cancelamentos do dia', 'avaliacoes do dia', 'entregas'],
     salao: ['salao', 'mesas', 'comandas'],
+    garantido: ['garantido', 'escala dos motoboys', 'jaison', 'chegada na fila', 'corridas do motoboy'],
     motodocs: ['documentos dos motoboys', 'cnh', 'mei', 'contrato motoboy', 'bag termica', 'bau', 'placa da moto'],
     escalaclima: ['escala', 'clima', 'chuva', 'previsao do tempo', 'quantos motoboys'],
     taxaponto: ['ponto dos taxas', 'qr code', 'qr do ponto', 'taxa bater ponto', 'hellen'],

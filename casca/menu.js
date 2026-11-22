@@ -182,6 +182,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "garantido",
+    "rotulo": "Garantido e escala dos motoboys",
+    "icone": "💰",
+    "origem": "fabio"
+   },
+   {
     "chave": "motodocs",
     "rotulo": "Documentos dos motoboys",
     "icone": "🪪",
