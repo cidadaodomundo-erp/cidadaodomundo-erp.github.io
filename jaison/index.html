@@ -59,6 +59,9 @@
   details.clima table { width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
   details.clima th, details.clima td { text-align:left; padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; }
   details.clima tr:first-child th { border-top:0; color:var(--fraco); font-size:12px; }
+  .passos { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); } .passos ol { margin:8px 0 8px 20px; padding:0; } .passos li { margin:6px 0; line-height:1.35; }
+  table.sug { width:100%; border-collapse:collapse; font-size:14px; margin-top:6px; } table.sug th, table.sug td { text-align:left; padding:6px 4px; border-top:1px solid var(--line); } table.sug th { color:var(--fraco); font-size:12px; border-top:0; }
+  .sug-falta { color:#ff6b6b; font-weight:700; } .sug-ok { color:#4cc38a; font-weight:600; }
   .cl-s { white-space:nowrap; } .cl-chuva { color:#7cc4ff; font-weight:600; }
   .cl-fer { display:block; color:var(--amarelo); font-size:11px; font-weight:600; }
   tr.cl-dest th, tr.cl-dest td { background:#2a2410; }
@@ -79,9 +82,9 @@
   .login button { width:100%; height:50px; margin-top:18px; border:0; border-radius:12px; background:var(--amarelo); color:#111; font-weight:800; font-size:17px; }
   .erro { color:var(--verm); font-size:14px; margin-top:10px; display:none; }
   .dica { color:var(--fraco); font-size:13px; margin-top:14px; }
-  .modos { display:flex; gap:6px; margin-bottom:10px; } .modos button { flex:1; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:15px; font-weight:600; }
+  .modos { display:flex; gap:6px; margin-bottom:10px; } .modos button { flex:1; min-width:0; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:14px; white-space:nowrap; font-weight:600; }
   .modos button.on { background:var(--amarelo); color:#111; border-color:var(--amarelo); }
-  .modos a { flex:1; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:15px; font-weight:600; display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  .modos a { flex:1; min-width:0; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:14px; white-space:nowrap; font-weight:600; display:flex; align-items:center; justify-content:center; text-decoration:none; }
   .cl-dia { border-top:1px solid var(--line); padding:8px 0; } .cl-dia:first-of-type { border-top:0; }
   .cl-dia b { font-size:15px; } .cl-per { display:flex; gap:6px; margin:6px 0 4px; } .cl-per div { flex:1; background:#151514; border-radius:10px; padding:5px 7px; font-size:12px; }
   .cl-per span { display:block; font-weight:700; font-size:13px; } .cl-dificil span { color:var(--verm); } .cl-atencao span { color:var(--laranja); } .cl-facil span { color:var(--verde); }
@@ -113,7 +116,7 @@
   const hojeSP = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
   const somaDias = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
   const horasTxt = (h) => { if (h == null) return '—'; const m = Math.round(Number(h) * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : ''); };
-  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = 'garantido', DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, RECADO = '';
+  let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = 'garantido', DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, SUG = null, RECADO = '';
   const maxDia = () => MODO === 'escala' ? somaDias(hojeSP(), 30) : hojeSP();
   window.exigirLogin = () => telaLogin('Sua sessão venceu. Entre de novo.');
 
@@ -134,7 +137,7 @@
 
 
   // PREVISÃO DO TEMPO (20/11/2026, pedido do Fábio): Open-Meteo direto do navegador, sem robô, mesma fonte da tela Escala e Clima.
-  const METEO = 'https://api.open-meteo.com/v1/forecast?latitude=-25.43&longitude=-49.27&hourly=precipitation,precipitation_probability&forecast_days=7&timezone=America%2FSao_Paulo';
+  const METEO = 'https://api.open-meteo.com/v1/forecast?latitude=-25.43&longitude=-49.27&hourly=precipitation,precipitation_probability&forecast_days=8&past_days=31&timezone=America%2FSao_Paulo';
   const FERIADOS = { '2026-11-20': 'Consciência Negra', '2026-12-25': 'Natal', '2027-01-01': 'Ano Novo', '2027-02-09': 'Carnaval',
     '2027-03-26': 'Sexta-feira Santa', '2027-04-21': 'Tiradentes', '2027-05-01': 'Dia do Trabalho', '2027-05-27': 'Corpus Christi',
     '2027-09-07': 'Independência', '2027-09-08': 'N. Sra. da Luz (Curitiba)', '2027-10-12': 'N. Sra. Aparecida', '2027-11-02': 'Finados',
@@ -150,7 +153,8 @@
     } catch (e) { CLIMA = {}; }
     return CLIMA;
   }
-  const nivel = (x) => (x.p >= 60 && x.mm >= 0.5) || x.mm >= 2 ? 2 : (x.p >= 40 && x.mm >= 0.1) ? 1 : 0;
+  const nivelPrev = (x) => (x.p >= 60 && x.mm >= 0.5) || x.mm >= 2 ? 2 : (x.p >= 40 && x.mm >= 0.1) ? 1 : 0;
+  const nivelFoi = (x) => x.mm >= 0.5 ? 2 : x.mm >= 0.1 ? 1 : 0;
   // Junta horas seguidas de chuva em faixas: "19h às 22h".
   function faixas(hs) {
     const r = []; hs.forEach((x) => { const u = r[r.length - 1]; if (u && x.h === u.f) u.f = x.h + 1; else r.push({ i: x.h, f: x.h + 1 }); });
@@ -159,6 +163,7 @@
   const PERIODOS = [['Manhã', 6, 12], ['Tarde', 12, 18], ['Noite', 18, 24]];
   function climaDia(d) {
     const hs = (CLIMA && CLIMA[d]) || []; if (!hs.length) return '';
+    const nivel = d < hojeSP() ? nivelFoi : nivelPrev;   // dia passado: só a chuva que caiu (mm); a chance (%) não vale mais
     const per = PERIODOS.map(([nome, i, f]) => {
       const x = hs.filter((y) => y.h >= i && y.h < f), n = Math.max(0, ...x.map(nivel)), mm = x.reduce((a, y) => a + y.mm, 0);
       const chuva = x.filter((y) => nivel(y) > 0);
@@ -166,7 +171,14 @@
     });
     const ruins = hs.filter((y) => nivel(y) === 2), alm = ruins.some((y) => y.h >= 10 && y.h < 16), jan = ruins.some((y) => y.h >= 17);
     const amanha = somaDias(d, 1), fer = FERIADOS[d], vesp = FERIADOS[amanha];
-    const nomeDia = (d === hojeSP() ? 'Hoje' : d === somaDias(hojeSP(), 1) ? 'Amanhã' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })) + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7);
+    const nomeDia = (d === hojeSP() ? 'Hoje' : d === somaDias(hojeSP(), 1) ? 'Amanhã' : d === somaDias(hojeSP(), -1) ? 'Ontem' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })) + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7);
+    // 22/11/2026 (Fábio): dia que já passou mostra como foi, sem ordem de chamar motoboy
+    if (d < hojeSP()) {
+      const foi = per.map((x) => '<div class="' + (x.n === 2 ? 'cl-dificil' : x.n === 1 ? 'cl-atencao' : 'cl-facil') + '">' + x.nome + '<span>' + (x.n === 2 ? 'Choveu' : x.n === 1 ? 'Garoou' : 'Sem chuva') + '</span>' + esc(x.quando === 'sem chuva' ? '—' : x.quando.replace('chuva ', '')) + '</div>').join('');
+      return '<div class="cl-dia"><b>Como foi · ' + esc(nomeDia) + '</b>' + (fer ? '<span class="cl-fer">' + esc('feriado: ' + fer) + '</span>' : '') +
+        '<div class="cl-per">' + foi + '</div>' +
+        (ruins.length ? '<div class="cl-ordem">🌧️ ' + esc((alm && jan ? 'Choveu no almoço e no jantar' : alm ? 'Choveu no almoço' : jan ? 'Choveu no jantar' : 'Choveu fora dos turnos') + '. Isso ajuda a explicar atraso e corrida a mais.') + '</div>' : '<div class="cl-ok">☀️ Dia sem chuva forte.</div>') + '</div>';
+    }
     const ordens = [];
     if (alm && jan) ordens.push('Vai chover no almoço e no jantar. Chame mais motoboys para os dois turnos.');
     else if (alm) ordens.push('Vai chover no almoço (' + faixas(ruins.filter((y) => y.h >= 10 && y.h < 16)) + '). Chame mais motoboys para o almoço.');
@@ -177,12 +189,51 @@
       '<div class="cl-per">' + per.map((x) => '<div class="' + (x.n === 2 ? 'cl-dificil' : x.n === 1 ? 'cl-atencao' : 'cl-facil') + '">' + x.nome + '<span>' + x.txt + '</span>' + esc(x.quando) + '</div>').join('') + '</div>' +
       (ordens.length ? ordens.map((o) => '<div class="cl-ordem">👉 ' + esc(o) + '</div>').join('') : '<div class="cl-ok">✅ Sem chuva forte nos turnos. Escala normal.</div>') + '</div>';
   }
-  function climaHtml(soDia) {
-    if (!CLIMA || !Object.keys(CLIMA).length) return '';
-    const hoje = hojeSP(); const dias = soDia ? [soDia].filter((d) => CLIMA[d]) : Object.keys(CLIMA).filter((d) => d >= hoje).slice(0, 4);
-    if (!dias.length) return '';
-    return '<details class="clima" open><summary>🌦️ Chuva e o que fazer</summary>' + dias.map(climaDia).join('') +
-      '<div class="cl-pe">Previsão de Curitiba por hora (Open-Meteo), lida agora. Difícil = chance de 60% ou mais e chuva de verdade. Atenção = pode chuviscar.</div></details>';
+  // 22/11/2026 (Fábio): o quadro acompanha o dia escolhido em cima (antes mostrava sempre hoje + 3 dias)
+  function climaHtml(dia) {
+    if (!CLIMA || !Object.keys(CLIMA).length || !dia) return '';
+    const passado = dia < hojeSP();
+    const corpo = (CLIMA[dia] ? climaDia(dia) : '<div class="cl-ok">Ainda não há previsão para este dia (a previsão cobre só 7 dias à frente).</div>') + passosHtml(dia);
+    return '<details class="clima" open><summary>' + (passado ? '🌦️ Chuva neste dia' : '🌦️ Chuva e o que fazer') + '</summary>' + corpo +
+      '<div class="cl-pe">' + (passado ? 'Chuva estimada em Curitiba por hora (Open-Meteo, modelo do tempo, não é medição de estação).' : 'Previsão de Curitiba por hora (Open-Meteo), lida agora. Difícil = chance de 60% ou mais e chuva de verdade. Atenção = pode chuviscar.') + '</div></details>';
+  }
+
+  // 22/11/2026 (Fábio): sugestão de motoboys por loja e turno + passo a passo para o Jaison.
+  // Base = mediana dos motoboys que rodaram nos últimos 6 dias iguais da semana (TrackEat, escala_sugestao).
+  // Chuva forte prevista no turno = +1 motoboy por loja (regra combinada com o Fábio em 22/11, ajustável).
+  const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' };
+  function chuvaTurno(dia, k) {
+    const hs = (CLIMA && CLIMA[dia]) || [];
+    return Math.max(0, ...hs.filter((y) => k === 'almoco' ? (y.h >= 10 && y.h < 16) : y.h >= 17).map(nivelPrev));
+  }
+  function sugestoes(dia) {
+    if (!SUG || SUG.dia !== dia || !ESC) return [];
+    return (SUG.linhas || []).map((x) => {
+      const loja = LOJA_NOME[x.unidade] || x.unidade, chuva = chuvaTurno(dia, x.turno) === 2;
+      const precisa = x.sugerido + (chuva ? 1 : 0);
+      const tem = (ESC.linhas || []).filter((l) => l.loja === loja && l.turno === x.turno).length;
+      return Object.assign({}, x, { loja, chuva, precisa, tem, falta: precisa - tem });
+    });
+  }
+  function passosHtml(dia) {
+    if (MODO !== 'escala' || dia < hojeSP()) return '';
+    const S = sugestoes(dia);
+    if (!S.length) return SUG && SUG.dia === dia ? '' : '<div class="cl-ok">Calculando quantos motoboys chamar…</div>';
+    const nomeT = { almoco: 'almoço', jantar: 'jantar' };
+    const faltam = S.filter((x) => x.falta > 0).sort((a, b) => b.falta - a.falta);
+    const sobram = S.filter((x) => x.falta < 0);
+    const p = [];
+    faltam.forEach((x) => p.push('<b>' + esc(x.loja) + ', ' + nomeT[x.turno] + ':</b> chame mais ' + x.falta + ' motoboy' + (x.falta > 1 ? 's' : '') + '. Tem ' + x.tem + ' na escala, precisa de ' + x.precisa + (x.chuva ? ' (já com +1 pela chuva)' : '') + '.'));
+    if (!faltam.length) p.push('<b>Escala completa</b> nas 3 lojas para almoço e jantar. Não precisa chamar ninguém.');
+    sobram.forEach((x) => p.push(esc(x.loja) + ', ' + nomeT[x.turno] + ': tem ' + x.tem + ', o normal é ' + x.precisa + '. Se o movimento estiver fraco, dá para liberar ' + (-x.falta) + '.'));
+    p.push('Pôs alguém? Abra a loja em cima, use <b>➕ Pôr motoboy</b> e depois <b>📲 Copiar para o WhatsApp</b> e cole no grupo.');
+    p.push('No dia, confira na aba <b>💰 Garantido</b> quem chegou na fila no horário.');
+    const tab = '<table class="sug"><tr><th>Loja</th><th>Almoço</th><th>Jantar</th></tr>' + ['Água Verde', 'Ahú', 'São Braz'].map((l) => '<tr><td>' + l + '</td>' + ['almoco', 'jantar'].map((k) => {
+      const x = S.find((y) => y.loja === l && y.turno === k); if (!x) return '<td>—</td>';
+      return '<td class="' + (x.falta > 0 ? 'sug-falta' : 'sug-ok') + '"><b>' + x.tem + ' de ' + x.precisa + '</b>' + (x.chuva ? ' 🌧️' : '') + '</td>';
+    }).join('') + '</tr>').join('') + '</table>';
+    return '<div class="passos"><b>✅ Passo a passo para ' + esc(dia === hojeSP() ? 'hoje' : dia.slice(8, 10) + '/' + dia.slice(5, 7)) + '</b><ol>' + p.map((t) => '<li>' + t + '</li>').join('') + '</ol>' + tab +
+      '<div class="cl-pe">"Precisa" = quantos motoboys rodaram, no meio da conta, nos últimos ' + esc(String(Math.max(...S.map((x) => x.dias)))) + ' dias iguais da semana (TrackEat, entregas até ' + esc(SUG.dados_ate || '—') + '), +1 quando a previsão marca chuva forte no turno. "Tem" = escala gravada agora.</div></div>';
   }
 
   function moldura(conteudo) {
@@ -198,7 +249,7 @@
       '<input type="date" id="iDia" value="' + dia + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
       '<button id="bDepois" aria-label="Próximo dia"' + (dia >= maxDia() ? ' disabled' : '') + '>›</button></div>' +
       (lojas.length > 2 || MODO === 'escala' ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === lojaAtual ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
-      climaHtml(MODO === 'escala' ? DIAE : null) + conteudo;
+      climaHtml(MODO === 'escala' ? DIAE : DIA) + conteudo;
   }
   function ligar() {
     const q = (id) => document.getElementById(id);
@@ -326,6 +377,7 @@
     if (!r.ok) { falha(r.status === 403 ? 'Este login ainda não pode mexer na escala. Fale com o Fábio.' : await trErroDe(r)); return; }
     ESC = await r.json();
     if (seq === SEQ) desenharEscala();
+    trRpc('escala_sugestao', { p_dia: DIAE }).then((q) => q.ok ? q.json() : null).then((j) => { if (j && seq === SEQ) { SUG = j; if (ESC && MODO === 'escala') desenharEscala(); } }).catch(() => {});
   }
   const TURNOS = [['almoco', 'Almoço'], ['jantar', 'Jantar']];
   function desenharEscala() {
@@ -334,7 +386,8 @@
     const podeMexer = DIAE >= somaDias(hojeSP(), -7);
     const bloco = TURNOS.map(([k, nome]) => {
       const x = ls.filter((l) => l.turno === k);
-      return '<div class="esc-t">' + nome + ' · ' + x.length + ' motoboy' + (x.length === 1 ? '' : 's') + '</div>' +
+      const sg = sugestoes(DIAE).find((y) => y.loja === LOJAE && y.turno === k);
+      return '<div class="esc-t">' + nome + ' · ' + x.length + ' motoboy' + (x.length === 1 ? '' : 's') + (sg ? ' · <span class="' + (sg.falta > 0 ? 'sug-falta' : 'sug-ok') + '">' + (sg.falta > 0 ? 'faltam ' + sg.falta + ' (precisa ' + sg.precisa + ')' : 'ok, precisa ' + sg.precisa) + '</span>' : '') + '</div>' +
         (x.length ? x.map((l, i) => '<div class="esc-l"><div><b>' + esc(l.nome) + '</b><small>' + esc(l.inicio + (l.fim ? ' às ' + l.fim : ' · sem hora de saída')) + (l.mexido ? ' · mexido na tela' : '') + (l.id ? '' : ' · sem cadastro no TrackEat') + '</small></div>' +
           (podeMexer ? '<button data-t="' + k + '" data-n="' + esc(l.nome) + '">Tirar</button>' : '') + '</div>').join('') : '<div class="linha">Ninguém na escala.</div>');
     }).join('');
