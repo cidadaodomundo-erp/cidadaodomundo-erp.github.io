@@ -81,6 +81,7 @@
   .dica { color:var(--fraco); font-size:13px; margin-top:14px; }
   .modos { display:flex; gap:6px; margin-bottom:10px; } .modos button { flex:1; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:15px; font-weight:600; }
   .modos button.on { background:var(--amarelo); color:#111; border-color:var(--amarelo); }
+  .modos a { flex:1; height:44px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--tx); font-size:15px; font-weight:600; display:flex; align-items:center; justify-content:center; text-decoration:none; }
   .cl-dia { border-top:1px solid var(--line); padding:8px 0; } .cl-dia:first-of-type { border-top:0; }
   .cl-dia b { font-size:15px; } .cl-per { display:flex; gap:6px; margin:6px 0 4px; } .cl-per div { flex:1; background:#151514; border-radius:10px; padding:5px 7px; font-size:12px; }
   .cl-per span { display:block; font-weight:700; font-size:13px; } .cl-dificil span { color:var(--verm); } .cl-atencao span { color:var(--laranja); } .cl-facil span { color:var(--verde); }
@@ -191,7 +192,7 @@
     const lojas = MODO === 'escala' ? ['Água Verde', 'Ahú', 'São Braz'] : ['todas'].concat([...new Set((DADOS && DADOS.linhas || []).map((l) => l.loja))]);
     const lojaAtual = MODO === 'escala' ? LOJAE : LOJA;
     return '<div class="topo"><h1>🛵 ' + (MODO === 'escala' ? 'Escala' : 'Garantido') + '</h1><button class="sair" id="bSair">Sair</button></div>' +
-      '<div class="modos"><button data-m="garantido" class="' + (MODO === 'garantido' ? 'on' : '') + '">💰 Garantido</button><button data-m="escala" class="' + (MODO === 'escala' ? 'on' : '') + '">📋 Escala</button></div>' +
+      '<div class="modos"><button data-m="garantido" class="' + (MODO === 'garantido' ? 'on' : '') + '">💰 Garantido</button><button data-m="escala" class="' + (MODO === 'escala' ? 'on' : '') + '">📋 Escala</button><a href="../delivery/motoboys-documentos.html?v=20261122a">🪪 Documentos</a></div>' +
       '<div class="dia"><button id="bAntes" aria-label="Dia anterior">‹</button>' +
       '<div class="meio"><b>' + dia.slice(8, 10) + '/' + dia.slice(5, 7) + '</b><small>' + esc(sem) + (dia === hojeSP() ? ' · hoje' + (MODO === 'garantido' ? ', ainda rodando' : '') : '') + '</small>' +
       '<input type="date" id="iDia" value="' + dia + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
