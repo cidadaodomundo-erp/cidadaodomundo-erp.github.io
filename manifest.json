@@ -1,7 +1,7 @@
 {
-  "name": "Cidadão do Mundo — Painel",
-  "short_name": "Painel CDM",
-  "description": "Painel de resultados da rede Cidadão do Mundo",
+  "name": "Cidadão do Mundo",
+  "short_name": "Cidadão",
+  "description": "Portal da equipe Cidadão do Mundo",
   "start_url": "./sistema.html",
   "scope": "./",
   "display": "standalone",
@@ -9,7 +9,16 @@
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "id": "./sistema.html"
 }
