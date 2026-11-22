@@ -274,10 +274,9 @@ function desenhar() {
   const nPedir = ativas.filter((f) => faltas(f).length).length;
   const nConf = ativas.filter(conferido).length;
   document.getElementById('totais').innerHTML =
-    tot('pedir', 'Precisa pedir algo', nPedir, 'grande' + (nPedir ? '' : ' zero')) +
-    tot('todos', 'Motoboys com ficha', ativas.length, '') +
+    tot('todos', 'Com ficha', ativas.length, '') +
     tot('tudo', 'Tudo conferido', nConf, '') +
-    tot('conferir', 'Falta conferir', ativas.filter(ABAS[1][2]).length, '') +
+    tot('pedir', 'Precisa pedir algo', nPedir, 'grande' + (nPedir ? '' : ' zero')) +
     tot('semficha', 'Rodaram sem ficha', sem.length, sem.length ? 'alerta' : '');
 
   const ult = ultimaMarcacao(ativas);
