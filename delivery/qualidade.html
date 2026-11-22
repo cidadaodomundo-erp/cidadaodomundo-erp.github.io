@@ -15,7 +15,9 @@
      só com o que já está no banco do ERP. Só leitura, pela RPC erp_qualidade_delivery (supabase/qualidade-delivery.sql).
      Só os donos (eh_dono(): Neto e Fábio). Nada copiado do banco pessoal.
      Fica de fora (não chega ao ERP): no prazo / atrasos (hora prometida), chamados, taxa de resposta, maquininha e a
-     análise dos entregadores (essa é só do Fábio). -->
+     análise dos entregadores (essa é só do Fábio).
+     22/11/2026 (Fábio, 2a parte): bloco Maquininha — entregas pagas com cartão/vale na porta (Saipos) cruzadas com a Rede
+     (vw_cartao_entrega_cobranca, já existia no ERP; sem robô novo). -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -71,7 +73,7 @@
       <div>
         <h1>Qualidade e avaliações · Delivery</h1>
         <div class="sub">O boletim do iFood: como fomos com o cliente. Quantos pedidos, quantos cancelaram e por quê,
-          quantas negociações (reclamação com pedido de reembolso) e as notas que o cliente deu. Por loja e por marca.</div>
+          quantas negociações (reclamação com pedido de reembolso), as notas que o cliente deu e a maquininha na porta. Por loja e por marca.</div>
       </div>
     </div>
     <div class="q-filtros">
@@ -99,7 +101,6 @@
       <ul>
         <li><b>No prazo e atrasos</b>: o ERP não recebe a hora que o iFood prometeu ao cliente.</li>
         <li><b>Chamados</b> (por que o cliente abriu chamado) e <b>taxa de resposta</b> do chat da loja.</li>
-        <li><b>Maquininha</b>: o que foi pago na porta em cada entrega.</li>
         <li><b>Análise dos entregadores</b>: fica só no portal do Fábio.</li>
       </ul>
     </div>
@@ -265,6 +266,16 @@ function desenhar(d) {
 
   h += '<div class="q-sec"><h2>⭐ Notas de 1 a 3 e o que o cliente escreveu</h2><p class="q-sub">As avaliações mais baixas do período, da mais nova para a mais antiga.</p><div class="q-lista" id="lBaixas"></div></div>';
   h += '<div class="q-sec"><h2>🧾 Cada pedido cancelado</h2><div class="q-lista" id="lCanc"></div></div>';
+  const mq = d.maquininha || {}, mql = mq.lojas || [];
+  h += '<div class="q-sec"><h2>💳 Maquininha — pago na porta</h2><p class="q-sub">Entregas que o Saipos marca como pagas com cartão ou vale na porta, ' +
+    'e se a venda apareceu na maquininha da Rede (até 45 min da entrega; vale até 7 dias). "Esperando a Rede" = a Rede ainda não mandou aquele dia. ' +
+    '"Não achada" = não apareceu venda com esse valor: conferir com o motoboy.</p>' +
+    '<div class="q-tab-wrap"><table class="q-tab"><thead><tr><th class="esq">Loja</th><th>Entregas</th><th>Valor</th><th>Achadas na Rede</th>' +
+    '<th>Esperando a Rede</th><th>Não achadas</th><th>Valor não achado</th></tr></thead><tbody>' +
+    (mql.length ? mql.map((l) => '<tr><td class="esq">' + esc(un(l.unidade)) + '</td><td>' + num(l.entregas) + '</td><td>' + rs(l.valor) + '</td><td>' + num(l.cobradas) +
+      '</td><td>' + num(l.aguardando) + '</td><td class="' + (l.nao_achadas ? 'q-ruim' : '') + '">' + num(l.nao_achadas) + '</td><td>' + rs(l.valor_nao_achado) + '</td></tr>').join('')
+      : '<tr><td class="esq" colspan="7">Nenhuma entrega paga na porta no período.</td></tr>') +
+    '</tbody></table></div><div class="q-lista" id="lMaq"></div></div>';
   document.getElementById('conteudo').innerHTML = h;
 
   listaMais('lBaixas', d.notas_baixas || [], (a) => '<div class="q-item"><div class="q-cab"><b>' + '★'.repeat(Math.round(a.nota)) + '☆'.repeat(5 - Math.round(a.nota)) + '</b>' +
@@ -276,6 +287,11 @@ function desenhar(d) {
     '<span>' + esc(un(c.unidade)) + ' · ' + esc(c.marca) + '</span>' + (c.pedido ? '<span class="q-fraco">pedido ' + esc(c.pedido) + '</span>' : '') +
     '<span class="q-selo">' + (c.tipo === 'PARCIAL' ? 'parcial' : 'total') + '</span><b>' + rs(c.valor) + '</b></div><div class="q-txt">' + esc(c.motivo) + '</div></div>',
     'Nenhum cancelamento no período.', 20);
+  listaMais('lMaq', mq.nao_achadas || [], (m) => '<div class="q-item"><div class="q-cab"><b>' + esc(ddmm(m.dia)) + ' ' + esc(m.hora || '') + '</b>' +
+    '<span>' + esc(un(m.unidade)) + '</span><span>' + esc(m.tipo || '') + '</span><b>' + rs(m.valor) + '</b>' +
+    (m.entregador ? '<span>motoboy ' + esc(m.entregador) + '</span>' : '') + (m.venda ? '<span class="q-fraco">venda Saipos ' + esc(m.venda) + '</span>' : '') +
+    '<span class="q-selo sem">não achada na Rede</span></div></div>',
+    'Todas as entregas pagas na porta foram achadas na Rede (ou ainda esperam a Rede).', 20);
 }
 
 document.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => { periodo(Number(b.dataset.p)); carregar(); }));
