@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Qualidade e avaliações · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- QUALIDADE E AVALIAÇÕES DO DELIVERY (22/11/2026, pedido do Fábio: "trazer para o portal novo, dentro do painel da entrega,
+     o Neto também tem que ter acesso"). Adaptação da tela "Como fomos · Qualidade do Delivery" do portal antigo (qualidade/),
+     só com o que já está no banco do ERP. Só leitura, pela RPC erp_qualidade_delivery (supabase/qualidade-delivery.sql).
+     Só os donos (eh_dono(): Neto e Fábio). Nada copiado do banco pessoal.
+     Fica de fora (não chega ao ERP): no prazo / atrasos (hora prometida), chamados, taxa de resposta, maquininha e a
+     análise dos entregadores (essa é só do Fábio). -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<style>
+  .na-casca body::before { display:none !important; }
+  .q-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
+  .q-topo h1 { font-size:22px; margin:0; letter-spacing:.3px; }
+  .q-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; max-width:720px; line-height:1.45; }
+  .q-filtros { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin:0 0 12px; }
+  .q-filtros label { font-size:12.5px; opacity:.85; display:flex; flex-direction:column; gap:3px; }
+  .q-filtros select, .q-filtros input { font:inherit; padding:6px 8px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
+  .q-btn { font:inherit; font-size:13px; padding:7px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; font-weight:700; }
+  .q-btn:hover, .q-btn.on { border-color:var(--brand); }
+  .q-caixa { border:1px solid var(--line); border-radius:12px; padding:10px 14px; background:var(--surface); margin:0 0 12px; font-size:12.5px; line-height:1.5; }
+  .q-caixa h3 { margin:0 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--tx-3); }
+  .q-caixa ul { margin:0; padding-left:18px; }
+  .q-velho { color:var(--farol-fora, #ff6b6b); font-weight:700; }
+  .q-falta { opacity:.8; }
+  .q-cards { display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 16px; }
+  .q-card { border:1px solid var(--line-2); border-radius:12px; padding:10px 14px; background:var(--surface); min-width:190px; flex:1 1 190px; }
+  .q-card h3 { margin:0 0 6px; font-size:15px; }
+  .q-card .linha { display:flex; justify-content:space-between; gap:8px; font-size:13px; margin-top:3px; }
+  .q-card .linha b { font-variant-numeric:tabular-nums; }
+  .q-sec h2 { font-size:16px; margin:18px 0 4px; }
+  .q-sub { font-size:12px; color:var(--tx-3); margin:0 0 6px; line-height:1.45; }
+  .q-tab-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-top:6px; }
+  .q-tab { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .q-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:9px 8px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
+  .q-tab td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .q-tab th.esq, .q-tab td.esq { text-align:left; white-space:normal; }
+  .q-tab tr.un td { background:var(--surface-2); font-weight:800; }
+  .q-ruim { color:var(--farol-fora, #ff6b6b); font-weight:700; }
+  .q-aten { color:var(--farol-atencao, #d29922); font-weight:700; }
+  .q-ok { color:var(--farol-ok, #3fb950); }
+  .q-fraco { color:var(--tx-3); }
+  .q-lista { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+  .q-item { border:1px solid var(--line); border-radius:10px; padding:9px 12px; background:var(--surface); }
+  .q-cab { display:flex; flex-wrap:wrap; gap:4px 10px; font-size:12.5px; opacity:.9; align-items:center; }
+  .q-txt { margin:5px 0 0; font-size:14px; line-height:1.45; white-space:pre-wrap; }
+  .q-selo { font-size:11px; font-weight:700; padding:1px 7px; border-radius:20px; border:1px solid var(--line-2); }
+  .q-selo.sem { color:var(--farol-atencao, #d29922); border-color:var(--farol-atencao, #d29922); }
+  .q-vazio { padding:14px; opacity:.75; }
+  .q-mais { font:inherit; margin-top:8px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div class="q-topo">
+      <div>
+        <h1>Qualidade e avaliações · Delivery</h1>
+        <div class="sub">O boletim do iFood: como fomos com o cliente. Quantos pedidos, quantos cancelaram e por quê,
+          quantas negociações (reclamação com pedido de reembolso) e as notas que o cliente deu. Por loja e por marca.</div>
+      </div>
+    </div>
+    <div class="q-filtros">
+      <label>Unidade
+        <select id="fUnidade">
+          <option value="">Todas</option>
+          <option value="AGUA VERDE">Água Verde</option>
+          <option value="SÃO BRAZ">São Braz</option>
+          <option value="AHU">Ahú</option>
+          <option value="BOQUEIRAO">Boqueirão</option>
+        </select>
+      </label>
+      <label>De <input type="date" id="fIni"></label>
+      <label>Até <input type="date" id="fFim"></label>
+      <button type="button" class="q-btn" data-p="1">Ontem</button>
+      <button type="button" class="q-btn" data-p="7">Últimos 7 dias</button>
+      <button type="button" class="q-btn" data-p="30">Últimos 30 dias</button>
+      <button type="button" class="q-btn" id="btnAtualizar">Atualizar</button>
+    </div>
+    <div class="q-caixa" id="fonte"></div>
+    <div id="erroMsg" class="q-caixa q-ruim" style="display:none;"></div>
+    <div id="conteudo"><div class="q-vazio">Carregando…</div></div>
+    <div class="q-caixa q-falta">
+      <h3>O que a tela antiga mostrava e ainda não chega ao ERP</h3>
+      <ul>
+        <li><b>No prazo e atrasos</b>: o ERP não recebe a hora que o iFood prometeu ao cliente.</li>
+        <li><b>Chamados</b> (por que o cliente abriu chamado) e <b>taxa de resposta</b> do chat da loja.</li>
+        <li><b>Maquininha</b>: o que foi pago na porta em cada entrega.</li>
+        <li><b>Análise dos entregadores</b>: fica só no portal do Fábio.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261122d"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
+<script src="../nucleo/telas-extra.js?v=20261106a"></script>
+<script>
+const TELA = 'qualidel';
+const NOME_UN = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz', 'BOQUEIRAO': 'Boqueirão' };
+const un = (u) => NOME_UN[u] || u || '—';
+const esc = trEscH;
+const TZ = { timeZone: 'America/Sao_Paulo' };
+function hojeBR() { return new Date().toLocaleDateString('en-CA', TZ); }
+function menosDias(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); }
+function ddmm(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '—'; }
+function quando(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('pt-BR', Object.assign({ day: '2-digit', month: '2-digit' }, TZ)) + ' ' +
+    d.toLocaleTimeString('pt-BR', Object.assign({ hour: '2-digit', minute: '2-digit' }, TZ));
+}
+const num = (v) => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+const rs = (v) => v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const pctQ = (a, b) => b ? (100 * a / b).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%' : '—';
+const nota = (m) => m == null ? '<span class="q-fraco">—</span>' : '<span class="' + (m < 4.5 ? 'q-ruim' : (m < 4.75 ? 'q-aten' : 'q-ok')) + '">' + num(m) + '</span>';
+
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html';
+}
+
+// loja do topo da casca
+let SINCRONIZANDO = false;
+function aplicarLojaDaCasca(loja) {
+  const sel = document.getElementById('fUnidade');
+  SINCRONIZANDO = true;
+  sel.value = (loja && NOME_UN[loja]) ? loja : '';
+  SINCRONIZANDO = false;
+}
+async function sincronizarLoja() { try { await lojaCarregar(); } catch (e) {} aplicarLojaDaCasca(lojaAtual()); }
+if (typeof aoMudarLoja === 'function') aoMudarLoja((loja) => { aplicarLojaDaCasca(loja); carregar(); });
+
+function periodo(n) {
+  const ontem = menosDias(hojeBR(), 1);
+  document.getElementById('fFim').value = ontem;
+  document.getElementById('fIni').value = menosDias(ontem, n - 1);
+  marcar(n);
+}
+function marcar(n) { document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('on', Number(b.dataset.p) === n)); }
+
+let ULTIMA = 0;
+function mostrarErro(txt) {
+  const el = document.getElementById('erroMsg');
+  el.style.display = 'block'; el.textContent = txt;
+  document.getElementById('conteudo').innerHTML = '';
+}
+async function carregar() {
+  const minha = ++ULTIMA;
+  document.getElementById('erroMsg').style.display = 'none';
+  const ini = document.getElementById('fIni').value, fim = document.getElementById('fFim').value;
+  if (!ini || !fim || fim < ini) { mostrarErro('Escolha um período válido.'); return; }
+  document.getElementById('conteudo').innerHTML = '<div class="q-vazio">Carregando…</div>';
+  let r;
+  try { r = await trRpcSeguro('erp_qualidade_delivery', { p_ini: ini, p_fim: fim, p_unidade: document.getElementById('fUnidade').value || null }); }
+  catch (e) { if (minha === ULTIMA) mostrarErro('Não foi possível completar a consulta agora. Tente novamente.'); return; }
+  if (minha !== ULTIMA) return;
+  if (r.status === 401) { exigirLogin('Entre de novo para ver a qualidade do delivery.'); return; }
+  if (r.status === 403) { mostrarErro('Esta tela é só dos donos (Neto e Fábio).'); return; }
+  if (!r.ok) {
+    let msg = '';
+    try { msg = ((await r.json()) || {}).message || ''; } catch (e) {}
+    mostrarErro(/período/.test(msg) ? 'Período inválido: até 63 dias, sem datas futuras.' : (r.status === 0 ? 'Sem conexão com o servidor.' : 'Não foi possível completar a consulta agora. Tente novamente.'));
+    return;
+  }
+  let d;
+  try { d = await r.json(); } catch (e) { mostrarErro('Resposta inesperada do servidor.'); return; }
+  if (minha !== ULTIMA) return;
+  desenhar(d || {});
+}
+
+function desenharFontes(d) {
+  const ontem = menosDias(hojeBR(), 1);
+  const linhas = (d.fontes || []).map((f) => {
+    const velho = f.ultimo_dia && f.ultimo_dia < menosDias(ontem, f.tabela === 'ifood_avaliacoes_api' ? 1 : 0);
+    return '<li><b>' + esc(f.rotulo) + '</b>: última leitura ' + esc(quando(f.lido_em)) + ', dados até ' + esc(ddmm(f.ultimo_dia)) +
+      (velho ? ' <span class="q-velho">(atrasado)</span>' : '') + '. <span class="q-fraco">' + esc(f.obs || '') + '</span></li>';
+  }).join('');
+  document.getElementById('fonte').innerHTML = '<h3>De onde vêm os dados</h3><ul>' + linhas +
+    '<li class="q-fraco">Banco do ERP, consultado em ' + esc(quando(d.consultado_em)) + '. Período: ' + esc(ddmm(d.ini)) + ' a ' + esc(ddmm(d.fim)) + '.</li></ul>';
+}
+
+function somar(lista) {
+  const t = { pedidos: 0, cancel_total: 0, cancel_parcial: 0, valor_cancel: 0, negociacoes: 0, acordos: 0, avaliacoes: 0, notas_baixas: 0, somaNotas: 0 };
+  lista.forEach((m) => {
+    ['pedidos', 'cancel_total', 'cancel_parcial', 'valor_cancel', 'negociacoes', 'acordos', 'avaliacoes', 'notas_baixas'].forEach((k) => { t[k] += Number(m[k]) || 0; });
+    t.somaNotas += (Number(m.media) || 0) * (Number(m.avaliacoes) || 0);
+  });
+  t.media = t.avaliacoes ? t.somaNotas / t.avaliacoes : null;
+  return t;
+}
+function cartao(nome, t) {
+  const canc = t.cancel_total + t.cancel_parcial;
+  return '<div class="q-card"><h3>' + esc(nome) + '</h3>' +
+    '<div class="linha"><span>Pedidos</span><b>' + num(t.pedidos) + '</b></div>' +
+    '<div class="linha"><span>Cancelados</span><b>' + num(canc) + ' <span class="q-fraco">(' + pctQ(canc, t.pedidos) + ')</span></b></div>' +
+    '<div class="linha"><span>Valor cancelado</span><b>' + rs(t.valor_cancel) + '</b></div>' +
+    '<div class="linha"><span>Negociações</span><b>' + num(t.negociacoes) + ' <span class="q-fraco">(' + pctQ(t.negociacoes, t.pedidos) + ')</span></b></div>' +
+    '<div class="linha"><span>Nota média</span><b>' + nota(t.media) + ' <span class="q-fraco">(' + num(t.avaliacoes) + ')</span></b></div>' +
+    '<div class="linha"><span>Notas 1 a 3</span><b class="' + (t.notas_baixas ? 'q-aten' : '') + '">' + num(t.notas_baixas) + '</b></div></div>';
+}
+function linhaMarca(m, cls, nome) {
+  const canc = (Number(m.cancel_total) || 0) + (Number(m.cancel_parcial) || 0);
+  return '<tr class="' + (cls || '') + '"><td class="esq">' + esc(nome || m.marca) + '</td><td>' + num(m.pedidos) + '</td>' +
+    '<td>' + num(m.cancel_total) + '</td><td>' + num(m.cancel_parcial) + '</td><td>' + pctQ(canc, m.pedidos) + '</td><td>' + rs(m.valor_cancel) + '</td>' +
+    '<td>' + num(m.negociacoes) + '</td><td>' + num(m.acordos) + '</td><td>' + num(m.avaliacoes) + '</td><td>' + nota(m.media) + '</td><td>' + num(m.notas_baixas) + '</td></tr>';
+}
+function listaMais(id, itens, montar, vazio, passo) {
+  const el = document.getElementById(id);
+  if (!itens.length) { el.innerHTML = '<div class="q-vazio">' + vazio + '</div>'; return; }
+  let n = 0;
+  const pintar = () => {
+    n += passo;
+    el.innerHTML = itens.slice(0, n).map(montar).join('') +
+      (itens.length > n ? '<button type="button" class="q-mais">Ver mais (' + (itens.length - n) + ')</button>' : '');
+    const b = el.querySelector('.q-mais'); if (b) b.onclick = pintar;
+  };
+  pintar();
+}
+
+function desenhar(d) {
+  desenharFontes(d);
+  const marcas = d.marcas || [];
+  const unidades = [...new Set(marcas.map((m) => m.unidade))];
+  const total = somar(marcas);
+  let h = '<div class="q-cards">' + (unidades.length > 1 ? cartao('Rede', total) : '') +
+    unidades.map((u) => cartao(un(u), somar(marcas.filter((m) => m.unidade === u)))).join('') + '</div>';
+
+  h += '<div class="q-sec"><h2>🏷 Cada marca, dentro da loja</h2><p class="q-sub">Cancelado total = o pedido todo foi cancelado. Parcial = o iFood devolveu ' +
+    'parte ao cliente (ex.: item faltando). Negociação = o cliente reclamou e pediu reembolso pelo iFood; acordo = a loja aceitou. ' +
+    'Nota: vermelho abaixo de 4,5, amarelo abaixo de 4,75.</p>' +
+    '<div class="q-tab-wrap"><table class="q-tab"><thead><tr><th class="esq">Marca</th><th>Pedidos</th><th>Canc. total</th><th>Canc. parcial</th><th>% canc.</th><th>Valor canc.</th>' +
+    '<th>Negociações</th><th>Acordos</th><th>Avaliações</th><th>Nota</th><th>Notas 1–3</th></tr></thead><tbody>' +
+    unidades.map((u) => {
+      const ms = marcas.filter((m) => m.unidade === u);
+      return linhaMarca(somar(ms), 'un', un(u)) + ms.map((m) => linhaMarca(m)).join('');
+    }).join('') + '</tbody></table></div></div>';
+
+  h += '<div class="q-sec"><h2>📅 Dia a dia</h2><div class="q-tab-wrap"><table class="q-tab"><thead><tr><th class="esq">Dia</th><th>Pedidos</th><th>Cancelados</th>' +
+    '<th>% canc.</th><th>Negociações</th><th>Avaliações</th><th>Nota</th></tr></thead><tbody>' +
+    (d.dias || []).slice().reverse().map((x) => '<tr><td class="esq">' + esc(ddmm(x.dia)) + '</td><td>' + num(x.pedidos) + '</td><td>' + num(x.cancelamentos) +
+      '</td><td>' + pctQ(x.cancelamentos, x.pedidos) + '</td><td>' + num(x.negociacoes) + '</td><td>' + num(x.avaliacoes) + '</td><td>' + nota(x.media) + '</td></tr>').join('') +
+    '</tbody></table></div></div>';
+
+  h += '<div class="q-sec"><h2>🚫 Por que os pedidos foram cancelados</h2><p class="q-sub">Motivo que o iFood informou em cada pedido cancelado.</p>' +
+    '<div class="q-tab-wrap"><table class="q-tab"><thead><tr><th class="esq">Motivo</th><th>Tipo</th><th>Pedidos</th><th>Valor</th></tr></thead><tbody>' +
+    ((d.motivos || []).length ? d.motivos.map((m) => '<tr><td class="esq">' + esc(m.motivo) + '</td><td>' + (m.tipo === 'PARCIAL' ? 'Parcial' : 'Total') +
+      '</td><td>' + num(m.qtd) + '</td><td>' + rs(m.valor) + '</td></tr>').join('') : '<tr><td class="esq" colspan="4">Nenhum cancelamento no período.</td></tr>') +
+    '</tbody></table></div></div>';
+
+  h += '<div class="q-sec"><h2>⭐ Notas de 1 a 3 e o que o cliente escreveu</h2><p class="q-sub">As avaliações mais baixas do período, da mais nova para a mais antiga.</p><div class="q-lista" id="lBaixas"></div></div>';
+  h += '<div class="q-sec"><h2>🧾 Cada pedido cancelado</h2><div class="q-lista" id="lCanc"></div></div>';
+  document.getElementById('conteudo').innerHTML = h;
+
+  listaMais('lBaixas', d.notas_baixas || [], (a) => '<div class="q-item"><div class="q-cab"><b>' + '★'.repeat(Math.round(a.nota)) + '☆'.repeat(5 - Math.round(a.nota)) + '</b>' +
+    '<span>' + esc(ddmm(a.dia)) + '</span><span>' + esc(un(a.unidade)) + ' · ' + esc(a.marca) + '</span>' + (a.pedido ? '<span class="q-fraco">pedido ' + esc(a.pedido) + '</span>' : '') +
+    (a.respondida ? '<span class="q-selo">respondida</span>' : (a.comentario ? '<span class="q-selo sem">sem resposta</span>' : '')) + '</div>' +
+    (a.comentario ? '<div class="q-txt">' + esc(a.comentario) + '</div>' : '<div class="q-txt q-fraco">(sem comentário)</div>') + '</div>',
+    'Nenhuma nota de 1 a 3 no período.', 20);
+  listaMais('lCanc', d.cancelados || [], (c) => '<div class="q-item"><div class="q-cab"><b>' + esc(ddmm(c.dia)) + ' ' + esc(c.hora || '') + '</b>' +
+    '<span>' + esc(un(c.unidade)) + ' · ' + esc(c.marca) + '</span>' + (c.pedido ? '<span class="q-fraco">pedido ' + esc(c.pedido) + '</span>' : '') +
+    '<span class="q-selo">' + (c.tipo === 'PARCIAL' ? 'parcial' : 'total') + '</span><b>' + rs(c.valor) + '</b></div><div class="q-txt">' + esc(c.motivo) + '</div></div>',
+    'Nenhum cancelamento no período.', 20);
+}
+
+document.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => { periodo(Number(b.dataset.p)); carregar(); }));
+document.getElementById('btnAtualizar').addEventListener('click', carregar);
+['fIni', 'fFim'].forEach((id) => document.getElementById(id).addEventListener('change', () => { marcar(0); carregar(); }));
+document.getElementById('fUnidade').addEventListener('change', () => {
+  if (!SINCRONIZANDO && NA_CASCA && !(typeof lojaTravada === 'function' && lojaTravada())) {
+    avisarCasca({ tipo: 'casca-loja-pedir', loja: document.getElementById('fUnidade').value || 'REDE' });
+  }
+  carregar();
+});
+(function limites() {
+  ['fIni', 'fFim'].forEach((id) => { const f = document.getElementById(id); f.max = hojeBR(); f.min = '2026-07-01'; });
+})();
+periodo(7);
+
+if (!rmbSessao()) exigirLogin('Entre para ver a qualidade do delivery.');
+else {
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  (async () => { await sincronizarLoja(); carregar(); })();
+}
+window.reentrarTela = carregar;
+</script>
+</body>
+</html>
