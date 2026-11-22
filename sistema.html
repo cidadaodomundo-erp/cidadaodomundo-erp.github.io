@@ -270,7 +270,7 @@
 
 <script src="casca/menu.js?v=20261119tmp"></script>
 <script src="casca/paginas.js?v=20261119est"></script>
-<script src="casca/modulos.js?v=20261119est"></script>
+<script src="casca/modulos.js?v=20261122a"></script>
 <script src="casca/setores-fabio.js?v=20261117t"></script>
 <script src="casca/busca.js?v=20261119est"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
@@ -299,8 +299,9 @@ SO_NA_CASCA.forEach((i) => { ITENS[i.chave] = Object.assign({ grupo: null }, i);
 // 16/11/2026 (Fábio): 'peventos' sai do menu: virou o modo "Todos da loja" da Consulta de ponto.
 // 19/11/2026 (dono, pelo Organizador: "pode seguir com tudo"): Clientes do iFood, Resumos semanais e Telas do painel saem do menu
 // (só o Neto usava); as páginas continuam abrindo pelo endereço.
-const FORA_DO_MENU = new Set(['avaliacoes', 'qualidade', 'negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas', 'peventos', 'clientes', 'relatorios', 'telas']);
-ITENS['link:portal-qualidade'] = { grupo: null, rotulo: 'Qualidade e avaliações → portal da operação', icone: '🔗', link: 'https://cidadaodomundo.github.io/qualidade/' };
+const FORA_DO_MENU = new Set(['negociacoes', 'estasemana', 'fechamento', 'prh', 'encomendas', 'peventos', 'clientes', 'relatorios', 'telas']);
+// 22/11/2026 (Fábio: "nao pode ter coisas que levem ao portal antigo"): sai o atalho 'Qualidade e avaliações → portal da
+// operação'. Avaliações e Qualidade & Super voltam ao menu (módulo Entrega), com as telas deste portal.
 // MENU NOVO OFICIAL (dono, sáb 07/11/2026 03:51: "gostei do menu, pode aplicar"): nomes e telas extras do menu novo vêm de
 // casca/modulos.js (CASCA_MODULOS_CFG). O ?menu=proposta da simulação continua abrindo, com este mesmo menu (alias).
 const MOD_CFG = window.CASCA_MODULOS_CFG || {};
