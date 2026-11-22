@@ -14,7 +14,9 @@
      (supabase/avaliacoes-do-dia.sql). A mesma página abre em dois lugares do menu:
        ?modo=delivery -> iFood (ifood_avaliacoes_api) e Site (Accon: não há avaliações no sistema)
        ?modo=salao    -> Google (API oficial do Perfil da Empresa: google_avaliacao_recente / google_avaliacao_loja)
-     Nenhum botão de responder: responder fica para depois do OK do Fábio. -->
+     22/11/2026: botão "Robô de respostas" (pedido do Fábio). Mostra o que o robô respondeu ou vai responder,
+     pela RPC erp_robo_respostas (supabase/robo-respostas.sql). Daqui ninguém publica: só mostra.
+     Google: o robô fica no banco pessoal (chaves do Google não vêm para o ERP). iFood: só rascunhos até o OK do Fábio. -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
@@ -55,6 +57,13 @@
   .av-selo.sem { color:var(--farol-perto, #e0a33a); border-color:var(--farol-perto, #e0a33a); }
   .av-vazio { padding:14px; opacity:.75; }
   .av-nota { font-size:12px; opacity:.75; margin:14px 0 0; line-height:1.45; }
+  .av-robo-btn { font:inherit; padding:7px 12px; border-radius:8px; border:1px solid var(--brand); background:var(--surface-2); color:inherit; cursor:pointer; font-weight:700; }
+  .av-robo { border:1px solid var(--brand); border-radius:10px; padding:10px 14px; margin:0 0 14px; background:var(--surface); }
+  .av-robo h2 { font-size:16px; margin:0 0 6px; }
+  .av-robo .av-cards { margin:8px 0 10px; }
+  .av-selo.rasc { color:var(--farol-perto, #e0a33a); border-color:var(--farol-perto, #e0a33a); }
+  .av-selo.pub { color:var(--farol-ok, #3fb950); border-color:var(--farol-ok, #3fb950); }
+  .av-selo.fal { color:var(--farol-fora, #ff6b6b); border-color:var(--farol-fora, #ff6b6b); }
   .av-mais { font:inherit; margin-top:8px; padding:6px 12px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; cursor:pointer; }
 </style>
 </head>
@@ -77,7 +86,9 @@
       <button type="button" id="btnHoje">Hoje</button>
       <button type="button" id="btnOntem">Ontem</button>
       <button type="button" id="btnAtualizar">Atualizar</button>
+      <button type="button" id="btnRobo" class="av-robo-btn">🤖 Robô de respostas</button>
     </div>
+    <div class="av-robo" id="robo" style="display:none;"></div>
     <div class="av-fonte" id="fonte"></div>
     <div id="erroMsg" style="display:none;"></div>
     <div id="conteudo"><div class="av-vazio">Carregando…</div></div>
@@ -262,6 +273,49 @@ function desenhar(d) {
     b.remove();
   }));
 }
+
+// ------------------------------------------------ robô de respostas (22/11/2026)
+const ROBO_CANAL = MODO === 'salao' ? 'google' : 'ifood';
+const ROBO_STATUS = { rascunho: ['rasc', 'rascunho, esperando OK'], publicada: ['pub', 'publicada'], falhou: ['fal', 'falhou'], descartada: ['', 'descartada'] };
+function roboExplica() {
+  return MODO === 'salao'
+    ? 'O robô responde as avaliações do Google em nome da loja, pela API oficial do Perfil da Empresa. Ele só publica quando o Fábio manda; não tem horário automático.'
+    : 'O robô prepara as respostas das avaliações do iFood. Por enquanto são só rascunhos: nada é publicado até o OK do Fábio e a conferência com o robô de contestações.';
+}
+async function carregarRobo() {
+  const c = document.getElementById('robo');
+  c.innerHTML = '<h2>🤖 Robô de respostas · ' + (MODO === 'salao' ? 'Google' : 'iFood') + '</h2><p class="av-sub">' + esc(roboExplica()) + '</p><div class="av-vazio">Carregando…</div>';
+  let r;
+  try { r = await trRpcSeguro('erp_robo_respostas', { p_canal: ROBO_CANAL, p_unidade: document.getElementById('fUnidade').value || null }); }
+  catch (e) { c.querySelector('.av-vazio').textContent = 'Não foi possível completar a consulta agora.'; return; }
+  if (r.status === 401) { exigirLogin('Entre de novo para ver o robô.'); return; }
+  if (!r.ok) { c.querySelector('.av-vazio').textContent = r.status === 404 ? 'O robô ainda não está ligado nesta tela.' : (r.status === 403 ? 'Você ainda não tem acesso a esta consulta.' : 'Não foi possível completar a consulta agora.'); return; }
+  let d; try { d = await r.json(); } catch (e) { c.querySelector('.av-vazio').textContent = 'Resposta inesperada do servidor.'; return; }
+  const rs = (d && d.resumo) || {};
+  const itens = Array.isArray(d && d.itens) ? d.itens : [];
+  const card = (t, n, cls) => '<div class="av-card"><div class="n ' + (cls || '') + '">' + esc(num(n || 0)) + '</div><div class="l">' + esc(t) + '</div></div>';
+  const linhas = itens.map((a) => {
+    const st = ROBO_STATUS[a.status] || ['', a.status];
+    const ruim = Number(a.nota) <= 2;
+    return '<div class="av-item' + (ruim ? ' ruim' : '') + '"><div class="av-cab"><span class="av-estrelas' + (ruim ? ' av-ruim' : '') + '">' + estrelas(a.nota) + '</span>' +
+      '<b>' + esc(un(a.unidade)) + '</b><span>' + esc(a.quem || '') + '</span><span>' + esc(quando(a.avaliado_em)) + '</span>' +
+      '<span class="av-selo ' + st[0] + '">' + esc(st[1]) + (a.publicado_em ? ' ' + esc(quando(a.publicado_em)) : '') + '</span></div>' +
+      (a.comentario ? '<p class="av-txt">' + esc(a.comentario) + '</p>' : '<p class="av-txt av-fonte-sem">(sem comentário)</p>') +
+      '<div class="av-resp"><b>' + (a.status === 'publicada' ? 'Resposta publicada:' : 'Resposta preparada:') + '</b> ' + esc(a.resposta) + '</div>' +
+      (a.erro ? '<div class="av-resp av-ruim">' + esc(a.erro) + '</div>' : '') + '</div>';
+  });
+  c.innerHTML = '<h2>🤖 Robô de respostas · ' + (MODO === 'salao' ? 'Google' : 'iFood') + '</h2><p class="av-sub">' + esc(roboExplica()) + '</p>' +
+    '<div class="av-cards">' + card('publicadas', rs.publicada, 'av-ok') + card('rascunhos esperando OK', rs.rascunho) + card('falharam', rs.falhou, rs.falhou ? 'av-ruim' : '') + '</div>' +
+    '<p class="av-sub">Última publicação: ' + esc(quando(d.ultima_publicacao)) + ' · consultado em ' + esc(quando(d.consultado_em)) + '. Esta tela só mostra; ninguém publica por aqui.</p>' +
+    (linhas.length ? '<div class="av-lista">' + linhas.join('') + '</div>' : '<div class="av-vazio">Nenhuma resposta registrada ainda.</div>');
+}
+document.getElementById('btnRobo').addEventListener('click', () => {
+  const c = document.getElementById('robo');
+  const abrir = c.style.display === 'none';
+  c.style.display = abrir ? 'block' : 'none';
+  document.getElementById('btnRobo').classList.toggle('on', abrir);
+  if (abrir) carregarRobo();
+});
 
 document.getElementById('btnAtualizar').addEventListener('click', carregar);
 document.getElementById('btnHoje').addEventListener('click', () => { document.getElementById('fDia').value = hojeBR(); carregar(); });
