@@ -407,7 +407,7 @@ function blocoRecados(item, esc, sess) {
       onclick="planoRecadosAlternar('${esc(item.id)}')">${aberto ? '\u25be' : '\u25b8'} ${rotulo}</button>${etiqueta}`;
   if (!aberto) return `<div class="plano-recados-linha">${gatilho}</div>`;
 
-  const souDono = souODono();
+  const souDono = souODonoPrincipal();   // 22/11: recados do Plano seguem Fábio propõe, Neto responde
   if (PLANO_EDITANDO === item.id) return `<div class="plano-recados-linha">${gatilho}${editorDoItem(item, esc)}</div>`;
   const linhas = meus.map(r => `
     <div class="plano-recado${r.visto_em ? ' lido' : ''}">

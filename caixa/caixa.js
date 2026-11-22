@@ -1360,7 +1360,8 @@ function cofreHtml() {
   const naoChegou = E.filter((x) => String(x.situacao).startsWith('MARCADO'));
   const soma = (A) => A.reduce((s, x) => s + Number(x.valor || 0), 0);
   // 03/11/2026 (dono, "pode aplicar"): o banco só aceita o "Não chegou" da Hellen e do dono; para os outros, o botão nem aparece
-  const marcaNaoChegou = ['hellen@cidadaodomundo.com.br', 'neto@cidadaodomundo.com.br'].includes(((rmbSessao() || {}).email || '').toLowerCase());
+  // 22/11/2026 (Fábio): os donos (Neto e Fábio) e a Hellen marcam "não chegou"; o banco confere de novo (policy cofre_nao_recebido)
+  const marcaNaoChegou = (typeof souODono === 'function' && souODono()) || ((rmbSessao() || {}).email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br';
   const linha = (x) => {
     const id = Number(x.saida_id_titulo);
     const acao = !marcaNaoChegou ? '' : x.situacao === 'ROBO VAI LANCAR' ? `<button class="preset-btn" onclick="cofreNaoChegou(${id})">Não chegou</button>`
