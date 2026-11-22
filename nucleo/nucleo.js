@@ -496,13 +496,27 @@ async function carregarEmailDono() {
   try { r = await ler(); if (await rmbRenovarSeExpirado(r)) r = await ler(); } catch (e) { r = null; }
   const d = r && r.ok ? await r.json().catch(() => null) : null;
   EMAIL_DONO = d ? ((d[0] && d[0].valor) || '') : null;
+  // 22/11/2026 (Fábio): o portal tem DOIS donos, Neto e Fábio (rmb_config.emails_dono, a mesma lista que eh_dono() lê no banco).
+  try {
+    const r2 = await fetch(`${SUPABASE_URL}/rest/v1/rmb_config?chave=eq.emails_dono&select=valor`, { headers: rmbHeaders() });
+    const d2 = r2.ok ? await r2.json() : [];
+    EMAILS_DONO = String((d2[0] && d2[0].valor) || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  } catch (e) { EMAILS_DONO = []; }
   return EMAIL_DONO || '';
 }
+let EMAILS_DONO = [];
 
+// souODono: qualquer um dos donos (Neto ou Fábio) — decide o que aparece na tela.
 function souODono() {
   const s = rmbSessao();
-  return !!(s && s.email && EMAIL_DONO &&
-            s.email.toLowerCase() === String(EMAIL_DONO).toLowerCase());
+  if (!(s && s.email)) return false;
+  const em = s.email.toLowerCase();
+  return (!!EMAIL_DONO && em === String(EMAIL_DONO).toLowerCase()) || EMAILS_DONO.includes(em);
+}
+// souODonoPrincipal: só o Neto — usado onde a conversa é "Fábio propõe, Neto responde" (recados do Plano).
+function souODonoPrincipal() {
+  const s = rmbSessao();
+  return !!(s && s.email && EMAIL_DONO && s.email.toLowerCase() === String(EMAIL_DONO).toLowerCase());
 }
 
 // ------------------------------------------------------------------

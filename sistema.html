@@ -491,7 +491,9 @@ const SO_DONO = new Set(['atividades', 'regras', 'usuarios']);   // 18/11: Usuá
 // 07/11/2026 (dono 03:59): a Minha agenda também abre para quem vê a agenda da equipe (agenda_quem_ve_equipe: o Fabio)
 let VE_EQUIPE = null;
 const EMAIL_DONO = 'neto@cidadaodomundo.com.br';
-function ehDono() { return String((sessao() || {}).email || '').toLowerCase() === EMAIL_DONO; }
+// 22/11/2026 (Fábio): dois donos, Neto e Fábio — a mesma lista de rmb_config.emails_dono que eh_dono() confere no banco
+const EMAILS_DONO = ['neto@cidadaodomundo.com.br', 'fabio@cidadaodomundo.com.br'];
+function ehDono() { return EMAILS_DONO.includes(String((sessao() || {}).email || '').toLowerCase()); }
 let VE_GESTAO = null;
 function visivel(chave) {
   const it = ITENS[chave];
