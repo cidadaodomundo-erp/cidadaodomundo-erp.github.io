@@ -17,15 +17,22 @@
      22/11/2026 — REDESENHO (pedido do Fábio: "design de acordo com os outros", menos misturado, dizer de onde vêm os dados):
      tabela por loja no padrão da tela Pagar motoboys (uma linha por motoboy, uma coluna por documento), quadro
      "De onde vêm os dados" com a data de cada fonte, filtros enxutos (situação + "sem qual item") e detalhe ao clicar na linha,
-     com a data e a origem de cada item. Mesmas funções do banco; nada novo no banco. -->
+     com a data e a origem de cada item. Mesmas funções do banco; nada novo no banco.
+     22/11/2026 (2ª volta, Fábio): cartões com "Falta / Falta conferir / Em dia" em palavras, botões de loja, "Ver por item"
+     (ex.: quantos têm proteção térmica), números de cima fixos, rodapé explicando cada item, feito primeiro para o celular.
+     Com ?de=jaison copia o visual e a barra de abas da central do Jaison (jaison/index.html). -->
 <script>
   const NA_CASCA = window.parent !== window;
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  // 22/11/2026: aberta pela central do Jaison (?de=jaison) usa o mesmo visual e a mesma barra de abas da página dele
+  const MODO_JAISON = !NA_CASCA && new URLSearchParams(location.search).get('de') === 'jaison';
+  if (MODO_JAISON) document.documentElement.classList.add('modo-jaison');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
 <style>
   .na-casca body::before { display:none !important; }
+  .md-voltar { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:inherit; text-decoration:none; border:1px solid var(--line-2); background:var(--surface); border-radius:10px; padding:8px 12px; margin:8px 0 0; }
   .md-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
   .md-topo h1 { font-size:22px; margin:0; letter-spacing:.3px; }
   .md-topo .sub { font-size:12px; color:var(--tx-3); margin-top:2px; }
@@ -34,119 +41,138 @@
   .md-btn:hover:not(:disabled) { border-color:var(--brand); }
   .md-btn:disabled { opacity:.45; cursor:default; }
   .md-btn.pri { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
-  .md-caixa { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 10px; }
-  /* resumo */
-  .md-totais { display:flex; flex-wrap:wrap; gap:8px 28px; align-items:flex-end; }
-  .md-totais button { font:inherit; color:inherit; background:none; border:0; padding:0; text-align:left; cursor:pointer; }
-  .md-totais .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; }
-  .md-totais .v { font-size:22px; font-weight:800; }
-  .md-totais .grande .v { font-size:34px; line-height:1.05; color:var(--farol-fora, #e5534b); }
-  .md-totais .grande.zero .v { color:var(--farol-ok, #3fb950); }
-  .md-totais .alerta .v { color:var(--farol-atencao, #d29922); }
-  .md-totais button:hover .k { color:var(--tx-1); }
-  /* de onde vêm os dados */
-  .md-fontes { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:8px 18px; font-size:12.5px; line-height:1.4; }
-  .md-fontes .t { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; margin:0 0 6px; grid-column:1/-1; }
-  .md-fontes b { display:block; font-size:13px; }
-  .md-fontes span { color:var(--tx-3); }
-  /* filtros */
-  .md-filtros { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:0 0 10px; }
-  .md-abas { display:flex; flex-wrap:wrap; gap:6px; }
-  .md-abas button { font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; }
-  .md-abas button.on { background:var(--brand); border-color:var(--brand); color:#fff; }
-  .md-abas button .n { opacity:.75; margin-left:5px; font-weight:700; }
-  .md-filtros select, .md-busca { font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; }
-  .md-busca { min-width:180px; }
-  .md-filtros .dir { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
-  /* legenda */
-  .md-legenda { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:12px; color:var(--tx-3); margin:0 0 4px; }
-  /* tabela por loja (mesmo desenho da tela Pagar motoboys) */
-  .md-loja { margin:16px 0 4px; display:flex; align-items:baseline; gap:10px; border-bottom:2px solid var(--marca-amarelo, #e0a526); padding-bottom:4px; }
-  .md-loja h2 { font-size:17px; margin:0; text-transform:uppercase; letter-spacing:.5px; }
-  .md-loja .meta { margin-left:auto; font-size:12px; color:var(--tx-3); }
-  .md-loja .meta b { color:var(--tx-1); }
-  .md-tab-wrap { overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-top:8px; }
-  .md-tab { width:100%; min-width:1020px; table-layout:fixed; border-collapse:collapse; font-size:13.5px; }
-  .md-tab col.c-nome { width:200px; } .md-tab col.c-cnh { width:180px; } .md-tab col.c-prot { width:120px; } .md-tab col.c-bau { width:115px; } .md-tab col.c-n { width:80px; }
-  .md-tab th { font-size:10.5px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; padding:9px 8px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--line); }
-  .md-tab td { padding:8px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; overflow:hidden; text-overflow:ellipsis; }
-  .md-tab th.n, .md-tab td.n { text-align:right; font-variant-numeric:tabular-nums; }
-  .md-tab td:first-child, .md-tab th:first-child { white-space:normal; min-width:170px; }
-  .md-tab tr.lin { cursor:pointer; }
-  .md-tab tr.lin:hover td { background:var(--surface-2); }
-  .md-tab tr.lin.aberta td, .md-tab tr.lin:hover td:first-child, .md-tab tr.lin.aberta td:first-child { background:var(--surface-2); }
-  .md-nome { font-weight:700; }
-  .md-nome .sinal { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-  .md-pede { font-size:12px; color:var(--farol-fora, #e5534b); font-weight:600; margin-top:2px; }
-  .md-sub { font-size:11.5px; color:var(--tx-3); }
-  /* bolinha de situação */
-  .st { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; }
-  .st::before { content:''; width:9px; height:9px; border-radius:50%; flex:0 0 9px; background:transparent; border:1.5px dashed var(--tx-3); }
-  .st.ok::before { background:var(--farol-ok, #3fb950); border:0; }
-  .st.pasta::before, .st.atencao::before { background:var(--farol-atencao, #d29922); border:0; }
-  .st.falta::before { background:var(--farol-fora, #e5534b); border:0; }
-  .st.falta { color:var(--farol-fora, #e5534b); font-weight:600; }
-  .st.nao_sei { color:var(--tx-3); }
-  /* detalhe da linha */
-  .md-det td { background:var(--surface-2); padding:10px 12px 14px; white-space:normal; overflow:visible; }
-  .md-det-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
-  .md-item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--surface); font-size:12.5px; line-height:1.45; }
-  .md-item .tit { display:flex; justify-content:space-between; gap:8px; font-weight:700; font-size:13px; margin-bottom:4px; }
+  .md-rot { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.6px; text-transform:uppercase; margin:0 0 6px; }
+  /* botões em linha: rolam de lado no celular em vez de quebrar e mudar a altura da tela */
+  .md-linha-bt { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin:0 0 12px; scrollbar-width:none; }
+  .md-linha-bt::-webkit-scrollbar { display:none; }
+  .md-linha-bt.quebra { flex-wrap:wrap; overflow:visible; }
+  .md-linha-bt button { flex:0 0 auto; font:inherit; font-size:13.5px; min-height:38px; padding:6px 14px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); color:inherit; cursor:pointer; white-space:nowrap; }
+  .md-linha-bt button.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+  .md-linha-bt.lojas button.on { background:var(--marca-amarelo, #e0a526); border-color:var(--marca-amarelo, #e0a526); color:#111; }
+  .md-linha-bt button .n { opacity:.8; margin-left:6px; font-weight:700; }
+  /* 4 números: sempre 4 colunas no computador e 2x2 no celular, para não pular */
+  .md-totais { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:0 0 12px; }
+  .md-totais button { font:inherit; color:inherit; text-align:left; cursor:pointer; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-height:72px; }
+  .md-totais button.on { border-color:var(--brand); box-shadow:inset 0 0 0 1px var(--brand); }
+  .md-totais .k { font-size:11px; font-weight:700; color:var(--tx-3); letter-spacing:.5px; text-transform:uppercase; }
+  .md-totais .v { font-size:28px; font-weight:800; line-height:1.15; }
+  .md-totais .vermelho .v { color:var(--farol-fora, #e5534b); }
+  .md-totais .verde .v { color:var(--farol-ok, #3fb950); }
+  .md-totais .amarelo .v { color:var(--farol-atencao, #d29922); }
+  .md-resumo-item { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:0 0 12px; font-size:14px; line-height:1.5; }
+  .md-resumo-item b.g { font-size:16px; }
+  .md-busca { font:inherit; font-size:14px; padding:9px 12px; border-radius:10px; border:1px solid var(--line-2); background:var(--surface); color:inherit; width:100%; box-sizing:border-box; margin:0 0 12px; }
+  /* lista de motoboys: 1 coluna no celular, 2 no computador; cada cartão com a mesma estrutura */
+  .md-lista { display:grid; grid-template-columns:1fr; gap:8px; }
+  @media (min-width:900px) { .md-lista { grid-template-columns:1fr 1fr; } }
+  .md-card { background:var(--surface); border:1px solid var(--line); border-left:5px solid var(--line-2); border-radius:12px; padding:10px 12px; cursor:pointer; }
+  .md-card.falta { border-left-color:var(--farol-fora, #e5534b); }
+  .md-card.atencao { border-left-color:var(--farol-atencao, #d29922); }
+  .md-card.ok { border-left-color:var(--farol-ok, #3fb950); }
+  .md-card.aberto { grid-column:1/-1; cursor:default; }
+  .md-c1 { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .md-c1 .nome { font-weight:800; font-size:15.5px; }
+  .md-c1 .loja { font-size:12px; color:var(--tx-3); white-space:nowrap; }
+  .md-c2 { font-size:12px; color:var(--tx-3); margin:1px 0 6px; }
+  .md-l { font-size:13.5px; line-height:1.45; margin:2px 0; }
+  .md-l { display:grid; grid-template-columns:132px 1fr; gap:6px; }
+  .md-l.falta b { color:var(--farol-fora, #e5534b); }
+  .md-l.conf b { color:var(--farol-atencao, #d29922); }
+  .md-l.ok { color:var(--tx-3); } .md-l.ok b { color:var(--farol-ok, #3fb950); }
+  .md-l.ns { color:var(--tx-3); }
+  .md-um { font-size:15px; font-weight:700; }
+  .md-um.falta { color:var(--farol-fora, #e5534b); } .md-um.atencao, .md-um.pasta { color:var(--farol-atencao, #d29922); }
+  .md-um.ok { color:var(--farol-ok, #3fb950); } .md-um.nao_sei { color:var(--tx-3); font-weight:600; }
+  .md-loja-t { grid-column:1/-1; margin:10px 0 0; font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; border-bottom:2px solid var(--marca-amarelo, #e0a526); padding-bottom:3px; }
+  /* detalhe */
+  .md-det { margin-top:10px; border-top:1px solid var(--line); padding-top:10px; }
+  .md-det-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:8px; }
+  .md-item { border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--surface-2); font-size:12.5px; line-height:1.45; }
+  .md-item .tit { font-weight:700; font-size:13.5px; margin-bottom:4px; }
   .md-item .orig { color:var(--tx-3); font-size:11.5px; margin-top:4px; }
-  .md-item select, .md-item input { font:inherit; font-size:13px; padding:4px 6px; border-radius:6px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; margin:3px 0 0; width:100%; box-sizing:border-box; }
+  .md-item select, .md-item input { font:inherit; font-size:15px; padding:7px 8px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface); color:inherit; margin:3px 0 0; width:100%; box-sizing:border-box; }
   .md-det-acoes { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-  .md-msg { font-size:12.5px; }
+  .md-det-acoes .md-btn { font-size:15px; padding:9px 18px; }
+  .md-msg { font-size:13px; }
   .md-msg.erro { color:var(--farol-fora, #e5534b); }
   .md-msg.ok { color:var(--farol-ok, #3fb950); }
-  .md-nota { font-size:12px; color:var(--tx-3); margin:12px 0 0; line-height:1.5; }
-  .md-vazio { padding:18px; opacity:.75; }
+  .md-vazio { padding:18px; opacity:.75; grid-column:1/-1; }
+  .md-sem { width:100%; border-collapse:collapse; font-size:14px; background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .md-sem th, .md-sem td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; }
+  .md-sem th { font-size:11px; color:var(--tx-3); text-transform:uppercase; letter-spacing:.5px; }
+  .md-sem .n { text-align:right; }
+  /* rodapé: fontes e explicação de cada item */
+  .md-rodape { margin:18px 0 0; display:grid; gap:10px; }
+  .md-rodape details { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 14px; }
+  .md-rodape summary { font-weight:700; cursor:pointer; font-size:14px; }
+  .md-rodape dl { margin:8px 0 0; font-size:13.5px; line-height:1.5; }
+  .md-rodape dt { font-weight:700; margin-top:8px; }
+  .md-rodape dd { margin:0; color:var(--tx-2, inherit); }
+  .md-rodape .cinza { color:var(--tx-3); }
+  /* MODO JAISON: mesmas cores, largura e barra de abas da página jaison/index.html */
+  .jz-modos { display:none; }
+  .modo-jaison { --bg:#111110; --surface:#1c1c1a; --surface-2:#151514; --line:#2e2e2b; --line-2:#2e2e2b; --tx-1:#f2f1ec; --tx-3:#a3a29b; --brand:#f5c518; --marca-amarelo:#f5c518; --farol-ok:#46c46e; --farol-fora:#ff6b5e; --farol-atencao:#f0a23a; }
+  .modo-jaison body { background:#111110; color:#f2f1ec; font:16px/1.4 -apple-system, "Segoe UI", Roboto, Inter, sans-serif; }
+  .modo-jaison body::before { display:none !important; }
+  .modo-jaison .wrap { max-width:640px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+  .modo-jaison .md-voltar, .modo-jaison #btnAjuda { display:none !important; }
+  .modo-jaison .md-topo { border-bottom:0; padding-bottom:0; margin:0 0 10px; }
+  .modo-jaison .md-topo h1 { font-size:20px; }
+  .modo-jaison .md-linha-bt button.on, .modo-jaison .md-btn.pri { color:#111; }
+  .modo-jaison .md-lista { grid-template-columns:1fr; }
+  .modo-jaison .jz-modos { display:flex; gap:6px; margin-bottom:10px; }
+  .modo-jaison .md-topo { flex-wrap:nowrap; align-items:center; }
+  .modo-jaison .md-topo .acoes { flex:0 0 auto; }
+  .jz-modos a { flex:1; min-width:0; white-space:nowrap; display:flex; align-items:center; justify-content:center; height:44px; border-radius:12px; border:1px solid #2e2e2b; background:#1c1c1a; color:#f2f1ec; font-size:14px; font-weight:600; text-decoration:none; }
+  .jz-modos a.on { background:#f5c518; color:#111; border-color:#f5c518; }
   @media (max-width:640px) {
-    .md-filtros .dir { margin-left:0; width:100%; } .md-busca { flex:1; }
-    /* no celular cada motoboy vira um bloco: nome em cima, os itens embaixo com o nome do item */
-    .md-tab { min-width:0; table-layout:auto; } .md-tab colgroup, .md-tab thead { display:none; }
-    .md-tab, .md-tab tbody, .md-tab tr, .md-tab td { display:block; width:auto; }
-    .md-tab tr.lin { display:flex; flex-wrap:wrap; gap:4px 12px; padding:8px 10px; border-bottom:1px solid var(--line); }
-    .md-tab tr.lin td { border:0; padding:0; overflow:visible; }
-    .md-tab tr.lin td:first-child { width:100%; min-width:0; }
-    .md-tab tr.lin td[data-r]::before { content:attr(data-r); display:block; font-size:10px; font-weight:700; color:var(--tx-3); text-transform:uppercase; letter-spacing:.4px; }
-    .md-tab td.n { text-align:left; }
+    .md-totais { grid-template-columns:1fr 1fr; }
+    .md-totais .v { font-size:24px; }
+    .md-topo h1 { font-size:20px; }
+    .md-l { grid-template-columns:118px 1fr; }
+    .md-l { font-size:13px; }
   }
 </style>
 </head>
 <body>
 <div class="main-content">
   <div class="wrap">
+    <nav class="jz-modos" aria-label="Central do Jaison"><a href="../jaison/#escala">📋 Escala</a><a href="../jaison/#garantido">💰 Garantido</a><a class="on" aria-current="page">🪪 Documentos</a></nav>
+    <a class="md-voltar" id="voltar" href="../jaison/" style="display:none;">← Voltar para a central do Jaison</a>
     <div class="md-topo">
       <div>
-        <h1>Documentos dos motoboys</h1>
+        <h1 id="titulo">Documentos dos motoboys</h1>
         <div class="sub" id="sub">Carregando…</div>
       </div>
       <div class="acoes"><button class="md-btn" id="btnAtualizar" type="button">Atualizar</button></div>
     </div>
     <div id="erroMsg" class="md-msg erro" style="display:none;margin:0 0 10px;"></div>
-    <div class="md-caixa"><div class="md-totais" id="totais"></div></div>
-    <div class="md-caixa"><div class="md-fontes" id="fontes"></div></div>
-    <div class="md-filtros">
-      <div class="md-abas" id="abas"></div>
-      <div class="dir">
-        <select id="item" title="Ver só quem está sem este item"></select>
-        <input class="md-busca" id="busca" type="search" placeholder="Procurar pelo nome">
-      </div>
+    <div class="md-rot">Loja</div>
+    <div class="md-linha-bt lojas" id="lojas"></div>
+    <div class="md-totais" id="totais"></div>
+    <div class="md-rot">Ver por item</div>
+    <div class="md-linha-bt" id="itens"></div>
+    <div id="resumoItem"></div>
+    <input class="md-busca" id="busca" type="search" placeholder="Procurar pelo nome">
+    <div class="md-lista" id="lista"></div>
+    <div class="md-rodape">
+      <details id="fontes"></details>
+      <details>
+        <summary>O que é cada item</summary>
+        <dl>
+          <dt>MEI</dt><dd>O CNPJ de microempreendedor do motoboy. Na ficha fica o número do CNPJ.</dd>
+          <dt>CNH</dt><dd>A carteira de motorista, com categoria A (moto). Vencida conta como <b>falta</b>; se vence em até 60 dias aparece como <b>para conferir</b>. Na ficha ficam a categoria e a validade.</dd>
+          <dt>Moto</dt><dd>O documento da moto. Na ficha fica a placa.</dd>
+          <dt>Contrato</dt><dd>O contrato de prestação de serviço de entrega entre o motoboy e a loja.</dd>
+          <dt>Pix</dt><dd>A chave Pix para receber o pagamento. Vem do cadastro do motoboy feito pelo RH e não se muda nesta tela; aqui só aparece se a chave está preenchida.</dd>
+          <dt>Proteção térmica</dt><dd>O que mantém o lanche quente: <b>bag térmica</b> ou <b>vedação</b> no baú. "Sem proteção" quer dizer que ele não tem nenhuma das duas.</dd>
+          <dt>Baú</dt><dd>O tamanho do baú da moto: grande ou pequeno (e os litros, quando alguém anotou).</dd>
+          <dt>As situações</dt><dd><b>Conferido</b> = alguém da equipe viu e está certo. <b>Na pasta</b> = o documento está guardado, mas ninguém conferiu ainda. <b>Olhar</b> = tem alguma coisa para checar. <b>Falta</b> = ele não tem ou não entregou. <b>Ninguém marcou</b> = a ficha ainda não foi preenchida.</dd>
+          <dt>Os números de cima</dt><dd><b>Precisa pedir algo</b> = falta MEI, CNH, moto, contrato ou a chave Pix. Proteção térmica e baú aparecem no cartão, mas não entram nessa conta (para eles, use "Ver por item"). <b>Tudo conferido</b> = MEI, CNH, moto, contrato e Pix conferidos. <b>Rodaram sem ficha</b> = nomes que fizeram entrega no TrackEat nos últimos 30 dias e não têm ficha (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica lá para não juntar errado).</dd>
+        </dl>
+        <p class="cinza" style="font-size:12px;margin:10px 0 0;">Ainda não vieram do portal antigo: fotos dos documentos e a avaliação de cada motoboy.</p>
+      </details>
     </div>
-    <div class="md-legenda">
-      <span class="st ok">Conferido</span><span class="st pasta">Na pasta ou para olhar</span>
-      <span class="st falta">Falta</span><span class="st nao_sei">Ninguém marcou ainda</span>
-      <span>· Clique na linha para ver o detalhe e atualizar.</span>
-    </div>
-    <div id="lista"></div>
-    <p class="md-nota">
-      <b>Regras da tela:</b> CNH vencida conta como falta; CNH que vence em até 60 dias fica amarela.
-      "Precisa pedir algo" = tem pelo menos um item marcado como falta (ou a chave Pix em branco no cadastro).
-      "Falta conferir" = nada marcado como falta, mas algum item ainda não está conferido (na pasta, para olhar ou sem marcação).
-      "Rodaram sem ficha" = nomes do TrackEat dos últimos 30 dias que não casaram com nenhuma ficha
-      (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica lá para não juntar errado).
-      Ainda não vieram do portal antigo: fotos dos documentos e a avaliação de cada motoboy.
-    </p>
   </div>
 </div>
 
@@ -155,18 +181,27 @@
 <script>
 const TELA = 'motodocs';
 const esc = trEscH;
-const DOCS = [
-  { k: 'mei', nome: 'MEI', num: 'CNPJ do MEI' },
-  { k: 'cnh', nome: 'CNH', num: 'Categoria (precisa ter A)', validade: true },
-  { k: 'moto', nome: 'Moto', num: 'Placa' },
-  { k: 'contrato', nome: 'Contrato' },
+// a ordem aqui é a ordem em que aparecem na tela
+const ITENS = [
+  { k: 'contrato', nome: 'Contrato', doc: true },
+  { k: 'mei', nome: 'MEI', doc: true, num: 'CNPJ do MEI' },
+  { k: 'cnh', nome: 'CNH', doc: true, num: 'Categoria (precisa ter A)', validade: true },
+  { k: 'moto', nome: 'Moto', doc: true, num: 'Placa' },
+  { k: 'pix', nome: 'Pix' },
+  { k: 'prot', nome: 'Proteção térmica' },
+  { k: 'bau', nome: 'Baú' },
 ];
+const DOCS = ITENS.filter((i) => i.doc);
 const SIT = { ok: 'Conferido', pasta: 'Na pasta', atencao: 'Olhar', falta: 'Falta', nao_sei: 'Não sei' };
 const PROT = { bag: 'Bag térmica', vedacao: 'Vedação', nenhuma: 'Sem proteção', nao_sei: 'Não sei' };
 const BAU = { grande: 'Grande', pequeno: 'Pequeno', nao_sei: 'Não sei' };
 const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'AHU': 'Ahú', 'BOQUEIRAO': 'Boqueirão', 'BOQUEIRÃO': 'Boqueirão' };
 const ORDEM_LOJA = ['Água Verde', 'São Braz', 'Ahú', 'Boqueirão'];
-let DADOS = null, ABA = 'pedir', ITEM = '', ABERTA = null, ULTIMA_REQ = 0;
+let DADOS = null, ABA = 'pedir', ITEM = '', ESTADO = '', LOJA = null, ABERTA = null, ULTIMA_REQ = 0;
+
+// aberta direto (fora do portal), por exemplo pelo botão da central do Jaison: mostra o "Voltar" bem à vista
+if (!NA_CASCA && !MODO_JAISON) document.getElementById('voltar').style.display = 'inline-flex';
+if (MODO_JAISON) document.getElementById('titulo').textContent = '🛵 Documentos';
 
 function exigirLogin(recado) {
   localStorage.removeItem('rmbSessao');
@@ -192,49 +227,44 @@ function sitDoc(f, k) {
   }
   return d.situacao;
 }
-function sitPix(f) { return f.pix === true ? 'ok' : f.pix === false ? 'falta' : 'nao_sei'; }
-function sitProt(f) { return f.protecao === 'bag' || f.protecao === 'vedacao' ? 'ok' : f.protecao === 'nenhuma' ? 'falta' : 'nao_sei'; }
-function sitBau(f) { return f.bau && f.bau !== 'nao_sei' ? 'ok' : 'nao_sei'; }
+// situação de qualquer item, na mesma régua: ok / pasta / atencao / falta / nao_sei
+function sit(f, k) {
+  if (k === 'pix') return f.pix === true ? 'ok' : f.pix === false ? 'falta' : 'nao_sei';
+  if (k === 'prot') return f.protecao === 'bag' || f.protecao === 'vedacao' ? 'ok' : f.protecao === 'nenhuma' ? 'falta' : 'nao_sei';
+  if (k === 'bau') return f.bau && f.bau !== 'nao_sei' ? 'ok' : 'nao_sei';
+  return sitDoc(f, k);
+}
+// texto curto de um item para a pessoa ler ("Bag térmica", "Conferido · vence 27/06/2032")
+function texto(f, k) {
+  if (k === 'pix') return f.pix === true ? 'Tem chave' : f.pix === false ? 'Sem chave' : 'Ninguém marcou';
+  if (k === 'prot') return PROT[f.protecao] || 'Ninguém marcou';
+  if (k === 'bau') return f.bau && f.bau !== 'nao_sei' ? (BAU[f.bau] || f.bau) + (f.bau_litros ? ' (' + f.bau_litros + ' L)' : '') : 'Ninguém marcou';
+  const s = sitDoc(f, k), doc = (f.docs || {})[k] || {};
+  let t = s === 'nao_sei' ? 'Ninguém marcou' : SIT[s];
+  if (k === 'cnh' && doc.validade) t += ' · vence ' + dataFmt(doc.validade);
+  return t;
+}
 function faltas(f) {
   const l = DOCS.filter((d) => sitDoc(f, d.k) === 'falta').map((d) => d.nome);
-  if (f.pix === false) l.push('chave Pix');
+  if (f.pix === false) l.push('Pix');
   return l;
 }
 function conferido(f) { return DOCS.every((d) => sitDoc(f, d.k) === 'ok') && f.pix === true; }
 function classe(f) { return faltas(f).length ? 'falta' : conferido(f) ? 'ok' : 'atencao'; }
 
-// abas = situação geral; o seletor ao lado = "sem qual item"
-const ABAS = [
-  ['pedir', 'Precisa pedir algo', (f) => faltas(f).length > 0],
-  ['conferir', 'Falta conferir', (f) => !faltas(f).length && !conferido(f)],
-  ['tudo', 'Tudo conferido', conferido],
-  ['todos', 'Todos', () => true],
-];
-const ITENS = [
-  ['', 'Qualquer item', () => true],
-  ['contrato', 'Sem contrato conferido', (f) => sitDoc(f, 'contrato') !== 'ok'],
-  ['mei', 'Sem MEI conferido', (f) => sitDoc(f, 'mei') !== 'ok'],
-  ['cnh', 'Sem CNH conferida', (f) => sitDoc(f, 'cnh') !== 'ok'],
-  ['moto', 'Moto sem conferir', (f) => sitDoc(f, 'moto') !== 'ok'],
-  ['pix', 'Pix não confirmado', (f) => f.pix !== true],
-  ['bag', 'Sem bag térmica', (f) => f.protecao === 'nenhuma'],
-  ['bau', 'Baú sem tamanho', (f) => !f.bau || f.bau === 'nao_sei'],
-  ['parado', 'Não rodou em 30 dias', (f) => !f.entregas],
-];
+const ABAS = {
+  pedir: (f) => faltas(f).length > 0,
+  tudo: conferido,
+  todos: () => true,
+};
 
 function lojaDaCasca() {
   const l = typeof lojaAtual === 'function' ? lojaAtual() : null;
   if (!l || l === 'REDE') return null;
   return LOJA_NOME[l] || l;
 }
-function fichasDaLoja() {
-  const loja = lojaDaCasca();
-  return (DADOS.fichas || []).filter((f) => f.ativo !== false && (!loja || f.loja === loja));
-}
-function semFichaDaLoja() {
-  const loja = lojaDaCasca();
-  return (DADOS.sem_ficha || []).filter((s) => !loja || (LOJA_NOME[s.loja] || s.loja) === loja);
-}
+function fichasDaLoja() { return (DADOS.fichas || []).filter((f) => f.ativo !== false && (!LOJA || f.loja === LOJA)); }
+function semFichaDaLoja() { return (DADOS.sem_ficha || []).filter((s) => !LOJA || (LOJA_NOME[s.loja] || s.loja) === LOJA); }
 
 async function carregar() {
   const minha = ++ULTIMA_REQ;
@@ -254,8 +284,6 @@ function mostrarErro(t) {
   const el = document.getElementById('erroMsg'); el.textContent = t; el.style.display = 'block';
   document.getElementById('sub').textContent = '';
 }
-
-// a data mais recente entre os "quando" das fichas visíveis (documentos ou equipamento)
 function ultimaMarcacao(fichas) {
   let melhor = '';
   fichas.forEach((f) => {
@@ -266,84 +294,89 @@ function ultimaMarcacao(fichas) {
 }
 
 function desenhar() {
+  const todas = (DADOS.fichas || []).filter((f) => f.ativo !== false);
   const ativas = fichasDaLoja();
   const sem = semFichaDaLoja();
-  const loja = lojaDaCasca();
-  document.getElementById('sub').textContent = (loja || 'Todas as lojas') + ' · consultado em ' + (jaPronta(DADOS.gerado_em) || '—');
+  document.getElementById('sub').textContent = (LOJA || 'Todas as lojas') + ' · consultado em ' + (jaPronta(DADOS.gerado_em) || '—');
 
-  const nPedir = ativas.filter((f) => faltas(f).length).length;
-  const nConf = ativas.filter(conferido).length;
+  const lojas = [...new Set(todas.map((f) => f.loja).filter(Boolean))]
+    .sort((a, b) => (ORDEM_LOJA.indexOf(a) + 1 || 99) - (ORDEM_LOJA.indexOf(b) + 1 || 99));
+  document.getElementById('lojas').innerHTML = '<button type="button" data-l="" class="' + (!LOJA ? 'on' : '') + '">Todas<span class="n">' + todas.length + '</span></button>' +
+    lojas.map((l) => '<button type="button" data-l="' + esc(l) + '" class="' + (LOJA === l ? 'on' : '') + '">' + esc(l) +
+      '<span class="n">' + todas.filter((f) => f.loja === l).length + '</span></button>').join('');
+
+  const nPedir = ativas.filter(ABAS.pedir).length, nConf = ativas.filter(conferido).length;
+  const t = (aba, k, v, cor) => '<button type="button" data-a="' + aba + '" class="' + cor + (ABA === aba && !ITEM ? ' on' : '') + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></button>';
   document.getElementById('totais').innerHTML =
-    tot('todos', 'Com ficha', ativas.length, '') +
-    tot('tudo', 'Tudo conferido', nConf, '') +
-    tot('pedir', 'Precisa pedir algo', nPedir, 'grande' + (nPedir ? '' : ' zero')) +
-    tot('semficha', 'Rodaram sem ficha', sem.length, sem.length ? 'alerta' : '');
+    t('todos', 'Com ficha', ativas.length, '') + t('tudo', 'Tudo conferido', nConf, 'verde') +
+    t('pedir', 'Precisa pedir algo', nPedir, nPedir ? 'vermelho' : 'verde') + t('semficha', 'Rodaram sem ficha', sem.length, sem.length ? 'amarelo' : '');
+
+  document.getElementById('itens').innerHTML = '<button type="button" data-i="" class="' + (!ITEM ? 'on' : '') + '">Todos os itens</button>' +
+    ITENS.map((i) => '<button type="button" data-i="' + i.k + '" class="' + (ITEM === i.k ? 'on' : '') + '">' + esc(i.nome) + '</button>').join('');
 
   const ult = ultimaMarcacao(ativas);
-  document.getElementById('fontes').innerHTML = '<div class="t">De onde vêm os dados</div>' +
-    fonte('Documentos, proteção e baú', 'Ficha do motoboy no banco do ERP, marcada à mão pela equipe nesta tela. ' +
-      (ult ? 'Última atualização: ' + esc(ult) + '.' : 'Ninguém marcou nada ainda.')) +
-    fonte('Chave Pix', 'Cadastro do motoboy feito pelo RH. Não se muda aqui; só mostra se a chave está preenchida.') +
-    fonte('Entregas e “rodaram sem ficha”', 'TrackEat, últimos 30 dias. Dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') + '.') +
-    fonte('Consulta', 'Lido do banco do ERP em ' + esc(jaPronta(DADOS.gerado_em) || '—') + '. O botão Atualizar lê de novo.');
-
-  document.getElementById('abas').innerHTML = ABAS.map(([id, nome, fn]) =>
-    '<button type="button" data-a="' + id + '" class="' + (ABA === id ? 'on' : '') + '">' + esc(nome) +
-    '<span class="n">' + ativas.filter(fn).length + '</span></button>').join('') +
-    '<button type="button" data-a="semficha" class="' + (ABA === 'semficha' ? 'on' : '') + '">Rodaram sem ficha<span class="n">' + sem.length + '</span></button>';
-
-  const base = ativas.filter((ABAS.find((x) => x[0] === ABA) || ABAS[3])[2]);
-  const sel = document.getElementById('item');
-  sel.innerHTML = ITENS.map(([id, nome, fn]) => '<option value="' + id + '"' + (ITEM === id ? ' selected' : '') + '>' +
-    esc(nome) + (id ? ' (' + base.filter(fn).length + ')' : '') + '</option>').join('');
-  sel.disabled = ABA === 'semficha';
+  const fontes = document.getElementById('fontes');
+  const aberto = fontes.open;
+  fontes.innerHTML = '<summary>De onde vêm os dados</summary><dl>' +
+    '<dt>Documentos, proteção térmica e baú</dt><dd>Ficha do motoboy no banco do ERP, marcada à mão pela equipe nesta tela. ' + (ult ? 'Última atualização: ' + esc(ult) + '.' : 'Ninguém marcou nada ainda.') + '</dd>' +
+    '<dt>Chave Pix</dt><dd>Cadastro do motoboy feito pelo RH.</dd>' +
+    '<dt>Entregas e "rodaram sem ficha"</dt><dd>TrackEat, últimos 30 dias. Dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') + '.</dd>' +
+    '<dt>Consulta</dt><dd>Lido do banco do ERP em ' + esc(jaPronta(DADOS.gerado_em) || '—') + '. O botão Atualizar lê de novo.</dd></dl>';
+  fontes.open = aberto;
 
   const lista = document.getElementById('lista');
-  if (ABA === 'semficha') { lista.innerHTML = tabelaSemFicha(sem); return; }
-  const q = document.getElementById('busca').value.trim().toLowerCase();
-  const fnItem = (ITENS.find((x) => x[0] === ITEM) || ITENS[0])[2];
-  const mostrar = base.filter((f) => fnItem(f) && (!q || String(f.nome).toLowerCase().includes(q)))
-    .sort((a, b) => (b.entregas || 0) - (a.entregas || 0));
-  if (!mostrar.length) { lista.innerHTML = '<div class="md-vazio">Ninguém neste filtro.</div>'; return; }
-  const lojas = [...new Set(mostrar.map((f) => f.loja || '—'))]
-    .sort((a, b) => (ORDEM_LOJA.indexOf(a) + 1 || 99) - (ORDEM_LOJA.indexOf(b) + 1 || 99));
-  lista.innerHTML = lojas.map((l) => {
-    const linhas = mostrar.filter((f) => (f.loja || '—') === l);
-    const nP = linhas.filter((f) => faltas(f).length).length;
-    return '<div class="md-loja"><h2>' + esc(l) + '</h2><div class="meta"><b>' + linhas.length + '</b> motoboy' + (linhas.length > 1 ? 's' : '') +
-      (nP ? ' · <b>' + nP + '</b> com algo a pedir' : '') + '</div></div>' +
-      '<div class="md-tab-wrap"><table class="md-tab"><colgroup><col class="c-nome">' + DOCS.map((d) => '<col' + (d.k === 'cnh' ? ' class="c-cnh"' : '') + '>').join('') +
-      '<col><col class="c-prot"><col class="c-bau"><col class="c-n"></colgroup><thead><tr><th>Motoboy</th>' +
-      DOCS.map((d) => '<th>' + esc(d.nome) + '</th>').join('') +
-      '<th>Pix</th><th>Proteção</th><th>Baú</th><th class="n">Entregas 30d</th></tr></thead><tbody>' +
-      linhas.map(linha).join('') + '</tbody></table></div>';
-  }).join('');
-}
-function tot(aba, k, v, cls) {
-  return '<button type="button" data-a="' + aba + '" class="' + cls + '"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></button>';
-}
-function fonte(t, txt) { return '<div><b>' + esc(t) + '</b><span>' + txt + '</span></div>'; }
-function st(s, txt) { return '<span class="st ' + s + '">' + esc(txt) + '</span>'; }
+  const resumo = document.getElementById('resumoItem');
+  if (ABA === 'semficha' && !ITEM) { resumo.innerHTML = ''; lista.innerHTML = tabelaSemFicha(sem); return; }
 
-function linha(f) {
-  const fl = faltas(f), c = classe(f);
-  const cor = c === 'falta' ? 'var(--farol-fora, #e5534b)' : c === 'ok' ? 'var(--farol-ok, #3fb950)' : 'var(--farol-atencao, #d29922)';
-  const docs = DOCS.map((d) => {
-    const s = sitDoc(f, d.k), doc = (f.docs || {})[d.k] || {};
-    let txt = SIT[s] || s;
-    if (d.k === 'cnh' && doc.validade) txt += ' · vence ' + dataFmt(doc.validade);
-    return '<td data-r="' + esc(d.nome) + '">' + st(s, txt) + '</td>';
+  let base = ITEM ? ativas : ativas.filter(ABAS[ABA] || ABAS.todos);
+  if (ITEM) {
+    const nomeI = ITENS.find((i) => i.k === ITEM).nome;
+    const cont = { ok: 0, pasta: 0, atencao: 0, falta: 0, nao_sei: 0 };
+    ativas.forEach((f) => { cont[sit(f, ITEM)]++; });
+    const rot = ITEM === 'prot' ? { ok: 'têm bag ou vedação', falta: 'sem proteção' } : ITEM === 'pix' ? { ok: 'com chave', falta: 'sem chave' } :
+      ITEM === 'bau' ? { ok: 'com tamanho anotado' } : { ok: 'conferidos', pasta: 'na pasta', atencao: 'para olhar', falta: 'faltam' };
+    const partes = ['ok', 'pasta', 'atencao', 'falta', 'nao_sei'].filter((k) => cont[k] && (rot[k] || k === 'nao_sei'))
+      .map((k) => '<button type="button" data-e="' + k + '" class="' + (ESTADO === k ? 'on' : '') + '">' + cont[k] + ' ' + esc(k === 'nao_sei' ? 'ninguém marcou' : rot[k]) + '</button>');
+    resumo.innerHTML = '<div class="md-resumo-item"><b class="g">' + esc(nomeI) + '</b> · ' + ativas.length + ' motoboys' + (LOJA ? ' no ' + esc(LOJA) : '') + '</div>' +
+      '<div class="md-linha-bt quebra"><button type="button" data-e="" class="' + (!ESTADO ? 'on' : '') + '">Todos</button>' + partes.join('') + '</div>';
+    if (ESTADO) base = base.filter((f) => sit(f, ITEM) === ESTADO);
+  } else resumo.innerHTML = '';
+
+  const q = document.getElementById('busca').value.trim().toLowerCase();
+  const ordem = { falta: 0, atencao: 1, pasta: 2, nao_sei: 3, ok: 4 };
+  const mostrar = base.filter((f) => !q || String(f.nome).toLowerCase().includes(q))
+    .sort((a, b) => ITEM ? (ordem[sit(a, ITEM)] - ordem[sit(b, ITEM)]) || ((b.entregas || 0) - (a.entregas || 0)) : (b.entregas || 0) - (a.entregas || 0));
+  if (!mostrar.length) { lista.innerHTML = '<div class="md-vazio">Ninguém neste filtro.</div>'; return; }
+  const grupos = LOJA ? [LOJA] : [...new Set(mostrar.map((f) => f.loja || '—'))].sort((a, b) => (ORDEM_LOJA.indexOf(a) + 1 || 99) - (ORDEM_LOJA.indexOf(b) + 1 || 99));
+  lista.innerHTML = grupos.map((l) => {
+    const daLoja = mostrar.filter((f) => (f.loja || '—') === l);
+    return (grupos.length > 1 ? '<div class="md-loja-t">' + esc(l) + ' · ' + daLoja.length + '</div>' : '') + daLoja.map(cartao).join('');
   }).join('');
-  const aberta = String(ABERTA) === String(f.id);
-  return '<tr class="lin' + (aberta ? ' aberta' : '') + '" data-id="' + esc(f.id) + '"><td><div class="md-nome"><span class="sinal" style="background:' + cor + '"></span>' + esc(f.nome) + '</div>' +
-    '<div class="md-sub">' + (f.tipo ? esc(f.tipo) + ' · ' : '') + (f.ultima ? 'última entrega ' + esc(dataFmt(f.ultima)) : 'sem entrega em 30 dias') + '</div>' +
-    (fl.length ? '<div class="md-pede">Pedir: ' + esc(fl.join(', ')) + '</div>' : '') + '</td>' +
-    docs +
-    '<td data-r="Pix">' + st(sitPix(f), f.pix === true ? 'Tem' : f.pix === false ? 'Falta' : 'Não sei') + '</td>' +
-    '<td data-r="Proteção">' + st(sitProt(f), PROT[f.protecao] || 'Não sei') + '</td>' +
-    '<td data-r="Baú">' + st(sitBau(f), (BAU[f.bau] || 'Não sei') + (f.bau_litros ? ' · ' + f.bau_litros + ' L' : '')) + '</td>' +
-    '<td class="n" data-r="Entregas 30d">' + esc(f.entregas || 0) + '</td></tr>' +
-    (aberta ? '<tr class="md-det"><td colspan="' + (DOCS.length + 5) + '">' + detalhe(f) + '</td></tr>' : '');
+}
+
+function cartao(f) {
+  const aberto = String(ABERTA) === String(f.id);
+  let corpo;
+  if (ITEM) {
+    const s = sit(f, ITEM);
+    corpo = '<div class="md-um ' + s + '">' + esc(texto(f, ITEM)) + '</div>';
+  } else {
+    const grupo = { falta: [], conf: [], ok: [], ns: [] };
+    ITENS.forEach((i) => {
+      const s = sit(f, i.k);
+      const nome = i.k === 'prot' ? 'Proteção térmica' : i.nome;
+      if (s === 'falta') grupo.falta.push(i.k === 'prot' ? 'Proteção térmica' : i.k === 'pix' ? 'Chave Pix' : nome);
+      else if (s === 'pasta' || s === 'atencao') grupo.conf.push(nome + (s === 'pasta' ? ' (na pasta)' : ' (olhar)'));
+      else if (s === 'ok') grupo.ok.push(nome);
+      else grupo.ns.push(nome);
+    });
+    const l = (cls, rot, arr) => arr.length ? '<div class="md-l ' + cls + '"><b>' + rot + '</b><span>' + esc(arr.join(', ')) + '</span></div>' : '';
+    corpo = l('falta', 'Falta:', grupo.falta) + l('conf', 'Falta conferir:', grupo.conf) + l('ns', 'Ninguém marcou:', grupo.ns) + l('ok', 'Em dia:', grupo.ok);
+  }
+  return '<div class="md-card ' + classe(f) + (aberto ? ' aberto' : '') + '" data-id="' + esc(f.id) + '">' +
+    '<div class="md-c1"><span class="nome">' + esc(f.nome) + '</span></div>' +
+    '<div class="md-c2">' + (f.tipo ? esc(f.tipo) + ' · ' : '') + esc(f.entregas || 0) + ' entregas em 30 dias' + (f.ultima ? ' · última ' + esc(dataFmt(f.ultima)) : '') + '</div>' +
+    corpo + (aberto ? '<div class="md-det">' + detalhe(f) + '</div>' : '') + '</div>';
 }
 
 function opcoes(mapa, atual) {
@@ -353,21 +386,21 @@ function quando(q) { return q ? 'Última atualização: ' + esc(jaPronta(q)) + '
 function detalhe(f) {
   const id = esc(f.id);
   const itens = DOCS.map((d) => {
-    const doc = (f.docs || {})[d.k] || {}, s = sitDoc(f, d.k);
-    return '<div class="md-item"><div class="tit">' + esc(d.nome) + st(s, SIT[s] || s) + '</div>' +
+    const doc = (f.docs || {})[d.k] || {};
+    return '<div class="md-item"><div class="tit">' + esc(d.nome) + '</div>' +
       '<select data-doc="' + d.k + '" data-c="sit" aria-label="Situação ' + esc(d.nome) + '">' + opcoes(SIT, doc.situacao || 'nao_sei') + '</select>' +
       (d.num ? '<input type="text" data-doc="' + d.k + '" data-c="num" placeholder="' + esc(d.num) + '" value="' + esc(doc.numero || '') + '">' : '') +
       (d.validade ? '<input type="date" data-doc="' + d.k + '" data-c="val" title="Validade da CNH" value="' + esc(doc.validade || '') + '">' : '') +
       '<div class="orig">' + quando(doc.quando) + '</div></div>';
   }).join('') +
-    '<div class="md-item"><div class="tit">Chave Pix' + st(sitPix(f), f.pix === true ? 'Tem' : f.pix === false ? 'Falta' : 'Não sei') + '</div>' +
+    '<div class="md-item"><div class="tit">Chave Pix: ' + esc(texto(f, 'pix')) + '</div>' +
       '<div class="orig">Vem do cadastro do motoboy feito pelo RH' + (f.pix == null ? ' (esta ficha não está ligada a um cadastro)' : '') + '. Não se muda aqui.</div></div>' +
-    '<div class="md-item"><div class="tit">Proteção do lanche' + st(sitProt(f), PROT[f.protecao] || 'Não sei') + '</div>' +
-      '<select data-c="prot" aria-label="Proteção">' + opcoes(PROT, f.protecao || 'nao_sei') + '</select>' +
+    '<div class="md-item"><div class="tit">Proteção térmica</div>' +
+      '<select data-c="prot" aria-label="Proteção térmica">' + opcoes(PROT, f.protecao || 'nao_sei') + '</select>' +
       '<div class="orig">' + quando(f.equip_quando) + '</div></div>' +
-    '<div class="md-item"><div class="tit">Baú' + st(sitBau(f), BAU[f.bau] || 'Não sei') + '</div>' +
+    '<div class="md-item"><div class="tit">Baú</div>' +
       '<select data-c="bau" aria-label="Baú">' + opcoes(BAU, f.bau || 'nao_sei') + '</select>' +
-      '<div class="orig">' + (f.bau_litros ? 'Tamanho registrado: ' + esc(f.bau_litros) + ' L. ' : '') + quando(f.equip_quando) + '</div></div>' +
+      '<div class="orig">' + (f.bau_litros ? 'Tamanho anotado: ' + esc(f.bau_litros) + ' L. ' : '') + quando(f.equip_quando) + '</div></div>' +
     '<div class="md-item"><div class="tit">Entregas</div>' + esc(f.entregas || 0) + ' nos últimos 30 dias' +
       (f.ultima ? '; última em ' + esc(dataFmt(f.ultima)) : '') +
       '<div class="orig">TrackEat, dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') + '.</div></div>';
@@ -378,10 +411,10 @@ function detalhe(f) {
 
 function tabelaSemFicha(sem) {
   if (!sem.length) return '<div class="md-vazio">Todo mundo que rodou no TrackEat nos últimos 30 dias tem ficha.</div>';
-  return '<div class="md-tab-wrap"><table class="md-tab"><thead><tr><th>Nome no TrackEat</th><th>Loja</th><th class="n">Entregas 30d</th><th>Última</th></tr></thead><tbody>' +
+  return '<div style="grid-column:1/-1"><table class="md-sem"><thead><tr><th>Nome no TrackEat</th><th>Loja</th><th class="n">Entregas</th><th>Última</th></tr></thead><tbody>' +
     sem.map((s) => '<tr><td>' + esc(s.nome) + '</td><td>' + esc(LOJA_NOME[s.loja] || s.loja || '—') + '</td><td class="n">' + esc(s.n) + '</td><td>' + esc(dataFmt(s.ultima)) + '</td></tr>').join('') +
-    '</tbody></table></div><p class="md-nota">Fonte: TrackEat, últimos 30 dias, dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') +
-    '. Para tirar alguém daqui, a ficha precisa ser criada no cadastro de motoboys (ainda pelo RH). Nome igual em duas fichas da mesma loja também cai aqui.</p>';
+    '</tbody></table><p class="md-rodape cinza" style="font-size:12px;">TrackEat, últimos 30 dias, dados até ' + esc(jaPronta(DADOS.entregas_ate) || '—') +
+    '. Para tirar alguém daqui, a ficha precisa ser criada no cadastro de motoboys (ainda pelo RH).</p></div>';
 }
 
 async function salvar(id, botao) {
@@ -411,27 +444,30 @@ async function salvar(id, botao) {
   } finally { botao.disabled = false; }
 }
 
-function trocarAba(a) { ABA = a; ABERTA = null; desenhar(); }
-document.getElementById('abas').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) trocarAba(b.dataset.a); });
-document.getElementById('totais').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b) trocarAba(b.dataset.a); });
-document.getElementById('item').addEventListener('change', (e) => { ITEM = e.target.value; ABERTA = null; desenhar(); });
+
+function redesenhar() { ABERTA = null; desenhar(); }
+document.getElementById('lojas').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (!b) return; LOJA = b.dataset.l || null; redesenhar(); });
+document.getElementById('totais').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (!b) return; ABA = b.dataset.a; ITEM = ''; ESTADO = ''; redesenhar(); });
+document.getElementById('itens').addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (!b) return; ITEM = b.dataset.i; ESTADO = ''; if (!ITEM && ABA === 'semficha') ABA = 'pedir'; redesenhar(); });
+document.getElementById('resumoItem').addEventListener('click', (e) => { const b = e.target.closest('button[data-e]'); if (!b) return; ESTADO = b.dataset.e; redesenhar(); });
 document.getElementById('lista').addEventListener('click', (e) => {
   const s = e.target.closest('[data-salvar]'); if (s) { salvar(s.dataset.salvar, s); return; }
-  if (e.target.closest('[data-fechar]')) { ABERTA = null; desenhar(); return; }
+  if (e.target.closest('[data-fechar]')) { redesenhar(); return; }
   if (e.target.closest('.md-det')) return;   // clique dentro do detalhe (selects) não fecha
-  const tr = e.target.closest('tr.lin'); if (!tr) return;
-  ABERTA = String(ABERTA) === tr.dataset.id ? null : tr.dataset.id;
+  const c = e.target.closest('.md-card'); if (!c) return;
+  ABERTA = String(ABERTA) === c.dataset.id ? null : c.dataset.id;
   desenhar();
+  const el = document.querySelector('.md-card.aberto'); if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 });
 document.getElementById('busca').addEventListener('input', () => { if (DADOS) desenhar(); });
 document.getElementById('btnAtualizar').addEventListener('click', carregar);
-if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { if (DADOS) { ABERTA = null; desenhar(); } });
+if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { LOJA = lojaDaCasca(); if (DADOS) redesenhar(); });
 
 if (!rmbSessao()) exigirLogin('Entre para ver os documentos dos motoboys.');
 else {
   registrarUso(TELA);
   avisarCasca({ tipo: 'casca-modulo', nome: TELA });
-  (async () => { try { await lojaCarregar(); } catch (e) {} carregar(); })();
+  (async () => { try { await lojaCarregar(); } catch (e) {} LOJA = lojaDaCasca(); carregar(); })();
 }
 window.reentrarTela = carregar;
 </script>
