@@ -212,6 +212,12 @@ window.CASCA_MENU = [
     "origem": "fabio"
    },
    {
+    "chave": "qualidel",
+    "rotulo": "Qualidade e avaliações · iFood",
+    "icone": "📊",
+    "origem": "fabio"
+   },
+   {
     "chave": "reservas",
     "rotulo": "Reservas (GetIn)",
     "icone": "📖",

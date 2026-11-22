@@ -268,10 +268,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261122g"></script>
-<script src="casca/paginas.js?v=20261122g"></script>
-<script src="casca/modulos.js?v=20261122g"></script>
-<script src="casca/setores-fabio.js?v=20261122g"></script>
+<script src="casca/menu.js?v=20261122q"></script>
+<script src="casca/paginas.js?v=20261122q"></script>
+<script src="casca/modulos.js?v=20261122q"></script>
+<script src="casca/setores-fabio.js?v=20261122q"></script>
 <script src="casca/busca.js?v=20261119est"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -511,6 +511,8 @@ function visivel(chave) {
   if (chave === 'pausadosdel') return visivel('pausados');
   // 16/11/2026: Avaliações do dia usam a permissão da tela do setor (Delivery do dia / Salão); o banco filtra as lojas (painel_minhas_lojas)
   if (chave === 'avaldel') return visivel('delivery');
+  // 22/11/2026 (Fábio): Qualidade e avaliações do Delivery só para os donos (Neto e Fábio); o banco confere de novo (eh_dono)
+  if (chave === 'qualidel') return ehDono();
   // 17/11/2026: Escala e Clima usa a permissão do Delivery do dia; o banco filtra as lojas (painel_minhas_lojas)
   if (chave === 'escalaclima') return visivel('delivery');
   // 17/11/2026: Ponto dos taxas (QR) abre para quem vê Taxas e Freelas; o banco confere o papel (DONO, FINANCEIRO, FILIAL ou pessoal)
