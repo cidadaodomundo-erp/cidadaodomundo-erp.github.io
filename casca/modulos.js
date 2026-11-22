@@ -54,7 +54,7 @@ window.CASCA_MODULOS = [
   { id: 'vendas', nome: 'Vendas e canais', icone: '🛵',
     lancar: [], acompanhar: ['resumo', 'promocoes', 'link:promos.html', 'cancelamentos', 'cardapio', 'site', 'frete'] },
   { id: 'entrega', nome: 'Entrega', icone: '🏍️',   // 18/11: as telas do delivery do Fabio + as nossas que a junção propõe juntar nelas
-    lancar: [], acompanhar: ['delivery', 'atrasos', 'chegada', 'escalaclima', 'motodocs', 'pausadosdel', 'avaldel', 'atendimento', 'link:portal-qualidade', 'cozinha', 'tvs'] },
+    lancar: [], acompanhar: ['delivery', 'atrasos', 'chegada', 'escalaclima', 'garantido', 'motodocs', 'pausadosdel', 'avaldel', 'atendimento', 'link:portal-qualidade', 'cozinha', 'tvs'] },
   { id: 'salao', nome: 'Salão', icone: '🍽️',
     lancar: [], acompanhar: ['reservas', 'pausados', 'avalsalao', 'salao'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',

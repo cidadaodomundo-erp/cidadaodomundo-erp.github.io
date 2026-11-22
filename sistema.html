@@ -268,10 +268,10 @@
   </div>
 </div>
 
-<script src="casca/menu.js?v=20261119tmp"></script>
-<script src="casca/paginas.js?v=20261119est"></script>
-<script src="casca/modulos.js?v=20261119est"></script>
-<script src="casca/setores-fabio.js?v=20261117t"></script>
+<script src="casca/menu.js?v=20261122g"></script>
+<script src="casca/paginas.js?v=20261122g"></script>
+<script src="casca/modulos.js?v=20261122g"></script>
+<script src="casca/setores-fabio.js?v=20261122g"></script>
 <script src="casca/busca.js?v=20261119est"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
@@ -503,6 +503,8 @@ function visivel(chave) {
   // 16/11/2026: Pagar motoboys só para quem vê pessoal (dono, Fábio, Hellen) e vê o Delivery; o banco confere de novo (pode_ver_pessoal)
   if (chave === 'pagarmoto') return VE_PESSOAL === true && visivel('delivery');
   // 17/11/2026: Documentos dos motoboys, mesma regra do Pagar motoboys; o banco confere de novo (pode_ver_pessoal)
+  // 22/11/2026 (Fábio): Garantido e escala (página do Jaison) — donos e quem vê pessoal, ou login com 'garantido' no painel_acesso; o banco confere (pode_ver_garantido)
+  if (chave === 'garantido') return VE_PESSOAL === true || (Array.isArray(PODE) && PODE.includes('garantido'));
   // 22/11/2026 (Fábio): o Jaison (painel_acesso só com 'motodocs') também abre; o banco confere de novo (pode_ver_garantido)
   if (chave === 'motodocs') return (VE_PESSOAL === true && visivel('delivery')) || (Array.isArray(PODE) && PODE.includes('motodocs'));
   // 16/11/2026: Itens pausados do Delivery usa a MESMA permissão dos Itens pausados do Salão (sem chave nova no painel_acesso)
