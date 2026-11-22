@@ -44,6 +44,8 @@
   .ps-vazio { padding:18px; opacity:.75; }
   .ps-trunc { font-size:12px; color:var(--farol-perto, #e0a33a); margin:6px 0 0; }
   .ps-est { font-weight:700; }
+  .ps-desde small { opacity:.75; }
+  .ps-velho { color:var(--farol-fora, #ff6b6b); font-weight:700; }
   .ps-comp { margin:0 0 18px; }
   .ps-comp h2 { font-size:16px; margin:0 0 4px; }
   .ps-comp-sub { font-size:12px; opacity:.75; margin:0 0 10px; line-height:1.45; }
@@ -152,6 +154,22 @@ function horaCurta(ts) {
 }
 // data de atualização do item: sempre com hora em BRT (atualizado_em é timestamptz, não um date puro)
 function dataHoraBR(ts) { return ts ? horaCurta(ts) : '—'; }
+
+// 22/11/2026: desde quando o item está pausado/escondido (campo "desde" da RPC; data pura AAAA-MM-DD).
+// Se "desde" = 1º dia de leitura do canal, o item já estava assim quando a leitura começou -> "ou antes".
+let INICIO_LEITURAS = {};
+function desdeHtml(x) {
+  if (!x.desde) return '—';
+  const [a, m, d] = String(x.desde).slice(0, 10).split('-').map(Number);
+  const hoje = new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + 'T00:00:00');
+  const dias = Math.round((hoje - new Date(a, m - 1, d)) / 86400000);
+  const ini = INICIO_LEITURAS[x.canal];
+  const antes = ini && String(ini).slice(0, 10) >= String(x.desde).slice(0, 10);
+  const txt = String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + (antes ? ' ou antes' : '');
+  const qt = dias <= 0 ? 'hoje' : (dias === 1 ? '1 dia' : dias + ' dias');
+  const cls = dias >= 2 ? ' ps-velho' : '';
+  return '<span class="ps-desde' + cls + '">' + esc(txt) + ' <small>(' + (antes ? '+' : '') + esc(qt) + ')</small></span>';
+}
 
 // --------------------------------------------------------- loja única (casca)
 // Esta tela só cobre AGUA VERDE/SÃO BRAZ/AHU. Loja da rede fora dessa lista (ex.: Boqueirão)
@@ -308,13 +326,14 @@ function desenhar(dados) {
   desenharComparativo(dados);
   document.getElementById('consultado').textContent = dados.consultado_em ? 'Consultado em ' + horaCurta(dados.consultado_em) : '';
 
+  INICIO_LEITURAS = dados.inicio_leituras || {};
   const linhas = Array.isArray(dados.itens) ? dados.itens : [];
   const c = document.getElementById('conteudo');
   if (!linhas.length) {
     c.innerHTML = '<div class="ps-vazio">Nenhum item pausado/escondido encontrado para este filtro. Isto não significa que não existam itens pausados no fornecedor — pode ser que a leitura ainda não tenha chegado, ou que o canal não tenha coleta prevista nesta unidade.</div>';
   } else {
     c.innerHTML = '<div id="tabelaPausados"><table class="ps-tab"><thead><tr>' +
-      '<th>Unidade</th><th>Canal</th><th>Item</th><th>Tipo</th><th>Estado</th><th>Marca</th><th>Atualizado (BRT)</th>' +
+      '<th>Unidade</th><th>Canal</th><th>Item</th><th>Tipo</th><th>Estado</th><th>Desde</th><th>Marca</th><th>Atualizado (BRT)</th>' +
       '</tr></thead><tbody>' +
       linhas.map((x) => '<tr>' +
         '<td>' + esc(un(x.unidade)) + '</td>' +
@@ -322,6 +341,7 @@ function desenhar(dados) {
         '<td>' + esc(x.item || '—') + '</td>' +
         '<td>' + esc(x.tipo || '—') + '</td>' +
         '<td data-valor="' + esc(x.estado || '') + '">' + estadoHtml(x.estado) + '</td>' +
+        '<td data-valor="' + esc(x.desde || '') + '">' + desdeHtml(x) + '</td>' +
         '<td>' + esc(x.marca || '—') + '</td>' +
         '<td>' + esc(dataHoraBR(x.atualizado_em)) + '</td>' +
         '</tr>').join('') +
