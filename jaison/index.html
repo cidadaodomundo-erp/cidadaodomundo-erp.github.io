@@ -183,9 +183,9 @@
         (ruins.length ? '<div class="cl-ordem">🌧️ ' + esc((alm && jan ? 'Choveu no almoço e no jantar' : alm ? 'Choveu no almoço' : jan ? 'Choveu no jantar' : 'Choveu fora dos turnos') + '. Isso ajuda a explicar atraso e corrida a mais.') + '</div>' : '<div class="cl-ok">☀️ Dia sem chuva forte.</div>') + '</div>';
     }
     const ordens = [];
-    if (alm && jan) ordens.push('Vai chover no almoço e no jantar. Chame mais motoboys para os dois turnos.');
-    else if (alm) ordens.push('Vai chover no almoço (' + faixas(ruins.filter((y) => y.h >= 10 && y.h < 16)) + '). Chame mais motoboys para o almoço.');
-    else if (jan) ordens.push('Vai chover no jantar (' + faixas(ruins.filter((y) => y.h >= 17)) + '). Chame mais motoboys para o jantar.');
+    if (alm && jan) ordens.push('Vai chover no almoço e no jantar. Veja abaixo quantos motoboys chamar em cada loja.');
+    else if (alm) ordens.push('Vai chover no almoço (' + faixas(ruins.filter((y) => y.h >= 10 && y.h < 16)) + '). Veja abaixo quantos motoboys chamar em cada loja.');
+    else if (jan) ordens.push('Vai chover no jantar (' + faixas(ruins.filter((y) => y.h >= 17)) + '). Veja abaixo quantos motoboys chamar em cada loja.');
     if (fer) ordens.push('Feriado (' + fer + '). Reforce a escala.');
     else if (vesp) ordens.push('Véspera de feriado (' + vesp + '). Reforce a escala do jantar.');
     return '<div class="cl-dia"><b>' + esc(nomeDia) + '</b>' + (fer || vesp ? '<span class="cl-fer">' + esc(fer ? 'feriado: ' + fer : 'véspera de feriado: ' + vesp) + '</span>' : '') +
@@ -203,19 +203,25 @@
 
   // 22/11/2026 (Fábio): sugestão de motoboys por loja e turno + passo a passo para o Jaison.
   // Base = mediana dos motoboys que rodaram nos últimos 6 dias iguais da semana (TrackEat, escala_sugestao).
-  // Chuva forte prevista no turno = +1 motoboy por loja (regra combinada com o Fábio em 22/11, ajustável).
+  // 22/11/2026 (Fábio): quantos motoboys cabem para CADA UM bater o garantido só com as entregas (sem a loja completar).
+  // Teto = arredondar para baixo (entregas previstas ÷ entregas para bater o garantido), mínimo 1.
+  // Com previsão de chuva ≥ 3 mm na janela do turno (almoço 11h–15h, jantar 18h–0h), as entregas previstas sobem pelo fator medido
+  // no histórico jan–nov/2026 (conversa "Calcular motoboys necessários com chuva", 22/11).
   const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' };
-  function chuvaTurno(dia, k) {
+  const FATOR_CHUVA = { 'AGUA VERDE': { almoco: 1.10, jantar: 1.00 }, 'AHU': { almoco: 1.20, jantar: 1.10 }, 'SÃO BRAZ': { almoco: 1.25, jantar: 1.15 } };
+  function chuvaMm(dia, k) {
     const hs = (CLIMA && CLIMA[dia]) || [];
-    return Math.max(0, ...hs.filter((y) => k === 'almoco' ? (y.h >= 10 && y.h < 16) : y.h >= 17).map(nivelPrev));
+    return hs.filter((y) => k === 'almoco' ? (y.h >= 11 && y.h < 15) : y.h >= 18).reduce((a, y) => a + y.mm, 0);
   }
   function sugestoes(dia) {
     if (!SUG || SUG.dia !== dia || !ESC) return [];
-    return (SUG.linhas || []).map((x) => {
-      const loja = LOJA_NOME[x.unidade] || x.unidade, chuva = chuvaTurno(dia, x.turno) === 2;
-      const precisa = x.sugerido + (chuva ? 1 : 0);
+    return (SUG.linhas || []).filter((x) => x.por_moto > 0).map((x) => {
+      const loja = LOJA_NOME[x.unidade] || x.unidade, mm = chuvaMm(dia, x.turno), chuva = mm >= 3;
+      const fator = chuva ? ((FATOR_CHUVA[x.unidade] || {})[x.turno] || 1) : 1;
+      const prev = Math.round(x.entregas * fator);
+      const precisa = Math.max(1, Math.floor(prev / x.por_moto));
       const tem = (ESC.linhas || []).filter((l) => l.loja === loja && l.turno === x.turno).length;
-      return Object.assign({}, x, { loja, chuva, precisa, tem, falta: precisa - tem });
+      return Object.assign({}, x, { loja, chuva, mm, fator, prev, precisa, tem, falta: precisa - tem });
     });
   }
   function passosHtml(dia) {
@@ -224,19 +230,20 @@
     if (!S.length) return SUG && SUG.dia === dia ? '' : '<div class="cl-ok">Calculando quantos motoboys chamar…</div>';
     const nomeT = { almoco: 'almoço', jantar: 'jantar' };
     const faltam = S.filter((x) => x.falta > 0).sort((a, b) => b.falta - a.falta);
-    const sobram = S.filter((x) => x.falta < 0);
+    const sobram = S.filter((x) => x.falta < 0).sort((a, b) => a.falta - b.falta);
     const p = [];
-    faltam.forEach((x) => p.push('<b>' + esc(x.loja) + ', ' + nomeT[x.turno] + ':</b> chame mais ' + x.falta + ' motoboy' + (x.falta > 1 ? 's' : '') + '. Tem ' + x.tem + ' na escala, precisa de ' + x.precisa + (x.chuva ? ' (já com +1 pela chuva)' : '') + '.'));
-    if (!faltam.length) p.push('<b>Escala completa</b> nas 3 lojas para almoço e jantar. Não precisa chamar ninguém.');
-    sobram.forEach((x) => p.push(esc(x.loja) + ', ' + nomeT[x.turno] + ': tem ' + x.tem + ', o normal é ' + x.precisa + '. Se o movimento estiver fraco, dá para liberar ' + (-x.falta) + '.'));
+    const conta = (x) => ' Previstas ' + x.prev + ' entregas' + (x.chuva ? ' (com chuva)' : '') + ', cada um precisa de ' + String(x.por_moto).replace('.', ',') + ' para bater o garantido.';
+    faltam.forEach((x) => p.push('<b>' + esc(x.loja) + ', ' + nomeT[x.turno] + ':</b> chame mais ' + x.falta + ' motoboy' + (x.falta > 1 ? 's' : '') + '. Tem ' + x.tem + ', cabem ' + x.precisa + '.' + conta(x)));
+    sobram.forEach((x) => p.push('<b>' + esc(x.loja) + ', ' + nomeT[x.turno] + ':</b> tem ' + x.tem + ', mas o movimento só dá para ' + x.precisa + ' bater o garantido sem a loja completar. Libere ' + (-x.falta) + ' se puder.' + conta(x)));
+    if (!faltam.length && !sobram.length) p.push('<b>Escala certa</b> nas 3 lojas para almoço e jantar. Não precisa mexer.');
     p.push('Pôs alguém? Abra a loja em cima, use <b>➕ Pôr motoboy</b> e depois <b>📲 Copiar para o WhatsApp</b> e cole no grupo.');
     p.push('No dia, confira na aba <b>💰 Garantido</b> quem chegou na fila no horário.');
     const tab = '<table class="sug"><tr><th>Loja</th><th>Almoço</th><th>Jantar</th></tr>' + ['Água Verde', 'Ahú', 'São Braz'].map((l) => '<tr><td>' + l + '</td>' + ['almoco', 'jantar'].map((k) => {
       const x = S.find((y) => y.loja === l && y.turno === k); if (!x) return '<td>—</td>';
-      return '<td class="' + (x.falta > 0 ? 'sug-falta' : 'sug-ok') + '"><b>' + x.tem + ' de ' + x.precisa + '</b>' + (x.chuva ? ' 🌧️' : '') + '</td>';
+      return '<td class="' + (x.falta !== 0 ? 'sug-falta' : 'sug-ok') + '"><b>' + x.tem + ' de ' + x.precisa + '</b>' + (x.chuva ? ' 🌧️' : '') + '</td>';
     }).join('') + '</tr>').join('') + '</table>';
     return '<div class="passos"><b>✅ Passo a passo para ' + esc(dia === hojeSP() ? 'hoje' : dia.slice(8, 10) + '/' + dia.slice(5, 7)) + '</b><ol>' + p.map((t) => '<li>' + t + '</li>').join('') + '</ol>' + tab +
-      '<div class="cl-pe">"Precisa" = quantos motoboys rodaram, no meio da conta, nos últimos ' + esc(String(Math.max(...S.map((x) => x.dias)))) + ' dias iguais da semana (TrackEat, entregas até ' + esc(SUG.dados_ate || '—') + '), +1 quando a previsão marca chuva forte no turno. "Tem" = escala gravada agora.</div></div>';
+      '<div class="cl-pe">"Cabem" = quantos motoboys conseguem, cada um, bater o garantido só com as entregas: entregas previstas (mediana dos últimos 6 dias iguais da semana no TrackEat, até ' + esc(SUG.dados_ate || '—') + ') ÷ entregas para bater o garantido (horas do turno na escala × R$ ' + esc(String(SUG.r_hora)) + '/h' + (SUG.fds ? ' de fim de semana' : '') + ' ÷ valor médio pago por entrega nas últimas 4 semanas), arredondado para baixo, mínimo 1. Com previsão de chuva de 3 mm ou mais no turno, as entregas previstas sobem conforme o histórico de jan a nov/2026. "Tem" = escala gravada agora.</div></div>';
   }
 
   function moldura(conteudo) {
@@ -398,7 +405,7 @@
     const bloco = TURNOS.map(([k, nome]) => {
       const x = ls.filter((l) => l.turno === k);
       const sg = sugestoes(DIAE).find((y) => y.loja === LOJAE && y.turno === k);
-      return '<div class="esc-t">' + nome + ' · ' + x.length + ' motoboy' + (x.length === 1 ? '' : 's') + (sg ? ' · <span class="' + (sg.falta > 0 ? 'sug-falta' : 'sug-ok') + '">' + (sg.falta > 0 ? 'faltam ' + sg.falta + ' (precisa ' + sg.precisa + ')' : 'ok, precisa ' + sg.precisa) + '</span>' : '') + '</div>' +
+      return '<div class="esc-t">' + nome + ' · ' + x.length + ' motoboy' + (x.length === 1 ? '' : 's') + (sg ? ' · <span class="' + (sg.falta !== 0 ? 'sug-falta' : 'sug-ok') + '">' + (sg.falta > 0 ? 'faltam ' + sg.falta + ' (cabem ' + sg.precisa + ')' : sg.falta < 0 ? 'sobram ' + (-sg.falta) + ' (cabem ' + sg.precisa + ')' : 'certo, cabem ' + sg.precisa) + '</span>' : '') + '</div>' +
         (x.length ? x.map((l, i) => '<div class="esc-l"><div><b>' + esc(l.nome) + '</b><small>' + esc(l.inicio + (l.fim ? ' às ' + l.fim : ' · sem hora de saída')) + (l.mexido ? ' · mexido na tela' : '') + (l.id ? '' : ' · sem cadastro no TrackEat') + '</small></div>' +
           (podeMexer ? '<button data-t="' + k + '" data-n="' + esc(l.nome) + '">Tirar</button>' : '') + '</div>').join('') : '<div class="linha">Ninguém na escala.</div>');
     }).join('');
