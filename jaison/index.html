@@ -118,6 +118,9 @@
   const horasTxt = (h) => { if (h == null) return '—'; const m = Math.round(Number(h) * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : ''); };
   let DIA = somaDias(hojeSP(), -1), LOJA = 'todas', DADOS = null, SEQ = 0, MODO = (location.hash === '#garantido' ? 'garantido' : 'escala'), DIAE = hojeSP(), LOJAE = 'Água Verde', ESC = null, SUG = null, RECADO = '';
   const maxDia = () => MODO === 'escala' ? somaDias(hojeSP(), 30) : hojeSP();
+  // 22/11/2026 (Fábio): o Jaison vê só o último dia — Garantido: ontem e hoje; Escala: de hoje em diante. Donos e quem vê pessoal veem tudo.
+  let TUDO = false;
+  const diaMin = () => TUDO ? '2000-01-01' : (MODO === 'escala' ? hojeSP() : somaDias(hojeSP(), -1));
   window.exigirLogin = () => telaLogin('Sua sessão venceu. Entre de novo.');
 
   function telaLogin(recado) {
@@ -243,9 +246,9 @@
     const lojas = MODO === 'escala' ? ['Água Verde', 'Ahú', 'São Braz'] : ['todas'].concat([...new Set((DADOS && DADOS.linhas || []).map((l) => l.loja))]);
     const lojaAtual = MODO === 'escala' ? LOJAE : LOJA;
     return cabeca() +
-      '<div class="dia"><button id="bAntes" aria-label="Dia anterior">‹</button>' +
+      '<div class="dia"><button id="bAntes" aria-label="Dia anterior"' + (dia <= diaMin() ? ' disabled' : '') + '>‹</button>' +
       '<div class="meio"><b>' + dia.slice(8, 10) + '/' + dia.slice(5, 7) + '</b><small>' + esc(sem) + (dia === hojeSP() ? ' · hoje' + (MODO === 'garantido' ? ', ainda rodando' : '') : '') + '</small>' +
-      '<input type="date" id="iDia" value="' + dia + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
+      '<input type="date" id="iDia" value="' + dia + '" min="' + diaMin() + '" max="' + maxDia() + '" aria-label="Escolher o dia"></div>' +
       '<button id="bDepois" aria-label="Próximo dia"' + (dia >= maxDia() ? ' disabled' : '') + '>›</button></div>' +
       (lojas.length > 2 || MODO === 'escala' ? '<div class="lojas">' + lojas.map((k) => '<button data-l="' + esc(k) + '" class="' + (k === lojaAtual ? 'on' : '') + '">' + (k === 'todas' ? 'Todas' : esc(k)) + '</button>').join('') + '</div>' : '') +
       (MODO === 'escala' ? climaHtml(DIAE) : '') + conteudo;
@@ -264,9 +267,9 @@
     const mudaDia = (x) => { if (MODO === 'escala') DIAE = x; else DIA = x; recarregar(); };
     const dia = () => MODO === 'escala' ? DIAE : DIA;
     q('bSair').onclick = () => { localStorage.removeItem('rmbSessao'); telaLogin(''); };
-    q('bAntes').onclick = () => mudaDia(somaDias(dia(), -1));
+    q('bAntes').onclick = () => { if (dia() > diaMin()) mudaDia(somaDias(dia(), -1)); };
     q('bDepois').onclick = () => { if (dia() < maxDia()) mudaDia(somaDias(dia(), 1)); };
-    q('iDia').onchange = (e) => { if (e.target.value) mudaDia(e.target.value > maxDia() ? maxDia() : e.target.value); };
+    q('iDia').onchange = (e) => { if (e.target.value) mudaDia(e.target.value > maxDia() ? maxDia() : e.target.value < diaMin() ? diaMin() : e.target.value); };
     document.querySelectorAll('.lojas button').forEach((b) => { b.onclick = () => { if (MODO === 'escala') { LOJAE = b.dataset.l; RECADO = ''; desenharEscala(); } else { LOJA = b.dataset.l; desenhar(); } }; });
     document.querySelectorAll('.modos button').forEach((b) => { b.onclick = () => { if (MODO !== b.dataset.m) { MODO = b.dataset.m; if (MODO === 'escala' && LOJA !== 'todas') LOJAE = LOJA; RECADO = ''; recarregar(); } }; });
   }
@@ -462,7 +465,12 @@
     RECADO = '✅ ' + ok; DADOS = null; await carregarEscala();
   }
 
-  recarregar();
+  (async () => {
+    try { await carregarEmailDono(); } catch (e) {}
+    const em = String((rmbSessao() || {}).email || '').toLowerCase();
+    TUDO = (typeof souODono === 'function' && souODono()) || em === 'hellen@cidadaodomundo.com.br';
+    recarregar();
+  })();
 })();
 </script>
 </body>
