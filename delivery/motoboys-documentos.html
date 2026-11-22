@@ -168,7 +168,7 @@
           <dt>Proteção térmica</dt><dd>O que mantém o lanche quente: <b>bag térmica</b> ou <b>vedação</b> no baú. "Sem proteção" quer dizer que ele não tem nenhuma das duas.</dd>
           <dt>Baú</dt><dd>O tamanho do baú da moto: grande ou pequeno (e os litros, quando alguém anotou).</dd>
           <dt>As situações</dt><dd><b>Conferido</b> = alguém da equipe viu e está certo. <b>Na pasta</b> = o documento está guardado, mas ninguém conferiu ainda. <b>Olhar</b> = tem alguma coisa para checar. <b>Falta</b> = ele não tem ou não entregou. <b>Ninguém marcou</b> = a ficha ainda não foi preenchida.</dd>
-          <dt>Os números de cima</dt><dd><b>Precisa pedir algo</b> = tem pelo menos um item que falta (ou a chave Pix em branco). <b>Tudo conferido</b> = MEI, CNH, moto, contrato e Pix conferidos. <b>Rodaram sem ficha</b> = nomes que fizeram entrega no TrackEat nos últimos 30 dias e não têm ficha (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica lá para não juntar errado).</dd>
+          <dt>Os números de cima</dt><dd><b>Precisa pedir algo</b> = falta MEI, CNH, moto, contrato ou a chave Pix. Proteção térmica e baú aparecem no cartão, mas não entram nessa conta (para eles, use "Ver por item"). <b>Tudo conferido</b> = MEI, CNH, moto, contrato e Pix conferidos. <b>Rodaram sem ficha</b> = nomes que fizeram entrega no TrackEat nos últimos 30 dias e não têm ficha (quando dois motoboys da mesma loja têm o mesmo primeiro nome, o nome fica lá para não juntar errado).</dd>
         </dl>
         <p class="cinza" style="font-size:12px;margin:10px 0 0;">Ainda não vieram do portal antigo: fotos dos documentos e a avaliação de cada motoboy.</p>
       </details>
@@ -238,7 +238,7 @@ function sit(f, k) {
 function texto(f, k) {
   if (k === 'pix') return f.pix === true ? 'Tem chave' : f.pix === false ? 'Sem chave' : 'Ninguém marcou';
   if (k === 'prot') return PROT[f.protecao] || 'Ninguém marcou';
-  if (k === 'bau') return f.bau && f.bau !== 'nao_sei' ? BAU[f.bau] + (f.bau_litros ? ' (' + f.bau_litros + ' L)' : '') : 'Ninguém marcou';
+  if (k === 'bau') return f.bau && f.bau !== 'nao_sei' ? (BAU[f.bau] || f.bau) + (f.bau_litros ? ' (' + f.bau_litros + ' L)' : '') : 'Ninguém marcou';
   const s = sitDoc(f, k), doc = (f.docs || {})[k] || {};
   let t = s === 'nao_sei' ? 'Ninguém marcou' : SIT[s];
   if (k === 'cnh' && doc.validade) t += ' · vence ' + dataFmt(doc.validade);
