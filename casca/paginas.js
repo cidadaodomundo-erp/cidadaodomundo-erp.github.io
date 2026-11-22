@@ -126,7 +126,7 @@ window.CASCA_PAGINAS = {
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
   pausados: 'pausados/index.html?modo=salao&v=20261116a',   // 16/11/2026: Itens pausados do Salão = só Goomer (tablet)
   pausadosdel: 'pausados/index.html?modo=delivery&v=20261116a',   // 16/11/2026: Itens pausados do Delivery = iFood x Site (Accon), iFood é a referência
-  garantido: 'jaison/index.html?v=20261122c',   // 22/11/2026 (Fábio): a página do Jaison (garantido + escala) dentro do Delivery; donos, quem vê pessoal e o Jaison
+  garantido: 'jaison/index.html?v=20261122d',   // 22/11/2026 (Fábio): a página do Jaison (garantido + escala) dentro do Delivery; donos, quem vê pessoal e o Jaison
   motodocs: 'delivery/motoboys-documentos.html?v=20261122a',   // 17/11/2026: Documentos dos motoboys (erp_motoboys_ler); só quem vê pessoal. 22/11: redesenho
   escalaclima: 'delivery/escala.html?v=20261117a',   // 17/11/2026: Escala e Clima (erp_escala_clima_ler + Open-Meteo), só leitura
   taxaponto: 'taxa/painel.html?v=20261117a',   // 17/11/2026: Ponto dos taxas pelo QR (erp_taxa_ponto_ler, taxa_qr_codigo_da_semana)
