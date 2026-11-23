@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sem nenhuma requisicao externa: CSP bloqueia tudo que nao seja dado embutido. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Cidadão do Mundo — Tablet de mesa (DEMONSTRAÇÃO)</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<div class="faixa-demo" role="note">DEMONSTRAÇÃO — pedidos não chegam à cozinha</div>
+
+<div id="raiz">
+  <div id="app">
+    <header class="topo">
+      <img class="logo" src="{{LOGO}}" alt="Cidadão do Mundo" width="40" height="40">
+      <span class="marca cubano">CIDADAO DO MUNDO</span>
+      <button type="button" id="btnMesa" class="mesa-btn"><span class="cubano" id="mesaTxt">MESA 12</span><span class="mesa-dica">Alterar</span></button>
+      <span class="chip-offline" id="chipOffline">Sem conexão · sem envio real</span>
+      <label class="busca"><span class="sr-only">Buscar no cardápio</span>
+        <input id="busca" type="search" placeholder="Buscar no cardápio" autocomplete="off" maxlength="60"></label>
+    </header>
+    <div class="corpo">
+      <nav id="categorias" aria-label="Categorias"></nav>
+      <main>
+        <section class="abertura">
+          <h1 class="cubano">ESCOLHA SEU PROXIMO FAVORITO</h1>
+          <p id="notaPrevia" class="nota-previa"></p>
+        </section>
+        <p id="avisoStorage" class="aviso-storage" hidden>Armazenamento local indisponível: a comanda não será preservada ao recarregar.</p>
+        <div id="lista"></div>
+      </main>
+    </div>
+  </div>
+
+  <aside id="comanda" aria-label="Comanda da mesa">
+    <div class="comanda-topo">
+      <h2 class="cubano">COMANDA</h2>
+      <button type="button" id="btnFecharSheet" class="btn sec so-estreito">Fechar</button>
+    </div>
+    <div class="comanda-corpo">
+      <p id="ocupacaoInfo" class="pequeno"></p>
+      <section aria-labelledby="hCarrinho">
+        <h3 class="cubano sub" id="hCarrinho">CARRINHO</h3>
+        <div id="itens"></div>
+      </section>
+      <section aria-labelledby="hRodadas">
+        <h3 class="cubano sub" id="hRodadas">RODADAS</h3>
+        <div id="rodadas"></div>
+        <p class="total-linha forte"><span>Total da comanda (teste)</span><strong id="totalComanda"></strong></p>
+      </section>
+      <section aria-labelledby="hAcoes">
+        <h3 class="cubano sub" id="hAcoes">AJUDA</h3>
+        <div class="acoes-linha">
+          <button type="button" id="btnAtendente" class="btn sec">Chamar atendente (simulado)</button>
+          <button type="button" id="btnConta" class="btn sec">Pedir conta (simulado)</button>
+        </div>
+        <button type="button" id="btnFechar" class="btn perigo">Fechar comanda de teste</button>
+      </section>
+    </div>
+    <div class="comanda-rodape">
+      <p id="msg" class="msg" role="status" aria-live="polite"></p>
+      <p class="total-linha"><span>Total do carrinho</span><strong id="totalCarrinho"></strong></p>
+      <button type="button" id="btnConfirmar" class="btn prim cta">Confirmar pedido de teste</button>
+      <p class="pequeno">Pede confirmação e registra somente neste tablet. Nada é enviado à cozinha.</p>
+    </div>
+  </aside>
+</div>
+
+<div id="barra" class="barra">
+  <button type="button" id="btnAbrirSheet" class="btn prim" aria-expanded="false" aria-controls="comanda"></button>
+</div>
+
+<dialog id="dlgProduto" aria-labelledby="dpTitulo">
+  <div class="dlg-corpo">
+    <button type="button" id="dpFechar" class="dp-fechar" aria-label="Fechar">×</button>
+    <img id="dpFoto" class="dp-foto" alt="" hidden>
+    <div class="dp-texto">
+      <h2 id="dpTitulo" class="dp-titulo"></h2>
+      <p id="dpDesc" class="pequeno"></p>
+      <div id="dpConteudo"></div>
+    </div>
+  </div>
+  <div class="dlg-rodape">
+    <p id="dpAviso" class="aviso" role="status" aria-live="polite"></p>
+    <div class="acoes-linha">
+      <button type="button" id="dpCancelar" class="btn sec">Cancelar</button>
+      <button type="button" id="dpAdicionar" class="btn prim">Adicionar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgMesa" aria-labelledby="dmTitulo">
+  <div class="dlg-simples">
+    <h2 id="dmTitulo" class="cubano">OCUPACAO</h2>
+    <p id="dmInfo" class="pequeno"></p>
+    <fieldset class="grupo" id="dmModalidade">
+      <legend>Como este tablet identifica a comanda?</legend>
+      <div class="acoes-linha">
+        <button type="button" id="dmModMesa" class="btn sec" aria-pressed="true">Mesa</button>
+        <button type="button" id="dmModCartao" class="btn sec" aria-pressed="false">Cartão / comanda</button>
+      </div>
+    </fieldset>
+    <label for="dmNumero" id="dmRotulo">Número da mesa (1 a 150)</label>
+    <input id="dmNumero" type="text" inputmode="text" maxlength="12" autocomplete="off">
+    <p id="dmAjuda" class="pequeno"></p>
+    <p id="dmErro" class="aviso" role="alert"></p>
+    <div class="acoes-linha">
+      <button type="button" id="dmCancelar" class="btn sec">Cancelar</button>
+      <button type="button" id="dmSalvar" class="btn prim">Salvar mesa</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirma" aria-labelledby="dcTitulo" aria-describedby="dcTexto">
+  <div class="dlg-simples">
+    <h2 id="dcTitulo" class="cubano"></h2>
+    <p id="dcTexto"></p>
+    <div class="acoes-linha">
+      <button type="button" id="dcNao" class="btn sec">Cancelar</button>
+      <button type="button" id="dcSim" class="btn prim">Confirmar</button>
+    </div>
+  </div>
+</dialog>
+
+<script type="application/json" id="dados">{{DADOS}}</script>
+<script>
+{{CORE}}
+</script>
+<script>
+{{APP}}
+</script>
+</body>
+</html>

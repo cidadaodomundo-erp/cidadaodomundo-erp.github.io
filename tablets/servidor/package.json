@@ -1,0 +1,11 @@
+{
+  "name": "cdm-tablets-salao",
+  "private": true,
+  "type": "module",
+  "description": "Servidor do salão (modo teste): tablets das mesas -> cozinha de teste -> loja TESTE do Saipos",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node bin/start-salao.js",
+    "test": "node --test test/salao.test.js"
+  }
+}
