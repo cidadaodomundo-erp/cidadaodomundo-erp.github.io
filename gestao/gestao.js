@@ -486,7 +486,7 @@ async function entrarConcbanco() {
       // A VIEW, nao a tabela crua: ela esconde o residuo que o dono ja validou
       // no chat (marcacao 'saipos|...' com nao_vigiar) — caso Flavio/Viviane de
       // 28/08/2026, que reaparecia como alarme depois de validado.
-      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao,id,chave&order=data'),
+      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao,id,chave,id_titulo&order=data'),
       // 07/11/2026 (auditoria lote 1, dinheiro-18): o dia cujo extrato veio parcial (OFX baixado no meio do dia)
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
       // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): o que o robô está baixando
@@ -1062,6 +1062,46 @@ async function concbJaExplicado(bt) {
   await entrarConcbanco();
 }
 
+// 23/11/2026 (dono pelo Boletim): os outros dois botões da linha do Saipos sem movimento no banco. Gravam por função
+// (fin_conc_pedir_exclusao / fin_conc_trocar_data): excluir vira pedido à Hellen (o robô não exclui, por regra) e trocar
+// data entra na fila do robô do financeiro, que troca no Saipos.
+async function concbRpc(fn, corpo) {
+  const url = `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
+  const ir = () => fetch(url, { method: 'POST', headers: rmbHeaders(), body: JSON.stringify(corpo) });
+  let r = await ir();
+  if (await rmbRenovarSeExpirado(r)) r = await ir();
+  if (r.ok) return { ok: true };
+  const t = await r.text();
+  let msg = t; try { msg = JSON.parse(t).message || t; } catch (e) {}
+  return { ok: false, msg: String(msg).slice(0, 160) };
+}
+const concbDescRes = (d) => '"' + d.desc + '" de ' + d.data.split('-').reverse().join('/') + ' (R$ ' + Math.abs(Number(d.valor)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ')';
+async function concbResExcluir(bt) {
+  const d = bt.dataset;
+  const motivo = prompt('Excluir do Saipos ' + concbDescRes(d) + '?\n\nA Hellen recebe o pedido no aviso dela. Escreva o motivo (ex.: lançado em dobro, não foi pago).');
+  if (motivo === null) return;
+  if (!motivo.trim()) { avisoAcao('atencao', 'Escreva o motivo da exclusão.'); return; }
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const r = await concbRpc('fin_conc_pedir_exclusao', { p_id_residuo: Number(d.id), p_motivo: motivo.trim() });
+  bt.disabled = false; bt.textContent = 'excluir';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + r.msg, () => concbResExcluir(bt)); return; }
+  avisoAcao('ok', '✓ Pedido de exclusão enviado à Hellen às ' + concbHora() + ' · a linha sai quando ela excluir');
+}
+async function concbResTrocarData(bt) {
+  const d = bt.dataset;
+  const txt = prompt('Trocar a data de ' + concbDescRes(d) + ' no Saipos.\n\nQual a data em que aparece no extrato? (dd/mm)');
+  if (txt === null) return;
+  const m = String(txt).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (!m) { avisoAcao('atencao', 'Data no formato dd/mm, ex.: 17/11.'); return; }
+  const ano = m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : d.data.slice(0, 4);
+  const nova = ano + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const r = await concbRpc('fin_conc_trocar_data', { p_id_residuo: Number(d.id), p_data_nova: nova, p_motivo: 'data do extrato' });
+  bt.disabled = false; bt.textContent = 'trocar data';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + r.msg, () => concbResTrocarData(bt)); return; }
+  avisoAcao('ok', '✓ Troca para ' + nova.split('-').reverse().join('/') + ' na fila do robô às ' + concbHora() + ' · a linha sai quando ele trocar no Saipos');
+}
+
 async function concbDesmarcar(conta, fitid) {
   const url = `${SUPABASE_URL}/rest/v1/fin_conciliacao_marcacao`
     + `?conta=eq.${encodeURIComponent(conta)}&fitid=eq.${encodeURIComponent(fitid)}`;
@@ -1456,7 +1496,11 @@ function renderConcbanco() {
         notas.map(t => '<div class="caption-label" style="color:var(--info);white-space:normal">nota: ' + esc(t) + '</div>').join('') + '</td>' +
       '<td style="text-align:left">' + esc(r.subtipo || '') + '</td>' +
       '<td style="text-align:left;white-space:nowrap;color:' + (ent ? 'var(--farol-ok)' : 'var(--farol-fora)') + '">' + (ent ? '+ ' : '− ') + rs(Math.abs(n(r.valor))) + '</td>' +
-      '<td style="text-align:left">' + (r.chave ? '<button class="preset-btn concb-explica" data-conta="' + esc(r.conta) + '" data-chave="' + esc(r.chave) +
+      '<td style="text-align:left">' + (r.id_titulo ? '<button class="preset-btn concb-res-excluir" style="margin:2px 4px 2px 0" data-id="' + r.id +
+        '" data-valor="' + n(r.valor) + '" data-data="' + esc(r.data) + '" data-desc="' + esc(r.descricao || '') + '">excluir</button>' +
+        '<button class="preset-btn concb-res-data" style="margin:2px 4px 2px 0" data-id="' + r.id +
+        '" data-valor="' + n(r.valor) + '" data-data="' + esc(r.data) + '" data-desc="' + esc(r.descricao || '') + '">trocar data</button>' : '') +
+        (r.chave ? '<button class="preset-btn concb-explica" style="margin:2px 0" data-conta="' + esc(r.conta) + '" data-chave="' + esc(r.chave) +
         '" data-valor="' + n(r.valor) + '" data-desc="' + esc(r.descricao || '') + '">já explicado</button>' : '') + '</td></tr>'; }).join('');
     // Dono, 03/09/2026: o titulo "A conta da diferenca" e a frase de somas
     // sairam — "podemos manter somente as grades com as diferencas". Fica so a
@@ -1796,6 +1840,8 @@ function renderConcbanco() {
     renderConcbanco();
   }));
   alvo.querySelectorAll('.concb-explica').forEach(b => b.addEventListener('click', () => concbJaExplicado(b)));
+  alvo.querySelectorAll('.concb-res-excluir').forEach(b => b.addEventListener('click', () => concbResExcluir(b)));
+  alvo.querySelectorAll('.concb-res-data').forEach(b => b.addEventListener('click', () => concbResTrocarData(b)));
   alvo.querySelectorAll('.concb-desmarca').forEach(b => b.addEventListener('click', () =>
     concbDesmarcar(b.dataset.conta, b.dataset.fitid)));
   alvo.querySelectorAll('.concb-ir').forEach(tr => tr.addEventListener('click', () => {
