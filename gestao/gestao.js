@@ -1435,9 +1435,9 @@ function renderConcbanco() {
   // entradas sao a propria fila (banco tem, Saipos nao); as saidas tem DOIS
   // lados, e o segundo — lancado no Saipos sem debito no banco — nunca aparecia
   // na tela. Aqui os dois fecham no centavo com o numero do cabecalho.
-  const blocoDiferenca = naoFecharam.map(conta => {
-    const c = contas[conta];
-    if (Math.abs(c.difEnt) < CONCB_TOL_CENTAVOS && Math.abs(c.difSai) < CONCB_TOL_CENTAVOS) return '';
+  // 23/11/2026: TODA conta com linha do Saipos sem movimento no banco no dia, não só as que "não fecharam" pela fila —
+  // a ITAU AV de 19/11 tinha a fila zerada (✗ só pelo saldo) e o RECEBIMENTOS ALELO de 925,50 nunca aparecia.
+  const blocoDiferenca = nomes.map(conta => {
     const filaDia = abertas.filter(p => p.conta === conta && dias.includes(p.data));
     const fe = filaDia.filter(p => n(p.valor) > 0).reduce((s, p) => s + n(p.valor), 0);
     const fs = filaDia.filter(p => n(p.valor) < 0).reduce((s, p) => s - n(p.valor), 0);
