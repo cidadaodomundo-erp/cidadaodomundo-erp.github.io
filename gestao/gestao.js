@@ -472,7 +472,7 @@ async function entrarConcbanco() {
     // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
     // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
     const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura, ofxFalta] = await Promise.all([
+           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura, ofxFalta, notaChat] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
@@ -486,7 +486,7 @@ async function entrarConcbanco() {
       // A VIEW, nao a tabela crua: ela esconde o residuo que o dono ja validou
       // no chat (marcacao 'saipos|...' com nao_vigiar) — caso Flavio/Viviane de
       // 28/08/2026, que reaparecia como alarme depois de validado.
-      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao&order=data'),
+      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao,id,chave&order=data'),
       // 07/11/2026 (auditoria lote 1, dinheiro-18): o dia cujo extrato veio parcial (OFX baixado no meio do dia)
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
       // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): o que o robô está baixando
@@ -496,9 +496,11 @@ async function entrarConcbanco() {
       consultarTudo('vw_fin_conta_cobertura?select=conta,situacao,coberto_ate,esperado_em,nota').catch(() => null),
       // 18/11/2026 (dono 12:28: "hoje novamente a Hellen não mandou os OFX, se confundiu achando que a conciliação estava rodando")
       consultarTudo('vw_fin_ofx_ontem_faltando?select=conta,falta').catch(() => null),
+      // 23/11/2026 (dono pelo Boletim): a nota que um chat deixou na linha aparece junto dela
+      consultarTudo('vw_fin_conciliacao_nota_chat?select=conta,data,valor,nota').catch(() => []),
     ]);
     CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, parcial, robo, cobertura, ofxFalta };
+              diaSaldo, duvidas, parcial, robo, cobertura, ofxFalta, notaChat };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -1036,6 +1038,30 @@ async function concbConciliarMarcadas(bt) {
   await entrarConcbanco();
 }
 
+// 23/11/2026 (dono pelo Boletim): linha "lançado no Saipos, sem movimento no banco" que já tem explicação sai da tela —
+// marcação CONCILIADO + nao_vigiar com a chave da view (vw_fin_conciliacao_saipos_residuo.chave), com o porquê escrito
+async function concbJaExplicado(bt) {
+  const d = bt.dataset;
+  const obs = prompt('O que explica "' + d.desc + '" (R$ ' + rs(Math.abs(Number(d.valor))) + ')?\n\nEx.: pago por outra conta, cai no próximo dia, lançamento duplicado já excluído.');
+  if (obs === null) return;
+  if (!obs.trim()) { avisoAcao('atencao', 'Escreva em poucas palavras o que explica a linha.'); return; }
+  const quem = await concbGarantirQuem();
+  if (!quem) return;
+  const s = rmbSessao();
+  const corpo = { conta: d.conta, fitid: d.chave, tipo: 'CONCILIADO', quem, email: (s && s.email) || null,
+    observacao: obs.trim().slice(0, 300), valor_marcado: Number(d.valor), nao_vigiar: true };
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const url = `${SUPABASE_URL}/rest/v1/fin_conciliacao_marcacao`;
+  const ir = () => fetch(url, { method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(corpo) });
+  let r = await ir();
+  if (await rmbRenovarSeExpirado(r)) r = await ir();
+  bt.disabled = false; bt.textContent = 'já explicado';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + (await r.text()).slice(0, 140), () => concbJaExplicado(bt)); return; }
+  avisoAcao('ok', '✓ Explicado às ' + concbHora() + ' · a linha saiu da tela');
+  CONCB = null;
+  await entrarConcbanco();
+}
+
 async function concbDesmarcar(conta, fitid) {
   const url = `${SUPABASE_URL}/rest/v1/fin_conciliacao_marcacao`
     + `?conta=eq.${encodeURIComponent(conta)}&fitid=eq.${encodeURIComponent(fitid)}`;
@@ -1415,26 +1441,36 @@ function renderConcbanco() {
     const filaDia = abertas.filter(p => p.conta === conta && dias.includes(p.data));
     const fe = filaDia.filter(p => n(p.valor) > 0).reduce((s, p) => s + n(p.valor), 0);
     const fs = filaDia.filter(p => n(p.valor) < 0).reduce((s, p) => s - n(p.valor), 0);
+    // 23/11/2026 (dono pelo Boletim: "não tem como interagir com eles pelo painel"): as DUAS mãos (saída lançada sem
+    // débito e entrada lançada sem crédito), a nota que um chat deixou na linha e o botão "já explicado", que grava a
+    // marcação nao_vigiar com a chave da própria view (a mesma que o filtro dela usa) — a linha some de vez.
     const sres = (cru.sresiduo || []).filter(r => r.conta === conta && dias.includes(r.data));
-    const srSai = sres.filter(r => n(r.valor) < 0);
-    const srTot = srSai.reduce((s, r) => s - n(r.valor), 0);
-    const linhaSr = srSai.map(r =>
-      '<tr><td style="text-align:left">' + esc(r.descricao || '') + '</td>' +
+    const srSai = sres.slice().sort((a, b) => (n(a.valor) > 0) - (n(b.valor) > 0) || (a.data < b.data ? -1 : 1));
+    const srTot = srSai.reduce((s, r) => s + n(r.valor), 0);
+    const notaDe = (r) => (cru.notaChat || []).filter(x => x.conta === conta
+      && (!x.data || x.data === r.data) && Math.abs(Math.abs(n(x.valor)) - Math.abs(n(r.valor))) < 0.005).map(x => x.nota);
+    const linhaSr = srSai.map(r => {
+      const ent = n(r.valor) > 0, notas = notaDe(r);
+      return '<tr><td style="text-align:left;white-space:nowrap;font-size:12px">' + ddmm(r.data) + '</td>' +
+      '<td style="text-align:left;white-space:normal">' + esc(r.descricao || '') +
+        notas.map(t => '<div class="caption-label" style="color:var(--info);white-space:normal">nota: ' + esc(t) + '</div>').join('') + '</td>' +
       '<td style="text-align:left">' + esc(r.subtipo || '') + '</td>' +
-      '<td style="text-align:left">' + rs(Math.abs(n(r.valor))) + '</td></tr>').join('');
+      '<td style="text-align:left;white-space:nowrap;color:' + (ent ? 'var(--farol-ok)' : 'var(--farol-fora)') + '">' + (ent ? '+ ' : '− ') + rs(Math.abs(n(r.valor))) + '</td>' +
+      '<td style="text-align:left">' + (r.chave ? '<button class="preset-btn concb-explica" data-conta="' + esc(r.conta) + '" data-chave="' + esc(r.chave) +
+        '" data-valor="' + n(r.valor) + '" data-desc="' + esc(r.descricao || '') + '">já explicado</button>' : '') + '</td></tr>'; }).join('');
     // Dono, 03/09/2026: o titulo "A conta da diferenca" e a frase de somas
     // sairam — "podemos manter somente as grades com as diferencas". Fica so a
     // tabela do lado que a fila nao mostra (Saipos sem banco), com o nome da
     // conta no cabecalho; a fila abaixo ja e a grade do outro lado.
     return (srSai.length
         ? '<div id="tabelaConcbSres' + esc(conta).replace(/\W/g, '') + '" style="overflow-x:auto"><table style="width:100%">' +
-          '<thead><tr><th style="text-align:left">' + esc(nomeConta(conta)) + ' — lançado no Saipos, sem débito no banco no dia</th>' +
-          '<th style="text-align:left">Categoria</th><th style="text-align:left">Valor</th></tr></thead>' +
+          '<thead><tr><th style="text-align:left">Data</th><th style="text-align:left">' + esc(nomeConta(conta)) + ' — lançado no Saipos, sem movimento no banco no dia</th>' +
+          '<th style="text-align:left">Categoria</th><th style="text-align:left">Valor</th><th style="text-align:left">Ação</th></tr></thead>' +
           '<tbody>' + linhaSr +
-          '<tr class="liq"><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:left"><b>' +
-          rs(srTot) + '</b></td></tr></tbody></table></div>' +
+          '<tr class="liq"><td></td><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:left"><b>' +
+          (srTot < 0 ? '− ' : '+ ') + rs(Math.abs(srTot)) + '</b></td><td></td></tr></tbody></table></div>' +
           // 12/11/2026 (T4): legenda de uma linha
-          '<div class="caption-label" style="text-align:left">Não lance de novo: confira se o lançamento do Saipos está certo.</div>'
+          '<div class="caption-label" style="text-align:left">Não lance de novo: confira o lançamento no Saipos. Se já está explicado, clique <b>já explicado</b> e a linha sai da tela.</div>'
         : '');
   }).join('');
 
@@ -1759,6 +1795,7 @@ function renderConcbanco() {
     if (CONCB_VER_TODAS.has(k)) CONCB_VER_TODAS.delete(k); else CONCB_VER_TODAS.add(k);
     renderConcbanco();
   }));
+  alvo.querySelectorAll('.concb-explica').forEach(b => b.addEventListener('click', () => concbJaExplicado(b)));
   alvo.querySelectorAll('.concb-desmarca').forEach(b => b.addEventListener('click', () =>
     concbDesmarcar(b.dataset.conta, b.dataset.fitid)));
   alvo.querySelectorAll('.concb-ir').forEach(tr => tr.addEventListener('click', () => {
