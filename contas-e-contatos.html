@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Contas e contatos</title>
+<!-- Levantamento das contas, avisos e contatos do Neto para passar ao Fabio (pedido do Fabio, 23/11/2026 11:28).
+     Lido AO VIVO de plano_levante_neto (RLS pode_ver_plano: só Neto e Fabio). Nenhum dado mora neste arquivo e nenhuma
+     senha existe na tabela. Marcar "feito" grava estado/feito_em (GRANT só nessas colunas). Chat "Plano de saída e Junção".
+     Destino: docs/contas-e-contatos.html. Mesma sessão do painel (localStorage 'rmbSessao'); nunca renova o token. -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .placar { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 1.2rem; }
+  .placar span { padding:4px 10px; border-radius:999px; font-size:.85rem; font-weight:600; }
+  .f-PRONTO { background:var(--ok-fundo); color:var(--ok); } .f-ANDA { background:var(--anda-fundo); color:var(--anda); }
+  .f-RISCO, .f-PARADO { background:var(--acento-fundo); color:var(--acento); }
+  .ent { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:14px 16px; margin-bottom:12px; }
+  .ent.b-PRONTO { border-left:5px solid var(--ok); } .ent.b-ANDA { border-left:5px solid var(--anda); }
+  .ent.b-RISCO, .ent.b-PARADO { border-left:5px solid var(--acento); }
+  .topo { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
+  .tit { font-weight:700; font-size:1.05rem; }
+  .ref { font-size:.75rem; color:var(--mudo); }
+  .diss { font-size:.82rem; color:var(--mudo); font-style:italic; margin:.2rem 0 .5rem; }
+  .bl { margin:.45rem 0 0; font-size:.92rem; }
+  .bl b { display:inline-block; min-width:64px; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--mudo); }
+  .bl.semdono { color:var(--acento); } .bl.semdono b { color:var(--acento); }
+  details > summary { cursor:pointer; color:var(--mudo); font-size:.8rem; margin-top:.5rem; }
+  .card { border-top:1px solid var(--linha); padding:6px 0; font-size:.85rem; color:var(--suave); }
+  .card i { color:var(--mudo); font-style:normal; font-size:.75rem; }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  @media (max-width:520px) { h1 { font-size:1.45rem; } .bl b { display:block; } }
+
+  .abas { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 1rem; }
+  .abas button { border:1px solid var(--forte); background:var(--papel); color:var(--tinta); border-radius:999px; padding:6px 12px; font:inherit; cursor:pointer; }
+  .abas button.on { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .grp { font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mudo); margin:1.1rem 0 .4rem; font-weight:600; }
+  .lin { background:var(--papel); border:1px solid var(--linha); border-left:4px solid var(--anda); border-radius:6px; padding:10px 12px; margin-bottom:6px; display:flex; gap:10px; align-items:flex-start; }
+  .lin.FEITO { border-left-color:var(--ok); opacity:.75; } .lin.FICA_COM_NETO { border-left-color:var(--forte); }
+  .lin .tx { flex:1; min-width:0; } .lin .n { font-weight:600; } .lin .s { font-size:.85rem; color:var(--suave); }
+  .lin .t { font-size:.85rem; margin-top:2px; } .lin .t b { color:var(--mudo); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
+  .marca { border:1px solid var(--forte); background:transparent; color:var(--mudo); border-radius:4px; padding:4px 8px; font:inherit; font-size:.8rem; cursor:pointer; white-space:nowrap; }
+  .marca.ok { background:var(--ok-fundo); color:var(--ok); border-color:var(--ok); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app');
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dataBR = d => d ? String(d).slice(8,10) + '/' + String(d).slice(5,7) : '';
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Contas e contatos</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:((t) => { t = String(t || '').trim(); return !t || t.includes('@') ? t : t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br'; })(document.getElementById('e').value), password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+
+
+const LISTAS = [['CONTA', 'Contas e acessos'], ['AVISO', 'Avisos que chegam ao Neto'], ['CONTATO', 'Contatos de fora'], ['PC', 'Computador das rotinas']];
+let LIN = [], ABA = 'CONTA';
+async function carregar() {
+  const s = sessaoValida();
+  if (!s) return telaLogin();
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/plano_levante_neto?select=*&order=lista,grupo,id`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } });
+  if (r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  LIN = r.ok ? await r.json() : [];
+  if (!LIN.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (é só do Neto e do Fabio).</p>
+      <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  desenhar();
+}
+async function marcar(id, feito, bt) {
+  const s = sessaoValida(); if (!s) return telaLogin('Sessão vencida, entre de novo.');
+  bt.disabled = true; bt.textContent = 'gravando…';
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/plano_levante_neto?id=eq.${id}`, { method:'PATCH',
+    headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}`, 'Content-Type':'application/json', Prefer:'return=representation' },
+    body: JSON.stringify(feito ? { estado:'FEITO', feito_em:hoje } : { estado:'A_TROCAR', feito_em:null }) });
+  const v = r.ok ? await r.json() : [];
+  if (!v.length) { bt.disabled = false; bt.textContent = '✗ não gravou, tentar de novo'; return; }
+  const i = LIN.findIndex(x => x.id === id); if (i >= 0) LIN[i] = v[0];
+  desenhar();
+}
+function desenhar() {
+  const daAba = LIN.filter(x => x.lista === ABA);
+  const conta = k => { const L = LIN.filter(x => x.lista === k); return k === 'PC' ? `${L.length}` : `${L.filter(x => x.estado !== 'A_TROCAR').length}/${L.length}`; };
+  const grupos = [...new Set(daAba.map(x => x.grupo))];
+  app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · passar ao Fabio</p><h1>Contas e contatos</h1>
+    <p class="lede">O que está no nome, no e-mail ou no celular do Neto, o que chega a ele e quem fala direto com ele. Nenhuma senha aqui: cada troca se faz no próprio site.</p>
+    <div class="abas">${LISTAS.map(([k, t]) => `<button class="${k === ABA ? 'on' : ''}" onclick="ABA='${k}';desenhar()">${t} · ${conta(k)}</button>`).join('')}</div>
+    ${grupos.map(g => `<p class="grp">${esc(g)}</p>` + daAba.filter(x => x.grupo === g).map(x => `
+      <div class="lin ${esc(x.estado)}"><div class="tx"><div class="n">${esc(x.nome)}</div>
+        ${x.o_que ? `<div class="s">${esc(x.o_que)}</div>` : ''}
+        ${x.hoje ? `<div class="t"><b>${x.lista === 'PC' ? 'Quando' : 'Hoje'}</b> ${esc(x.hoje)}</div>` : ''}
+        ${x.trocar ? `<div class="t"><b>${x.lista === 'PC' ? 'Usa' : 'Trocar'}</b> ${esc(String(x.trocar).replace(/^precisa de: /, ''))}</div>` : ''}
+        ${x.obs ? `<div class="t"><b>${x.lista === 'PC' ? 'Atenção' : 'Obs'}</b> ${esc(x.obs)}</div>` : ''}</div>
+        ${x.lista === 'PC' ? '' : x.estado === 'FICA_COM_NETO' ? '<span class="s">fica com o Neto</span>'
+          : x.estado === 'FEITO' ? `<button class="marca ok" onclick="marcar(${x.id},false,this)">✓ feito ${dataBR(x.feito_em)}</button>`
+          : `<button class="marca" onclick="marcar(${x.id},true,this)">marcar feito</button>`}
+      </div>`).join('')).join('')}
+    <footer>Os contatos de fora recebem o aviso a partir de 30/11. <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+carregar();
+</script>
+</body>
+</html>
