@@ -61,6 +61,9 @@
       #btnAjuda[hidden] { display:none; }
       #btnAjuda.aj-solto { position:fixed; right:14px; bottom:14px; z-index:9000; padding:8px 14px; border-radius:8px; cursor:pointer; font:inherit; font-size:13px; font-weight:700;
         background:var(--surface,#1e1e1c); color:var(--tx-1,#fff); border:1px solid var(--line-2,#45443f); }
+      /* 22/11/2026 (Fábio, celular): o botão solto tapava texto e botões no fim da tela; sobra espaço embaixo e ele fica menor */
+      body:has(#btnAjuda.aj-solto) { padding-bottom:64px; }
+      @media (max-width:700px) { #btnAjuda.aj-solto { right:10px; bottom:10px; padding:6px 11px; font-size:12px; opacity:.92; } }
       #btnAjuda .aj-ponto { position:absolute; top:-3px; right:-3px; width:9px; height:9px; border-radius:50%; background:var(--marca-amarelo,#f6c63e); }
       #ajFundo { position:fixed; inset:0; z-index:10100; background:rgba(0,0,0,.6); display:flex; justify-content:center; align-items:flex-start; padding:5vh 16px; overflow:auto; }
       #ajFundo[hidden] { display:none; }
