@@ -118,8 +118,8 @@ window.CASCA_PAGINAS = {
   freelas: 'freelas/index.html?v=20261116a',        // 16/11/2026: Taxas e Freelas (consulta + loja de cada freela)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
   temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
-  manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
-  prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
+  manutencao: 'manutencao/index.html?v=20261124a#chamados',      // Pedidos de manutenção (abrir, acompanhar, marcar arrumado)
+  prestadores: 'manutencao/index.html?v=20261124a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // 17/11/2026: Central do Salão (eventos da cidade, reservas, tablet, Google, equipe)

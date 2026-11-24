@@ -92,6 +92,9 @@ window.CASCA_BUSCA = {
   telas: ['telas', 'menu', 'uso do painel'],
   reembolsos: ['reembolso', 'pedir reembolso', 'gastei do meu bolso', 'nota fiscal de gasto'],
   freelas: ['freela', 'freelas', 'ponto freela', 'taxa', 'valor-hora', 'valor hora', 'extra', 'diarista'],
+  manutencao: ['manutencao', 'chamado', 'conserto', 'pedido de manutencao', 'quebrou', 'arrumar', 'estragou', 'consertar'],   // 24/11: pedidos
+  prestadores: ['quem conserta', 'prestador', 'tecnico', 'tecnicos', 'eletricista', 'encanador', 'refrigeracao'],
+  temperaturas: ['temperatura', 'camara fria', 'camaras', 'freezer', 'geladeira'],
   'link:promos.html': ['calendario', 'calendario de promocoes'],
 };
 
