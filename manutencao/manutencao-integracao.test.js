@@ -27,7 +27,7 @@ function preservaOriginais(atual, originais, nome) {
   assert.deepEqual(atual.filter((k) => originais.includes(k)), originais, nome + ': item original removido ou reordenado');
 }
 
-test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rotas casca na MESMA página, no módulo Compras', () => {
+test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rotas casca na MESMA página, no módulo Manutenção', () => {
   const m = itensMenu.filter((i) => i.chave === 'manutencao'), p = itensMenu.filter((i) => i.chave === 'prestadores');
   assert.equal(m.length, 1); assert.equal(p.length, 1);
   assert.equal(m[0].rotulo, 'Manutenção'); assert.equal(p[0].rotulo, 'Quem conserta');
@@ -35,7 +35,7 @@ test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rot
   assert.match(C.CASCA_PAGINAS.manutencao, /^manutencao\/index\.html(\?v=\d{8}[a-z])?#chamados$/);
   assert.match(C.CASCA_PAGINAS.prestadores, /^manutencao\/index\.html(\?v=\d{8}[a-z])?#prestadores$/);
   assert.ok(fs.existsSync(path.join(RAIZ, 'manutencao', 'index.html')));
-  ['manutencao', 'prestadores'].forEach((k) => assert.deepEqual(C.CASCA_MODULOS.filter((x) => [...x.lancar, ...x.acompanhar].includes(k)).map((x) => x.id), ['compras'], k));
+  ['manutencao', 'prestadores'].forEach((k) => assert.deepEqual(C.CASCA_MODULOS.filter((x) => [...x.lancar, ...x.acompanhar].includes(k)).map((x) => x.id), ['manutencao'], k));
   const termos = (k) => C.CASCA_BUSCA[k] || [];
   ['manutencao', 'chamado', 'conserto'].forEach((t) => assert.ok(termos('manutencao').includes(t), t));
   ['quem conserta', 'prestador'].forEach((t) => assert.ok(termos('prestadores').includes(t), t));
