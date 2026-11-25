@@ -126,7 +126,7 @@ function caixaFrentesFaixa(unidade, dia) {
   const hm = ts => ts ? String(ts).slice(8, 10) + '/' + String(ts).slice(5, 7) + ' ' + String(ts).slice(11, 16) : '';
   const D = (CAIXA_DIFSAI || []).filter(l => l.unidade === unidade && l.data === dia);
   const itens = CAIXA_HELLEN && !CAIXA_HELLEN.erro && CAIXA_HELLEN.trs ? caixaHellenItens().filter(x => x.u === unidade && x.dia === dia && !['aguardando', 'quebra'].includes(x.bloco)) : null;
-  const tipos = { aberto: 'fechar no Saipos', difsaipos: 'explicar a diferença', contagem: 'contar', cofre: 'dinheiro', troca: 'trocar bandeira', semcobr: 'maquininha', pix: 'PIX', online: 'online' };
+  const tipos = { aberto: 'fechar no Saipos', difsaipos: 'explicar a diferença', contagem: 'contar', cofre: 'dinheiro', troca: 'o robô troca a bandeira', semcobr: 'maquininha', pix: 'PIX', online: 'a Hellen corrige o online' };
   const linhas = T.map(t => {
     const nome = caixaFrenteNome(unidade, t.caixa), d = D.find(l => String(l.descricao || '').replace(/^.*?-\s*/, '').toLowerCase() === nome.toLowerCase());
     const v = d ? Math.round((cgNum(d.credito) - cgNum(d.debito)) * 100) / 100 : null;
@@ -389,7 +389,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
         cor: Math.abs(dif) < 0.005 ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(S[0].hora), valor: dif,
         saipos: `${txtS} (${S.length} ${S.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaS)})`, real: `${txtR} (${R.length} ${R.length === 1 ? 'linha' : 'linhas'}, ${reaisCc(somaR)})`,
         leitura: Math.abs(dif) < 0.005 ? `conta dividida, forma trocada no Saipos: ${trocaTxt}` : `conta dividida: Saipos ${reaisCc(somaS)} × maquininha ${reaisCc(somaR)} = ${dif > 0 ? '+' : '−'}${reaisCc(Math.abs(dif))}`,
-        acao: Math.abs(dif) < 0.005 ? 'trocar a forma no Saipos para a que passou na maquininha' : (dif > 0 ? 'faltou ' : 'passou ') + reaisCc(Math.abs(dif)) + ' na conta dividida: conferir o valor digitado em cada cartão' });
+        acao: Math.abs(dif) < 0.005 ? 'forma trocada na conta dividida: o robô troca no Saipos (nada a fazer)' : (dif > 0 ? 'faltou ' : 'passou ') + reaisCc(Math.abs(dif)) + ' na conta dividida: conferir o valor digitado em cada cartão' });
     });
   }
   // "Pendente" / "Pagamento nao cadastrado": o Saipos nao disse a forma (dono, 09/09/2026:
@@ -677,10 +677,11 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     (onl || []).filter(x => noCxItem(x, cx)).forEach(x => { const l = L(formaPadrao(x.tipo)); l.ordem = 3; l.online = true; l.saipos += +x.valor; l.nS++;
       if (x.canal_ok === true) { l.real += +x.valor; l.nR++; }
       else l.conferir.push({ contrib: +x.valor, hora: hhmm(String(x.hora || '').slice(11)), venda: x.numero ? 'venda ' + x.numero + (x.numero_pedido ? ' (' + x.numero_pedido + ')' : '') : 'venda', diz: `${x.tipo} · pedido do canal ${x.canal}`, real: '—', valor: +x.valor,
-        acao: x.canal_ok === false ? 'canal do pedido não bate com a forma: trocar a forma no Saipos' : 'forma online sem regra cadastrada: conferir' }); });
+        acao: x.canal_ok === false ? `canal do pedido não bate com a forma: a Hellen corrige a forma do online (canal do pedido: ${x.canal})` : 'forma online sem regra cadastrada: conferir' }); });
     // 1º AJUSTAR NO SAIPOS: registrado numa forma, passou em outra (do cruzamento + varredura)
     trocas.filter(x => noCxItem(x, cx)).forEach(x => {
-      L(x.de).ajustar.push({ contrib: x.valor, hora: x.hora, venda: x.venda, valor: x.valor, texto: trocaBaixa(x) ? `✓ bandeira trocada (${x.de} → ${x.para}) — baixa dada, fica só o registro` : x.pd ? `fechar a venda com a forma <b>${x.para}</b>` : `trocar de ${x.de} para <b>${x.para}</b>`, porque: 'foi assim que passou na maquininha' });
+      // 25/11/2026 [conserto] (dono #107): a troca provada pela maquininha é do robô — vai para "aguardando", não para "1º ajustar"
+      L(x.de).esperar.push({ contrib: x.valor, hora: x.hora, venda: x.venda, valor: x.valor, texto: trocaBaixa(x) ? `✓ bandeira trocada (${x.de} → ${x.para}) — baixa dada, fica só o registro` : `🤖 o robô ${x.pd ? 'fecha a venda com a forma' : 'troca para'} <b>${x.para}</b> no Saipos (${x.de} → ${x.para})`, porque: 'foi assim que passou na maquininha' });
       if (!x.pd) L(x.para).notas.push({ texto: `inclui ${reaisCc(x.valor)} de ${x.venda}, registrada no Saipos como ${x.de} (some quando corrigir lá)`, contrib: -x.valor }); });
     viradas.filter(x => noCxItem(x, cx)).forEach(x => L(x.forma).notas.push({ texto: x.texto, contrib: x.contrib }));
     // 2º CONFERIR / AGUARDANDO: pendencias abertas deste caixa, por forma
@@ -750,7 +751,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
               const fr = formaPadrao(r.detalhe);
               passou = `${limpa(r.detalhe)} ${reaisCc(r.valor)} às ${hhmm(r.hora)}${!doDia(r) ? ` <span style="color:var(--farol-perto);">(${ddmm(r.dia)})</span>` : ''}${extra}`;
               if (fr !== l.forma) { contrib = +x.valor; cor = 'var(--tx-creme)'; bg = 'background:rgba(245,166,35,.05);';
-                status = ehPendenteTxt(x.detalhe) ? `<span style="color:var(--farol-perto); font-weight:700;">1º</span> fechar a venda com a forma <b>${fr}</b>` : `<span style="color:var(--farol-perto); font-weight:700;">1º</span> trocar de ${l.forma} para <b>${fr}</b> <span style="color:#8a897e;">— no Saipos: caixa do dia → Ver → ${rotVenda(x)} → mudar a forma → salvar ajustes</span>`; }
+                // 25/11/2026 [conserto] (dono #107): com a prova da maquininha, a troca é do robô — em cinza, nada a fazer
+                status = `<span style="color:#9aa4af;">🤖 passou como <b>${fr}</b>: o robô ${ehPendenteTxt(x.detalhe) ? 'fecha a venda com essa forma' : 'troca'} no Saipos (${l.forma} → ${fr})</span>`; }
               else if (!doDia(r)) { contrib = +x.valor; status = '<span style="color:#9aa4af;">✔ bateu · virada do dia: a maquininha registrou em outro dia</span>'; }
               else status = '<span style="color:#7bc47f;">✔ bateu</span>';
             }
@@ -770,7 +772,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
         (onl || []).filter(x => noCxItem(x, cx) && formaPadrao(x.tipo) === l.forma).forEach(x => { const okC = x.canal_ok === true;
           det.push({ ord: min(String(x.hora || '').slice(11)), hora: hhmm(String(x.hora || '').slice(11)), venda: x.numero ? 'venda ' + x.numero + (x.numero_pedido ? ' (' + x.numero_pedido + ')' : '') : 'venda', reg: `${x.tipo} ${reaisCc(x.valor)}`,
             passou: `pedido do canal ${x.canal}`, contrib: okC ? 0 : +x.valor, cor: okC ? '#8a897e' : 'var(--tx-creme)', bg: okC ? '' : 'background:rgba(255,107,107,.05);',
-            status: okC ? '<span style="color:#7bc47f;">✔ canal certo</span>' : `<span style="color:var(--farol-fora); font-weight:700;">2º</span> ${x.canal_ok === false ? 'canal do pedido não bate com a forma: trocar a forma no Saipos' : 'forma online sem regra cadastrada: conferir'}` }); });
+            status: okC ? '<span style="color:#7bc47f;">✔ canal certo</span>' : `<span style="color:var(--farol-fora); font-weight:700;">2º</span> ${x.canal_ok === false ? `canal do pedido não bate com a forma: a Hellen corrige a forma do online (canal do pedido: ${trEscH(x.canal || '')})` : 'forma online sem regra cadastrada: conferir'}` }); });
         l.notas.forEach(n => det.push({ ord: 9e9, hora: '', venda: '', reg: `<span style="color:#8a897e;">↳ ${n.texto}</span>`, passou: '', contrib: n.contrib, status: '', cor: '#8a897e', bg: '' }));
         det.sort((a, b) => a.ord - b.ord);
         det.forEach(d => sub.push(`${tr(d.bg)}<td style="${tdS} white-space:nowrap; color:${d.cor};">${d.hora}${d.venda ? ' · ' + d.venda : ''}</td><td style="${tdS} color:${d.cor};">${d.reg}</td><td style="${tdS} color:${d.cor};">${d.passou}</td><td style="${tdS} text-align:right; white-space:nowrap;">${sinal(d.contrib)}</td><td style="${tdS} border-right:0; color:${d.cor};">${d.status}</td></tr>`));
@@ -1630,7 +1632,7 @@ function caixaHellenItens() {
     }
     // online pago com a forma errada (canal do pedido ≠ forma registrada)
     (H.onl || []).filter(x => x.unidade === u && x.dia >= corte).forEach(x => add({ u, dia: x.dia, caixa: x.caixa || '', ordem: 2, valor: +x.valor,
-      oque: `venda ${x.numero || ''} registrada como ${x.tipo}, mas o pedido é do canal ${x.canal}`, acao: 'abrir', botao: x.canal_ok === false ? 'trocar a forma' : 'conferir',
+      oque: `venda ${x.numero || ''} registrada como ${x.tipo}, mas o pedido é do canal ${x.canal}`, acao: 'abrir', botao: x.canal_ok === false ? 'corrigir a forma' : 'conferir',
       bloco: 'online', hora: String(x.hora || '').slice(11, 16), venda: x.numero ? 'nº ' + x.numero : '', forma: x.tipo + ' · canal ' + x.canal }));
     // cofre: contado diferente do Saipos, e hoje sem contagem
     const cof = (COFRE_DIA || []).filter(r => r.unidade === u && r.dia >= corte);
@@ -1709,7 +1711,7 @@ function caixaTarefa(x) {   // { txt, btn } da pendência, em frase
     case 'pix': return { txt: `Achar o pagamento da ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>): o PIX não entrou no banco`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
     case 'semcobr': return { txt: `Conferir a ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>)${x.quem ? ' com o motoboy ' + trEscH(x.quem) : ''}: ${trEscH((x.pend && x.pend.leitura) || 'não bate com a maquininha')}`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
     case 'troca': return { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, ${R(x.valor)}): passou como ${trEscH(x.para || '')} — o robô troca no Saipos`, btn: '' };
-    case 'online': return { txt: `Trocar a forma da ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.forma || '')})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'online': return { txt: `A Hellen corrige a forma do online da ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.forma || '')})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     case 'cofre': return x.acao === 'naochegou' || x.acao === 'cofre' ? { txt: trEscH(x.oque), btn: '' } : { txt: `Explicar o dinheiro contado ${trEscH(x.venda || '')} (${dd}, <b>${R(x.valor)}</b>)`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     // 12/11/2026 (dono, agenda #96): a perda mostra "a confirmar" ou "confirmada por X em dd/mm"; só o dono e a Hellen confirmam
     case 'quebra': return { txt: `Descontar ou repor a quebra de <b>${R(x.valor)}</b> (${trEscH(x.quem || '')}, ${dd})${caixaEstadoFalta(x) ? ' · ' + caixaEstadoFalta(x) : ''}`,
@@ -1783,10 +1785,10 @@ async function caixaHellenAbrir(i) {
   if (x.acao === 'contar') { const el = document.querySelector('#concartao-dia input[id^="cfT_"]'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } return; }
   if (x.caixa) caixaDrillFiltro(x.caixa);
   // 05/11/2026 (Financeiro, regra 8): a troca é feita no Saipos; depois, o "atualizar este dia" confere de novo
-  if (/no Saipos/.test(x.botao || '')) {
+  if (x.bloco === 'online' && x.botao === 'corrigir a forma') {
     const bt = document.querySelector('#concartao-dia button[onclick^="caixaAtualizarDia"]');
     if (bt) { bt.scrollIntoView({ behavior: 'smooth', block: 'center' }); bt.style.outline = '2px solid var(--marca-amarelo)';
-      avisoAcao('atencao', `! Troque a forma no Saipos (caixa do dia → Ver → a venda → mudar a forma → salvar ajustes) e depois clique em "Já corrigi no Saipos — atualizar este dia".`); }
+      avisoAcao('atencao', `! A Hellen corrige a forma do online (caixa do dia → Ver → a venda → mudar a forma → salvar ajustes) e depois clica em "Já corrigi no Saipos — atualizar este dia".`); }
   }
 }
 function caixaHellenCofre() {
@@ -1919,7 +1921,7 @@ function renderModuloCaixa() {
       const HI = CAIXA_HELLEN && !CAIXA_HELLEN.erro && (CAIXA_HELLEN.lojas || []).includes(unidade) && CAIXA_HELLEN.trs && iso >= caixaHellenCorte(unidade) ? caixaHellenItens() : null;
       const itDia = HI ? HI.filter(x => x.u === unidade && x.dia === iso && x.bloco !== 'quebra' && (!F.caixa || !x.caixa || x.caixa === F.caixa)) : null;
       // 11/11/2026 (proposta 3.3): a situação em frase com verbo, o que a pessoa vai fazer
-      const tipoIt = { aberto: 'fechar o caixa no Saipos', difsaipos: 'explicar a diferença do Saipos', contagem: 'contar o dinheiro', cofre: 'explicar o dinheiro contado', troca: 'trocar bandeira', semcobr: 'conferir a maquininha', pix: 'achar o PIX', online: 'trocar a forma do online', erro: 'abrir o dia' };
+      const tipoIt = { aberto: 'fechar o caixa no Saipos', difsaipos: 'explicar a diferença do Saipos', contagem: 'contar o dinheiro', cofre: 'explicar o dinheiro contado', troca: 'o robô troca a bandeira', semcobr: 'conferir a maquininha', pix: 'achar o PIX', online: 'a Hellen corrige a forma do online', erro: 'abrir o dia' };
       if (aberto) situacao = '<span style="color:#9aa4af;">dia em aberto</span>';
       else if (itDia) {
         const ac = itDia.filter(x => x.bloco !== 'aguardando');
