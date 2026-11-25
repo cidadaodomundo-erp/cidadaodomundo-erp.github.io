@@ -1756,6 +1756,10 @@ async function caixaHellenCarregar() {
     const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
     // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
     const motos = await consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []);
+    // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
+    CAIXA_ABERTO = {};
+    (await consultarTudo('vw_loja_dia_aberto?select=unidade,dia,aberto&dia=gte.' + caixaHellenMais(hoje, -40)).catch(() => [])).forEach((x) => {
+      const kk = x.unidade + '|' + String(x.dia).slice(0, 10); CAIXA_ABERTO[kk] = !!(CAIXA_ABERTO[kk] || x.aberto); });
     CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc, motos };
   } catch (e) { CAIXA_HELLEN = { lojas, erro: e.message }; }
   CAIXA_HELLEN_CALC = null;
@@ -1921,7 +1925,7 @@ function caixaHellenHtml() {
   }).join('');
   // 2) PARA A HELLEN: só o que é dela, uma linha e um botão
   const ontemCx = caixaHellenMais(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }), -1);
-  const deHellen = todos.filter(x => !['aguardando', 'contagem', 'aberto'].includes(x.bloco) && !(x.dia === ontemCx && x.pend));   // o caixa de ontem está no cartão
+  const deHellen = todos.filter(x => !['aguardando', 'contagem', 'aberto'].includes(x.bloco) && !(x.dia === ontemCx && x.pend) && !caixaLojaFechada(x.u, x.dia));   // o caixa de ontem está no cartão
   const podeNaoChegou = (typeof souODono === 'function' && souODono()) || ((rmbSessao() || {}).email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br';
   const R = v => 'R$ ' + fmt(Math.abs(+v || 0));
   const curta = x => {
@@ -2003,6 +2007,7 @@ function caixaHistoricoHtml() {
   const itens = H && !H.erro && H.trs ? caixaHellenItens() : [];
   const sit = (u, d) => {
     const cf = (CAIXA_CONF || []).filter(c => c.unidade === u && c.dia === d);
+    if (caixaLojaFechada(u, d)) return '<span style="color:var(--tx-4);">loja fechada</span>';
     // até 24/11 tudo fechou em lote (dono 25/11), com ou sem a linha do carimbo para aquele caixa
     if (cf.some(caixaFechouLote) || d < CAIXA_NOVO_FLUXO) return '<span style="color:var(--farol-ok);">fechado em lote pelo dono</span>';
     // 25/11/2026 (dono 20:13: "cada linha mostrar um status final, se tem pendência ou está ok"): pendência de venda + desconto sem explicação
@@ -2036,7 +2041,9 @@ function caixaHistoricoHtml() {
 // 1) envelope recebido pela Hellen × o que o Saipos mandou para o envelope; 2) venda a venda: "Bateu" recolhido e "Pendente" aberto,
 // cada pendente com explicação OBRIGATÓRIA e a decisão (caixa_pendencia_decidir); 3) ✓ só sem pendente; 4) descontos sem motivo ou
 // sem autorização, cada um com explicação.
-let CAIXA_BATEU = {};
+let CAIXA_BATEU = {}, CAIXA_ABERTO = {};
+// sem linha na vw_loja_dia_aberto = não se sabe: trata como aberta (nunca esconde dia por falta de dado)
+const caixaLojaFechada = (u, dia) => CAIXA_ABERTO[u + '|' + dia] === false;
 // DESCONTOS DO DIA ANTERIOR (dono 20:26: "a Hellen verifica os descontos do dia anterior junto com o fechamento do caixa"): bloco próprio,
 // logo abaixo dos cartões; só valem de 26/11 em diante (nada antes vira pendência)
 const CAIXA_DESC_DESDE = '2026-11-26';
@@ -2116,6 +2123,7 @@ function caixaConfHtml(u, dia) {
   const H = CAIXA_HELLEN, R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   const k = (u + dia).replace(/[^A-Z0-9]/g, '');
   const sec = (tit, corpo) => `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);"><div style="font-weight:700;margin-bottom:4px;">${tit}</div>${corpo}</div>`;
+  if (caixaLojaFechada(u, dia)) return sec(`Caixa de ${caixaDdm(dia)} · <span style="color:var(--tx-4);">loja fechada</span>`, '<div style="color:var(--tx-4);">a loja não abriu neste dia: nada a conferir</div>');
   if (dia < CAIXA_NOVO_FLUXO) {
     setTimeout(() => caixaConfLote(u, dia, k), 0);
     return sec(`Conferência do caixa de ${caixaDdm(dia)} · <span style="color:var(--farol-ok);">✓ fechado em lote pelo dono</span>`, `<div id="cxLote_${k}">${caixaLoteCorpo(k)}</div>`);
