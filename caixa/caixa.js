@@ -108,6 +108,7 @@ function caixaDiaDaVez(u) {
 }
 // quem = 'regra do dono 25/11' = o dia fechou sozinho (caixa_fechar_dias_regra, pg_cron 10:30 e 15:00)
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
+const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
 let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {};
 const cgNum = v => Number(v) || 0;
@@ -572,6 +573,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const confs = (CAIXA_CONF || []).filter(c => c.unidade === unidade && c.dia === dia);
   const hojeStr = new Date().toLocaleDateString('en-CA');
   const carimboCx = cx => { const rot = cx === 'SALÃO' ? 'Salão' : 'Delivery'; const c = confs.find(x => x.caixa === cx); const n = pendCx(cx);
+      if (c && caixaFechouLote(c)) return `<span><b style="color:#3f9c5a;">${rot} ✔ fechado em lote pelo dono, 25/11</b></span>`;
       if (c && caixaFechouSozinho(c)) return `<span><b style="color:#3f9c5a;">${rot} ✔ fechou sozinho</b> <span style="color:var(--tx-3);">(regra do dono 25/11: caixa fechado no Saipos, trocas do robô feitas e dinheiro contado) em ${String(c.conferido_em || '').slice(0, 16).replace('T', ' ')}</span></span>`;
       if (c) return `<span><b style="color:#3f9c5a;">${rot} ✔ conferido</b> <span style="color:var(--tx-3);">por ${String(c.quem || '').split('@')[0]} em ${String(c.conferido_em || '').slice(0, 16).replace('T', ' ')}</span>${podeExplicar ? ` <button onclick="caixaDesconferir('${cx}')" style="font:inherit; font-size:11px; padding:1px 7px; cursor:pointer;">desfazer</button>` : ''}</span>`;
       if (dia >= hojeStr) return `<span style="color:#9aa4af;">${rot}: turno em aberto</span>`;
@@ -1567,7 +1569,9 @@ function caixaHellenLojas() {
   return caixaLojas().map(([u]) => u).filter(u => dono || (CAIXA_RESP || []).some(r => r.unidade === u && String(r.email).toLowerCase() === eu));
 }
 // recomeço limpo de cada loja (21/10/2026): o corte travado do cofre
-const caixaHellenCorte = u => ((COFRE_DIA || []).find(r => r.unidade === u && r.tem_corte) || {}).dia || '2026-10-20';
+// 25/11/2026 [conserto] (dono aprovou fechar o passado em lote, livro caixa-passivo-fecha-em-lote-contagem-de-corte): até 24/11 tudo
+// fechou em lote (caixa_conferencia quem = 'dono 25/11 lote'); a lista da Hellen começa em 25/11 (ou na contagem de corte, se depois)
+const caixaHellenCorte = u => { const c = ((COFRE_DIA || []).find(r => r.unidade === u && r.tem_corte) || {}).dia || '2026-10-20'; return c > CAIXA_NOVO_FLUXO ? c : CAIXA_NOVO_FLUXO; };
 const caixaHellenMais = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toLocaleDateString('en-CA'); };
 async function caixaHellenCarregar() {
   const lojas = caixaHellenLojas();
@@ -1771,7 +1775,7 @@ function caixaHellenHtml() {
   const esp = todos.filter(x => x.bloco === 'aguardando');
   const rb = H.robo || [], vai = rb.filter(x => x.acao === 'TROCAR'), feito = rb.filter(x => x.acao !== 'TROCAR');
   const somaRb = A => 'R$ ' + fmt(A.reduce((a, x) => a + +x.valor, 0));
-  const robo = rb.length ? `${vai.length ? `vai trocar ${vai.length} bandeira(s) no Saipos (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''}` : '';
+  const robo = rb.length ? `${vai.length ? `vai fazer a troca de ${vai.length} bandeira(s) (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)}), esperando a próxima leitura do Saipos` : ''}` : '';
   return `${cartoes}
     ${cinza(`aguardando: ${esp.length} (não precisa fazer nada)`, esp.length ? esp.map(x => `${nomeLoja(x.u)} · ${caixaTarefa(x).txt}`).join('<br>') : '')}
     ${cinza(`o robô vai fazer: ${vai.length + feito.length} troca(s) de bandeira`, robo)}`;
@@ -1959,6 +1963,7 @@ function renderModuloCaixa() {
       // 11/11/2026 (proposta 3.4): quem conferiu e quando, à vista ("Arissa, 09/11 19:12"); sem carimbo, "—"; caixa sem carimbo diz qual falta
       const carimbo = c => { const nome = String(c.quem || '').split('@')[0].split(/[._-]/)[0]; const ts = c.conferido_em || c.hora; const d = ts ? new Date(ts) : null;
         const qd = d && !isNaN(d) ? d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '';
+        if (caixaFechouLote(c)) return 'fechado em lote pelo dono, 25/11';
         if (caixaFechouSozinho(c)) return '✔ fechou sozinho' + (qd ? ', ' + qd : '');
         return (nome ? nome.charAt(0).toUpperCase() + nome.slice(1) : 'alguém') + (qd ? ', ' + qd : ''); };
       const comC = caixasDaLoja.map(cx => ({ cx, c: confs.find(x => x.caixa === cx) })), feitos = comC.filter(o => o.c);
@@ -2023,7 +2028,7 @@ function renderModuloCaixa() {
     </div>
     ${blocos}
     </details>
-    <div class="caption-label" style="text-align:left;margin-top:10px;">Até 24/11: resolva o dia da vez de cada loja. De 25/11 em diante cada dia abre sozinho e fecha sozinho quando o caixa está fechado no Saipos, as trocas do robô foram feitas e o dinheiro foi contado.</div>`;
+    <div class="caption-label" style="text-align:left;margin-top:10px;">Até 24/11 os dias foram fechados em lote pelo dono. De 25/11 em diante cada dia abre sozinho e fecha sozinho quando o caixa está fechado no Saipos, as trocas do robô foram feitas e o dinheiro foi contado.</div>`;
   if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
 }
 // CONTROLE DE DESCONTOS do salão e do balcão (dono, qui 12/11/2026 03:23: "quem deu o desconto e o motivo, e se usou a senha
