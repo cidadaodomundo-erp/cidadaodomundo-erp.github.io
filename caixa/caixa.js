@@ -1104,7 +1104,9 @@ async function caixaDesfazer(i) {
 // PC) vem depois. Serie comeca em 01/08/2026 (antes nao ha coluna dinheiro).
 // ------------------------------------------------------------------
 let CAIXA_DIAS = null, CAIXA_CONTAGENS = null, CAIXA_RESP = null;
-const CAIXA_MODO = new URLSearchParams(location.search).get('modo') || '';
+let CAIXA_MODO = new URLSearchParams(location.search).get('modo') || '';
+// a casca não aceita outra URL no quadro: os descontos abrem na própria tela (o mesmo modo, sem trocar de endereço)
+function caixaVerDescontos(on) { CAIXA_MODO = on ? 'descontos' : ''; renderModuloCaixa(); window.scrollTo(0, 0); }
 let CAIXA_HIST_N = 7;   // dias à vista no histórico ("ver mais" mostra 30)
 let CAIXA_CARTAO = null, CAIXA_PIX = null, CAIXA_TURNOS = null, CAIXA_VALID = null, CAIXA_DIAS_CX = null, CAIXA_CONF = null, CAIXA_CARTAO_CX = null, CAIXA_PIX_CX = null, CAIXA_AVISOS = null;
 
@@ -1804,7 +1806,7 @@ function caixaHellenHtml() {
     }
   };
   const semMot = Array.isArray(DESC.vendas) ? DESC.vendas.filter(v => v.alerta_sem_motivo).length : 0;
-  const lista = (semMot ? `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${semMot} descontos sem motivo no salão e no balcão</span><a class="preset-btn" style="min-width:110px;text-align:center;" href="index.html?modo=descontos">Ver e marcar</a></div>` : '') + deHellen.map(x => { const [t, b] = curta(x);
+  const lista = (semMot ? `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${semMot} descontos sem motivo no salão e no balcão</span><button class="preset-btn" style="min-width:110px;" onclick="caixaVerDescontos(true)">Ver e marcar</button></div>` : '') + deHellen.map(x => { const [t, b] = curta(x);
     return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${t}</span>${b}</div>`; }).join('');
   return `<div class="section-label" style="text-align:left;">Hoje · ${caixaDdm(hojeSP)}</div>
     <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">${hoje}</div>
@@ -1898,7 +1900,7 @@ function renderModuloCaixa() {
   // os descontos do salão e do balcão abrem numa tela só deles (caixa/index.html?modo=descontos)
   if (CAIXA_MODO === 'descontos') {
     alvo.innerHTML = `<div class="section-label">Descontos do salão e do balcão</div>
-      <div class="caption-label" style="text-align:left;"><a href="index.html">‹ voltar ao Fechamento de Caixas</a></div><div id="descCorpo"></div>`;
+      <div class="caption-label" style="text-align:left;"><a href="javascript:void(0)" onclick="caixaVerDescontos(false)">‹ voltar ao Fechamento de Caixas</a></div><div id="descCorpo"></div>`;
     DESC.aberto = true; descCarregar(); return;
   }
   // data local de verdade (toISOString e' UTC e vira amanha depois das 21h)
@@ -2116,7 +2118,7 @@ function renderModuloCaixa() {
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
     ${caixaHistoricoHtml()}
-    <div class="caption-label" style="text-align:left;margin-top:14px;"><a href="index.html?modo=descontos">Descontos do salão e do balcão ›</a></div>`;
+    <div class="caption-label" style="text-align:left;margin-top:14px;"><a href="javascript:void(0)" onclick="caixaVerDescontos(true)">Descontos do salão e do balcão ›</a></div>`;
   if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
 }
 // CONTROLE DE DESCONTOS do salão e do balcão (dono, qui 12/11/2026 03:23: "quem deu o desconto e o motivo, e se usou a senha
