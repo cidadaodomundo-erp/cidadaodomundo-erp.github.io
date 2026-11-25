@@ -2130,19 +2130,21 @@ function caixaConfHtml(u, dia) {
   }
   // 1) dinheiro do caixa: envelope (Hellen) + gaveta (abertura do dia seguinte no Saipos) = total × dinheiro do dia no Saipos
   const cd = (COFRE_CDIA || []).find(x => x.unidade === u && String(x.dia).slice(0, 10) === dia) || {};
-  const gav = cd.gaveta_abertura != null ? Number(cd.gaveta_abertura) : cd.gaveta_saipos != null ? Number(cd.gaveta_saipos) : null;
+  // colunas do Financeiro (82de4b1): gaveta = abertura do caixa SEGUINTE; esperado = abertura do dia + dinheiro do Saipos
+  const num = (v) => v == null ? null : Number(v);
+  const gav = num(cd.gaveta_abertura_dia_seguinte), abre = num(cd.abertura_do_dia);
   const envGrav = cd.contado != null && !CDIA_CORRIGINDO[k];
   const envCampo = envGrav ? `<b>${R(cd.contado)}</b> <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${k}']=true; renderModuloCaixa();">corrigir</button>`
     : `<input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" value="${cd.contado != null ? cd.contado : ''}" style="width:120px;text-align:right;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
-       <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\\'")}', '${dia}', '${k}')">Gravar</button>`;
-  const tot = envGrav && gav != null ? Number(cd.contado) + gav : null;
-  const df = tot != null && cd.dinheiro_saipos != null ? Math.round((tot - Number(cd.dinheiro_saipos)) * 100) / 100 : null;
+       <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\'")}', '${dia}', '${k}')">Gravar</button>`;
+  const tot = num(cd.total_contado), esp = num(cd.esperado_saipos), df = num(cd.diferenca_total);
+  const ag = '<span style="color:var(--tx-4);">aguardando a leitura do Saipos</span>', tr = '<span style="color:var(--tx-4);">—</span>';
   const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
   const din = ln('Envelope recebido pela Hellen', envCampo)
-    + ln('Gaveta (abertura do caixa do dia seguinte no Saipos)', gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando o Saipos</span>')
-    + ln('Total (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : '<span style="color:var(--tx-4);">—</span>')
-    + ln('Saipos (dinheiro do dia)', cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '<span style="color:var(--tx-4);">—</span>')
-    + ln('Diferença', df == null ? '<span style="color:var(--tx-4);">—</span>' : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
+    + ln('Gaveta (abertura do caixa do dia seguinte)', gav != null ? R(gav) : ag)
+    + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
+    + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
+    + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
     .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, idx: x.i }));
