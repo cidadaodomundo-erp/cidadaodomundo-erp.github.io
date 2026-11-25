@@ -149,6 +149,10 @@ async function carregar() {
     fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_resumo?select=unidade,data_partida,data_contagem,itens,confiaveis,texto,selo_modulo`, hh).catch(() => null),
     fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_item?select=unidade,nome_saipos,un,esperado,contado,diferenca,dif_pct,selo,motivo,conserto`, hh).catch(() => null)]);
   SELO = { res: rs1 && rs1.ok ? await rs1.json() : [], itens: rs2 && rs2.ok ? await rs2.json() : [] };
+  // 25/11/2026 17:02 [migracao] (Organizador: o dono quer o selo de TODOS os módulos no mesmo lugar do andamento): vw_modulo_selo,
+  // select=* para aceitar as colunas novas que o chat Regras puser (âncora)
+  const rms = await fetch(`${SUPABASE_URL}/rest/v1/vw_modulo_selo?select=*`, hh).catch(() => null);
+  MSELO = rms && rms.ok ? await rms.json() : [];
   if (!ITENS.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso ao plano (é só do Neto e do Fabio).</p>
       <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
   desenhar();
@@ -173,7 +177,7 @@ function migHtml() {
   const dias = (a, b) => (new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5;
   const posHoje = Math.max(0, Math.min(100, dias(MIG_INICIO, hoje) * 100 / dias(MIG_INICIO, MIG_FIM)));
   let h = `<h2>Migração para o Fabio — entrega 01/12</h2>
-    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>`;
+    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>` + mseloHtml();
   if (ROTM.length) {
     const n = k => ROTM.filter(x => x.situacao === k).length, T = ROTM.length;
     const sem = new Date(hoje + 'T12:00:00');
@@ -201,6 +205,36 @@ function migHtml() {
   if (MIG.length) h += `<details class="bloco"><summary>Consertos, regras e contas <span class="n" style="font-weight:400;color:var(--mudo)">${MIG.filter(x => x.situacao === 'feito').length} de ${MIG.length} feitos</span></summary><div class="corpo">${migPassosHtml()}</div></details>`;
   return h;
 }
+// ---- Selo dos módulos (vw_modulo_selo): uma linha por módulo, em conserto primeiro; clicar abre o detalhe
+let MSELO = [], MSELO_ABERTO = new Set();
+const MSELO_NOME = { 'm-atacado':'Atacado', 'm-avaliacoes':'Avaliações', 'm-caixa':'Fechamento de caixa', 'm-cardapio':'Cardápio', 'm-cartoes':'Cartões',
+  'm-compliance':'Vencimentos e renovações', 'm-compras':'Compras', 'm-contestacao':'Contestação', 'm-dre':'DRE e resultado', 'm-estoque':'Estoque',
+  'm-financeiro':'Financeiro', 'm-listas':'Listas entre lojas', 'm-lojinha':'Lojinha', 'm-promocoes':'Promoções', 'm-rh':'RH e folha',
+  'm-tempo-entrega':'Tempo de entrega', 'pagar-motoboys':'Pagar motoboys' };
+const MSELO_COLS = ['modulo', 'selo', 'nao_usar', 'ate', 'vermelhas', 'verdes', 'cinzas', 'regras', 'pendencias'];
+function mseloCor(s) { s = String(s || '').toLowerCase(); return s.startsWith('confi') ? 'var(--ok)' : s.includes('conserto') ? 'var(--acento)' : 'var(--anda)'; }
+function mseloHtml() {
+  if (!MSELO.length) return '';
+  const ord = s => { s = String(s || '').toLowerCase(); return s.includes('conserto') ? 0 : s.startsWith('confi') ? 2 : 1; };
+  const L = MSELO.slice().sort((a, b) => ord(a.selo) - ord(b.selo) || (Number(b.vermelhas) || 0) - (Number(a.vermelhas) || 0)
+    || String(MSELO_NOME[a.modulo] || a.modulo).localeCompare(String(MSELO_NOME[b.modulo] || b.modulo), 'pt-BR'));
+  const n = k => MSELO.filter(x => ord(x.selo) === k).length;
+  const lista = t => String(t || '').split(' | ').filter(Boolean);
+  return `<div class="mig"><p class="grp" style="margin:0 0 .4rem;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mudo);font-weight:600">Selo dos módulos</p>
+    <div class="mig-nums"><span class="feito">${n(2)} confiáve${n(2) === 1 ? 'l' : 'is'}</span>${n(0) ? `<span class="travado">${n(0)} em conserto</span>` : ''}${n(1) ? `<span class="andamento">${n(1)} sem âncora ou sem prova</span>` : ''}</div>
+    ${L.map(x => { const ab = MSELO_ABERTO.has(x.modulo), nu = lista(x.nao_usar), pe = lista(x.pendencias);
+      const extra = Object.keys(x).filter(k => !MSELO_COLS.includes(k) && x[k] != null && x[k] !== '');
+      return `<div class="mig-l" style="cursor:pointer" onclick="MSELO_ABERTO.has('${esc(x.modulo)}') ? MSELO_ABERTO.delete('${esc(x.modulo)}') : MSELO_ABERTO.add('${esc(x.modulo)}'); desenhar()">
+        <span class="bola" style="background:${mseloCor(x.selo)}"></span><div class="tx"><b>${esc(MSELO_NOME[x.modulo] || x.modulo)}</b> · <span style="color:${mseloCor(x.selo)};font-weight:700">${esc(x.selo || '')}</span>
+        <div class="meta">${nu.length ? `<span class="atraso">não usar: ${nu.length}</span> · ` : ''}${Number(x.vermelhas) ? `<span class="atraso">${x.vermelhas} vermelha${Number(x.vermelhas) > 1 ? 's' : ''}</span> · ` : ''}${Number(x.cinzas) || 0} não medida${Number(x.cinzas) === 1 ? '' : 's'} · ${Number(x.verdes) || 0} de ${Number(x.regras) || 0} regras verdes${pe.length ? ` · ${pe.length} pendência${pe.length > 1 ? 's' : ''} de migração` : ''}${x.ate ? ` · até ${dataBR(String(x.ate))}` : ''} · ${ab ? 'fechar ▴' : 'detalhe ▾'}</div>
+        ${ab ? `${nu.length ? `<div class="trav" style="margin-top:4px"><b>Não usar enquanto em conserto:</b><br>${nu.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
+          ${pe.length ? `<div class="meta" style="margin-top:4px"><b>Pendências de migração:</b><br>${pe.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
+          ${extra.map(k => `<div class="meta"><b>${esc(k.replace(/_/g, ' '))}:</b> ${esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])}</div>`).join('')}
+          ${!nu.length && !pe.length && !extra.length ? '<div class="meta">Nada pendente neste módulo.</div>' : ''}` : ''}
+        </div></div>`; }).join('')}
+    <p class="rascunho" style="margin-top:.6rem">Selo pelas regras com prova de cada módulo: confiável = nenhuma vermelha; em conserto = alguma regra vermelha (o "não usar" diz o quê).</p></div>`;
+}
+
 // selo por módulo: hoje só o estoque tem (uma linha por loja); vermelho primeiro, sem botões
 let SELO = { res: [], itens: [] };
 function seloHtml() {
