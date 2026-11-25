@@ -166,7 +166,7 @@ async function abrirDiaConcartao(unidade, dia) {
     consultarTudo('vw_cartao_transacoes?select=*&dia=in.(' + [diaMais(-1), dia, diaMais(1)].join(',') + ')' +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=dia,hora'),
     // PIX do dia (09/09/2026): QR da maquininha e chave, com o credito do banco que casou
-    consultarTudo('vw_pix_conciliacao?select=id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco&dia=eq.' + dia +
+    consultarTudo('vw_pix_conciliacao?select=dia,dia_turno,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco&dia=in.(' + dia + ',' + diaMais(1) + ')' +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&order=entrega'),
     // quem entregou cada venda de cartao/vale (para dizer "confirmar com o motoboy X")
     consultarTudo('vw_cartao_entrega_cobranca?select=id_sale,entregador&dia=eq.' + dia +
@@ -182,6 +182,8 @@ async function abrirDiaConcartao(unidade, dia) {
     consultarTudo('vw_caixa_troca_bandeira_robo?select=id_sale,valor,caixa,hora_venda,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em&dia=eq.' + dia +
       '&unidade=eq.' + encodeURIComponent(unidade) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),   // 05/11: DIVERGENTE = o robô já trocou
   ]);
+  // 25/11: o PIX vem do dia e do seguinte; fica o do TURNO deste dia (dia_turno)
+  const pixT = (pix || []).filter((x) => (x.dia_turno || x.dia) === dia); pix.length = 0; pixT.forEach((x) => pix.push(x));
   CAIXA_DRILL_DADOS = { unidade, dia, trs, pix, cobr, forma, descs, onl, robo };
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
   caixaFrentesFaixa(unidade, dia);
@@ -216,7 +218,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // hora antes das 10h pertence ao FIM do turno (dia = turno; corte 06:00 de 10/09/2026, 10:00 desde 03/11/2026 — dono: "o dia vai das 10:00 até o fechamento do caixa")
   const CORTE_TURNO = 600;
   trs.forEach(x => { const m0 = min(x.hora); x.t = m0 + (m0 < CORTE_TURNO ? 1440 : 0) + Math.round((new Date(x.dia + 'T12:00:00') - new Date(dia + 'T12:00:00')) / 864e5) * 1440; });
-  const doDia = x => x.dia === dia;
+  // 25/11/2026 [conserto] (Organizador 19:47; Financeiro 20:00): a venda é do dia do TURNO (dia_turno), não do relógio — a de 00:03
+  // num caixa aberto em 24/11 fica no 24
+  const doDia = x => (x.dia_turno || x.dia) === dia;
 
   const saipos = trs.filter(t => t.origem === 'SAIPOS').map(t => ({ ...t, par: null }));
   const rede = trs.filter(t => t.origem === 'REDE').map(t => ({ ...t, usado: false }));
@@ -1702,7 +1706,7 @@ async function caixaHellenCarregar() {
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
-      consultarTudo('vw_pix_conciliacao?select=dia,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
+      consultarTudo('vw_pix_conciliacao?select=dia,dia_turno,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
       consultarTudo('vw_cartao_bandeira_divergente?select=dia,unidade,hora,registrado,passou,valor,nivel,numero,mesa,caixa,id_sale,referencia' + faixa(des, ate) + '&order=hora'),
       consultarTudo('vw_caixa_online_dia?select=*&canal_ok=not.is.true' + faixa(des, ate) + '&order=hora'),
@@ -1727,7 +1731,7 @@ function caixaHellenItens() {
     const deLoja = H.trs.filter(x => x.unidade === u), corte = caixaHellenCorte(u), abertos = new Set();
     for (let dia = corte; dia <= H.ate; dia = mais(dia, 1)) {
       const viz = [mais(dia, -1), dia, mais(dia, 1)];
-      const doDia = A => (A || []).filter(x => x.unidade === u && x.dia === dia);
+      const doDia = A => (A || []).filter(x => x.unidade === u && (x.dia_turno || x.dia) === dia);   // 25/11: pelo dia do turno
       let r;
       try { r = renderDiaConcartao(u, dia, deLoja.filter(x => viz.includes(String(x.dia))), doDia(H.pix), doDia(H.cobr), doDia(H.forma), [], [], { robo: doDia(H.robo) }); }
       catch (e) { add({ u, dia, ordem: 9, oque: 'não consegui conferir este dia (' + e.message + ')', acao: 'abrir', bloco: 'erro' }); continue; }
