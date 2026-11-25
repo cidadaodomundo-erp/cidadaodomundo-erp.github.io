@@ -414,8 +414,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   semParS.filter(s => !s._explicado).forEach(s => pend.push({ forma: formaPadrao(s.detalhe), caixa: s.caixa || null, chave: 'pdv:' + s.referencia + ':' + (+s.valor).toFixed(2), bloco: semForma(s) ? 'dinheiro' : 'maquininha', efeito: semForma(s) ? 0 : +s.valor,
     p: madrugadaSemRede(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) ? '#9aa4af' : eVale(s) ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(s.hora),
     saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou este dia inteiro' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
-    leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'registrado no Saipos, mas não passou na maquininha',
-    acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou' : 'confirmar no caixa se cobrou, ou se passou em outra forma' }));
+    leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'não passou na maquininha: a Hellen autoriza o desconto',   // 25/11/2026 [conserto] (dono #108 12:53: "itens não recebidos devem ser enviados para a Hellen autorizar o desconto")
+    acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou; se não cobrou, a Hellen autoriza o desconto' : 'a Hellen autoriza o desconto (ou acha a venda paga em outra forma)' }));
   restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || null, chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
     p: 2, cor: 'var(--farol-perto)', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
     leitura: 'passou na maquininha, mas não está registrado no Saipos', acao: 'achar a venda no Saipos (lançada em outra forma ou não lançada)' }));
@@ -1613,8 +1613,10 @@ function caixaHellenItens() {
       r.turnos.filter(t => t.fechado === false && !abertos.has(t.caixa + '|' + t.aberto_em) && abertos.add(t.caixa + '|' + t.aberto_em)).forEach(t => add({ u, dia, caixa: t.caixa === 'SALÃO' || t.caixa === 'DELIVERY' ? t.caixa : '', ordem: 0,
         oque: 'falta fechar no Saipos: ' + caixaFrenteNome(u, t.caixa) + ', aberta desde ' + dm(t.aberto_em) + ' ' + String(t.aberto_em || '').slice(11, 16), acao: 'abrir', botao: 'fechar no Saipos',
         bloco: 'aberto', venda: caixaFrenteNome(u, t.caixa) + ' · aberta desde ' + dm(t.aberto_em), hora: String(t.aberto_em || '').slice(11, 16), frente: caixaFrenteNome(u, t.caixa), desde: dm(t.aberto_em) }));
-      r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para}`, acao: 'abrir',
-        botao: t.pd ? 'fechar no Saipos com ' + t.para : 'trocar no Saipos para ' + t.para, bloco: 'troca', hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para, de: t.de, para: t.para }));
+      // 25/11/2026 [conserto] (dono #107 10:05: "quem lança a troca de bandeira é o robô"; proposta 2026-11-25-caixa-troca-e-do-robo):
+      // a troca provada pela maquininha não é tarefa de ninguém — vai em cinza, com o "aguardando", e o robô troca no Saipos
+      r.trocas.forEach(t => add({ u, dia, caixa: t.caixa || '', ordem: 1, valor: t.valor, oque: `${t.venda} às ${t.hora}: registrada como ${t.de}, passou como ${t.para} — o robô troca`, acao: 'abrir',
+        bloco: 'aguardando', robo: true, hora: t.hora, venda: t.venda, forma: t.de + ' → ' + t.para, de: t.de, para: t.para }));
       // dinheiro depois do recomeço se confere no cofre (gaveta + cofre), não na gaveta do turno
       r.abertas.filter(x => !String(x.chave).startsWith('dinheiro:')).forEach(x => add({ u, dia, caixa: x.caixa || '', ordem: 2, valor: x.valor,
         oque: `${x.hora} · ${String(x.saipos || '').replace(/<[^>]+>/g, '')} × ${x.real} — ${x.leitura}`, acao: 'explicar', pend: x, ...caixaHellenCampos(x) }));
@@ -1679,13 +1681,13 @@ const CAIXA_BLOCOS = [
   ['contagem', 'Dinheiro sem contagem', 'gaveta + cofre ainda não contados hoje'],
   ['difsaipos', 'Diferença no fechamento do Saipos', 'o caixa foi fechado, mas a gaveta não bateu: explicar como quebra ou sobra (até R$ 1 é absorvido)'],
   ['cofre', 'Dinheiro do cofre e envios', 'contagem diferente do Saipos, ou envio do São Braz sem confirmação'],
-  ['troca', 'Bandeira trocada no Saipos', 'registrada numa forma, passou em outra: trocar no Saipos'],
+  ['troca', 'Bandeira trocada', 'registrada numa forma, passou em outra: o robô troca no Saipos'],
   ['pix', 'PIX que não entrou no banco', 'registrado como PIX e nenhum crédito desse valor no banco em até 5 dias'],
   ['semcobr', 'Venda sem cobrança ou cobrado diferente', 'o Saipos registrou e a maquininha não mostra (ou mostra outro valor)'],
   ['online', 'Online com a forma errada', 'a forma registrada não bate com o canal do pedido'],
   ['quebra', 'Quebra a descontar ou repor', 'quebra registrada esperando desconto ou reposição'],
   ['erro', 'Dia que não consegui conferir', 'abrir o dia para ver o que aconteceu'],
-  ['aguardando', 'Aguardando — não precisa fazer nada', 'vale leva até 7 dias para aparecer na Rede; a maquininha ainda não mandou o dia'],
+  ['aguardando', 'Aguardando — não precisa fazer nada', 'o robô troca a bandeira no Saipos; vale leva até 7 dias para aparecer na Rede; a maquininha ainda não mandou o dia'],
 ];
 // 5º pedido (dono 06/11/2026, via Financeiro: "muito poluída ... tem que estar de forma clara pra ele o que tem que fazer, o que está
 // pendente e como resolver"): um cartão por loja com o dia da vez e uma tarefa por linha (frase com verbo + um botão); o resto recolhido.
@@ -1699,13 +1701,14 @@ function caixaTarefa(x) {   // { txt, btn } da pendência, em frase
     case 'difsaipos': return { txt: `Explicar a ${+x.valor < 0 ? 'falta' : 'sobra'} de <b>${R(x.valor)}</b> no dinheiro do ${trEscH(x.frente || '')} (${dd})`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
     case 'pix': return { txt: `Achar o pagamento da ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>): o PIX não entrou no banco`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
     case 'semcobr': return { txt: `Conferir a ${trEscH(x.venda || 'venda')} (${dd}${q ? ', ' + trEscH(q) : ''}, <b>${R(x.valor)}</b>)${x.quem ? ' com o motoboy ' + trEscH(x.quem) : ''}: ${trEscH((x.pend && x.pend.leitura) || 'não bate com a maquininha')}`, btn: B('Explicar', `caixaHellenExplicar(${x.i})`) };
-    case 'troca': return { txt: `Trocar no Saipos a ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, <b>${R(x.valor)}</b>) de ${trEscH(x.de || '')} para <b>${trEscH(x.para || '')}</b>`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
+    case 'troca': return { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, ${R(x.valor)}): passou como ${trEscH(x.para || '')} — o robô troca no Saipos`, btn: '' };
     case 'online': return { txt: `Trocar a forma da ${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.forma || '')})`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     case 'cofre': return x.acao === 'naochegou' || x.acao === 'cofre' ? { txt: trEscH(x.oque), btn: '' } : { txt: `Explicar o dinheiro contado ${trEscH(x.venda || '')} (${dd}, <b>${R(x.valor)}</b>)`, btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
     // 12/11/2026 (dono, agenda #96): a perda mostra "a confirmar" ou "confirmada por X em dd/mm"; só o dono e a Hellen confirmam
     case 'quebra': return { txt: `Descontar ou repor a quebra de <b>${R(x.valor)}</b> (${trEscH(x.quem || '')}, ${dd})${caixaEstadoFalta(x) ? ' · ' + caixaEstadoFalta(x) : ''}`,
       btn: (caixaFaltaAConfirmar(x) && caixaPodeConfirmar() ? caixaBotaoConfirmar(x.chave) + ' ' : '') + B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
-    case 'aguardando': return { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(q)}, ${R(x.valor)}): esperando a Rede`, btn: '' };
+    case 'aguardando': return x.robo ? { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(x.hora || '')}, ${R(x.valor)}): registrada como ${trEscH(x.de || '')}, passou como ${trEscH(x.para || '')} — o robô troca no Saipos`, btn: '' }
+      : { txt: `${trEscH(x.venda || 'venda')} (${dd}, ${trEscH(q)}, ${R(x.valor)}): esperando a Rede`, btn: '' };
     default: return { txt: trEscH(x.oque || ''), btn: B('Abrir o dia', `caixaHellenAbrir(${x.i})`) };
   }
 }
