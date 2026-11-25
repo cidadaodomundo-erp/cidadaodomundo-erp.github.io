@@ -2081,6 +2081,8 @@ function caixaPendRow(p, idx, lote) {
 }
 function caixaResPendHtml(res, pend, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  // sem nenhuma venda de cartão lida para o dia não é "tudo certo": diz que falta o dado
+  if ((!res || !res.n) && !pend.length) return '<div style="color:var(--tx-4);">sem vendas de cartão lidas para este dia (a maquininha ainda não chegou ao painel)</div>';
   return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
     + (pend.length ? `<div style="margin-top:6px;font-weight:700;color:var(--farol-perto);">Pendentes (${pend.length})</div>${pend.map((p) => caixaPendRow(p, p.idx, lote)).join('')}`
       : '<div style="color:var(--farol-ok);">✓ nenhuma pendente</div>');
