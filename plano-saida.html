@@ -211,7 +211,7 @@ const MSELO_NOME = { 'm-atacado':'Atacado', 'm-avaliacoes':'Avaliações', 'm-ca
   'm-compliance':'Vencimentos e renovações', 'm-compras':'Compras', 'm-contestacao':'Contestação', 'm-dre':'DRE e resultado', 'm-estoque':'Estoque',
   'm-financeiro':'Financeiro', 'm-listas':'Listas entre lojas', 'm-lojinha':'Lojinha', 'm-promocoes':'Promoções', 'm-rh':'RH e folha',
   'm-tempo-entrega':'Tempo de entrega', 'pagar-motoboys':'Pagar motoboys' };
-const MSELO_COLS = ['modulo', 'selo', 'nao_usar', 'ate', 'vermelhas', 'verdes', 'cinzas', 'regras', 'pendencias'];
+const MSELO_COLS = ['modulo', 'selo', 'nao_usar', 'ate', 'vermelhas', 'verdes', 'cinzas', 'nao_medidas', 'regras', 'pendencias', 'ancora', 'ancora_o_que_compara', 'ancora_detalhe'];
 function mseloCor(s) { s = String(s || '').toLowerCase(); return s.startsWith('confi') ? 'var(--ok)' : s.includes('conserto') ? 'var(--acento)' : 'var(--anda)'; }
 function mseloHtml() {
   if (!MSELO.length) return '';
@@ -226,13 +226,13 @@ function mseloHtml() {
       const extra = Object.keys(x).filter(k => !MSELO_COLS.includes(k) && x[k] != null && x[k] !== '');
       return `<div class="mig-l" style="cursor:pointer" onclick="MSELO_ABERTO.has('${esc(x.modulo)}') ? MSELO_ABERTO.delete('${esc(x.modulo)}') : MSELO_ABERTO.add('${esc(x.modulo)}'); desenhar()">
         <span class="bola" style="background:${mseloCor(x.selo)}"></span><div class="tx"><b>${esc(MSELO_NOME[x.modulo] || x.modulo)}</b> · <span style="color:${mseloCor(x.selo)};font-weight:700">${esc(x.selo || '')}</span>
-        <div class="meta">${nu.length ? `<span class="atraso">não usar: ${nu.length}</span> · ` : ''}${Number(x.vermelhas) ? `<span class="atraso">${x.vermelhas} vermelha${Number(x.vermelhas) > 1 ? 's' : ''}</span> · ` : ''}${Number(x.cinzas) || 0} não medida${Number(x.cinzas) === 1 ? '' : 's'} · ${Number(x.verdes) || 0} de ${Number(x.regras) || 0} regras verdes${pe.length ? ` · ${pe.length} pendência${pe.length > 1 ? 's' : ''} de migração` : ''}${x.ate ? ` · até ${dataBR(String(x.ate))}` : ''} · ${ab ? 'fechar ▴' : 'detalhe ▾'}</div>
-        ${ab ? `${nu.length ? `<div class="trav" style="margin-top:4px"><b>Não usar enquanto em conserto:</b><br>${nu.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
+        <div class="meta">${nu.length ? `<span class="atraso">não usar: ${nu.length}</span> · ` : ''}${Number(x.vermelhas) ? `<span class="atraso">${x.vermelhas} vermelha${Number(x.vermelhas) > 1 ? 's' : ''}</span> · ` : ''}${x.ancora ? `âncora: <span style="color:${/não|nao/i.test(x.ancora) ? 'var(--acento)' : /bate/i.test(x.ancora) ? 'var(--ok)' : 'var(--anda)'};font-weight:700">${esc(x.ancora)}</span> · ` : ''}${Number(x.nao_medidas ?? x.cinzas) || 0} não medida${Number(x.nao_medidas ?? x.cinzas) === 1 ? '' : 's'} · ${Number(x.verdes) || 0} de ${Number(x.regras) || 0} regras verdes${pe.length ? ` · ${pe.length} pendência${pe.length > 1 ? 's' : ''} de migração` : ''}${x.ate ? ` · até ${dataBR(String(x.ate))}` : ''} · ${ab ? 'fechar ▴' : 'detalhe ▾'}</div>
+        ${ab ? `${x.ancora_o_que_compara ? `<div class="meta" style="margin-top:4px"><b>Âncora (o que se compara com o mundo real):</b> ${esc(x.ancora_o_que_compara)}${x.ancora_detalhe ? ' — ' + esc(x.ancora_detalhe) : ''}</div>` : ''}${nu.length ? `<div class="trav" style="margin-top:4px"><b>Não usar enquanto em conserto:</b><br>${nu.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
           ${pe.length ? `<div class="meta" style="margin-top:4px"><b>Pendências de migração:</b><br>${pe.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
           ${extra.map(k => `<div class="meta"><b>${esc(k.replace(/_/g, ' '))}:</b> ${esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])}</div>`).join('')}
           ${!nu.length && !pe.length && !extra.length ? '<div class="meta">Nada pendente neste módulo.</div>' : ''}` : ''}
         </div></div>`; }).join('')}
-    <p class="rascunho" style="margin-top:.6rem">Selo pelas regras com prova de cada módulo: confiável = nenhuma vermelha; em conserto = alguma regra vermelha (o "não usar" diz o quê).</p></div>`;
+    <p class="rascunho" style="margin-top:.6rem">Confiável = a âncora bate com o mundo real e nenhuma regra está vermelha; em conserto = a âncora não bate ou alguma regra está vermelha (o "não usar" diz o quê); sem âncora = ainda não há comparação com o mundo real.</p></div>`;
 }
 
 // selo por módulo: hoje só o estoque tem (uma linha por loja); vermelho primeiro, sem botões
