@@ -59,6 +59,26 @@
   .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
   .erro { color:var(--acento); font-size:.85rem; }
   footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  /* 25/11/2026 [migracao]: seção "Migração sem Claude — entrega 01/12" (dono pelo Organizador 14:58; fonte migracao_passos) */
+  .mig { background:var(--papel); border:1px solid var(--linha); border-radius:8px; padding:14px 16px; margin:0 0 1rem; }
+  .mig-nums { display:flex; flex-wrap:wrap; gap:8px; margin:.2rem 0 .8rem; }
+  .mig-nums span { padding:4px 12px; border-radius:999px; font-size:.85rem; font-weight:700; background:var(--alt); color:var(--mudo); }
+  .mig-nums .feito { background:var(--ok-fundo); color:var(--ok); } .mig-nums .andamento { background:var(--anda-fundo); color:var(--anda); }
+  .mig-nums .travado { background:var(--acento-fundo); color:var(--acento); }
+  .mig-barra { position:relative; height:12px; background:var(--alt); border-radius:999px; overflow:hidden; }
+  .mig-barra i { position:absolute; left:0; top:0; bottom:0; background:var(--ok); border-radius:999px; }
+  .mig-tempo { position:relative; height:18px; font-size:.72rem; color:var(--mudo); margin-top:4px; }
+  .mig-tempo b { position:absolute; transform:translateX(-50%); color:var(--acento); white-space:nowrap; }
+  .mig-tempo span { position:absolute; } .mig-tempo span.fim { right:0; }
+  .mig-filtro { display:flex; flex-wrap:wrap; gap:6px; margin:.9rem 0 .2rem; }
+  .mig-filtro button { border:1px solid var(--forte); background:var(--papel); color:var(--tinta); border-radius:999px; padding:4px 11px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .mig-filtro button.on { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .mig-l { display:flex; gap:10px; align-items:flex-start; border-top:1px solid var(--linha); padding:7px 0; font-size:.92rem; }
+  .mig-l .bola { width:10px; height:10px; border-radius:50%; margin-top:7px; flex:none; background:var(--forte); }
+  .mig-l .bola.feito { background:var(--ok); } .mig-l .bola.andamento { background:var(--anda); } .mig-l .bola.travado { background:var(--acento); }
+  .mig-l .tx { flex:1; min-width:0; } .mig-l .meta { font-size:.75rem; color:var(--mudo); }
+  .mig-l .meta .atraso { color:var(--acento); font-weight:700; } .mig-l .trav { font-size:.82rem; color:var(--acento); }
+  .mig-l.feito .tx { color:var(--mudo); }
 </style>
 </head>
 <body>
@@ -113,9 +133,49 @@ async function carregar() {
     { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } });
   if (r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
   ITENS = r.ok ? await r.json() : [];
+  // 25/11/2026 [migracao]: os passos da migração sem Claude (mesma RLS pode_ver_plano)
+  const rm = await fetch(`${SUPABASE_URL}/rest/v1/migracao_passos?select=id,fase,passo,responsavel,prazo,situacao,travado_por,atualizado_em&order=fase,prazo,id`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
+  MIG = rm && rm.ok ? await rm.json() : [];
   if (!ITENS.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso ao plano (é só do Neto e do Fabio).</p>
       <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
   desenhar();
+}
+
+// ---- Migração sem Claude — entrega 01/12 (25/11/2026 [migracao]; dono: "um passo a passo dessa migração, resumido e
+// objetivo, onde eu possa ver o que está em andamento, já foi feito, etc."). Travados primeiro, depois por prazo.
+let MIG = [], MIG_F = 'todos';
+const MIG_FASES = { 1:'1. Consertar e congelar', 2:'2. Tirar o Claude', 3:'3. Passar ao Fabio' };
+const MIG_ORD = { travado:0, andamento:1, 'a fazer':2, feito:3 };
+const MIG_INICIO = '2026-11-25', MIG_FIM = '2026-12-01';
+function migHtml() {
+  if (!MIG.length) return '';
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+  const n = k => MIG.filter(x => x.situacao === k).length;
+  const pct = Math.round(n('feito') * 100 / MIG.length);
+  const dias = (a, b) => (new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5;
+  const posHoje = Math.max(0, Math.min(100, dias(MIG_INICIO, hoje) * 100 / dias(MIG_INICIO, MIG_FIM)));
+  const vis = MIG.filter(x => MIG_F === 'todos' || x.situacao === MIG_F);
+  const linha = x => { const atrasado = x.prazo && x.prazo < hoje && x.situacao !== 'feito';
+    return `<div class="mig-l ${esc(x.situacao)}"><span class="bola ${esc(x.situacao)}" title="${esc(x.situacao)}"></span><div class="tx">${esc(x.passo)}
+      <div class="meta">${esc(x.responsavel || '')}${x.prazo ? ` · <span class="${atrasado ? 'atraso' : ''}">até ${dataBR(x.prazo)}${atrasado ? ' (passou)' : ''}</span>` : ''} · ${esc(x.situacao)}</div>
+      ${x.situacao === 'travado' && x.travado_por ? `<div class="trav">travado por: ${esc(x.travado_por)}</div>` : ''}</div></div>`; };
+  const fases = [...new Set(MIG.map(x => x.fase))].sort();
+  const corpo = fases.map(f => { const l = vis.filter(x => x.fase === f).sort((a, b) => (MIG_ORD[a.situacao] ?? 9) - (MIG_ORD[b.situacao] ?? 9) || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
+    return l.length ? `<div class="fase">${esc(MIG_FASES[f] || 'Fase ' + f)} · ${l.length}</div>${l.map(linha).join('')}` : ''; }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
+  const ult = MIG.map(x => x.atualizado_em).filter(Boolean).sort().pop();
+  return `<h2>Migração sem Claude — entrega 01/12</h2>
+    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que já rodam sem o Claude, com farol e o que fazer se parar.</p>
+    <div class="mig">
+      <div class="mig-nums"><span class="feito">${n('feito')} feito${n('feito') === 1 ? '' : 's'}</span><span class="andamento">${n('andamento')} em andamento</span>
+        <span>${n('a fazer')} a fazer</span>${n('travado') ? `<span class="travado">${n('travado')} travado${n('travado') === 1 ? '' : 's'}</span>` : ''}</div>
+      <div class="mig-barra" title="${pct}% feito"><i style="width:${pct}%"></i></div>
+      <div class="mig-tempo"><span>${pct}% feito · 25/11</span><b style="left:${posHoje}%">hoje</b><span class="fim">ter 01/12</span></div>
+      <div class="mig-filtro">${[['todos', 'Todos'], ['travado', 'Travados'], ['andamento', 'Em andamento'], ['a fazer', 'A fazer'], ['feito', 'Feitos']]
+        .map(([k, t]) => `<button class="${MIG_F === k ? 'on' : ''}" onclick="MIG_F='${k}';desenhar()">${t} · ${k === 'todos' ? MIG.length : n(k)}</button>`).join('')}</div>
+      ${corpo}
+      ${ult ? `<p class="rascunho" style="margin-top:.6rem">Situação atualizada em ${dataBR(ult.slice(0, 10))} ${new Date(ult).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit' })}; parte dela se atualiza sozinha de 30 em 30 minutos.</p>` : ''}
+    </div>`;
 }
 
 function card(i) {
@@ -157,6 +217,7 @@ function desenhar() {
     <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio${ult ? ' · atualizado em ' + dataBR(ult) : ''}</p>
     <h1>Plano de saída</h1>
     <p class="missao"><b>A missão até 31/12:</b> entregar e fazer rodar. Quem assume cada coisa depois é decisão do Fabio.</p>
+    ${migHtml()}
     <h2>As 6 entregas até 31/12</h2>
     <p class="rascunho">O prazo é 31/12. As outras datas são referência de trabalho.</p>
     ${entregas || '<p class="vazio">Todas entregues.</p>'}
