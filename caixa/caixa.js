@@ -1132,7 +1132,7 @@ let CAIXA_DIAS = null, CAIXA_CONTAGENS = null, CAIXA_RESP = null;
 let CAIXA_MODO = new URLSearchParams(location.search).get('modo') || '';
 // a casca não aceita outra URL no quadro: os descontos abrem na própria tela (o mesmo modo, sem trocar de endereço)
 function caixaVerDescontos(on) { CAIXA_MODO = on ? 'descontos' : ''; renderModuloCaixa(); window.scrollTo(0, 0); }
-let CAIXA_HIST_N = 7;   // dias à vista no histórico ("ver mais" mostra 30)
+let CAIXA_HIST_N = 7, CAIXA_HIST_ABERTO = null;   // dias à vista no histórico ("ver mais" mostra 30)
 let CAIXA_CARTAO = null, CAIXA_PIX = null, CAIXA_TURNOS = null, CAIXA_VALID = null, CAIXA_DIAS_CX = null, CAIXA_CONF = null, CAIXA_CARTAO_CX = null, CAIXA_PIX_CX = null, CAIXA_AVISOS = null;
 
 // FECHAMENTO DE CAIXAS (09/09/2026) — modulo unico, decisao do dono: absorveu
@@ -1490,7 +1490,12 @@ function cofreLinhaDia(unidade, dia) {
     c2 = cartao('Contagem do cofre', sub2, ctrl + `<div id="cfRes_${k}">contado <b>${R(tot)}</b> · comparando com o saldo do cofre no Saipos…</div>
       ${pode ? `<button class="preset-btn ${livre}" style="margin-top:6px;" onclick="COFRE_CORRIGINDO['${k}']=true; cofreRedesenhar('${esc(unidade)}', '${dia}')">corrigir</button>` : ''}${cofreConferidoTxt(cSel)}`);
   } else if (!pode) c2 = cartao('Contagem do cofre', sub2, ctrl + '<div style="color:var(--farol-perto);">ainda não contado</div>');
-  else c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, ctrl + cofreGradeHtml(unidade, dSel, k, livre), corte);
+  else {
+    setTimeout(() => cofreSaldoCarregar(unidade, dSel, k, mom), 0);   // dono 20:13: "o sistema acha o saldo do Saipos desse dia e carrega pra ela"
+    c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, ctrl
+      + `<div id="cfSaldo_${k}" style="margin-bottom:6px;">saldo do cofre no Saipos: carregando…</div>` + cofreGradeHtml(unidade, dSel, k, livre)
+      + `<div id="cfDif_${k}" style="margin-top:6px;font-weight:700;"></div>`, corte);
+  }
   return `<div id="cfBox_${k}">${c2}</div>`;   // 25/11: o envelope do dia foi para o cartão da loja (conferência do caixa de ontem)
 }
 async function cofreGravarDia(unidade, dia, k) {
@@ -1512,6 +1517,16 @@ async function cofreGravarDia(unidade, dia, k) {
   } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarDia(unidade, dia, k)); }
 }
 let COFRE_CORRIGINDO = {}, COFRE_CDIA = [], CDIA_CORRIGINDO = {}, COFRE_DATA = {}, COFRE_MOM = {};
+let COFRE_SALDO = {};
+async function cofreSaldoCarregar(unidade, data, k, mom) {
+  const r = await trRpcSeguro('caixa_cofre_saldo_saipos', { p_unidade: unidade, p_data: data });
+  const j = r.ok ? await r.json().catch(() => null) : null, row = Array.isArray(j) ? j[0] : j;
+  const el = document.getElementById('cfSaldo_' + k); if (!el) return;
+  if (!row) { COFRE_SALDO[k] = null; el.innerHTML = `<span style="color:var(--tx-4);">sem o saldo do Saipos para ${caixaDdm(data)} ainda</span>`; cedSomar(k); return; }
+  COFRE_SALDO[k] = Number(mom === 'noite' ? row.saldo_fim_dia : row.saldo_inicio_dia);
+  el.innerHTML = `saldo do cofre no Saipos (${mom === 'noite' ? 'fim' : 'início'} de ${caixaDdm(data)}): <b>R$ ${fmt(COFRE_SALDO[k])}</b>`;
+  cedSomar(k);
+}
 // o resultado da contagem do cofre: contado × saldo do Saipos no início (manhã) ou no fim (noite) da data escolhida
 async function cofreResultado(unidade, data, k, mom, tot) {
   const el = document.getElementById('cfRes_' + k); if (!el) return;
@@ -1547,7 +1562,7 @@ function cofreGradeHtml(unidade, dia, k, livre) {
     <details style="margin-top:6px;"><summary style="cursor:pointer; font-size:12px; color:var(--tx-4);">digitar só o total</summary>
       <div style="display:flex; gap:8px; align-items:center; margin-top:4px;"><input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;">
       <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar o total</button></div></details>
-    <div class="caption-label" style="text-align:left;">O saldo do cofre no Saipos aparece depois de gravar.</div>`;
+    `;
 }
 // abre o campo de novo, já preenchido, no lugar do "contado × Saipos" (grava por cima: o upsert é o mesmo)
 function cofreCorrigir(unidade, dia, k, atual) {
@@ -1637,6 +1652,9 @@ function cedSomar(k) {
     tot[gr] = Math.round(tot[gr] * 100) / 100;
     const el = document.getElementById(`ced_${k}_${gr}`); if (el) el.textContent = 'R$ ' + fmt(tot[gr]);
   });
+  const dEl = document.getElementById('cfDif_' + k);
+  if (dEl && tot.COFRE != null && COFRE_SALDO[k] != null) { const df = Math.round((tot.COFRE - COFRE_SALDO[k]) * 100) / 100;
+    dEl.innerHTML = `soma R$ ${fmt(tot.COFRE)} · ` + (Math.abs(df) < 0.005 ? '<span style="color:var(--farol-ok);">bate com o Saipos</span>' : `<span style="color:var(--farol-fora);">${df < 0 ? 'faltam' : 'sobram'} R$ ${fmt(Math.abs(df))}</span>`); }
   const t = document.getElementById(`ced_${k}_TOTAL`);
   if (t) t.textContent = `gaveta + cofre: R$ ${fmt(Math.round(((tot.CAIXA || 0) + (tot.DEPOSITO || 0)) * 100) / 100)}`;
   return tot;
@@ -1899,10 +1917,8 @@ function caixaHellenHtml() {
       ${linha(`Caixa de ontem (${caixaDdm(ontemSP)}) fechado no Saipos`, abertos.length ? nao(abertos.map(x => trEscH(x.frente || 'caixa') + ' aberto desde ' + x.desde).join(', ')) : ok('sim'))}
       ${linha('Trocas de bandeira', rb.length ? esp(`o robô vai trocar ${rb.length}`) : ok('nada pendente'))}
       ${linha('Dinheiro contado hoje', contado ? ok('contado' + (quem ? ' por ' + trEscH(quem.charAt(0).toUpperCase() + quem.slice(1)) : '')) : nao('ainda não'))}
-      ${contado ? '' : `<button class="preset-btn active" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="caixaContarHoje('${u.replace(/'/g, "\\'")}')">Contar dinheiro</button>`}
+      ${contado ? '' : `<button class="preset-btn active" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="caixaIrContagem('${u.replace(/'/g, "\\'")}')">Contar dinheiro</button>`}
       ${caixaConfHtml(u, ontemSP)}
-      <div style="margin-top:8px;"><a href="javascript:void(0)" onclick="caixaAbrirNoCartao('${u.replace(/'/g, "\\'")}', '${ontemSP}', true)">ver venda a venda do caixa de ${caixaDdm(ontemSP)} ›</a></div>
-      <div id="cxCartaoDia_${u.replace(/[^A-Z]/g, '')}"></div>
     </div>`;
   }).join('');
   // 2) PARA A HELLEN: só o que é dela, uma linha e um botão
@@ -1990,11 +2006,14 @@ function caixaHistoricoHtml() {
     const cf = (CAIXA_CONF || []).filter(c => c.unidade === u && c.dia === d);
     // até 24/11 tudo fechou em lote (dono 25/11), com ou sem a linha do carimbo para aquele caixa
     if (cf.some(caixaFechouLote) || d < CAIXA_NOVO_FLUXO) return '<span style="color:var(--farol-ok);">fechado em lote pelo dono</span>';
-    const pend = itens.filter(x => x.u === u && x.dia === d && !['aguardando', 'contagem'].includes(x.bloco));
-    if (pend.length) return `<b style="color:var(--farol-perto);">com pendência (${pend.length})</b>`;
-    if (cf.some(caixaFechouSozinho)) return '<span style="color:var(--farol-ok);">fechou sozinho</span>';
-    if (cf.length) return '<span style="color:var(--farol-ok);">fechado</span>';
-    return '<span style="color:var(--tx-4);">aberto</span>';
+    // 25/11/2026 (dono 20:13: "cada linha mostrar um status final, se tem pendência ou está ok"): pendência de venda + desconto sem explicação
+    const pend = itens.filter(x => x.u === u && x.dia === d && x.pend).length;
+    const exp = new Set((CAIXA_VALID || []).map(v => v.chave));
+    const desc = ((H && H.desc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === d && (x.alerta_sem_motivo || x.alerta_sem_autorizacao) && !exp.has('desc:' + x.id_sale)).length;
+    const n = pend + desc;
+    if (n) return `<b style="color:var(--farol-perto);">⚠ ${n} ${n === 1 ? 'pendência' : 'pendências'}</b>`;
+    if (d >= hojeSP) return '<span style="color:var(--tx-4);">em andamento</span>';
+    return '<span style="color:var(--farol-ok);">✓ ok</span>';
   };
   const R = v => 'R$ ' + fmt(Number(v));
   const linhas = dias.flatMap(d => lojas.map(u => {
@@ -2003,11 +2022,14 @@ function caixaHistoricoHtml() {
     const contado = c && c.contado != null ? R(c.contado) + (env ? `<div style="font-size:11px;color:var(--tx-4);">saiu do cofre para a AV: ${R(env)}</div>` : '') : (env ? `<span style="color:var(--tx-4);">—</span><div style="font-size:11px;color:var(--tx-4);">saiu do cofre para a AV: ${R(env)}</div>` : '<span style="color:var(--tx-4);">—</span>');
     const dif = c && c.contado != null && c.diferenca != null ? (Math.abs(Number(c.diferenca)) < 0.005 ? '<span style="color:var(--farol-ok);">bateu</span>'
       : `<span style="color:var(--farol-fora);">${Number(c.diferenca) < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(Number(c.diferenca)))}</span>`) : '<span style="color:var(--tx-4);">—</span>';
-    return `<tr style="cursor:pointer;" title="abrir o dia" onclick="abrirDiaConcartao('${u.replace(/'/g, "\\'")}', '${d}')"><td>${caixaDdm(d)}</td><td>${nomeLoja(u)}</td><td>${sit(u, d)}</td><td>${contado}</td><td>${dif}</td></tr>`;
+    const kk = (u + d).replace(/[^A-Z0-9]/g, ''), aberto = CAIXA_HIST_ABERTO === kk;
+    return `<tr><td>${caixaDdm(d)}</td><td>${nomeLoja(u)}</td><td>${sit(u, d)}</td><td>${contado}${dif.includes('—') ? '' : '<div style="font-size:11.5px;">' + dif + '</div>'}</td>
+      <td><button class="preset-btn${aberto ? ' active' : ''}" onclick="CAIXA_HIST_ABERTO = CAIXA_HIST_ABERTO === '${kk}' ? null : '${kk}'; renderModuloCaixa();">${aberto ? 'Fechar' : 'Abrir'}</button></td></tr>`
+      + (aberto ? `<tr><td colspan="5" style="white-space:normal;">${caixaConfHtml(u, d)}</td></tr>` : '');
   })).join('');
-  return `<div class="section-label" style="text-align:left;margin-top:16px;">Histórico</div>
-    <div class="caption-label" style="text-align:left;">Até 24/11 fechado em lote pelo dono em 25/11. Toque no dia para abrir.</div>
-    <div id="tabelaCaixaHistorico" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Situação</th><th>Dinheiro contado</th><th>Diferença</th></tr></thead><tbody>${linhas}</tbody></table></div>
+  return `<div class="section-label" style="text-align:left;margin-top:16px;">Últimos ${CAIXA_HIST_N} dias</div>
+    <div class="caption-label" style="text-align:left;">Até 24/11 fechado em lote pelo dono em 25/11. [Abrir] mostra a conferência do dia.</div>
+    <div id="tabelaCaixaHistorico" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Situação</th><th>Dinheiro contado</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
     <div style="margin-top:6px;"><button class="preset-btn" onclick="CAIXA_HIST_N = CAIXA_HIST_N > 7 ? 7 : 30; renderModuloCaixa();">${CAIXA_HIST_N > 7 ? 'ver só os últimos 7 dias' : 'ver mais (30 dias)'}</button></div>`;
 }
 // ---------- CONFERÊNCIA DO CAIXA DE ONTEM (25/11/2026 [regra]; dono: "ficou mais simples, mas parece que perdeu o sentido da conferência";
@@ -2085,6 +2107,19 @@ async function caixaDescExplicar(u, dia, idSale, valor, bt) {
   if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaDescExplicar(u, dia, idSale, valor, bt)); }
   avisoAcao('ok', `✓ Desconto explicado às ${avisoHora()}.`);
   await caixaRecarregarValidadas();
+}
+// 25/11/2026 [dono] (Organizador 20:16, desenho final): a contagem do dinheiro fica no FIM da tela, um cartão por loja (data e momento
+// escolhidos); o "Contar dinheiro" do topo só rola até ela. O quadro do dia (venda a venda) saiu do caminho principal.
+function caixaContagemFimHtml() {
+  const H = CAIXA_HELLEN, lojas = (H && H.lojas && H.lojas.length) ? H.lojas : caixaLojas().map(x => x[0]);
+  const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
+  return `<div class="section-label" style="text-align:left;margin-top:16px;">Contagem do dinheiro</div>`
+    + lojas.map(u => `<div id="cxCont_${u.replace(/[^A-Z]/g, '')}" style="margin-top:6px;"><b>${nomeLoja(u)}</b>${cofreLinhaDia(u, hojeSP)}</div>`).join('');
+}
+function caixaIrContagem(u) {
+  const el = document.getElementById('cxCont_' + u.replace(/[^A-Z]/g, ''));
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); const i = el.querySelector('input'); if (i) setTimeout(() => i.focus(), 400); }
 }
 function caixaHellenDeNovo() { CAIXA_HELLEN = null; renderModuloCaixa(); caixaHellenCarregar(); }
 async function caixaHellenAbrir(i) {
@@ -2335,6 +2370,7 @@ function renderModuloCaixa() {
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
     ${caixaHistoricoHtml()}
+    ${caixaContagemFimHtml()}
     <div class="caption-label" style="text-align:left;margin-top:14px;"><a href="javascript:void(0)" onclick="caixaVerDescontos(true)">Descontos do salão e do balcão ›</a></div>`;
   if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
 }
