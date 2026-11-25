@@ -1459,7 +1459,7 @@ function cofreLinhaDia(unidade, dia) {
   if (!r) c2 = cartao('Contagem do cofre', sub2, '<div class="caption-label" style="text-align:left;">sem saldo do cofre para este dia no sistema</div>');
   else if (r.contagem_cobre_cofre === true && r.contado != null && !COFRE_CORRIGINDO[k]) {
     const dif = Number(r.diferenca);
-    c2 = cartao('Contagem do cofre', sub2, `<div>esperado <b>${R(r.saldo_fim_dia)}</b> · contado <b>${R(r.contado)}</b> · ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(dif))}</b>`}
+    c2 = cartao('Contagem do cofre', sub2, `<div>saldo do cofre no Saipos <b>${R(r.saldo_fim_dia)}</b> · contado <b>${R(r.contado)}</b> · ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(dif))}</b>`}
       ${pode ? ` <button class="preset-btn ${livre}" onclick="COFRE_CORRIGINDO['${k}']=true; cofreRedesenhar('${unidade}', '${dia}')">corrigir</button>` : ''}</div>${cofreConferidoTxt(cofreContagemDe(unidade, dia))}`);
   } else if (!pode) c2 = cartao('Contagem do cofre', sub2, '<div style="color:var(--farol-perto);">ainda não contado</div>');
   else c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, cofreGradeHtml(unidade, dia, k, livre), corte);
@@ -1490,7 +1490,7 @@ function cofreGradeHtml(unidade, dia, k, livre) {
     <details style="margin-top:6px;"><summary style="cursor:pointer; font-size:12px; color:var(--tx-4);">digitar só o total</summary>
       <div style="display:flex; gap:8px; align-items:center; margin-top:4px;"><input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;">
       <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar o total</button></div></details>
-    <div class="caption-label" style="text-align:left;">O esperado aparece depois de gravar.</div>`;
+    <div class="caption-label" style="text-align:left;">O saldo do cofre no Saipos aparece depois de gravar.</div>`;
 }
 // abre o campo de novo, já preenchido, no lugar do "contado × Saipos" (grava por cima: o upsert é o mesmo)
 function cofreCorrigir(unidade, dia, k, atual) {
