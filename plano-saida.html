@@ -165,8 +165,8 @@ function migHtml() {
   const corpo = fases.map(f => { const l = vis.filter(x => x.fase === f).sort((a, b) => (MIG_ORD[a.situacao] ?? 9) - (MIG_ORD[b.situacao] ?? 9) || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
     return l.length ? `<div class="fase">${esc(MIG_FASES[f] || 'Fase ' + f)} · ${l.length}</div>${l.map(linha).join('')}` : ''; }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
   const ult = MIG.map(x => x.atualizado_em).filter(Boolean).sort().pop();
-  return `<h2>Migração sem Claude — entrega 01/12</h2>
-    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que já rodam sem o Claude, com farol e o que fazer se parar.</p>
+  return `<h2>Migração para o Fabio — entrega 01/12</h2>
+    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>
     <div class="mig">
       <div class="mig-nums"><span class="feito">${n('feito')} feito${n('feito') === 1 ? '' : 's'}</span><span class="andamento">${n('andamento')} em andamento</span>
         <span>${n('a fazer')} a fazer</span>${n('travado') ? `<span class="travado">${n('travado')} travado${n('travado') === 1 ? '' : 's'}</span>` : ''}</div>
