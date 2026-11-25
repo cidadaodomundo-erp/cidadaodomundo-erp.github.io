@@ -6945,6 +6945,53 @@ async function entrarContasPagar() {
   await cpCarregar();
   renderContasPagar();
   cxhAplicarIr('contaspagar');
+  sispagCard();
+}
+
+// ---------- ARQUIVOS DO SISPAG (25/11/2026; dono pelo Organizador 12:56: o arquivo sai por um BOTÃO no painel; proposta
+// 2026-11-25-sispag-baixar-arquivo.md, chat Itaú: API). Card próprio ACIMA da lista (o render de Contas a pagar regrava o
+// view inteiro; o card mora fora dele). Só aparece se rpc itau_sispag_pode_ver() = true (Neto e Hellen); o conteúdo só sai
+// pela rpc itau_sispag_baixar, que marca baixado. O arquivo vai byte a byte: CRLF do banco, sem trim nem replace.
+async function sispagCard() {
+  const alvo = document.getElementById('view-contaspagar');
+  if (!alvo) return;
+  let box = document.getElementById('sispagCard');
+  let pode = false;
+  try { const r = await trRpcSeguro('itau_sispag_pode_ver', {}); pode = r.ok && (await r.json()) === true; } catch (e) { pode = false; }
+  if (!pode) { if (box) box.remove(); return; }
+  if (!box) { box = document.createElement('div'); box.id = 'sispagCard'; alvo.parentNode.insertBefore(box, alvo); }
+  let L;
+  try {
+    L = await consultarTudo('itau_sispag_remessa?select=id,empresa,conta,tipo,nome_arquivo,qtd_pagamentos,valor_total,resumo,gerado_em,baixado_em,baixado_por,retorno_status,retorno_em&order=gerado_em.desc&limit=20');
+  } catch (e) { box.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os arquivos do SISPAG: ${trEscH(e.message)} <button class="preset-btn" onclick="sispagCard()">Tentar de novo</button></div>`; return; }
+  const dh = (t) => t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '';
+  const rs = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const selo = (t) => t === 'PRODUCAO'
+    ? `<span style="display:inline-block;border:2px solid var(--farol-fora);color:var(--farol-fora);border-radius:8px;padding:2px 8px;font-weight:800;">PRODUÇÃO — subir na Transmissão de produção</span><div class="caption-label" style="text-align:left;">Os pagamentos ficam esperando a sua aprovação no Bankline.</div>`
+    : `<span style="display:inline-block;border:2px solid var(--marca-laranja);color:var(--marca-laranja);border-radius:8px;padding:2px 8px;font-weight:800;">TESTE — subir em Transmissão (Teste)</span><div class="caption-label" style="text-align:left;">Em teste o Itaú só confere o arquivo: não paga nada.</div>`;
+  box.innerHTML = `<div class="section-label" style="text-align:left;border-top:none;margin-top:0;padding-top:0;">Arquivos do SISPAG (pagamentos pelo Itaú)</div>
+    <div class="caption-label" style="text-align:left;">Baixe o arquivo e suba no Bankline: Mais… → Transmissão de Arquivo. Os pagamentos ficam para aprovar no Bankline.</div>
+    ${(L || []).length ? `<div id="tabelaSispag" style="overflow-x:auto;"><table><thead><tr><th>Gerado em</th><th>Conta</th><th>Tipo</th><th>Pagamentos</th><th>Resumo</th><th>Baixado</th><th>Retorno</th><th>Ação</th></tr></thead><tbody>
+      ${L.map((x) => `<tr><td style="white-space:nowrap;">${dh(x.gerado_em)}</td><td>${trEscH(x.conta || x.empresa || '')}</td><td style="white-space:normal;min-width:190px;">${selo(x.tipo)}</td>
+        <td style="white-space:nowrap;">${Number(x.qtd_pagamentos) || 0} · ${rs(x.valor_total)}</td><td style="white-space:normal;font-size:12.5px;">${trEscH(x.resumo || '')}</td>
+        <td style="white-space:nowrap;">${x.baixado_em ? `${dh(x.baixado_em)}${x.baixado_por ? ' · ' + trEscH(String(x.baixado_por).split('@')[0]) : ''}` : '<span style="color:var(--tx-4);">ainda não</span>'}</td>
+        <td style="white-space:normal;">${x.retorno_status ? trEscH(x.retorno_status) + (x.retorno_em ? `<div class="caption-label">${dh(x.retorno_em)}</div>` : '') : '<span style="color:var(--tx-4);">aguardando retorno</span>'}</td>
+        <td><button class="preset-btn active" onclick="sispagBaixar(${Number(x.id)}, this)">Baixar</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="caption-label" style="text-align:left;">Nenhum arquivo gerado ainda.</div>'}
+    <div style="height:14px;"></div>`;
+}
+async function sispagBaixar(id, bt) {
+  const txt = bt.textContent; bt.disabled = true; bt.textContent = 'baixando…';
+  const r = await trRpcSeguro('itau_sispag_baixar', { p_id: id });
+  bt.disabled = false; bt.textContent = txt;
+  if (!r.ok) { avisoAcao('erro', '✗ Não baixou: ' + (await trErroDe(r)), () => sispagBaixar(id, bt)); return; }
+  const j = await r.json(), a = Array.isArray(j) ? j[0] : j;
+  if (!a || a.conteudo == null) { avisoAcao('erro', '✗ Não baixou: o arquivo veio vazio.', () => sispagBaixar(id, bt)); return; }
+  const url = URL.createObjectURL(new Blob([a.conteudo], { type: 'text/plain' }));
+  const ln = document.createElement('a'); ln.href = url; ln.download = a.nome_arquivo || ('sispag-' + id + '.txt');
+  document.body.appendChild(ln); ln.click(); ln.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  avisoAcao('ok', `✓ Arquivo baixado: ${a.nome_arquivo || ''} — às ${avisoHora()}.`);
+  sispagCard();
 }
 
 async function entrarContasReceber() {
