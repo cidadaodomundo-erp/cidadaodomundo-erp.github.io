@@ -93,6 +93,15 @@
   .pm-tv .fo { display:block; margin-top:6px; font-size:11px; color:var(--tx-3); line-height:1.4; }
   .pm-nota { font-size:12px; color:var(--tx-3); margin:10px 0 0; line-height:1.5; }
   .pm-vazio { padding:18px; color:var(--tx-3); }
+  .pm-ok { color:var(--farol-ok, #2ea043); font-weight:700; }
+  .pm-ruim { color:var(--farol-erro, #e5534b); font-weight:700; }
+  .pm-espera { color:var(--farol-atencao, #d29922); font-weight:700; }
+  .pm-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .pm-form select, .pm-form input { font:inherit; font-size:13px; padding:6px 8px; border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:inherit; }
+  .pm-form input[type=text] { flex:1 1 220px; }
+  .pm-form input[type=number] { width:110px; }
+  .pm-resumo { display:flex; flex-wrap:wrap; gap:14px; font-size:13px; }
+  .pm-riscado td { text-decoration:line-through; opacity:.55; }
   .pm-regras { font-size:14px; line-height:1.6; }
   .pm-regras h3 { font-size:15px; margin:14px 0 4px; }
   .pm-regras li { margin:2px 0; }
@@ -120,20 +129,20 @@
 
     <div class="pm-abas" id="abas">
       <button data-aba="pagar" class="on">💵 Quanto pagar</button>
-      <button data-aba="maquininha">🧾 Maquininha do dia <span class="pm-selo">Em construção</span></button>
-      <button data-aba="dobro">🔎 Corrida em dobro <span class="pm-selo">Em construção</span></button>
-      <button data-aba="acerto">📒 Acerto <span class="pm-selo">Em construção</span></button>
+      <button data-aba="maquininha">🧾 Maquininha do dia</button>
+      <button data-aba="dobro">🔎 Corrida em dobro</button>
+      <button data-aba="acerto">📒 Acerto</button>
       <button data-aba="regras">📜 As regras</button>
     </div>
 
+    <div class="pm-caixa pm-dia">
+      <div class="rot" id="diaRot">💵 Quanto pagar a cada motoboy</div>
+      <button type="button" class="pm-btn" id="btnAntes">◀ dia anterior</button>
+      <input type="date" id="dia" aria-label="Dia">
+      <button type="button" class="pm-btn" id="btnDepois">dia seguinte ▶</button>
+    </div>
+    <div class="pm-caixa pm-lojas" id="lojas"></div>
     <div id="painelPagar">
-      <div class="pm-caixa pm-dia">
-        <div class="rot" id="diaRot">💵 Quanto pagar a cada motoboy</div>
-        <button type="button" class="pm-btn" id="btnAntes">◀ dia anterior</button>
-        <input type="date" id="dia" aria-label="Dia">
-        <button type="button" class="pm-btn" id="btnDepois">dia seguinte ▶</button>
-      </div>
-      <div class="pm-caixa pm-lojas" id="lojas"></div>
       <div id="avisos"></div>
       <div id="conteudo"><div class="pm-vazio">Carregando o dia…</div></div>
     </div>
@@ -175,6 +184,7 @@ function exigirLogin(recado) {
     if (!r.ok) { erro(r.status === 403 || r.status === 400 ? 'Esta tela é só do dono e de quem cuida do pessoal.' : await trErroDe(r)); return; }
     DADOS = await r.json(); ABERTO = {};
     if (seq === SEQ) desenhar();
+    if (seq === SEQ && !$('painelObra').hidden) carregarAbas();
   }
   // Chegada no pátio: a MESMA fonte da tela Chegada (fila do TrackEat, GPS do pátio, anotado no balcão e a decisão à mão
   // de garantido/refeição). Só leitura (GET). Se falhar, a conta sai sem hora do pátio e não corta ninguém.
@@ -393,15 +403,139 @@ function exigirLogin(recado) {
       '<li>A hora do pátio vem da fila do TrackEat e do GPS, pelo robô do Escritório 2. Se num dia não houver essa hora, a 1ª coleta aparece em laranja só como aviso e <b>não corta</b>, porque a 1ª coleta costuma ser bem depois da chegada.</li></ul></div>';
   }
 
+
+  // 25/11/2026 (dono): Maquininha do dia, Corrida em dobro e Acerto — leitura em pagar_motoboys_abas;
+  // o acerto à mão grava por motoboy_acerto_lancar / motoboy_acerto_cancelar (o mesmo que a conta do "Quanto pagar" lê).
+  let ABA = 'pagar', ABAS = null, ABAS_SEQ = 0;
+  const ROTULOS = { pagar: '💵 Quanto pagar a cada motoboy', maquininha: '🧾 Cartão cobrado na porta', dobro: '🔎 Corridas reprovadas ou pendentes no TrackEat', acerto: '📒 Acertos do dia', regras: '💵 Quanto pagar a cada motoboy' };
+  const UNID = { 'Água Verde': 'AGUA VERDE', 'São Braz': 'SÃO BRAZ', 'Ahú': 'AHU' };
+  const dm = (d) => (d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—');
+  function porLoja(lista) { return (lista || []).filter((x) => LOJA === 'todas' || x.loja === LOJA); }
+
+  async function carregarAbas() {
+    const dia = $('dia').value; const seq = ++ABAS_SEQ;
+    $('painelObra').innerHTML = '<div class="pm-vazio">Carregando…</div>';
+    let r;
+    try { r = await trRpc('pagar_motoboys_abas', { p_dia: dia }); } catch (e) { if (seq === ABAS_SEQ) $('painelObra').innerHTML = '<div class="pm-aviso">Sem conexão com o banco agora. Tente de novo.</div>'; return; }
+    if (seq !== ABAS_SEQ) return;
+    if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
+    if (!r.ok) { $('painelObra').innerHTML = '<div class="pm-aviso">' + esc(r.status === 403 || r.status === 400 ? 'Esta parte é só do dono e de quem cuida do pessoal.' : await trErroDe(r)) + '</div>'; return; }
+    ABAS = await r.json();
+    if (seq === ABAS_SEQ) desenharAba();
+  }
+
+  function desenharAba() {
+    if (!ABAS) return;
+    if (ABA === 'maquininha') abaMaquininha(); else if (ABA === 'dobro') abaDobro(); else if (ABA === 'acerto') abaAcerto();
+  }
+
+  function abaMaquininha() {
+    const ls = porLoja(ABAS.maquininha);
+    let h = '<div class="pm-aviso info">Cada venda paga com cartão ou vale na porta, procurada na Rede pelo mesmo valor até 45 min da entrega (vale: até 7 dias). A Rede chega no dia seguinte: hoje ela está carregada até <b>' + esc(dm(ABAS.rede_ate)) + '</b>.</div>';
+    if (!ls.length) { $('painelObra').innerHTML = h + '<div class="pm-vazio">Nenhuma venda de cartão na porta neste dia' + (LOJA !== 'todas' ? ' nesta loja' : '') + '.</div>'; return; }
+    const ach = ls.filter((x) => x.cobrado).length, esp = ls.filter((x) => !x.cobrado && x.aguardando).length, nao = ls.length - ach - esp;
+    h += '<div class="pm-caixa pm-resumo"><span><b>' + ls.length + '</b> vendas</span><span class="pm-ok">' + ach + ' achadas na Rede</span>' +
+      (esp ? '<span class="pm-espera">' + esp + ' esperando a Rede</span>' : '') + (nao ? '<span class="pm-ruim">' + nao + ' não achadas</span>' : '') + '</div>';
+    h += '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Loja</th><th>Hora</th><th>Forma</th><th>Valor</th><th>Rede</th></tr></thead><tbody>';
+    ls.forEach((x) => {
+      const st = x.cobrado ? '<span class="pm-ok">✓ achada</span>' : x.aguardando ? '<span class="pm-espera">esperando</span>' : '<span class="pm-ruim">✗ não achada</span>';
+      h += '<tr><td data-rot="Motoboy">' + esc(x.motoboy || '—') + '</td><td data-rot="Loja">' + esc(x.loja) + '</td><td data-rot="Hora">' + esc(x.hora || '—') + '</td><td data-rot="Forma">' + esc(x.tipo || x.grupo) +
+        '</td><td data-rot="Valor">' + brl(x.valor) + '</td><td data-rot="Rede">' + st + '</td></tr>';
+    });
+    h += '</tbody></table></div><p class="pm-nota">"Não achada" é aviso para conferir com o motoboy e com o comprovante, não é desconto automático. A conferência pelo GPS da casa do cliente segue no portal antigo.</p>';
+    $('painelObra').innerHTML = h;
+  }
+
+  function abaDobro() {
+    const ls = porLoja(ABAS.corridas);
+    let h = '<div class="pm-aviso info">Corrida <b>Reprovada</b> no TrackEat (corrida repetida) fica <b>fora</b> da conta. <b>Pendente</b> ainda conta até alguém aprovar ou reprovar no TrackEat. O robô que reprova sozinho a 2ª corrida quando o GPS mostra uma ida só continua rodando; o que ele reprova aparece aqui. TrackEat lido até ' + esc(dm(ABAS.trackeat_ate)) + '.</div>';
+    if (!ls.length) { $('painelObra').innerHTML = h + '<div class="pm-vazio">Nenhuma corrida reprovada ou pendente neste dia' + (LOJA !== 'todas' ? ' nesta loja' : '') + '.</div>'; return; }
+    const rep = ls.filter((x) => x.status_financeiro === 'Reprovado'), pen = ls.filter((x) => x.status_financeiro !== 'Reprovado');
+    const soma = (a) => a.reduce((t, x) => t + Number(x.taxa_entrega || 0), 0);
+    h += '<div class="pm-caixa pm-resumo"><span class="pm-ok">' + rep.length + ' reprovada(s) · ' + brl(soma(rep)) + ' fora da conta</span>' +
+      (pen.length ? '<span class="pm-espera">' + pen.length + ' pendente(s) · ' + brl(soma(pen)) + ' ainda contam</span>' : '') + '</div>';
+    h += '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Loja</th><th>Pedido</th><th>Hora</th><th>Distância</th><th>Taxa</th><th>TrackEat</th></tr></thead><tbody>';
+    ls.forEach((x) => {
+      const st = x.status_financeiro === 'Reprovado' ? '<span class="pm-ok">Reprovada</span>' : '<span class="pm-espera">Pendente</span>';
+      h += '<tr><td data-rot="Motoboy">' + esc(x.motoboy || '—') + '</td><td data-rot="Loja">' + esc(x.loja) + '</td><td data-rot="Pedido">' + esc(x.numero_venda || x.codigo || '—') + '</td><td data-rot="Hora">' + esc(x.hora || '—') +
+        '</td><td data-rot="Distância">' + (x.dist_km != null ? Number(x.dist_km).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' km' : '—') + '</td><td data-rot="Taxa">' + brl(x.taxa_entrega) + '</td><td data-rot="TrackEat">' + st + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    $('painelObra').innerHTML = h;
+  }
+
+  function abaAcerto() {
+    const ac = porLoja(ABAS.acertos), fc = porLoja(ABAS.faltas_caixa);
+    const mot = ((DADOS && DADOS.linhas) || []).filter((l) => l.id_entregador != null && (LOJA === 'todas' || l.loja === LOJA));
+    let h = '<div class="pm-aviso info">Acerto é um valor à mão somado (ou descontado) no pagamento do motoboy neste dia. Ele entra na hora na conta do <b>Quanto pagar</b>. A falta do caixa do delivery confirmada na conferência do caixa já é descontada sozinha, no 1º dia em que o motoboy roda depois da confirmação.</div>';
+    h += '<div class="pm-caixa"><div class="pm-form">' +
+      '<select id="acMot"><option value="">Motoboy…</option>' + mot.map((l, i) => '<option value="' + i + '">' + esc((l.nome || l.motoboy || '?') + ' · ' + l.loja) + '</option>').join('') + '</select>' +
+      '<select id="acSinal"><option value="-1">Descontar</option><option value="1">Pagar a mais</option></select>' +
+      '<input type="number" id="acValor" min="0" step="0.01" placeholder="R$ 0,00">' +
+      '<input type="text" id="acMotivo" placeholder="Motivo (ex.: desconto combinado no Pix)">' +
+      '<button type="button" class="pm-btn" id="acLancar">Lançar acerto</button></div>' +
+      (mot.length ? '' : '<p class="pm-nota">Nenhum motoboy rodou neste dia' + (LOJA !== 'todas' ? ' nesta loja' : '') + ': escolha outro dia ou loja.</p>') + '<div id="acMsg" class="pm-nota"></div></div>';
+    h += '<h3 style="font-size:14px;margin:14px 0 6px">Acertos lançados à mão</h3>';
+    if (!ac.length) h += '<div class="pm-vazio">Nenhum acerto à mão neste dia.</div>';
+    else {
+      h += '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Loja</th><th>Valor</th><th>Motivo</th><th>Lançado</th><th></th></tr></thead><tbody>';
+      ac.forEach((x) => {
+        h += '<tr' + (x.cancelado ? ' class="pm-riscado"' : '') + '><td data-rot="Motoboy">' + esc(x.motoboy || '—') + '</td><td data-rot="Loja">' + esc(x.loja) + '</td><td data-rot="Valor">' + brl(x.valor) +
+          '</td><td data-rot="Motivo" style="white-space:normal;text-align:left">' + esc(x.motivo || '') + (x.cancelado ? '<br><small>cancelado: ' + esc(x.motivo_cancelamento || '') + '</small>' : '') +
+          '</td><td data-rot="Lançado">' + esc((x.lancado_em || '') + (x.lancado_por ? ' · ' + x.lancado_por.split('@')[0] : '')) + '</td><td>' +
+          (x.cancelado ? '' : '<button type="button" class="pm-btn" data-cancelar="' + esc(x.id) + '">Cancelar</button>') + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+    h += '<h3 style="font-size:14px;margin:14px 0 6px">Falta do caixa descontada neste dia</h3>';
+    if (!fc.length) h += '<div class="pm-vazio">Nenhuma falta do caixa cai neste dia.</div>';
+    else {
+      h += '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th><th>Loja</th><th>Valor</th><th>Venda</th><th>Caixa de</th><th>Confirmada</th></tr></thead><tbody>';
+      fc.forEach((x) => {
+        h += '<tr><td data-rot="Motoboy">' + esc(x.motoboy || '—') + '</td><td data-rot="Loja">' + esc(x.loja) + '</td><td data-rot="Valor">' + brl(x.valor) + '</td><td data-rot="Venda">' + esc(x.numero_venda || '—') +
+          '</td><td data-rot="Caixa de">' + esc(x.dia_caixa || '—') + '</td><td data-rot="Confirmada">' + esc(x.confirmada_em || '—') + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+    $('painelObra').innerHTML = h;
+    $('acLancar').onclick = () => lancarAcerto(mot);
+  }
+
+  async function lancarAcerto(mot) {
+    const msg = (t, ruim) => { $('acMsg').innerHTML = '<span class="' + (ruim ? 'pm-ruim' : 'pm-ok') + '">' + esc(t) + '</span>'; };
+    const l = mot[Number($('acMot').value)]; const v = Number(String($('acValor').value).replace(',', '.')); const motivo = $('acMotivo').value.trim();
+    if (!$('acMot').value || !l) return msg('Escolha o motoboy.', true);
+    if (!(v > 0)) return msg('Digite o valor.', true);
+    if (motivo.length < 3) return msg('Escreva o motivo.', true);
+    $('acLancar').disabled = true; msg('Gravando…');
+    let r;
+    try { r = await trRpc('motoboy_acerto_lancar', { p_dia: $('dia').value, p_id_entregador: l.id_entregador, p_motoboy: l.nome || l.motoboy, p_unidade: UNID[l.loja] || l.loja, p_valor: Math.round(v * 100) / 100 * Number($('acSinal').value), p_motivo: motivo }); }
+    catch (e) { $('acLancar').disabled = false; return msg('Sem conexão. Nada foi gravado.', true); }
+    if (!r.ok) { $('acLancar').disabled = false; return msg('Não gravou: ' + (await trErroDe(r)), true); }
+    await carregar();
+  }
+
+  $('painelObra').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button[data-cancelar]'); if (!b) return;
+    const tr = b.closest('tr'); let inp = tr.querySelector('input.pm-mc');
+    if (!inp) { b.insertAdjacentHTML('beforebegin', '<input class="pm-mc" type="text" placeholder="Motivo do cancelamento" style="font:inherit;font-size:12px;padding:4px 6px;margin-right:6px">'); b.textContent = 'Confirmar'; return; }
+    const m = inp.value.trim(); if (m.length < 3) { inp.focus(); return; }
+    b.disabled = true;
+    let r; try { r = await trRpc('motoboy_acerto_cancelar', { p_id: Number(b.dataset.cancelar), p_motivo: m }); } catch (e) { b.disabled = false; return; }
+    if (!r.ok) { b.disabled = false; b.textContent = 'Não cancelou'; b.title = await trErroDe(r); return; }
+    await carregar();
+  });
+
   $('abas').addEventListener('click', (ev) => {
     const b = ev.target.closest('button[data-aba]'); if (!b) return;
     document.querySelectorAll('#abas button').forEach((x) => x.classList.toggle('on', x === b));
-    const a = b.dataset.aba;
+    ABA = b.dataset.aba; const a = ABA;
     $('painelPagar').hidden = a !== 'pagar'; $('painelRegras').hidden = a !== 'regras'; $('painelObra').hidden = a === 'pagar' || a === 'regras';
+    $('diaRot').textContent = ROTULOS[a] || ROTULOS.pagar;
     if (a === 'regras') regras();
-    if (!$('painelObra').hidden) $('painelObra').innerHTML = '<div class="pm-aviso info">Esta parte ainda está no portal antigo e vem para cá nos próximos passos.</div>';
+    if (!$('painelObra').hidden) carregarAbas();
   });
-  $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); });
+  $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); desenharAba(); });
   $('conteudo').addEventListener('click', (ev) => { const tv = ev.target.closest('button[data-tva]'); if (tv) { TURNO_VER[tv.dataset.tv] = tv.dataset.tva; desenhar(); return; } const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
   $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };
   $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
