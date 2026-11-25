@@ -145,7 +145,8 @@ async function carregar() {
 // ---- Migração sem Claude — entrega 01/12 (25/11/2026 [migracao]; dono: "um passo a passo dessa migração, resumido e
 // objetivo, onde eu possa ver o que está em andamento, já foi feito, etc."). Travados primeiro, depois por prazo.
 let MIG = [], MIG_F = 'todos';
-const MIG_FASES = { 1:'1. Consertar e congelar', 2:'2. Tirar o Claude', 3:'3. Passar ao Fabio' };
+// 25/11 15:10 (dono: "vai depender do Claude, mas do Claude do Fabio"): 4 fases
+const MIG_FASES = { 1:'1. Consertar e congelar', 2:'2. Regras por módulo', 3:'3. Trocar as contas para o Fabio', 4:'4. Teste' };
 const MIG_ORD = { travado:0, andamento:1, 'a fazer':2, feito:3 };
 const MIG_INICIO = '2026-11-25', MIG_FIM = '2026-12-01';
 function migHtml() {
