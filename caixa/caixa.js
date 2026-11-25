@@ -1472,17 +1472,25 @@ function cofreLinhaDia(unidade, dia) {
       <label>contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" class="${livre}" value="${cd && cd.contado != null ? cd.contado : ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
       <button class="preset-btn active ${livre}" style="padding:10px 14px;" onclick="cofreGravarDia('${unidade}', '${dia}', '${k}')">Gravar</button>
       <span class="caption-label">O dinheiro do Saipos aparece depois de gravar.</span></div>`);
-  // 2) CONTAGEM DO COFRE (a de corte, amanhã cedo)
-  const corte = dia === hojeSP && r && r.contado == null;
-  const sub2 = unidade === 'AGUA VERDE' ? 'o envelope de hoje mais a gaveta da Hellen — sem a gaveta do SB' : 'o envelope de hoje mais a gaveta da Hellen';
+  // 2) CONTAGEM DO COFRE — por DATA ESCOLHIDA e MOMENTO (Organizador 20:14; Financeiro 20:20): de manhã compara com o saldo do
+  // INÍCIO do dia no Saipos (o fim do anterior); à noite, com o do FIM do dia (rpc caixa_cofre_saldo_saipos)
+  const dSel = COFRE_DATA[k] || dia, mom = COFRE_MOM[k] || 'manha';
+  const sub2 = unidade === 'AGUA VERDE' ? 'o envelope mais a gaveta da Hellen — sem a gaveta do SB' : 'o envelope mais a gaveta da Hellen';
+  const esc = (t) => String(t).replace(/'/g, "\\'");
+  const ctrl = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;">
+      <label>data da contagem <input type="date" value="${dSel}" max="${hojeSP}" onchange="COFRE_DATA['${k}']=this.value; cofreRedesenhar('${esc(unidade)}', '${dia}')" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;"></label>
+      <select onchange="COFRE_MOM['${k}']=this.value; cofreRedesenhar('${esc(unidade)}', '${dia}')" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
+        <option value="manha"${mom === 'manha' ? ' selected' : ''}>contei de manhã (antes de abrir)</option><option value="noite"${mom === 'noite' ? ' selected' : ''}>contei à noite (depois de fechar)</option></select></div>`;
+  const cSel = cofreContagemDe(unidade, dSel);
+  const corte = dSel === hojeSP && !(cSel && cSel.cofre != null);
   let c2;
-  if (!r) c2 = cartao('Contagem do cofre', sub2, '<div class="caption-label" style="text-align:left;">sem saldo do cofre para este dia no sistema</div>');
-  else if (r.contagem_cobre_cofre === true && r.contado != null && !COFRE_CORRIGINDO[k]) {
-    const dif = Number(r.diferenca);
-    c2 = cartao('Contagem do cofre', sub2, `<div>saldo do cofre no Saipos <b>${R(r.saldo_fim_dia)}</b> · contado <b>${R(r.contado)}</b> · ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(dif))}</b>`}
-      ${pode ? ` <button class="preset-btn ${livre}" onclick="COFRE_CORRIGINDO['${k}']=true; cofreRedesenhar('${unidade}', '${dia}')">corrigir</button>` : ''}</div>${cofreConferidoTxt(cofreContagemDe(unidade, dia))}`);
-  } else if (!pode) c2 = cartao('Contagem do cofre', sub2, '<div style="color:var(--farol-perto);">ainda não contado</div>');
-  else c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, cofreGradeHtml(unidade, dia, k, livre), corte);
+  if (cSel && cSel.cofre != null && !COFRE_CORRIGINDO[k]) {
+    const tot = Number(cSel.contado || 0) + Number(cSel.cofre || 0);
+    setTimeout(() => cofreResultado(unidade, dSel, k, mom, tot), 0);
+    c2 = cartao('Contagem do cofre', sub2, ctrl + `<div id="cfRes_${k}">contado <b>${R(tot)}</b> · comparando com o saldo do cofre no Saipos…</div>
+      ${pode ? `<button class="preset-btn ${livre}" style="margin-top:6px;" onclick="COFRE_CORRIGINDO['${k}']=true; cofreRedesenhar('${esc(unidade)}', '${dia}')">corrigir</button>` : ''}${cofreConferidoTxt(cSel)}`);
+  } else if (!pode) c2 = cartao('Contagem do cofre', sub2, ctrl + '<div style="color:var(--farol-perto);">ainda não contado</div>');
+  else c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, ctrl + cofreGradeHtml(unidade, dSel, k, livre), corte);
   return `<div id="cfBox_${k}">${c2}</div>`;   // 25/11: o envelope do dia foi para o cartão da loja (conferência do caixa de ontem)
 }
 async function cofreGravarDia(unidade, dia, k) {
@@ -1503,7 +1511,18 @@ async function cofreGravarDia(unidade, dia, k) {
     if (document.getElementById('cfBox_' + k)) cofreRedesenhar(unidade, dia); else renderModuloCaixa();
   } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarDia(unidade, dia, k)); }
 }
-let COFRE_CORRIGINDO = {}, COFRE_CDIA = [], CDIA_CORRIGINDO = {};
+let COFRE_CORRIGINDO = {}, COFRE_CDIA = [], CDIA_CORRIGINDO = {}, COFRE_DATA = {}, COFRE_MOM = {};
+// o resultado da contagem do cofre: contado × saldo do Saipos no início (manhã) ou no fim (noite) da data escolhida
+async function cofreResultado(unidade, data, k, mom, tot) {
+  const el = document.getElementById('cfRes_' + k); if (!el) return;
+  const r = await trRpcSeguro('caixa_cofre_saldo_saipos', { p_unidade: unidade, p_data: data });
+  const j = r.ok ? await r.json().catch(() => null) : null, row = Array.isArray(j) ? j[0] : j;
+  const el2 = document.getElementById('cfRes_' + k); if (!el2) return;
+  if (!row) { el2.innerHTML = `contado <b>R$ ${fmt(tot)}</b> · sem o saldo do Saipos para ${caixaDdm(data)}`; return; }
+  const sal = Number(mom === 'noite' ? row.saldo_fim_dia : row.saldo_inicio_dia), dif = Math.round((tot - sal) * 100) / 100;
+  el2.innerHTML = `saldo do cofre no Saipos (${mom === 'noite' ? 'fim' : 'início'} de ${caixaDdm(data)}) <b>R$ ${fmt(sal)}</b> · contado <b>R$ ${fmt(tot)}</b> · `
+    + (Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))}</b>`);
+}
 function cofreRedesenhar(unidade, dia) {
   const k = (unidade + dia).replace(/[^A-Z0-9]/g, ''), box = document.getElementById('cfBox_' + k);
   if (box) box.outerHTML = cofreLinhaDia(unidade, dia);
@@ -1625,7 +1644,7 @@ function cedSomar(k) {
 function cedUsar(unidade, dia, k) {
   if (CED[k] && CED[k].COFRE) {   // 25/11: a grade simples do cofre — um total só (contado = 0, cofre = total), cédulas em {COFRE}
     const tot = cedSomar(k), o = {}; Object.keys(CED[k].COFRE).forEach((v) => { if (CED[k].COFRE[v] > 0) o[v] = CED[k].COFRE[v]; });
-    COFRE_CORRIGINDO[(unidade + dia).replace(/[^A-Z0-9]/g, '')] = false;
+    COFRE_CORRIGINDO[k] = false;
     return cofreGravarTotal(unidade, dia, k, { caixa: 0, deposito: Math.round((tot.COFRE || 0) * 100) / 100, cedulas: Object.keys(o).length ? { COFRE: o } : {} });
   }
   const tot = cedSomar(k), q = CED[k], cedulas = {};
