@@ -1913,8 +1913,10 @@ function caixaDiaParaCasa() {
 async function caixaAbrirNoCartao(u, dia, vendaAVenda) {
   const d = document.getElementById('concartao-dia'), lugar = document.getElementById('cxCartaoDia_' + u.replace(/[^A-Z]/g, ''));
   if (d && lugar) {
+    document.querySelectorAll('.cx-cartao').forEach((c) => { c.style.gridColumn = ''; });
     if (d.parentNode === lugar && d.dataset.dia === u + dia) { caixaDiaParaCasa(); d.innerHTML = ''; d.dataset.dia = ''; return; }   // tocar de novo fecha
     lugar.appendChild(d); d.dataset.dia = u + dia;
+    const cart = lugar.closest('.cx-cartao'); if (cart) cart.style.gridColumn = '1 / -1';   // o cartão aberto ocupa a largura toda
   }
   await abrirDiaConcartao(u, dia);
   if (vendaAVenda) { const r = document.getElementById('cxDiaResto'); if (r) r.style.display = '';
