@@ -81,6 +81,8 @@ async function entrarRateio() {
     try {
       const U = encodeURIComponent(RATEIO_UNIDADE);
       const pct = await consultarTudo(`vw_rateio_pct_canal_precificacao?select=*&unidade=eq.${U}`);
+      // 25/11/2026 [regra] (auditoria de regime #59): vw_rateio_resumo_canal e vw_rateio_pct_canal_precificacao são
+      // COMPETÊNCIA (pela data da venda / da nota); o título do Preço alvo diz "(competência)"
       const [resumo, preco, semCriterio] = await Promise.all([
         consultarTudo(`vw_rateio_resumo_canal?select=*&unidade=eq.${U}&order=mes`),
         // 07/11/2026 (proposta Cardapio, auditoria lote 2): a regua oficial e a

@@ -1905,6 +1905,8 @@ function cargaUltimoDia(fonte) {
 // com a meta de venda, que é sem a promoção). EVOL_PROMO = 'unidade|dia' com a promoção do iFood já chegada (1–2 dias depois).
 let EVOL_PROMO = null;
 async function evolLer() {
+  // 25/11/2026 [regra] (auditoria de regime #1, #2 e #6): vw_venda_evolucao e vw_ticket_canal_dia são COMPETÊNCIA (pela data
+  // da venda) — a tela diz isso no subtítulo de "Semana em curso", "Valor médio por canal" e "Vendido até ontem" (RG_VENDA)
   const [rows, tk] = await Promise.all([
     consultarTudo('vw_venda_evolucao?select=data,unidade,canal,faixa,pedidos,total,canceladas,total_cancelado&order=data'),
     consultarTudo('vw_ticket_canal_dia?select=dia,unidade,faturamento,promo_ok&canal=eq.IFOOD').catch(() => null),
@@ -3306,7 +3308,8 @@ function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variaç�
   const L = Object.entries(ac).filter(([, o]) => o.p > 0).sort((x, y) => y[1].p - x[1].p);
   if (!L.length) return '';
   const nome = (c) => ({ IFOOD: 'iFood', 'SALÃO': 'Salão', 'BALCÃO': 'Balcão', 'SITE PRÓPRIO': 'Site próprio', 'VNDX TECNOLOGIA': 'VNDX' }[c] || c);
-  return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + '</div>' +
+  // regime (auditoria #2): vw_ticket_canal_dia, pela data da venda (competência)
+  return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + rgSub(RG_VENDA) + '</div>' +
     '<div id="tabelaHojeTicket"><table><tr><th>Canal</th><th>Pedidos</th><th>Valor médio</th><th title="Os mesmos dias da semana anterior, nos dias em que a loja abriu nas duas">vs semana anterior</th></tr>' +
     L.map(([c, o]) => '<tr><td>' + nome(c) + (c === 'IFOOD' && ifoodAte && ifoodAte < V.fimIso ? ' <span style="color:var(--tx-5); font-size:11px;">até ' + ifoodAte.slice(8, 10) + '/' + ifoodAte.slice(5, 7) + ' (a promoção dos dias seguintes ainda não chegou)</span>' : '') + '</td><td>' + fxInt(o.p) + '</td><td>R$ ' + fmt(o.f / o.p) + '</td><td>' +
       (o.cp && o.bp ? varTxt(o.cf / o.cp, o.bf / o.bp) : '—') + '</td></tr>').join('') + '</table></div>' +
@@ -5051,7 +5054,9 @@ function fxCaixaLoja(u) {
   // espalhava o repasse do iFood (cai só na quarta) e somava o atacado duas vezes (AV quinta a domingo: 91 mil × 14,3 mil certo).
   const dowHoje = ((new Date(FX_S.hoje + 'T12:00:00').getDay() + 6) % 7) + 1;
   const recDiaU = (FX_S.recDia || []).filter(r => r.unidade === u && Number(r.dia_semana) >= dowHoje);
-  const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : mediaSem * diasRest / 7, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
+  // 25/11/2026 [regra] (Financeiro, prova semana-regime-em-cada-bloco): o caixa até domingo vem do Fluxo projetado — FXL,
+  // saldo_final do domingo (fxCaixaFluxo, abaixo). A média semanal × dias ÷ 7 saiu; sem o Fluxo, só a média por dia da semana.
+  const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : 0, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
   // o que esta loja recebe de OUTRA loja da Rede ate domingo: conta para ela, nao para a soma da Rede (07/10/2026)
   const recEntre = fxSoma(receberAte.filter(projEntreLojas), 'credito');
   const base = { u, banco, cofre, dataPartida: F ? F.dataPartida : null, recLanc, recEntre, esperado, pagar, vencidas: fxSoma(venc, 'debito'), nVenc: venc.length, pagarProx: fxSoma(pagarProx, 'debito'), sobra: banco + cofre + recLanc + esperado - pagar, diasRest, mediaSem, fim, fluxo: null };
@@ -7493,6 +7498,8 @@ function renderContasPagar() {
 // Fonte: vw_fin_sobra_filial_plano (a conta de cada quarta) + vw_fin_sobra_filial_a_lancar (o título de cada lado no Saipos).
 // A RLS das views só entrega a dono e financeiro: sem linha, o bloco não aparece (filial não vê). Cada view leva ~5 s:
 // carrega uma vez, por fora, sem segurar a tela.
+// 25/11/2026 [regra] (auditoria de regime #51): o repasse do iFood no banco da filial (repasse_valor) vem de
+// fin_repasse_ifood_situacao(), por dentro de vw_fin_sobra_filial_plano — é CAIXA; o bloco diz "pelo caixa" (RG_CAIXA).
 const SOBRA = { plano: null, lancar: null, cob: {}, carregando: false, erro: null };
 async function sobraFilialCarregar(forcar) {
   if (SOBRA.carregando || (SOBRA.plano && !forcar)) return;
@@ -8842,6 +8849,9 @@ function projCalc(unidade) {
 let FXL = null;   // null = sem as views novas: a tela de antes
 
 const FXL_DIA0_PREV = ['MEDIA', 'PROVISAO_RECEITA', 'PROVISAO_NF', 'COSTUMA_SAIR', 'BONUS'];
+// 25/11/2026 [regra] (auditoria de regime #30): o "previsto pelo vendido" (PROVISAO_RECEITA) vem de vw_fin_receita_provisao,
+// lida por dentro de vw_fin_previsto_detalhe — é CAIXA (o dia em que o dinheiro cai no banco); os quadros do Fluxo dizem
+// "pelo caixa" no subtítulo (RG_CAIXA).
 
 const FXL_ORIGEM = { SAIPOS: 'título do Saipos', SAIPOS_PAGO: 'pago no Saipos depois do extrato', MEDIA: 'média de vendas',
   PROVISAO_RECEITA: 'previsto pelo vendido', PROVISAO_NF: 'mercadoria prevista (fornecedor)', COSTUMA_SAIR: 'costuma sair',

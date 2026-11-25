@@ -610,7 +610,7 @@ const CG_TELAS = {
   // 29/10/2026 14:24 (dono): o que era "Acompanhar" virou tela própria (custo) ou foi para o Financeiro (acertos)
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
-  pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
+  pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento · pela competência: o mês trabalhado.',
            abas: [['adt', 'Adiantamento · dia 20'], ['dez', 'Gratificações · dia 25'], ['vtva', 'VT e VA · fim do mês'], ['bonif', 'Bonificação'], ['ffcalc', 'Por fora']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
@@ -2469,6 +2469,7 @@ async function cgFeriasCarregar() {
   try {
     const [per, gozo, aPagar] = await Promise.all([consultarTudo('vw_rh_ferias?select=*&order=limite_gozo.nullslast,nome'),
                                            consultarTudo('vw_rh_ferias_gozo?select=*&order=inicio.desc').catch(() => []),
+                                           // regime (auditoria #64): férias a pagar = CAIXA (o dia em que sai do banco)
                                            consultarTudo('vw_rh_previsao_a_pagar?select=dia,unidade,valor,confianca&tipo=eq.FERIAS').catch(() => null)]);
     CARGOS.ferias = { per, gozo, aPagar };
   } catch (e) { CARGOS.ferias = { erro: e.message }; }
@@ -2508,7 +2509,7 @@ function cgAbaFerias() {
       ${card('podem', 'Podem tirar', podem, totalDe(podem))}
       ${card('marcadas', 'Marcadas na Flash', U.filter(marcada), cgR0(U.filter(marcada).reduce((a, x) => a + cgN(x.valor_programado), 0)))}
       ${card('formacao', 'Em formação', U.filter(formacao), `provisão ${totalDe(U.filter(formacao))}`)}
-      ${P60 ? `<div class="card neutral"><div class="card-lbl">A pagar em 60 dias</div><div class="card-val">${cgR0(soma60())}</div><div class="card-pct">provisão ${cgR0(soma60('ESTIMATIVA'))} · despesa ${cgR0(soma60('CALCULADO'))}</div></div>` : ''}
+      ${P60 ? `<div class="card neutral"><div class="card-lbl">A pagar em 60 dias</div><div class="card-val">${cgR0(soma60())}</div><div class="card-pct">provisão ${cgR0(soma60('ESTIMATIVA'))} · despesa ${cgR0(soma60('CALCULADO'))} · pelo caixa (dia do pagamento)</div></div>` : ''}
     </div>
     ${cgFiltroUnidade(CARGOS.pessoas)}`;
   const vis = (F.ferCard === 'podem' ? podem : F.ferCard === 'marcadas' ? U.filter(marcada) : F.ferCard === 'formacao' ? U.filter(formacao) : U.filter((x) => !formacao(x) || marcada(x)))
@@ -2555,6 +2556,7 @@ async function cgHojeCarregar() {
   const ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   try {
     const [L, r, calc, fer] = await Promise.all([ler('vw_rh_flash_caixa?select=*&order=faltam_dias.asc.nullslast,parado_dias.desc.nullslast'), trRpcSeguro('rh_flash_caixa_leitura', {}),
+      // regime (auditoria #62): os cálculos da folha são COMPETÊNCIA (o mês trabalhado); a legenda da tela diz isso
       ler('vw_rh_calculos_mes?select=*&order=data_limite'), ler('vw_rh_ferias_alertas?select=*&order=limite_gozo')]);
     if (!r.ok) throw new Error(await trErroDe(r));
     const lemb = await ler('vw_rh_lembretes_hoje?select=*&order=data,tipo,lembrete_id,pessoa_id');
