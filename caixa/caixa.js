@@ -1871,6 +1871,8 @@ function caixaHellenHtml() {
       ${linha('Trocas de bandeira', rb.length ? esp(`o robô vai trocar ${rb.length}`) : ok('nada pendente'))}
       ${linha('Dinheiro contado hoje', contado ? ok('contado' + (quem ? ' por ' + trEscH(quem.charAt(0).toUpperCase() + quem.slice(1)) : '')) : nao('ainda não'))}
       ${contado ? '' : `<button class="preset-btn active" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="caixaContarHoje('${u.replace(/'/g, "\\'")}')">Contar dinheiro</button>`}
+      <div style="margin-top:8px;"><a href="javascript:void(0)" onclick="caixaAbrirNoCartao('${u.replace(/'/g, "\\'")}', '${ontemSP}', true)">ver venda a venda do caixa de ${caixaDdm(ontemSP)} ›</a></div>
+      <div id="cxCartaoDia_${u.replace(/[^A-Z]/g, '')}"></div>
     </div>`;
   }).join('');
   // 2) PARA A HELLEN: só o que é dela, uma linha e um botão
@@ -1896,15 +1898,32 @@ function caixaHellenHtml() {
   const semMot = 0;   // 25/11 (Organizador 18:33): marcar o motivo pela tela não existe — os descontos ficam só no link, fora da lista da Hellen
   const lista = (semMot ? `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${semMot} descontos sem motivo no salão e no balcão</span><button class="preset-btn" style="min-width:110px;" onclick="caixaVerDescontos(true)">Ver e marcar</button></div>` : '') + deHellen.map(x => { const [t, b] = curta(x);
     return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${t}</span>${b}</div>`; }).join('');
-  return `<div class="section-label" style="text-align:left;">Hoje · ${caixaDdm(hojeSP)}</div>
+  return `<div class="section-label" style="text-align:left;">Caixa de ontem (${caixaDdm(caixaHellenMais(hojeSP, -1))}) · conferência de hoje</div>
     <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">${hoje}</div>
     <div class="section-label" style="text-align:left;margin-top:16px;">Para a Hellen${deHellen.length ? ' · ' + deHellen.length : ''}</div>
     ${deHellen.length || semMot ? `<div class="contexto" style="text-align:left;">${lista}</div>` : `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);">${ok('nada para resolver')}</div>`}`;
 }
 // "Contar dinheiro": abre o dia de hoje da loja já na contagem por cédula (com o campo do troco)
+// 25/11/2026 [dono] (Organizador 19:47: "o abrir detalhe podia aparecer logo abaixo da caixa do caixa do dia"): o quadro do dia
+// (#concartao-dia) abre DENTRO do cartão da loja; antes de redesenhar a tela ele volta para o lugar dele (caixaDiaParaCasa)
+function caixaDiaParaCasa() {
+  const d = document.getElementById('concartao-dia'), casa = document.getElementById('modulo-caixa');
+  if (d && casa && d.parentNode !== casa) casa.appendChild(d);
+}
+async function caixaAbrirNoCartao(u, dia, vendaAVenda) {
+  const d = document.getElementById('concartao-dia'), lugar = document.getElementById('cxCartaoDia_' + u.replace(/[^A-Z]/g, ''));
+  if (d && lugar) {
+    if (d.parentNode === lugar && d.dataset.dia === u + dia) { caixaDiaParaCasa(); d.innerHTML = ''; d.dataset.dia = ''; return; }   // tocar de novo fecha
+    lugar.appendChild(d); d.dataset.dia = u + dia;
+  }
+  await abrirDiaConcartao(u, dia);
+  if (vendaAVenda) { const r = document.getElementById('cxDiaResto'); if (r) r.style.display = '';
+    const b = [...document.querySelectorAll('#concartao-dia button')].find((x) => /venda a venda/.test(x.textContent)); if (b) b.textContent = 'esconder venda a venda'; }
+  if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 async function caixaContarHoje(u) {
   const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-  await abrirDiaConcartao(u, hojeSP);
+  await caixaAbrirNoCartao(u, hojeSP, false);
   const k = (u + hojeSP).replace(/[^A-Z0-9]/g, '');
   cedSomar(k);
   const el = document.getElementById('cfBox_' + k) || document.getElementById('concartao-dia');
@@ -1983,6 +2002,7 @@ async function caixaHellenExplicar(i) {
 
 function renderModuloCaixa() {
   const alvo = document.getElementById('view-caixa');
+  caixaDiaParaCasa();   // o quadro do dia pode estar dentro de um cartão: volta para o lugar dele antes de redesenhar
   // 25/11/2026 [dono] (Organizador 18:19: "o que for análise sai da tela do caixa e vai para a tela de origem, deixando um link"):
   // os descontos do salão e do balcão abrem numa tela só deles (caixa/index.html?modo=descontos)
   if (CAIXA_MODO === 'descontos') {
