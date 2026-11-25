@@ -1399,6 +1399,16 @@ function cofreHtml() {
   void cards;
   return blocoSB;
 }
+// 25/11/2026 [dono] (Financeiro 19:35: o que a planilha "Conferencia Caixa" tinha e a tela não): o TROCO à parte (só mostra; a regra de
+// 10/09 diz que o troco de abertura entra na contagem, o total não muda) e "conferido em dd/mm hh:mm por <nome>" depois de gravar
+const cofreContagemDe = (unidade, dia) => (CAIXA_CONTAGENS || []).find((x) => x.unidade === unidade && String(x.data).slice(0, 10) === dia && x.caixa === 'SALÃO');
+function cofreConferidoTxt(c) {
+  if (!c || !c.atualizado_em) return '';
+  const qd = new Date(c.atualizado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  const nome = String(c.quem || '').split('@')[0].split(/[._-]/)[0];
+  return `<div class="caption-label" style="text-align:left;">conferido em ${qd}${nome ? ' por ' + trEscH(nome.charAt(0).toUpperCase() + nome.slice(1)) : ''}${c.troco != null ? ` · troco que fica na gaveta R$ ${fmt(Number(c.troco))} (já está no total)` : ''}</div>`;
+}
+const cofreTrocoCampo = (k, livre, val) => `<label>troco (fica na gaveta, já entra no total) R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfTr_${k}" class="${livre}" value="${val == null ? '' : val}" style="width:110px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;"></label>`;
 // DINHEIRO DA LOJA NO DIA (05/11/2026, proposta do Financeiro): UM campo às cegas por loja e por dia, "gaveta + cofre contado".
 // Antes de gravar não se mostra o saldo do Saipos; depois, contado × saldo e "bateu" ou a diferença.
 function cofreLinhaDia(unidade, dia) {
@@ -1418,11 +1428,12 @@ function cofreLinhaDia(unidade, dia) {
     const dif = Number(r.diferenca);
     return cab + `<div style="margin-top:4px;">contado R$ ${fmt(Number(r.contado))} × Saipos R$ ${fmt(Number(r.saldo_fim_dia))} —
       ${Math.abs(dif) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${dif < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(dif))}</b>`}
-      ${pode ? ` <button class="preset-btn${livre}" onclick="cofreCorrigir('${unidade}', '${dia}', '${k}', ${Number(r.contado)})">corrigir</button>` : ''}</div></div>`;
+      ${pode ? ` <button class="preset-btn${livre}" onclick="cofreCorrigir('${unidade}', '${dia}', '${k}', ${Number(r.contado)})">corrigir</button>` : ''}</div>${cofreConferidoTxt(cofreContagemDe(unidade, dia))}</div>`;
   }
   if (!pode) return cab + `<div style="margin-top:4px; color:var(--farol-perto);">ainda não contado</div></div>`;
   return cab + `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
       <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre.trim()}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      ${cofreTrocoCampo(k, livre.trim(), null)}
       <button class="preset-btn${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a contagem</button>
       <button class="preset-btn${livre}" onclick="cedAbrir('${unidade}', '${dia}', '${k}')">contar por cédula</button>
       <span class="caption-label">O saldo do Saipos aparece depois de gravar.</span></div><div id="cfCed_${k}"></div></div>`;
@@ -1435,6 +1446,7 @@ function cofreCorrigir(unidade, dia, k, atual) {
   box.innerHTML = `<b>Dinheiro da loja</b> <span style="color:var(--tx-4); font-size:12px;">corrigir a contagem de ${dia.split('-').reverse().join('/')}${unidade === 'AGUA VERDE' ? ' — gaveta e cofre da AV, <b>sem</b> a gaveta do SB' : ''}</span>
     <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:6px;">
       <label>gaveta + cofre contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfT_${k}" class="${livre}" value="${Number(atual) || ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      ${cofreTrocoCampo(k, livre, (cofreContagemDe(unidade, dia) || {}).troco)}
       <button class="preset-btn ${livre}" onclick="cofreGravarTotal('${unidade}', '${dia}', '${k}')">Gravar a correção</button>
       <button class="preset-btn ${livre}" onclick="cedAbrir('${unidade}', '${dia}', '${k}')">contar por cédula</button></div><div id="cfCed_${k}"></div>`;
   const el = document.getElementById('cfT_' + k); if (el) el.focus();
@@ -1445,6 +1457,9 @@ async function cofreGravarTotal(unidade, dia, k, ced) {
   if (v === '') { avisoAcao('atencao', '! Digite o dinheiro contado (gaveta + cofre). Se não tinha nada, digite 0.'); return; }
   if (Number(v) === 0 && COFRE_ZERO !== k) { COFRE_ZERO = k; avisoAcao('atencao', '! Você contou R$ 0,00 na gaveta e no cofre juntos? O sistema espera dinheiro aqui. Se é isso mesmo, clique em gravar de novo.'); return; }
   COFRE_ZERO = null;
+  const elTr = document.getElementById('cfTr_' + k), trocoTxt = elTr ? elTr.value : '';
+  const troco = trocoTxt === '' ? null : Math.round(Number(trocoTxt) * 100) / 100;
+  if (troco != null && !(troco >= 0)) { avisoAcao('atencao', '! O troco precisa ser um valor (0 ou mais).'); return; }
   const s = rmbSessao();
   avisoAcao('enviando', 'Gravando a contagem do dinheiro…');
   try {
@@ -1452,10 +1467,13 @@ async function cofreGravarTotal(unidade, dia, k, ced) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem?on_conflict=unidade,data,caixa`, { method: 'POST',
       headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
       // 12/11/2026 (contar por cédula, banco do Financeiro): CAIXA = gaveta (contado), DEPOSITO = envelope/cofre (cofre)
-      body: JSON.stringify(Object.assign({ unidade, data: dia, caixa: 'SALÃO', contado: 0, troco: null, cofre: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() },
+      body: JSON.stringify(Object.assign({ unidade, data: dia, caixa: 'SALÃO', contado: 0, troco, cofre: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() },
         ced ? { contado: ced.caixa, cofre: ced.deposito, cedulas: ced.cedulas } : {})) });
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     await cofreCarregar();
+    // a linha gravada (quem, hora, troco) para o "conferido em … por …"
+    const nova = await consultarTudo(`caixa_contagem?select=*&unidade=eq.${encodeURIComponent(unidade)}&data=eq.${dia}&caixa=eq.${encodeURIComponent('SALÃO')}`).catch(() => []);
+    if (nova && nova[0]) { CAIXA_CONTAGENS = (CAIXA_CONTAGENS || []).filter((c) => !(c.unidade === unidade && String(c.data).slice(0, 10) === dia && c.caixa === 'SALÃO')); CAIXA_CONTAGENS.unshift(nova[0]); }
     const x = (COFRE_DIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia);
     const dif = x && x.diferenca != null ? Number(x.diferenca) : null;
     avisoAcao(dif != null && Math.abs(dif) >= 0.005 ? 'atencao' : 'ok', dif == null ? `✓ Contagem de ${dia.split('-').reverse().join('/')} gravada — às ${avisoHora()}.`
