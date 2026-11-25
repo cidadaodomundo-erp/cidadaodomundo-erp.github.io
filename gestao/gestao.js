@@ -7507,7 +7507,7 @@ async function sobraFilialCarregar(forcar) {
   // uma view de cada vez, e uma segunda tentativa 3 s depois (banco ocupado com a carga da tela)
   const ler = async (q) => { try { return await consultarTudo(q); } catch (e) { await new Promise((ok) => setTimeout(ok, 3000)); return consultarTudo(q); } };
   try {
-    SOBRA.plano = await ler('vw_fin_sobra_filial_plano?select=sigla,quarta,abate_lista,lista_fica_aberta,bonus,bonus_estimado,lucro,sai_da_filial,travado,repasse_valor,resto_lista_no_vencimento,falta_caixa_no_vencimento,lista_mes_pergunta&order=quarta,sigla');
+    SOBRA.plano = await ler('vw_fin_sobra_filial_plano?select=sigla,quarta,abate_lista,lista_fica_aberta,bonus,bonus_estimado,lucro,sai_da_filial,travado,repasse_valor,resto_lista_no_vencimento,falta_caixa_no_vencimento,saldo_min_depois,lista_mes_pergunta&order=quarta,sigla');
     SOBRA.lancar = Array.isArray(SOBRA.plano) && SOBRA.plano.length
       ? await ler('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo,id_cobranca&order=quarta,quem') : [];
     // total da lista do mês = tr_cobrancas.valor_total pela id_cobranca da linha LISTA (Financeiro 18/11 15:40)
@@ -7561,8 +7561,12 @@ function sobraFilialHtml() {
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
     const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? nota(`falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}`, 'var(--farol-fora)') : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
+    // 25/11/2026 [conserto] (Organizador 17:38; Financeiro f04f47b, regra lista-do-mes-quita-no-proximo-repasse): a lista paga na
+    // quarta mesmo que o saldo mínimo depois fique negativo — a tela diz quanto do limite do banco isso usa
+    const limite = Number(p.abate_lista) > 0 && p.saldo_min_depois != null && Number(p.saldo_min_depois) < 0
+      ? nota(`usa ${sobraR(-Number(p.saldo_min_depois))} do limite`, 'var(--farol-perto)') : '';
     return `<tr><td ${tdT}>${agDmSobra(p.quarta)}</td><td ${tdT}><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td ${tdT}>${sit}</td>
-      <td ${tdN}>${v(tot)}</td><td ${tdN}>${v(jaPago)}</td><td ${tdN}>${v(p.abate_lista)}</td><td ${tdN}>${falta}</td><td ${tdN}>${bonus}</td><td ${tdN}>${v(p.lucro)}</td><td ${tdN}><b>${total}</b>${pergunta}</td>
+      <td ${tdN}>${v(tot)}</td><td ${tdN}>${v(jaPago)}</td><td ${tdN}>${v(p.abate_lista)}${limite}</td><td ${tdN}>${falta}</td><td ${tdN}>${bonus}</td><td ${tdN}>${v(p.lucro)}</td><td ${tdN}><b>${total}</b>${pergunta}</td>
       <td class="centro" style="padding:6px 8px;vertical-align:top;">${lado(fil)}</td><td class="centro" style="padding:6px 8px;vertical-align:top;">${lado(av)}</td></tr>`;
   }).join('');
   const hoje = sobraHoje(), prox = (SOBRA.plano.map((p) => String(p.quarta)).filter((d) => d >= hoje).sort()[0]) || null;
