@@ -302,6 +302,23 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // com diferença de centavos". Agora TODO quase-par vai para "2º conferir" — o array
   // arredond fica vazio de propósito (outras partes da tela ainda o leem).
   const arredond = [], conferir = [];
+  // 25/11/2026 [conserto] (Financeiro 21:20, pedido do dono; vale de 25/11 em diante, o passado em lote não muda): par ÚNICO no dia,
+  // mesma bandeira e modalidade, |diferença| ≤ R$ 0,05 — no SALÃO o cartão pode vir até 90 min ANTES da venda (a mesa fecha depois)
+  // e até 15 min depois; no DELIVERY, ±15 min. Casa como "centavos" (resolvido, o centavo fica na sobra ou falta do dia).
+  if (dia >= CAIXA_NOVO_FLUXO) {
+    const cabe = (s, r) => { const dv = Math.abs(+r.valor - +s.valor), d = s.t - r.t;   // d > 0: o cartão passou antes da venda
+      if (dv > 0.05 || formaPadrao(r.detalhe) !== formaPadrao(s.detalhe)) return false;
+      return s.caixa === 'SALÃO' ? (d <= 90 && d >= -15) : Math.abs(d) <= 15; };
+    const S0 = semParS.filter(s => !s._composto), R0 = semParR.filter(r => !r._composto);
+    S0.forEach(s => {
+      const cand = R0.filter(r => !r._quase && cabe(s, r));
+      if (cand.length !== 1) return;
+      const r = cand[0];
+      if (S0.filter(x => !x._quase && cabe(x, r)).length !== 1) return;   // único dos dois lados
+      r._quase = s._quase = true;
+      arredond.push({ s, r, dv: +r.valor - +s.valor, centavos: true });
+    });
+  }
   [...semParS].forEach(s => {
     let melhor = null, nota = Infinity;
     semParR.filter(r => !r._quase).forEach(r => {
@@ -499,7 +516,7 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   const resolvidos = [
     ...divididas.map(d => ({ hora: d.hora, tipo: 'conta dividida', texto: d.texto })),
     ...compostos.map(c => ({ hora: hhmm(c.alvo.hora), tipo: 'conta dividida', texto: `${c.rotulo}: ${reaisCc(c.alvo.valor)} (${limpa(c.alvo.detalhe)}) = ${c.itens.map(t => reaisCc(t.valor) + ' às ' + hhmm(t.hora)).join(' + ')}` })),
-    ...arredond.map(q => ({ hora: hhmm(q.s.hora), tipo: 'centavos', texto: `${limpa(q.s.detalhe)} ${reaisCc(q.s.valor)} × maquininha ${reaisCc(q.r.valor)}` })),
+    ...arredond.map(q => ({ hora: hhmm(q.s.hora), tipo: 'centavos', texto: `${limpa(q.s.detalhe)} ${reaisCc(q.s.valor)} × maquininha ${reaisCc(q.r.valor)}${Math.abs(q.dv || 0) >= 0.005 ? ` — casou com ${reaisCc(Math.abs(q.dv))} de diferença` : ''}` })),
     // forma diferente da registrada: o Saipos diz X, passou Y — a base ja usa o Y
     // (decisao do dono, 09/09/2026: nada se corrige no Saipos). Fica so o registro.
     ...(forma || []).map(f => ({ hora: hhmm(String(f.hora || '').slice(11)), tipo: 'forma diferente (' + String(f.nivel).toLowerCase() + ')', texto: `registrado ${f.registrado}, passou ${f.passou} — ${reaisCc(f.valor)}; o painel já usa o que passou` })),
