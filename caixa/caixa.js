@@ -1777,7 +1777,7 @@ function caixaHellenHtml() {
   if (H.erro) return `<div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar o que fazer: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
   const todos = caixaHellenItens();
   // os descontos sem motivo viram UMA linha na lista da Hellen: lê uma vez, por fora, e redesenha quando chegar
-  if (!DESC.tentou && CAIXA_MODO !== 'descontos') { DESC.tentou = true; DESC.lendo = true; descCarregar().then(() => { DESC.lendo = false; if (Array.isArray(DESC.vendas) && DESC.vendas.some(v => v.alerta_sem_motivo)) renderModuloCaixa(); }).catch(() => { DESC.lendo = false; }); }
+  // (os descontos não entram mais na lista da Hellen; não precisa ler aqui)
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
   const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   const ok = t => `<span style="color:var(--farol-ok);font-weight:700;">✓ ${t}</span>`;
@@ -1824,7 +1824,7 @@ function caixaHellenHtml() {
       default: return [`${loja}${trEscH(x.oque || '')}`, B('Abrir', `caixaHellenAbrir(${x.i})`)];
     }
   };
-  const semMot = Array.isArray(DESC.vendas) ? DESC.vendas.filter(v => v.alerta_sem_motivo).length : 0;
+  const semMot = 0;   // 25/11 (Organizador 18:33): marcar o motivo pela tela não existe — os descontos ficam só no link, fora da lista da Hellen
   const lista = (semMot ? `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${semMot} descontos sem motivo no salão e no balcão</span><button class="preset-btn" style="min-width:110px;" onclick="caixaVerDescontos(true)">Ver e marcar</button></div>` : '') + deHellen.map(x => { const [t, b] = curta(x);
     return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${t}</span>${b}</div>`; }).join('');
   return `<div class="section-label" style="text-align:left;">Hoje · ${caixaDdm(hojeSP)}</div>
