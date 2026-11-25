@@ -87,7 +87,7 @@ function ccDesenhar() {
   if (!CC.cartoes.length) { alvo.innerHTML = '<h2>Compra no cartão</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não tem cartão liberado.</b> Peça ao Neto.</div>'; return; }
   const opc = CC.cartoes.map((c) => `<option value="${ccE(c.conta)}">${ccE(ccRotulo(c))}</option>`).join('');
   const nomeCartao = (conta) => { const c = CC.cartoes.find((x) => x.conta === conta); return c ? ccRotulo(c) : conta; };
-  let h = '<h2>Compra no cartão</h2>';
+  let h = '<h2>Compra no cartão</h2><div class="caption-label" style="text-align:left;margin:-4px 0 8px;"><a href="../guia-cartao.html" target="_blank" rel="noopener">Como funciona (guia) ›</a></div>';
   // 0) FILTRO POR CARTÃO (vale para as faturas e para as cobranças sem registro)
   if (CC.cartoes.length > 1) h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;">
     <button type="button" class="preset-btn${CC.filtro ? '' : ' active'}" onclick="ccFiltrar(null)">Todos</button>
