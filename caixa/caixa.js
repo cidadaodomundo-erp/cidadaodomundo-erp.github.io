@@ -1760,7 +1760,11 @@ function caixaHellenHtml() {
   const esp = t => `<span style="color:var(--tx-4);">${t}</span>`;
   // 1) HOJE
   const hoje = H.lojas.map(u => {
-    const abertos = todos.filter(x => x.u === u && x.bloco === 'aberto');
+    // 25/11/2026 (Organizador 18:08): o ✓ mede o caixa de ONTEM — frente aberta antes de hoje é ✗ (a de hoje ainda está vendendo)
+    const ontemSP = caixaHellenMais(hojeSP, -1), vistos = new Set();
+    const abertos = (CAIXA_TURNOS || []).filter(t => t.unidade === u && t.fechado === false && String(t.aberto_em || t.dia || '').slice(0, 10) < hojeSP
+      && !vistos.has(t.caixa + '|' + t.aberto_em) && vistos.add(t.caixa + '|' + t.aberto_em))
+      .map(t => ({ frente: caixaFrenteNome(u, t.caixa), desde: String(t.aberto_em || '').slice(8, 10) + '/' + String(t.aberto_em || '').slice(5, 7) + ' ' + String(t.aberto_em || '').slice(11, 16) }));
     const rb = (H.robo || []).filter(x => x.unidade === u && x.acao === 'TROCAR');
     const cof = (COFRE_DIA || []).find(r => r.unidade === u && String(r.dia).slice(0, 10) === hojeSP);
     const contado = cof && cof.contado != null;
@@ -1769,7 +1773,7 @@ function caixaHellenHtml() {
     const linha = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
     return `<div class="contexto cx-cartao" style="text-align:left;border-color:${abertos.length || !contado ? 'var(--farol-perto)' : 'var(--farol-ok)'};">
       <div style="font-size:15px;"><b>${nomeLoja(u)}</b></div>
-      ${linha('Caixa fechado no Saipos', abertos.length ? nao('falta fechar: ' + abertos.map(x => trEscH(x.frente || 'caixa') + ' (desde ' + (x.desde || caixaDdm(x.dia)) + ')').join(', ')) : ok('sim'))}
+      ${linha(`Caixa de ontem (${caixaDdm(ontemSP)}) fechado no Saipos`, abertos.length ? nao(abertos.map(x => trEscH(x.frente || 'caixa') + ' aberto desde ' + x.desde).join(', ')) : ok('sim'))}
       ${linha('Trocas de bandeira', rb.length ? esp(`o robô vai trocar ${rb.length}`) : ok('nada pendente'))}
       ${linha('Dinheiro contado hoje', contado ? ok('contado' + (quem ? ' por ' + trEscH(quem.charAt(0).toUpperCase() + quem.slice(1)) : '')) : nao('ainda não'))}
       ${contado ? '' : `<button class="preset-btn active" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="caixaContarHoje('${u.replace(/'/g, "\\'")}')">Contar dinheiro</button>`}
