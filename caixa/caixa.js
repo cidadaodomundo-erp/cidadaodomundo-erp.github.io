@@ -186,6 +186,25 @@ async function abrirDiaConcartao(unidade, dia) {
   renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl);
   caixaFrentesFaixa(unidade, dia);
   caixaTravarDia(unidade, dia);
+  caixaDiaEnxuto(unidade, dia);
+}
+// 25/11/2026 [dono] (Organizador 18:19: "abrindo cada aba ali, fica mais confuso ainda"): o dia abre enxuto — o título, as frentes
+// (3 colunas) e a contagem do dinheiro; o venda a venda fica atrás de UM botão
+function caixaDiaEnxuto(unidade, dia) {
+  const cont = document.getElementById('concartao-dia');
+  if (!cont || document.getElementById('cxDiaResto')) return;
+  const fica = new Set(['cxFrentes', 'cxTravaAviso']);
+  const box = cont.querySelector('[id^="cfBox_"]');
+  const resto = document.createElement('div'); resto.id = 'cxDiaResto'; resto.style.display = 'none';
+  [...cont.children].forEach((el) => { if (!fica.has(el.id)) resto.appendChild(el); });
+  const nomeLoja = typeof lojaNome === 'function' ? lojaNome(unidade) : unidade;
+  const topo = document.createElement('div');
+  topo.innerHTML = `<div class="section-label" style="text-align:left;">${trEscH(nomeLoja)} · ${caixaDdm(dia)}</div>`;
+  cont.insertBefore(topo, cont.firstChild);
+  if (box) cont.appendChild(box);   // a contagem fica à vista
+  const bt = document.createElement('div');
+  bt.innerHTML = `<button class="preset-btn" style="margin-top:8px;" onclick="const r=document.getElementById('cxDiaResto'); const on=r.style.display==='none'; r.style.display=on?'':'none'; this.textContent=on?'esconder venda a venda':'ver venda a venda';">ver venda a venda</button>`;
+  cont.appendChild(bt); cont.appendChild(resto);
 }
 // calc = { robo } (03/11/2026, lista da Hellen): faz o mesmo cruzamento sem desenhar e devolve as pendências do dia
 function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, calc) {
