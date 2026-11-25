@@ -143,6 +143,12 @@ async function carregar() {
   const rr = await fetch(`${SUPABASE_URL}/rest/v1/rotina_migracao?select=rotina,tipo,nome,lote,lote_data,situacao,placar_ok,texto_ok,regras_ok,atualizado_em&order=lote,nome`,
     { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
   ROTM = rr && rr.ok ? await rr.json() : [];
+  // 25/11/2026 [migracao]: selo do estoque ("X de Y itens confiáveis", ±3%; livro chat-frente-organizador/respostas/selo-por-modulo-e-margem-3)
+  const hh = { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } };
+  const [rs1, rs2] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_resumo?select=unidade,data_partida,data_contagem,itens,confiaveis,texto,selo_modulo`, hh).catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_item?select=unidade,nome_saipos,un,esperado,contado,diferenca,dif_pct,selo,motivo,conserto`, hh).catch(() => null)]);
+  SELO = { res: rs1 && rs1.ok ? await rs1.json() : [], itens: rs2 && rs2.ok ? await rs2.json() : [] };
   if (!ITENS.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso ao plano (é só do Neto e do Fabio).</p>
       <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
   desenhar();
@@ -191,8 +197,22 @@ function migHtml() {
       <p class="rascunho" style="margin-top:.6rem">Cada rotina passa por: escrita (a ficha) → validada (conferida rodando) → entregue (ao robô do Fabio) → migrada. A ficha abre no GitHub, com o login do GitHub.</p>
     </div>`;
   }
+  h += seloHtml();
   if (MIG.length) h += `<details class="bloco"><summary>Consertos, regras e contas <span class="n" style="font-weight:400;color:var(--mudo)">${MIG.filter(x => x.situacao === 'feito').length} de ${MIG.length} feitos</span></summary><div class="corpo">${migPassosHtml()}</div></details>`;
   return h;
+}
+// selo por módulo: hoje só o estoque tem (uma linha por loja); vermelho primeiro, sem botões
+let SELO = { res: [], itens: [] };
+function seloHtml() {
+  if (!SELO.res.length) return '';
+  const num = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+  return SELO.res.map(r => { const ok = /CONFI/i.test(r.selo_modulo || '');
+    const I = SELO.itens.filter(x => x.unidade === r.unidade).sort((a, b) => (a.selo === b.selo ? 0 : a.selo === 'EM CONSERTO' ? -1 : 1) || String(a.nome_saipos).localeCompare(String(b.nome_saipos)));
+    return `<details class="bloco"><summary>Selo do estoque (${esc(r.unidade)}): <span style="color:${ok ? 'var(--ok)' : 'var(--acento)'}">${esc(r.texto || '')} · ${ok ? 'confiável' : 'em conserto'}</span>
+      <span class="n" style="font-weight:400;color:var(--mudo)">contagem de ${dataBR(r.data_contagem)} contra ${dataBR(r.data_partida)} · margem 3%</span></summary>
+      <div class="corpo">${I.map(x => { const v = x.selo === 'EM CONSERTO'; return `<div class="mig-l"><span class="bola" style="background:${v ? 'var(--acento)' : 'var(--ok)'}"></span><div class="tx">${esc(x.nome_saipos)}
+        <div class="meta">esperado ${num(x.esperado)} · contado ${num(x.contado)} ${esc(String(x.un || '').toLowerCase())} · diferença ${x.dif_pct != null ? num(x.dif_pct) + '%' : '—'} · ${v ? 'em conserto' : 'confiável'}</div>
+        ${x.motivo ? `<div class="meta">por quê: ${esc(x.motivo)}${x.conserto ? ' · o que falta: ' + esc(x.conserto) : ''}</div>` : ''}</div></div>`; }).join('')}</div></details>`; }).join('');
 }
 function migPassosHtml() {
   if (!MIG.length) return '';
