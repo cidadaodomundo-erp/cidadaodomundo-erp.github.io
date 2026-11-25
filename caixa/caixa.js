@@ -1339,6 +1339,8 @@ async function cofreCarregar() {
       consultarTudo('vw_caixa_gaveta_sb_dia?select=unidade,dia,entrou,saiu,saldo_fim_dia&order=dia').catch((x) => { console.warn('gaveta SB:', x.message); return []; }),
     ]);
     COFRE_DIA = d; COFRE_ENVIOS = e; COFRE_GAVETA_SB = g;
+    // 25/11/2026 [dono] (Financeiro ab947ab): a contagem do DIA (o dinheiro do fechamento, um valor só) × o dinheiro do Saipos
+    COFRE_CDIA = await consultarTudo('vw_caixa_contagem_dia?select=unidade,dia,dinheiro_saipos,contado,diferenca,resultado,quem,atualizado_em').catch(() => []);
   } catch (err) { COFRE_DIA = []; COFRE_ENVIOS = []; COFRE_GAVETA_SB = []; console.warn('cofre:', err.message); }
 }
 function cofreHtml() {
@@ -1431,7 +1433,7 @@ function cofreConferidoTxt(c) {
   const nome = String(c.quem || '').split('@')[0].split(/[._-]/)[0];
   return `<div class="caption-label" style="text-align:left;">conferido em ${qd}${nome ? ' por ' + trEscH(nome.charAt(0).toUpperCase() + nome.slice(1)) : ''}${c.troco != null ? ` · troco que fica na gaveta R$ ${fmt(Number(c.troco))} (já está no total)` : ''}</div>`;
 }
-const cofreTrocoCampo = (k, livre, val) => `<label>troco (fica na gaveta, já entra no total) R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfTr_${k}" class="${livre}" value="${val == null ? '' : val}" style="width:110px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;"></label>`;
+const cofreTrocoCampo = (k, livre, val) => `<label>troco (fundo fixo da gaveta, só informação) R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cfTr_${k}" class="${livre}" value="${val == null ? '' : val}" style="width:110px; text-align:right; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px;"></label>`;
 // DINHEIRO DA LOJA NO DIA (05/11/2026, proposta do Financeiro): UM campo às cegas por loja e por dia, "gaveta + cofre contado".
 // Antes de gravar não se mostra o saldo do Saipos; depois, contado × saldo e "bateu" ou a diferença.
 // 25/11/2026 [dono] (dono, print 18:57: "aqui são duas contagens diferentes, o dinheiro que vem com o fechamento do caixa de cada dia,
@@ -1448,10 +1450,22 @@ function cofreLinhaDia(unidade, dia) {
   const R = (v) => 'R$ ' + fmt(Number(v || 0));
   const cartao = (tit, sub, corpo, destaque) => `<div style="margin-top:10px; padding:10px 12px; border:${destaque ? '2px solid var(--marca-amarelo)' : '1px solid var(--line)'}; border-radius:10px;">
     <div style="font-size:15px;"><b>${tit}</b></div><div style="font-size:12px; color:var(--tx-4); margin-bottom:6px;">${sub}</div>${corpo}</div>`;
-  // 1) DINHEIRO DO FECHAMENTO DE HOJE
-  const c1 = cartao('Dinheiro do fechamento de ' + (dia === hojeSP ? 'hoje' : caixaDdm(dia)), 'o envelope que vem com o fechamento do caixa do dia',
-    r ? `<div>Saipos: <b>${R(r.entrou)}</b> em dinheiro entrou no cofre pelo fechamento</div><div class="caption-label" style="text-align:left;">a contagem deste envelope em separado entra assim que o banco tiver o lugar dela</div>`
-      : '<div class="caption-label" style="text-align:left;">sem movimento do cofre para este dia</div>');
+  // 1) DINHEIRO DO FECHAMENTO DO DIA (dono 18:59: "somente o campo do valor", sem cédulas; sem o troco) × o dinheiro do Saipos
+  const cd = (COFRE_CDIA || []).find((x) => x.unidade === unidade && String(x.dia).slice(0, 10) === dia);
+  const tit1 = 'Dinheiro do fechamento de ' + (dia === hojeSP ? 'hoje' : caixaDdm(dia)), sub1 = 'o dinheiro que vem com o fechamento do caixa do dia, sem o troco';
+  let c1;
+  if (dia < CAIXA_NOVO_FLUXO) c1 = '';
+  else if (cd && cd.contado != null && !CDIA_CORRIGINDO[k]) {
+    const df = Number(cd.diferenca || 0), quem = String(cd.quem || '').split('@')[0].split(/[._-]/)[0];
+    const qd = cd.atualizado_em ? new Date(cd.atualizado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '';
+    c1 = cartao(tit1, sub1, `<div>Saipos <b>${R(cd.dinheiro_saipos)}</b> · contado <b>${R(cd.contado)}</b> · ${Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(df))}</b>`}
+      ${pode ? ` <button class="preset-btn ${livre}" onclick="CDIA_CORRIGINDO['${k}']=true; cofreRedesenhar('${unidade}', '${dia}')">corrigir</button>` : ''}</div>
+      <div class="caption-label" style="text-align:left;">conferido em ${qd}${quem ? ' por ' + trEscH(quem.charAt(0).toUpperCase() + quem.slice(1)) : ''}</div>`);
+  } else if (!pode) c1 = cartao(tit1, sub1, '<div style="color:var(--farol-perto);">ainda não contado</div>');
+  else c1 = cartao(tit1, sub1, `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+      <label>contado R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" class="${livre}" value="${cd && cd.contado != null ? cd.contado : ''}" style="width:140px; text-align:right; background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:8px;"></label>
+      <button class="preset-btn active ${livre}" style="padding:10px 14px;" onclick="cofreGravarDia('${unidade}', '${dia}', '${k}')">Gravar</button>
+      <span class="caption-label">O dinheiro do Saipos aparece depois de gravar.</span></div>`);
   // 2) CONTAGEM DO COFRE (a de corte, amanhã cedo)
   const corte = dia === hojeSP && r && r.contado == null;
   const sub2 = unidade === 'AGUA VERDE' ? 'o envelope de hoje mais a gaveta da Hellen — sem a gaveta do SB' : 'o envelope de hoje mais a gaveta da Hellen';
@@ -1465,7 +1479,25 @@ function cofreLinhaDia(unidade, dia) {
   else c2 = cartao('Contagem do cofre' + (corte ? ' · contagem de hoje' : ''), sub2, cofreGradeHtml(unidade, dia, k, livre), corte);
   return `<div id="cfBox_${k}">${c2}${c1}</div>`;
 }
-let COFRE_CORRIGINDO = {};
+async function cofreGravarDia(unidade, dia, k) {
+  const el = document.getElementById('cdV_' + k), v = el ? el.value : '';
+  if (v === '') { avisoAcao('atencao', '! Digite o dinheiro do fechamento (0 se não teve).'); return; }
+  const s = rmbSessao();
+  avisoAcao('enviando', 'Gravando o dinheiro do fechamento…');
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem_dia?on_conflict=unidade,dia`, { method: 'POST',
+      headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ unidade, dia, contado: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    CDIA_CORRIGINDO[k] = false;
+    await cofreCarregar();
+    const x = (COFRE_CDIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia);
+    const df = x && x.diferenca != null ? Number(x.diferenca) : null;
+    avisoAcao(df != null && Math.abs(df) >= 0.005 ? 'atencao' : 'ok', df == null ? `✓ Gravado às ${avisoHora()}.` : Math.abs(df) < 0.005 ? `✓ Gravado às ${avisoHora()}: bateu com o Saipos.` : `! Gravado às ${avisoHora()}: ${df < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(df))} em relação ao Saipos.`);
+    cofreRedesenhar(unidade, dia);
+  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarDia(unidade, dia, k)); }
+}
+let COFRE_CORRIGINDO = {}, COFRE_CDIA = [], CDIA_CORRIGINDO = {};
 function cofreRedesenhar(unidade, dia) {
   const k = (unidade + dia).replace(/[^A-Z0-9]/g, ''), box = document.getElementById('cfBox_' + k);
   if (box) box.outerHTML = cofreLinhaDia(unidade, dia);
