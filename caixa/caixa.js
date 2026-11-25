@@ -1717,7 +1717,9 @@ async function caixaHellenCarregar() {
     ]);
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
     const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_NOVO_FLUXO + '&' + un).catch(() => []);
-    CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc };
+    // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
+    const motos = await consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []);
+    CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc, motos };
   } catch (e) { CAIXA_HELLEN = { lojas, erro: e.message }; }
   CAIXA_HELLEN_CALC = null;
   renderModuloCaixa();
@@ -2021,7 +2023,7 @@ function caixaConfHtml(u, dia) {
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;">
         <input id="cxEx_${x.i}" placeholder="explicação (obrigatória)" style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
         <select id="cxDe_${x.i}" onchange="document.getElementById('cxMo_${x.i}').style.display = this.value === 'FALTA_DELIVERY' ? '' : 'none'" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DECISOES.map(([v, t]) => `<option value="${v}"${v === sug ? ' selected' : ''}>${t}</option>`).join('')}</select>
-        <input id="cxMo_${x.i}" placeholder="motoboy" value="${trEscH(x.quem || '')}" style="width:130px;${sug === 'FALTA_DELIVERY' ? '' : 'display:none;'}background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
+        <select id="cxMo_${x.i}" style="${sug === 'FALTA_DELIVERY' ? '' : 'display:none;'}background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;"><option value="">motoboy…</option>${(CAIXA_HELLEN.motos || []).map((n) => `<option${caixaMesmoNome(n, x.quem) ? ' selected' : ''}>${trEscH(n)}</option>`).join('')}</select>
         <button class="preset-btn active" onclick="caixaDecidir(${x.i}, this)">Gravar</button></div></div>`; };
   const venda = (b ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Bateu (${b.n} ${b.n === 1 ? 'venda' : 'vendas'} · ${R(b.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
     + (pend.length ? `<div style="margin-top:6px;font-weight:700;color:var(--farol-perto);">PENDENTE (${pend.length})</div>${pend.map(linhaP).join('')}` : '<div style="color:var(--farol-ok);">✓ nenhuma venda pendente</div>');
@@ -2038,13 +2040,18 @@ function caixaConfHtml(u, dia) {
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pend.length + abertosD.length + (cd && cd.contado != null ? 0 : 1)} a fazer</span>`}`,
     `<div style="margin-bottom:6px;"><b>Envelope recebido pela Hellen</b><div>${env}</div></div>` + venda + `<div style="margin-top:8px;">${descH}</div>`);
 }
+// o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
+const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  return !!(a && b) && (n(a) === n(b) || n(a).startsWith(n(b)) || n(b).startsWith(n(a))); };
+// os blocos que o banco aceita (Financeiro 20:15): dinheiro, maquininha, pix_chave, online, desconto
+const caixaBlocoBanco = (b) => ({ cofre: 'dinheiro', difsaipos: 'dinheiro', semcobr: 'maquininha', troca: 'maquininha', pix: 'maquininha' }[b] || b);
 async function caixaDecidir(i, bt) {
   const x = CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.itens[i]; if (!x || !x.pend) return;
   const ex = (document.getElementById('cxEx_' + i) || {}).value || '', de = (document.getElementById('cxDe_' + i) || {}).value, mo = (document.getElementById('cxMo_' + i) || {}).value || '';
   if (ex.trim().length < 3) return avisoAcao('atencao', '! Escreva a explicação (é obrigatória).');
-  if (de === 'FALTA_DELIVERY' && !mo.trim()) return avisoAcao('atencao', '! Diga qual motoboy (falta do delivery).');
+  if (de === 'FALTA_DELIVERY' && !mo.trim()) return avisoAcao('atencao', '! Escolha o motoboy na lista (falta do delivery).');
   bt.disabled = true; bt.textContent = 'gravando…';
-  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.u, p_dia: x.dia, p_chave: x.pend.chave, p_bloco: x.pend.bloco, p_valor: Number(x.valor) || 0,
+  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.u, p_dia: x.dia, p_chave: x.pend.chave, p_bloco: caixaBlocoBanco(x.pend.bloco), p_valor: Number(x.valor) || 0,
     p_explicacao: ex.trim(), p_decisao: de, p_caixa: x.caixa || null, p_responsavel: de === 'FALTA_DELIVERY' ? mo.trim() : null, p_descricao: [x.hora, x.venda, x.forma].filter(Boolean).join(' · ') });
   if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaDecidir(i, bt)); }
   avisoAcao('ok', `✓ Gravado às ${avisoHora()}.`);
