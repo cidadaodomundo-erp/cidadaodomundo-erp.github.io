@@ -1716,6 +1716,12 @@ async function cofreDesfazerNaoChegou(id) {
 // lojas de quem confere, desde o recomeço de cada loja, mais antiga primeiro. O cruzamento é o mesmo do clique no dia
 // (renderDiaConcartao com calc); a troca que o robô faz e o que só espera (madrugada, PIX de fim de semana) não entram.
 let CAIXA_HELLEN = null, CAIXA_HELLEN_CALC = null;
+// 25/11/2026 [conserto] (dono: "o filtro por loja não está funcionando no fechamento de caixa"): cada bloco segue o "Vendo:" do topo
+// na hora de desenhar (os dados podem ter sido lidos com outra escolha)
+function caixaLojasVis() {
+  const H = CAIXA_HELLEN, agora = caixaLojas().map((x) => x[0]);
+  return H && H.lojas && H.lojas.length ? H.lojas.filter((u) => agora.includes(u)) : agora;
+}
 function caixaHellenLojas() {
   const eu = String((rmbSessao() || {}).email || '').toLowerCase();
   const dono = typeof souODono === 'function' && souODono();
@@ -1904,7 +1910,7 @@ function caixaHellenHtml() {
   const nao = t => `<span style="color:var(--farol-fora);font-weight:700;">✗ ${t}</span>`;
   const esp = t => `<span style="color:var(--tx-4);">${t}</span>`;
   // 1) HOJE
-  const hoje = H.lojas.map(u => {
+  const hoje = caixaLojasVis().map(u => {
     // 25/11/2026 (Organizador 18:08): o ✓ mede o caixa de ONTEM — frente aberta antes de hoje é ✗ (a de hoje ainda está vendendo)
     const ontemSP = caixaHellenMais(hojeSP, -1), vistos = new Set();
     const abertos = (CAIXA_TURNOS || []).filter(t => t.unidade === u && t.fechado === false && String(t.aberto_em || t.dia || '').slice(0, 10) < hojeSP
@@ -1925,11 +1931,12 @@ function caixaHellenHtml() {
   }).join('');
   // 2) PARA A HELLEN: só o que é dela, uma linha e um botão
   const ontemCx = caixaHellenMais(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }), -1);
-  const deHellen = todos.filter(x => !['aguardando', 'contagem', 'aberto'].includes(x.bloco) && !(x.dia === ontemCx && x.pend) && !caixaLojaFechada(x.u, x.dia));   // o caixa de ontem está no cartão
+  const vis = new Set(caixaLojasVis());
+  const deHellen = todos.filter(x => vis.has(x.u) && !['aguardando', 'contagem', 'aberto'].includes(x.bloco) && !(x.dia === ontemCx && x.pend) && !caixaLojaFechada(x.u, x.dia));   // o caixa de ontem está no cartão
   const podeNaoChegou = (typeof souODono === 'function' && souODono()) || ((rmbSessao() || {}).email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br';
   const R = v => 'R$ ' + fmt(Math.abs(+v || 0));
   const curta = x => {
-    const dd = caixaDdm(x.dia), loja = H.lojas.length > 1 ? nomeLoja(x.u) + ' · ' : '';
+    const dd = caixaDdm(x.dia), loja = caixaLojasVis().length > 1 ? nomeLoja(x.u) + ' · ' : '';
     const B = (rot, f) => `<button class="preset-btn" style="min-width:110px;" onclick="event.stopPropagation(); ${f}">${rot}</button>`;
     switch (x.bloco) {
       case 'semcobr': return [`${loja}${trEscH(x.venda || 'venda')} de ${dd} · ${R(x.valor)} · não passou na maquininha`, B('Autorizar desconto', `caixaHellenExplicar(${x.i})`)];
@@ -2000,7 +2007,7 @@ function caixaDetalhesHtml() {
 // Dia · Loja · Situação · Dinheiro contado · Diferença — os últimos 7 dias à vista e "ver mais"; clicar na linha abre o dia.
 function caixaHistoricoHtml() {
   const H = CAIXA_HELLEN;
-  const lojas = (H && H.lojas && H.lojas.length) ? H.lojas : caixaLojas().map(x => x[0]);
+  const lojas = caixaLojasVis();
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
   const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   const dias = []; for (let d = caixaHellenMais(hojeSP, -1); dias.length < CAIXA_HIST_N; d = caixaHellenMais(d, -1)) dias.push(d);
@@ -2058,7 +2065,7 @@ function caixaDescontosHtml() {
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u, R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   const titulo = `<div class="section-label" style="text-align:left;margin-top:16px;">Descontos do dia anterior (${caixaDdm(dia)})</div>`;
   if (dia < CAIXA_DESC_DESDE) return titulo + `<div class="contexto" style="text-align:left;"><span style="color:var(--tx-4);">a conferência dos descontos começa com os de ${caixaDdm(CAIXA_DESC_DESDE)}</span></div>`;
-  return titulo + `<div class="contexto" style="text-align:left;">` + H.lojas.map(u => {
+  return titulo + `<div class="contexto" style="text-align:left;">` + caixaLojasVis().map(u => {
     const D = (H.desc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
     const semMot = D.filter(x => x.alerta_sem_motivo).length, semAut = D.filter(x => x.alerta_sem_autorizacao).length, ab = caixaDescAbertos(u, dia);
     return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${D.length} ${D.length === 1 ? 'desconto' : 'descontos'} · sem senha: ${semAut} · sem motivo: ${semMot}${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
@@ -2183,7 +2190,7 @@ async function caixaDescExplicar(u, dia, idSale, valor, bt) {
 // 25/11/2026 [dono] (Organizador 20:16, desenho final): a contagem do dinheiro fica no FIM da tela, um cartão por loja (data e momento
 // escolhidos); o "Contar dinheiro" do topo só rola até ela. O quadro do dia (venda a venda) saiu do caminho principal.
 function caixaContagemFimHtml() {
-  const H = CAIXA_HELLEN, lojas = (H && H.lojas && H.lojas.length) ? H.lojas : caixaLojas().map(x => x[0]);
+  const H = CAIXA_HELLEN, lojas = caixaLojasVis();
   const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
   return `<div class="section-label" style="text-align:left;margin-top:16px;">Contagem do dinheiro</div>`
@@ -2220,6 +2227,8 @@ async function caixaHellenExplicar(i) {
 function renderModuloCaixa() {
   const alvo = document.getElementById('view-caixa');
   caixaDiaParaCasa();   // o quadro do dia pode estar dentro de um cartão: volta para o lugar dele antes de redesenhar
+  // a loja escolhida não estava nos dados lidos (ex.: abriu numa loja e trocou para a Rede): lê de novo
+  if (CAIXA_HELLEN && !CAIXA_HELLEN.erro && CAIXA_HELLEN.lojas && caixaHellenLojas().some((u) => !CAIXA_HELLEN.lojas.includes(u))) { caixaHellenDeNovo(); return; }
   // 25/11/2026 [dono] (Organizador 18:19: "o que for análise sai da tela do caixa e vai para a tela de origem, deixando um link"):
   // os descontos do salão e do balcão abrem numa tela só deles (caixa/index.html?modo=descontos)
   if (CAIXA_MODO === 'descontos') {
