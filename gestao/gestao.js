@@ -7537,7 +7537,11 @@ function sobraLado(L, quarta, outro) {
 function sobraFilialHtml() {
   if (SOBRA.erro) return `<div id="sobraFilialWrap" class="caption-label" style="text-align:left;">✗ A sobra das filiais não carregou (o banco demorou). <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
   if (!Array.isArray(SOBRA.plano) || !SOBRA.plano.length) return '<div id="sobraFilialWrap"></div>';
-  const v = (x) => x == null ? '<span style="opacity:.4">—</span>' : sobraR(x);
+  // 25/11/2026 [conserto] (dono, print: "arruma a tabulação dessa tabela"): grade fixa sem rolagem no desktop, números à
+  // direita (tabular-nums), "—" centralizado, observação em linha menor dentro da coluna, Lucro explicado embaixo
+  const v = (x) => x == null ? '<span style="display:block;text-align:center;opacity:.4">—</span>' : sobraR(x);
+  const nota = (t, c) => `<div style="font-size:11px;line-height:1.25;color:${c || 'var(--tx-4)'};white-space:normal;margin-top:2px;">${t}</div>`;
+  const tdN = 'style="text-align:right;padding:6px 8px;vertical-align:top;"', tdT = 'style="text-align:left;padding:6px 8px;vertical-align:top;"';
   const nome = { AHU: 'Ahú', SB: 'São Braz' };
   const cor = { ok: 'var(--farol-ok)', perto: 'var(--farol-perto)', fora: 'var(--farol-fora)', na: 'var(--tx-4)' };
   const lanc = SOBRA.lancar || [];
@@ -7550,16 +7554,16 @@ function sobraFilialHtml() {
     const tot = cobId != null && SOBRA.cob[cobId] != null ? SOBRA.cob[cobId] : null;
     const jaPago = tot != null && p.abate_lista != null && p.lista_fica_aberta != null ? tot - Number(p.abate_lista) - Number(p.lista_fica_aberta) : null;
     if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
-    const pergunta = Number(p.lista_mes_pergunta) > 0 ? `<div style="font-size:11.5px;color:var(--farol-perto);">sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)</div>` : '';
+    const pergunta = Number(p.lista_mes_pergunta) > 0 ? nota(`sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)`, 'var(--farol-perto)') : '';
     const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
     // repasse_valor = repasse semanal do iFood que caiu no banco da FILIAL (Financeiro 18/11 15:47); o PIX para a AV é sai_da_filial
-    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null ? `<div style="font-size:11.5px;color:var(--tx-4);">repasse do iFood no banco da filial: ${sobraR(p.repasse_valor)}</div>` : '');
+    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null ? nota(`repasse do iFood no banco da filial: ${sobraR(p.repasse_valor)}`) : '');
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
-    const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
+    const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? nota(`falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}`, 'var(--farol-fora)') : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
-    return `<tr><td>${agDmSobra(p.quarta)}</td><td><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td>${sit}</td>
-      <td>${v(tot)}</td><td>${v(jaPago)}</td><td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b>${pergunta}</td>
-      <td>${lado(fil)}</td><td>${lado(av)}</td></tr>`;
+    return `<tr><td ${tdT}>${agDmSobra(p.quarta)}</td><td ${tdT}><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td ${tdT}>${sit}</td>
+      <td ${tdN}>${v(tot)}</td><td ${tdN}>${v(jaPago)}</td><td ${tdN}>${v(p.abate_lista)}</td><td ${tdN}>${falta}</td><td ${tdN}>${bonus}</td><td ${tdN}>${v(p.lucro)}</td><td ${tdN}><b>${total}</b>${pergunta}</td>
+      <td style="text-align:center;padding:6px 8px;vertical-align:top;">${lado(fil)}</td><td style="text-align:center;padding:6px 8px;vertical-align:top;">${lado(av)}</td></tr>`;
   }).join('');
   const hoje = sobraHoje(), prox = (SOBRA.plano.map((p) => String(p.quarta)).filter((d) => d >= hoje).sort()[0]) || null;
   const daQuarta = prox ? SOBRA.plano.filter((p) => String(p.quarta) === prox && Number(p.sai_da_filial) > 0) : [];
@@ -7568,8 +7572,9 @@ function sobraFilialHtml() {
       <div class="card-val">${sobraR(p.sai_da_filial)}</div><div class="card-pct">${p.travado ? 'um PIX só, desta filial' : 'previsão: o valor fecha na quarta'}</div></div>`).join('')}</div>` : '';
   return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta <span style="color:var(--tx-4); font-weight:normal;">· ${RG_CAIXA}</span>${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
-    <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro<br><span style="font-weight:normal;font-size:11px;">repassado por PIX (caixa) — não é o resultado do mês</span></th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
-    <tbody>${linhas}</tbody></table></div></details></div>`;
+    <div id="tabelaSobraFilial" style="overflow-x:auto;"><table style="width:100%;min-width:900px;table-layout:fixed;font-variant-numeric:tabular-nums;"><colgroup><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:6.5%"><col style="width:6.5%"></colgroup><thead><tr><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Quarta</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Filial</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Situação</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista do mês</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista já paga</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista paga nesta quarta</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Falta da lista</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Bônus do iFood</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;" title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro</th><th style="text-align:right;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Total do repasse</th><th style="text-align:center;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Saipos: filial paga</th><th style="text-align:center;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Saipos: AV recebe</th></tr></thead>
+    <tbody>${linhas}</tbody></table></div>
+    <div class="caption-label" style="text-align:left;">Lucro = o que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE.</div></details></div>`;
 }
 // hoje em Curitiba (AAAA-MM-DD), para o farol: quarta que já passou com título faltando = vermelho
 const sobraHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
