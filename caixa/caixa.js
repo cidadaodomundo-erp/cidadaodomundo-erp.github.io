@@ -1104,6 +1104,8 @@ async function caixaDesfazer(i) {
 // PC) vem depois. Serie comeca em 01/08/2026 (antes nao ha coluna dinheiro).
 // ------------------------------------------------------------------
 let CAIXA_DIAS = null, CAIXA_CONTAGENS = null, CAIXA_RESP = null;
+const CAIXA_MODO = new URLSearchParams(location.search).get('modo') || '';
+let CAIXA_HIST_N = 7;   // dias à vista no histórico ("ver mais" mostra 30)
 let CAIXA_CARTAO = null, CAIXA_PIX = null, CAIXA_TURNOS = null, CAIXA_VALID = null, CAIXA_DIAS_CX = null, CAIXA_CONF = null, CAIXA_CARTAO_CX = null, CAIXA_PIX_CX = null, CAIXA_AVISOS = null;
 
 // FECHAMENTO DE CAIXAS (09/09/2026) — modulo unico, decisao do dono: absorveu
@@ -1753,6 +1755,8 @@ function caixaHellenHtml() {
   if (!H.lojas.length) return '';
   if (H.erro) return `<div class="contexto" style="border-color:var(--farol-fora); text-align:left;">✗ Não consegui montar o que fazer: ${trEscH(H.erro)}. <button class="preset-btn" onclick="caixaHellenDeNovo()">Tentar de novo</button></div>`;
   const todos = caixaHellenItens();
+  // os descontos sem motivo viram UMA linha na lista da Hellen: lê uma vez, por fora, e redesenha quando chegar
+  if (!DESC.tentou && CAIXA_MODO !== 'descontos') { DESC.tentou = true; DESC.lendo = true; descCarregar().then(() => { DESC.lendo = false; if (Array.isArray(DESC.vendas) && DESC.vendas.some(v => v.alerta_sem_motivo)) renderModuloCaixa(); }).catch(() => { DESC.lendo = false; }); }
   const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
   const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   const ok = t => `<span style="color:var(--farol-ok);font-weight:700;">✓ ${t}</span>`;
@@ -1780,7 +1784,8 @@ function caixaHellenHtml() {
     </div>`;
   }).join('');
   // 2) PARA A HELLEN: só o que é dela, uma linha e um botão
-  const deHellen = todos.filter(x => !['aguardando', 'contagem', 'aberto'].includes(x.bloco) && x.acao !== 'naochegou');
+  const deHellen = todos.filter(x => !['aguardando', 'contagem', 'aberto'].includes(x.bloco));
+  const podeNaoChegou = (typeof souODono === 'function' && souODono()) || ((rmbSessao() || {}).email || '').toLowerCase() === 'hellen@cidadaodomundo.com.br';
   const R = v => 'R$ ' + fmt(Math.abs(+v || 0));
   const curta = x => {
     const dd = caixaDdm(x.dia), loja = H.lojas.length > 1 ? nomeLoja(x.u) + ' · ' : '';
@@ -1792,16 +1797,19 @@ function caixaHellenHtml() {
       case 'quebra': return [`${loja}Falta de ${R(x.valor)} (${trEscH(x.quem || 'sem responsável')}, ${dd})${caixaEstadoFalta(x) ? ' · ' + caixaEstadoFalta(x) : ''}`,
         caixaFaltaAConfirmar(x) && caixaPodeConfirmar() ? caixaBotaoConfirmar(x.chave) : B('Abrir', `caixaHellenAbrir(${x.i})`)];
       case 'online': return [`${loja}${trEscH(x.venda || 'venda')} de ${dd} · forma do online errada`, B('Corrigir', `caixaHellenAbrir(${x.i})`)];
-      case 'cofre': return [`${loja}${trEscH(x.oque || 'dinheiro do cofre')}`, x.acao === 'cofre' ? '' : B('Abrir', `caixaHellenAbrir(${x.i})`)];
+      case 'cofre': return x.acao === 'naochegou'
+        ? [`Envio do São Braz de ${dd} · ${R(x.valor)} · chegou na Água Verde?`, podeNaoChegou && x.id ? B('Não chegou', `cofreNaoChegou(${Number(x.id)})`) : '']
+        : [`${loja}${trEscH(x.oque || 'dinheiro do cofre')}`, ''];
       default: return [`${loja}${trEscH(x.oque || '')}`, B('Abrir', `caixaHellenAbrir(${x.i})`)];
     }
   };
-  const lista = deHellen.map(x => { const [t, b] = curta(x);
+  const semMot = Array.isArray(DESC.vendas) ? DESC.vendas.filter(v => v.alerta_sem_motivo).length : 0;
+  const lista = (semMot ? `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${semMot} descontos sem motivo no salão e no balcão</span><a class="preset-btn" style="min-width:110px;text-align:center;" href="index.html?modo=descontos">Ver e marcar</a></div>` : '') + deHellen.map(x => { const [t, b] = curta(x);
     return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${t}</span>${b}</div>`; }).join('');
   return `<div class="section-label" style="text-align:left;">Hoje · ${caixaDdm(hojeSP)}</div>
     <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">${hoje}</div>
     <div class="section-label" style="text-align:left;margin-top:16px;">Para a Hellen${deHellen.length ? ' · ' + deHellen.length : ''}</div>
-    ${deHellen.length ? `<div class="contexto" style="text-align:left;">${lista}</div>` : `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);">${ok('nada para resolver')}</div>`}`;
+    ${deHellen.length || semMot ? `<div class="contexto" style="text-align:left;">${lista}</div>` : `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);">${ok('nada para resolver')}</div>`}`;
 }
 // "Contar dinheiro": abre o dia de hoje da loja já na contagem por cédula (com o campo do troco)
 async function caixaContarHoje(u) {
@@ -1826,6 +1834,38 @@ function caixaDetalhesHtml() {
   return cinza(`aguardando · ${esp.length}`, esp.map(x => `${nomeLoja(x.u)} · ${caixaTarefa(x).txt}`).join('<br>'))
     + cinza(`trocas de bandeira do robô · ${rb.length}`, rb.length ? `${vai.length ? `vai trocar ${vai.length} (${somaRb(vai)})` : ''}${vai.length && feito.length ? ' · ' : ''}${feito.length ? `trocou ${feito.length} (${somaRb(feito)})` : ''}` : '')
     + cinza(`sobras e quebras do fechamento do Saipos · ${SF.length}`, SF.map(x => `${nomeLoja(x.u)} · ${caixaDdm(x.dia)} · ${trEscH(x.frente || '')} · ${x.valor < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(x.valor))} → ${rotT[x.tratamento] || trEscH(x.tratamento)}`).join('<br>'));
+}
+// HISTÓRICO (Organizador 18:18, print do dono: "essa parte do histórico ainda está bem confusa"): uma tabela curta, 5 colunas —
+// Dia · Loja · Situação · Dinheiro contado · Diferença — os últimos 7 dias à vista e "ver mais"; clicar na linha abre o dia.
+function caixaHistoricoHtml() {
+  const H = CAIXA_HELLEN;
+  const lojas = (H && H.lojas && H.lojas.length) ? H.lojas : caixaLojas().map(x => x[0]);
+  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u;
+  const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const dias = []; for (let d = caixaHellenMais(hojeSP, -1); dias.length < CAIXA_HIST_N; d = caixaHellenMais(d, -1)) dias.push(d);
+  const itens = H && !H.erro && H.trs ? caixaHellenItens() : [];
+  const sit = (u, d) => {
+    const cf = (CAIXA_CONF || []).filter(c => c.unidade === u && c.dia === d);
+    if (cf.some(caixaFechouLote)) return '<span style="color:var(--farol-ok);">fechado em lote pelo dono</span>';
+    const pend = itens.filter(x => x.u === u && x.dia === d && !['aguardando', 'contagem'].includes(x.bloco));
+    if (pend.length) return `<b style="color:var(--farol-perto);">com pendência (${pend.length})</b>`;
+    if (cf.some(caixaFechouSozinho)) return '<span style="color:var(--farol-ok);">fechou sozinho</span>';
+    if (cf.length) return '<span style="color:var(--farol-ok);">fechado</span>';
+    return '<span style="color:var(--tx-4);">aberto</span>';
+  };
+  const R = v => 'R$ ' + fmt(Number(v));
+  const linhas = dias.flatMap(d => lojas.map(u => {
+    const c = (COFRE_DIA || []).find(r => r.unidade === u && String(r.dia).slice(0, 10) === d);
+    const env = u === 'SÃO BRAZ' ? (COFRE_ENVIOS || []).filter(x => String(x.data_envio).slice(0, 10) === d).reduce((a, x) => a + Number(x.valor || 0), 0) : 0;
+    const contado = c && c.contado != null ? R(c.contado) + (env ? `<div style="font-size:11px;color:var(--tx-4);">saiu do cofre para a AV: ${R(env)}</div>` : '') : (env ? `<span style="color:var(--tx-4);">—</span><div style="font-size:11px;color:var(--tx-4);">saiu do cofre para a AV: ${R(env)}</div>` : '<span style="color:var(--tx-4);">—</span>');
+    const dif = c && c.contado != null && c.diferenca != null ? (Math.abs(Number(c.diferenca)) < 0.005 ? '<span style="color:var(--farol-ok);">bateu</span>'
+      : `<span style="color:var(--farol-fora);">${Number(c.diferenca) < 0 ? 'faltou' : 'sobrou'} ${R(Math.abs(Number(c.diferenca)))}</span>`) : '<span style="color:var(--tx-4);">—</span>';
+    return `<tr style="cursor:pointer;" title="abrir o dia" onclick="abrirDiaConcartao('${u.replace(/'/g, "\\'")}', '${d}')"><td>${caixaDdm(d)}</td><td>${nomeLoja(u)}</td><td>${sit(u, d)}</td><td>${contado}</td><td>${dif}</td></tr>`;
+  })).join('');
+  return `<div class="section-label" style="text-align:left;margin-top:16px;">Histórico</div>
+    <div class="caption-label" style="text-align:left;">Até 24/11 fechado em lote pelo dono em 25/11. Toque no dia para abrir.</div>
+    <div id="tabelaCaixaHistorico" style="overflow-x:auto;"><table><thead><tr><th>Dia</th><th>Loja</th><th>Situação</th><th>Dinheiro contado</th><th>Diferença</th></tr></thead><tbody>${linhas}</tbody></table></div>
+    <div style="margin-top:6px;"><button class="preset-btn" onclick="CAIXA_HIST_N = CAIXA_HIST_N > 7 ? 7 : 30; renderModuloCaixa();">${CAIXA_HIST_N > 7 ? 'ver só os últimos 7 dias' : 'ver mais (30 dias)'}</button></div>`;
 }
 function caixaHellenDeNovo() { CAIXA_HELLEN = null; renderModuloCaixa(); caixaHellenCarregar(); }
 async function caixaHellenAbrir(i) {
@@ -1853,6 +1893,13 @@ async function caixaHellenExplicar(i) {
 
 function renderModuloCaixa() {
   const alvo = document.getElementById('view-caixa');
+  // 25/11/2026 [dono] (Organizador 18:19: "o que for análise sai da tela do caixa e vai para a tela de origem, deixando um link"):
+  // os descontos do salão e do balcão abrem numa tela só deles (caixa/index.html?modo=descontos)
+  if (CAIXA_MODO === 'descontos') {
+    alvo.innerHTML = `<div class="section-label">Descontos do salão e do balcão</div>
+      <div class="caption-label" style="text-align:left;"><a href="index.html">‹ voltar ao Fechamento de Caixas</a></div><div id="descCorpo"></div>`;
+    DESC.aberto = true; descCarregar(); return;
+  }
   // data local de verdade (toISOString e' UTC e vira amanha depois das 21h)
   const hoje = new Date().toLocaleDateString('en-CA');
   const LOJAS_CAIXA = caixaLojas();
@@ -2067,18 +2114,8 @@ function renderModuloCaixa() {
     <div class="section-label">Fechamento de Caixas${visao ? ' · ' + (typeof lojaNome === 'function' ? lojaNome(visao) : visao) : ''}</div>
     ${visao === null ? '<div class="contexto" style="border-color:var(--farol-fora);">Este login ainda não tem loja liberada. Toque em Ajuda e diga a sua loja e a sua praça: a liberação sai no mesmo dia.</div>' : ''}
     ${(() => { try { return caixaHellenHtml(); } catch (e) { return '<div class="contexto">✗ Não consegui montar o que fazer: ' + trEscH(e.message) + '</div>'; } })()}
-    <div class="section-label" style="text-align:left;margin-top:16px;">Histórico</div>
-    <details class="cx-historico" style="color:var(--tx-4);"><summary style="cursor:pointer;">Até 24/11: fechado em lote pelo dono (25/11) · dia a dia</summary>
-    <div class="contexto" style="text-align:left;">
-      ${filtros}
-    </div>
-    ${blocos}
-    </details>
-    <details class="cx-detalhes" style="margin-top:6px;color:var(--tx-4);"><summary style="cursor:pointer;">detalhes</summary>
-      ${(() => { try { return caixaDetalhesHtml(); } catch (e) { return ''; } })()}
-      <details class="cx-cofre" style="margin-top:6px;"><summary style="cursor:pointer;">dinheiro do São Braz para a Água Verde</summary>${cofreHtml()}</details>
-      <details class="cx-descontos" style="margin-top:6px;"${DESC.aberto ? ' open' : ''} ontoggle="descAbrir(this.open)"><summary style="cursor:pointer;">descontos do salão e do balcão${DESC.resumo ? ' · ' + DESC.resumo : ''}</summary><div id="descCorpo">${DESC.aberto ? descHtml() : ''}</div></details>
-    </details>`;
+    ${caixaHistoricoHtml()}
+    <div class="caption-label" style="text-align:left;margin-top:14px;"><a href="index.html?modo=descontos">Descontos do salão e do balcão ›</a></div>`;
   if (CAIXA_HELLEN !== null) caixaGuia();   // só com a lista "o que fazer" montada, nunca no "Montando…"
 }
 // CONTROLE DE DESCONTOS do salão e do balcão (dono, qui 12/11/2026 03:23: "quem deu o desconto e o motivo, e se usou a senha
@@ -2195,7 +2232,7 @@ function caixaGuia() {
   guiaRegistrar('caixa', [   // 25/11/2026: o guia segue a tela nova de três blocos
     { sel: '.cx-cartao', texto: '<b>Hoje</b>, por loja: o caixa está fechado no Saipos, as trocas de bandeira são do robô e o dinheiro foi contado.' },
     { sel: '.cx-cartao .preset-btn', texto: '<b>Contar dinheiro</b> abre a contagem por cédula, com o troco à parte.' },
-    { sel: 'details.cx-historico > summary', texto: '<b>Histórico</b>: até 24/11 fechado em lote pelo dono; toque para ver dia a dia.' },
+    { sel: '#tabelaCaixaHistorico', texto: '<b>Histórico</b>: um dia por linha; toque para abrir o dia.' },
   ]);
   guiaTalvez('caixa');
 }
