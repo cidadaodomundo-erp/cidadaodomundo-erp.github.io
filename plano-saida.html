@@ -79,6 +79,7 @@
   .mig-l .tx { flex:1; min-width:0; } .mig-l .meta { font-size:.75rem; color:var(--mudo); }
   .mig-l .meta .atraso { color:var(--acento); font-weight:700; } .mig-l .trav { font-size:.82rem; color:var(--acento); }
   .mig-l.feito .tx { color:var(--mudo); }
+  .chk { font-size:.72rem; color:var(--mudo); white-space:nowrap; } .chk.sim { color:var(--ok); } .chk.nao { color:var(--acento); }
 </style>
 </head>
 <body>
@@ -137,6 +138,11 @@ async function carregar() {
   const rm = await fetch(`${SUPABASE_URL}/rest/v1/migracao_passos?select=id,fase,passo,responsavel,prazo,situacao,travado_por,atualizado_em&order=fase,prazo,id`,
     { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
   MIG = rm && rm.ok ? await rm.json() : [];
+  // 25/11/2026 17:00 [migracao] (rumo final do dono, livro chat-frente-organizador/respostas/migrar-rotinas-escritas-fabio-escolhe):
+  // a migração é POR ROTINA (rotina_migracao, RLS pode_ver_plano)
+  const rr = await fetch(`${SUPABASE_URL}/rest/v1/rotina_migracao?select=rotina,tipo,nome,lote,lote_data,situacao,placar_ok,texto_ok,regras_ok,atualizado_em&order=lote,nome`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
+  ROTM = rr && rr.ok ? await rr.json() : [];
   if (!ITENS.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso ao plano (é só do Neto e do Fabio).</p>
       <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
   desenhar();
@@ -149,7 +155,46 @@ let MIG = [], MIG_F = 'todos';
 const MIG_FASES = { 1:'1. Consertar e congelar', 2:'2. Regras por módulo', 3:'3. Trocar as contas para o Fabio', 4:'4. Teste' };
 const MIG_ORD = { travado:0, andamento:1, 'a fazer':2, feito:3 };
 const MIG_INICIO = '2026-11-25', MIG_FIM = '2026-12-01';
+// ---- Rotina a rotina (rumo final 25/11 15:25: "garantir que cada rotina esteja escrita 100% corretamente e ir passando
+// isso pro robo do Fabio"). Situação: escrita → validada → entregue → migrada. Lista por lote, com a ficha no GitHub.
+let ROTM = [], ROTM_F = 'todos';
+const ROTM_SIT = ['escrita', 'validada', 'entregue', 'migrada'];
+const ROTM_COR = { escrita:'var(--forte)', validada:'var(--anda)', entregue:'var(--acento)', migrada:'var(--ok)' };
+const ROTM_LOTE = { 1:'Financeiro', 2:'Estoque e compras', 3:'RH e avisos', 4:'iFood, promoções, cardápio e entrega', 5:'Vigias e infraestrutura' };
+const ROTM_FICHA = 'https://github.com/cidadaodomundo-erp/ifood-dashboard-core/blob/master/contexto/para-fabio/rotinas/';
 function migHtml() {
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+  const dias = (a, b) => (new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5;
+  const posHoje = Math.max(0, Math.min(100, dias(MIG_INICIO, hoje) * 100 / dias(MIG_INICIO, MIG_FIM)));
+  let h = `<h2>Migração para o Fabio — entrega 01/12</h2>
+    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>`;
+  if (ROTM.length) {
+    const n = k => ROTM.filter(x => x.situacao === k).length, T = ROTM.length;
+    const sem = new Date(hoje + 'T12:00:00');
+    const dsem = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()];
+    const ok = (v, rot) => `<span class="chk ${v === true ? 'sim' : v === false ? 'nao' : ''}" title="${rot}: ${v === true ? 'ok' : v === false ? 'falta' : 'ainda não conferido'}">${v === true ? '✓' : v === false ? '✗' : '–'} ${rot}</span>`;
+    const vis = ROTM.filter(x => ROTM_F === 'todos' || x.situacao === ROTM_F);
+    const lotes = [...new Set(ROTM.map(x => x.lote))].sort((a, b) => a - b);
+    const corpo = lotes.map(l => { const L = vis.filter(x => x.lote === l); if (!L.length) return '';
+      const d = (ROTM.find(x => x.lote === l) || {}).lote_data, atr = d && d < hoje;
+      return `<div class="fase">${l}. ${esc(ROTM_LOTE[l] || 'Lote ' + l)}${d ? ` · ${dsem(d)} ${dataBR(d)}` : ''} · ${L.length}</div>` + L.map(x => `
+        <div class="mig-l"><span class="bola" style="background:${ROTM_COR[x.situacao] || 'var(--forte)'}" title="${esc(x.situacao)}"></span><div class="tx">${esc(x.nome || x.rotina)}
+          <div class="meta">${esc(x.situacao)}${atr && x.situacao !== 'migrada' ? ' <span class="atraso">(lote passou do dia)</span>' : ''} · ${x.tipo === 'windows' ? 'tarefa do Windows' : 'rotina do Claude'} · ${ok(x.placar_ok, 'rodando')} ${ok(x.texto_ok, 'texto')} ${ok(x.regras_ok, 'regras')}
+            · <a href="${ROTM_FICHA}${encodeURIComponent(x.rotina)}.md" target="_blank" rel="noopener">ficha ›</a></div></div></div>`).join(''); }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
+    h += `<div class="mig">
+      <div class="mig-nums">${ROTM_SIT.map(k => `<span style="background:var(--alt);color:var(--tinta)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ROTM_COR[k]};margin-right:5px"></i>${n(k)} ${k}${n(k) === 1 ? '' : 's'}</span>`).join('')}</div>
+      <div class="mig-barra" title="de ${T} rotinas">${(() => { let acc = 0; return ROTM_SIT.slice().reverse().map(k => { const w = n(k) * 100 / T; const s = `<i style="left:${acc}%;width:${w}%;background:${ROTM_COR[k]};border-radius:0"></i>`; acc += w; return s; }).join(''); })()}</div>
+      <div class="mig-tempo"><span>${n('migrada')} de ${T} migradas · 25/11</span><b style="left:${posHoje}%">hoje</b><span class="fim">ter 01/12</span></div>
+      <div class="mig-filtro">${[['todos', 'Todas'], ...ROTM_SIT.map(k => [k, k[0].toUpperCase() + k.slice(1) + 's'])]
+        .map(([k, t]) => `<button class="${ROTM_F === k ? 'on' : ''}" onclick="ROTM_F='${k}';desenhar()">${t} · ${k === 'todos' ? T : n(k)}</button>`).join('')}</div>
+      ${corpo}
+      <p class="rascunho" style="margin-top:.6rem">Cada rotina passa por: escrita (a ficha) → validada (conferida rodando) → entregue (ao robô do Fabio) → migrada. A ficha abre no GitHub, com o login do GitHub.</p>
+    </div>`;
+  }
+  if (MIG.length) h += `<details class="bloco"><summary>Consertos, regras e contas <span class="n" style="font-weight:400;color:var(--mudo)">${MIG.filter(x => x.situacao === 'feito').length} de ${MIG.length} feitos</span></summary><div class="corpo">${migPassosHtml()}</div></details>`;
+  return h;
+}
+function migPassosHtml() {
   if (!MIG.length) return '';
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
   const n = k => MIG.filter(x => x.situacao === k).length;
@@ -165,9 +210,7 @@ function migHtml() {
   const corpo = fases.map(f => { const l = vis.filter(x => x.fase === f).sort((a, b) => (MIG_ORD[a.situacao] ?? 9) - (MIG_ORD[b.situacao] ?? 9) || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
     return l.length ? `<div class="fase">${esc(MIG_FASES[f] || 'Fase ' + f)} · ${l.length}</div>${l.map(linha).join('')}` : ''; }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
   const ult = MIG.map(x => x.atualizado_em).filter(Boolean).sort().pop();
-  return `<h2>Migração para o Fabio — entrega 01/12</h2>
-    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>
-    <div class="mig">
+  return `<div class="mig" style="border:0;padding:0;margin:0">
       <div class="mig-nums"><span class="feito">${n('feito')} feito${n('feito') === 1 ? '' : 's'}</span><span class="andamento">${n('andamento')} em andamento</span>
         <span>${n('a fazer')} a fazer</span>${n('travado') ? `<span class="travado">${n('travado')} travado${n('travado') === 1 ? '' : 's'}</span>` : ''}</div>
       <div class="mig-barra" title="${pct}% feito"><i style="width:${pct}%"></i></div>
