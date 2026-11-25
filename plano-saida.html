@@ -230,7 +230,7 @@ function mseloHtml() {
         ${ab ? `${x.ancora_o_que_compara ? `<div class="meta" style="margin-top:4px"><b>Âncora (o que se compara com o mundo real):</b> ${esc(x.ancora_o_que_compara)}${x.ancora_detalhe ? ' — ' + esc(x.ancora_detalhe) : ''}</div>` : ''}${nu.length ? `<div class="trav" style="margin-top:4px"><b>Não usar enquanto em conserto:</b><br>${nu.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
           ${pe.length ? `<div class="meta" style="margin-top:4px"><b>Pendências de migração:</b><br>${pe.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
           ${extra.map(k => `<div class="meta"><b>${esc(k.replace(/_/g, ' '))}:</b> ${esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])}</div>`).join('')}
-          ${!nu.length && !pe.length && !extra.length ? '<div class="meta">Nada pendente neste módulo.</div>' : ''}` : ''}
+          ${!nu.length && !pe.length && !extra.length && !x.ancora_o_que_compara ? '<div class="meta">Nada pendente neste módulo.</div>' : ''}` : ''}
         </div></div>`; }).join('')}
     <p class="rascunho" style="margin-top:.6rem">Confiável = a âncora bate com o mundo real e nenhuma regra está vermelha; em conserto = a âncora não bate ou alguma regra está vermelha (o "não usar" diz o quê); sem âncora = ainda não há comparação com o mundo real.</p></div>`;
 }
