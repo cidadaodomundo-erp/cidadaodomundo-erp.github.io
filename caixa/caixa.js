@@ -1846,7 +1846,8 @@ function caixaHistoricoHtml() {
   const itens = H && !H.erro && H.trs ? caixaHellenItens() : [];
   const sit = (u, d) => {
     const cf = (CAIXA_CONF || []).filter(c => c.unidade === u && c.dia === d);
-    if (cf.some(caixaFechouLote)) return '<span style="color:var(--farol-ok);">fechado em lote pelo dono</span>';
+    // até 24/11 tudo fechou em lote (dono 25/11), com ou sem a linha do carimbo para aquele caixa
+    if (cf.some(caixaFechouLote) || d < CAIXA_NOVO_FLUXO) return '<span style="color:var(--farol-ok);">fechado em lote pelo dono</span>';
     const pend = itens.filter(x => x.u === u && x.dia === d && !['aguardando', 'contagem'].includes(x.bloco));
     if (pend.length) return `<b style="color:var(--farol-perto);">com pendência (${pend.length})</b>`;
     if (cf.some(caixaFechouSozinho)) return '<span style="color:var(--farol-ok);">fechou sozinho</span>';
