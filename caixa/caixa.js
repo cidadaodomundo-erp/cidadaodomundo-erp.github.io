@@ -1346,7 +1346,7 @@ async function cofreCarregar() {
     ]);
     COFRE_DIA = d; COFRE_ENVIOS = e; COFRE_GAVETA_SB = g;
     // 25/11/2026 [dono] (Financeiro ab947ab): a contagem do DIA (o dinheiro do fechamento, um valor só) × o dinheiro do Saipos
-    COFRE_CDIA = await consultarTudo('vw_caixa_contagem_dia?select=unidade,dia,dinheiro_saipos,contado,diferenca,resultado,quem,atualizado_em,envelope_saipos,diferenca_envelope,resultado_envelope').catch(() => []);
+    COFRE_CDIA = await consultarTudo('vw_caixa_contagem_dia?select=*').catch(() => []);
   } catch (err) { COFRE_DIA = []; COFRE_ENVIOS = []; COFRE_GAVETA_SB = []; console.warn('cofre:', err.message); }
 }
 function cofreHtml() {
@@ -1912,12 +1912,10 @@ function caixaHellenHtml() {
     const c = contado ? cofreContagemDe(u, hojeSP) : null;
     const quem = c && c.quem ? String(c.quem).split('@')[0].split(/[._-]/)[0] : '';
     const linha = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
-    return `<div class="contexto cx-cartao" style="text-align:left;border-color:${abertos.length || !contado ? 'var(--farol-perto)' : 'var(--farol-ok)'};">
+    return `<div class="contexto cx-cartao" style="text-align:left;border-color:${abertos.length ? 'var(--farol-perto)' : 'var(--farol-ok)'};">
       <div style="font-size:15px;"><b>${nomeLoja(u)}</b></div>
       ${linha(`Caixa de ontem (${caixaDdm(ontemSP)}) fechado no Saipos`, abertos.length ? nao(abertos.map(x => trEscH(x.frente || 'caixa') + ' aberto desde ' + x.desde).join(', ')) : ok('sim'))}
       ${linha('Trocas de bandeira', rb.length ? esp(`o robô vai trocar ${rb.length}`) : ok('nada pendente'))}
-      ${linha('Dinheiro contado hoje', contado ? ok('contado' + (quem ? ' por ' + trEscH(quem.charAt(0).toUpperCase() + quem.slice(1)) : '')) : nao('ainda não'))}
-      ${contado ? '' : `<button class="preset-btn active" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="caixaIrContagem('${u.replace(/'/g, "\\'")}')">Contar dinheiro</button>`}
       ${caixaConfHtml(u, ontemSP)}
     </div>`;
   }).join('');
@@ -2064,38 +2062,84 @@ function caixaDescontosHtml() {
 }
 const CX_DECISOES = [['SOBRA_RECEITA', 'Sobra → receita'], ['FALTA_DELIVERY', 'Falta do delivery → pedir confirmação ao delivery'],
   ['FALTA_SALAO_DESCONTA', 'Falta do salão → descontar dos 10%'], ['FALTA_SALAO_NAO_DESCONTA', 'Falta do salão → não descontar (perda da casa)']];
+// 25/11/2026 [dono] (dono 20:48: "a parte dos detalhes de cada dia, com um bloco do resolvidos e pendentes, e o botão da explicação?"):
+// o detalhe é sempre o mesmo — Resolvidos (N · R$) recolhido, Pendentes (N) aberto, e em cada pendente o botão "Explicar", que abre a
+// explicação, a decisão e Gravar. Nos dias em lote (até 24/11) o detalhe aparece só para leitura, com a marca "fechado em lote".
+let CAIXA_LOTE = {};
+function caixaPendRow(p, idx, lote) {
+  const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  const e = Number(p.efeito || 0), sug = e < 0 ? 'SOBRA_RECEITA' : (p.caixa === 'DELIVERY' || p.quem) ? 'FALTA_DELIVERY' : 'FALTA_SALAO_DESCONTA';
+  return `<div style="padding:8px 0;border-top:1px dashed var(--line);">
+    <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span><b>${trEscH(p.hora || '')}</b> · ${trEscH(p.venda || 'venda')} · ${trEscH(p.forma || '')} · <b>${R(p.valor)}</b>
+      <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span></span>
+      <button class="preset-btn" onclick="const d=document.getElementById('cxExp_${idx}'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button></div>
+    <div id="cxExp_${idx}" style="display:none;margin-top:6px;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <input id="cxEx_${idx}" placeholder="explicação (obrigatória)" ${lote ? 'disabled' : ''} style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
+        <select id="cxDe_${idx}" ${lote ? 'disabled' : ''} style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DECISOES.map(([v, t]) => `<option value="${v}"${v === sug ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        ${lote ? '<span style="color:var(--tx-4);font-size:12.5px;">fechado em lote pelo dono — só leitura</span>' : `<button class="preset-btn active" onclick="caixaDecidir(${idx}, this)">Gravar</button>`}</div></div></div>`;
+}
+function caixaResPendHtml(res, pend, lote) {
+  const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
+    + (pend.length ? `<div style="margin-top:6px;font-weight:700;color:var(--farol-perto);">Pendentes (${pend.length})</div>${pend.map((p) => caixaPendRow(p, p.idx, lote)).join('')}`
+      : '<div style="color:var(--farol-ok);">✓ nenhuma pendente</div>');
+}
+// o dia em lote: busca o dia e roda o mesmo cruzamento, sem gravar nada
+async function caixaConfLote(u, dia, k) {
+  if (CAIXA_LOTE[k]) return;
+  CAIXA_LOTE[k] = { carregando: true };
+  const mais = (d, n) => caixaHellenMais(d, n), q = encodeURIComponent(u);
+  try {
+    const [trs, pix, cobr, forma, robo] = await Promise.all([
+      consultarTudo('vw_cartao_transacoes?select=*&dia=in.(' + [mais(dia, -1), dia, mais(dia, 1)].join(',') + ')&unidade=eq.' + q + '&order=dia,hora'),
+      consultarTudo('vw_pix_conciliacao?select=*&dia=in.(' + dia + ',' + mais(dia, 1) + ')&unidade=eq.' + q + '&order=entrega'),
+      consultarTudo('vw_cartao_entrega_cobranca?select=id_sale,entregador&dia=eq.' + dia + '&unidade=eq.' + q),
+      consultarTudo('vw_cartao_bandeira_divergente?select=*&dia=eq.' + dia + '&unidade=eq.' + q + '&order=hora'),
+      consultarTudo('vw_caixa_troca_bandeira_robo?select=*&dia=eq.' + dia + '&unidade=eq.' + q).catch(() => [])]);
+    const pixT = (pix || []).filter((x) => (x.dia_turno || x.dia) === dia);
+    const r = renderDiaConcartao(u, dia, trs, pixT, cobr, forma, [], [], { robo });
+    const pend = (r && r.abertas || []).map((x, j) => Object.assign({}, x, caixaHellenCampos(x), { idx: 'L' + k + j }));
+    CAIXA_LOTE[k] = { res: r && r.bateu, pend };
+  } catch (e) { CAIXA_LOTE[k] = { erro: e.message }; }
+  const el = document.getElementById('cxLote_' + k); if (el) el.innerHTML = caixaLoteCorpo(k);
+}
+function caixaLoteCorpo(k) {
+  const L = CAIXA_LOTE[k];
+  if (!L || L.carregando) return '<div class="caption-label" style="text-align:left;">lendo o dia…</div>';
+  if (L.erro) return `<div style="color:var(--farol-fora);">✗ não consegui ler o dia: ${trEscH(L.erro)}</div>`;
+  return caixaResPendHtml(L.res, L.pend, true);
+}
 function caixaConfHtml(u, dia) {
   const H = CAIXA_HELLEN, R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   const k = (u + dia).replace(/[^A-Z0-9]/g, '');
   const sec = (tit, corpo) => `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);"><div style="font-weight:700;margin-bottom:4px;">${tit}</div>${corpo}</div>`;
-  if (dia < CAIXA_NOVO_FLUXO) return sec(`Conferência do caixa de ${caixaDdm(dia)}`, '<span style="color:var(--farol-ok);">✓ fechado em lote pelo dono</span>');
-  // 1) envelope
-  const cd = (COFRE_CDIA || []).find(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
-  let env;
-  if (cd && cd.contado != null && !CDIA_CORRIGINDO[k]) {
-    const df = Number(cd.diferenca_envelope != null ? cd.diferenca_envelope : cd.diferenca || 0);
-    env = `Saipos mandou <b>${R(cd.envelope_saipos)}</b> · recebido <b>${R(cd.contado)}</b> · ${Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`}
-      <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${k}']=true; renderModuloCaixa();">corrigir</button>`;
-  } else env = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><label>recebido R$ <input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" value="${cd && cd.contado != null ? cd.contado : ''}" style="width:120px;text-align:right;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;"></label>
-      <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\\'")}', '${dia}', '${k}')">Gravar</button></div>`;
+  if (dia < CAIXA_NOVO_FLUXO) {
+    setTimeout(() => caixaConfLote(u, dia, k), 0);
+    return sec(`Conferência do caixa de ${caixaDdm(dia)} · <span style="color:var(--farol-ok);">✓ fechado em lote pelo dono</span>`, `<div id="cxLote_${k}">${caixaLoteCorpo(k)}</div>`);
+  }
+  // 1) dinheiro do caixa: envelope (Hellen) + gaveta (abertura do dia seguinte no Saipos) = total × dinheiro do dia no Saipos
+  const cd = (COFRE_CDIA || []).find(x => x.unidade === u && String(x.dia).slice(0, 10) === dia) || {};
+  const gav = cd.gaveta_abertura != null ? Number(cd.gaveta_abertura) : cd.gaveta_saipos != null ? Number(cd.gaveta_saipos) : null;
+  const envGrav = cd.contado != null && !CDIA_CORRIGINDO[k];
+  const envCampo = envGrav ? `<b>${R(cd.contado)}</b> <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${k}']=true; renderModuloCaixa();">corrigir</button>`
+    : `<input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" value="${cd.contado != null ? cd.contado : ''}" style="width:120px;text-align:right;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
+       <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\\'")}', '${dia}', '${k}')">Gravar</button>`;
+  const tot = envGrav && gav != null ? Number(cd.contado) + gav : null;
+  const df = tot != null && cd.dinheiro_saipos != null ? Math.round((tot - Number(cd.dinheiro_saipos)) * 100) / 100 : null;
+  const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
+  const din = ln('Envelope recebido pela Hellen', envCampo)
+    + ln('Gaveta (abertura do caixa do dia seguinte no Saipos)', gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando o Saipos</span>')
+    + ln('Total (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : '<span style="color:var(--tx-4);">—</span>')
+    + ln('Saipos (dinheiro do dia)', cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '<span style="color:var(--tx-4);">—</span>')
+    + ln('Diferença', df == null ? '<span style="color:var(--tx-4);">—</span>' : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
   // 2) venda a venda
-  const pend = H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [];
-  const b = CAIXA_BATEU[u + '|' + dia];
-  const linhaP = (x) => { const e = Number(x.pend.efeito || 0), sug = e < 0 ? 'SOBRA_RECEITA' : (x.caixa === 'DELIVERY' || x.quem) ? 'FALTA_DELIVERY' : 'FALTA_SALAO_DESCONTA';
-    return `<div style="padding:8px 0;border-top:1px dashed var(--line);">
-      <div><b>${trEscH(x.hora || '')}</b> · ${trEscH(x.venda || 'venda')} · ${trEscH(x.forma || '')} · <b>${R(x.valor)}</b></div>
-      <div style="font-size:12.5px;color:var(--tx-3);">${trEscH(x.pend.leitura || '')}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;">
-        <input id="cxEx_${x.i}" placeholder="explicação (obrigatória)" style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
-        <select id="cxDe_${x.i}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DECISOES.map(([v, t]) => `<option value="${v}"${v === sug ? ' selected' : ''}>${t}</option>`).join('')}</select>
-
-        <button class="preset-btn active" onclick="caixaDecidir(${x.i}, this)">Gravar</button></div></div>`; };
-  const venda = (b ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Bateu (${b.n} ${b.n === 1 ? 'venda' : 'vendas'} · ${R(b.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
-    + (pend.length ? `<div style="margin-top:6px;font-weight:700;color:var(--farol-perto);">PENDENTE (${pend.length})</div>${pend.map(linhaP).join('')}` : '<div style="color:var(--farol-ok);">✓ nenhuma venda pendente</div>');
+  const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
+    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, idx: x.i }));
   const abertosD = caixaDescAbertos(u, dia);
-  const ok = !pend.length && !abertosD.length && cd && cd.contado != null;
-  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pend.length + abertosD.length + (cd && cd.contado != null ? 0 : 1)} a fazer</span>`}`,
-    `<div style="margin-bottom:6px;"><b>Envelope recebido pela Hellen</b><div>${env}</div></div>` + venda);
+  const ok = !pend.length && !abertosD.length && envGrav;
+  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pend.length + abertosD.length + (envGrav ? 0 : 1)} a fazer</span>`}`,
+    `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false));
 }
 // o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
 const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
