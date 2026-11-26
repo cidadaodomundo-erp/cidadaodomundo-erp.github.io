@@ -132,6 +132,7 @@
       <button data-aba="maquininha">🧾 Maquininha do dia</button>
       <button data-aba="dobro">🔎 Corrida em dobro</button>
       <button data-aba="acerto">📒 Acerto</button>
+      <button data-aba="escalas">📅 Escalas motoboy</button>
       <button data-aba="regras">📜 As regras</button>
     </div>
 
@@ -449,8 +450,59 @@ function exigirLogin(recado) {
     if (seq === ABAS_SEQ) desenharAba();
   }
 
+  // 26/11/2026 (pedido da Hellen): aba Escalas motoboy — a escala que o Jaison manda no grupo MOTOBOYS CIDADÃO JAISON. Só mostra.
+  let ESC_INI = null, ESC = null, ESC_SEQ = 0;
+  const isoDe = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const segDe = (iso) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return isoDe(d); };
+  async function abaEscalas(pula) {
+    if (!ESC_INI) ESC_INI = segDe(hojeSP());
+    if (pula === 0) ESC_INI = segDe(hojeSP()); else if (pula) ESC_INI = somaDias(ESC_INI, 7 * pula);
+    if (!ESC || ESC.ini !== ESC_INI) {
+      const seq = ++ESC_SEQ; $('painelObra').innerHTML = '<div class="pm-vazio">Abrindo a escala…</div>';
+      let r; try { r = await trRpc('pagar_motoboys_escala_semana', { p_ini: ESC_INI }); } catch (e) { if (seq === ESC_SEQ) $('painelObra').innerHTML = '<div class="pm-aviso">Sem conexão com o banco agora. Tente de novo.</div>'; return; }
+      if (seq !== ESC_SEQ) return;
+      if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
+      if (!r.ok) { $('painelObra').innerHTML = '<div class="pm-aviso">' + esc(r.status === 403 || r.status === 400 ? 'Esta parte é só do dono e de quem cuida do pessoal.' : await trErroDe(r)) + '</div>'; return; }
+      ESC = await r.json(); ESC.ini = ESC_INI;
+    }
+    if (ABA !== 'escalas') return;
+    const dias = [], nomes = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'], hoje = hojeSP();
+    for (let i = 0; i < 7; i++) dias.push(somaDias(ESC_INI, i));
+    const f = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+    const at = ESC.atualizado ? new Date(ESC.atualizado).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    let h = '<div class="pm-caixa"><div class="rot">📅 Escala dos motoboys · semana de ' + f(dias[0]) + ' a ' + f(dias[6]) + '</div>' +
+      '<button type="button" class="pm-btn" data-escpula="-1">◀ semana anterior</button> <button type="button" class="pm-btn" data-escpula="0">esta semana</button> <button type="button" class="pm-btn" data-escpula="1">semana seguinte ▶</button></div>' +
+      '<div class="pm-aviso info">Vem da escala que o Jaison manda no grupo MOTOBOYS CIDADÃO JAISON' + (at ? ' · última atualização ' + esc(at) : '') + '. Esta aba só mostra; não muda nenhum valor a pagar.</div>';
+    const L = ESC.linhas || []; let lojas = ['Água Verde', 'São Braz', 'Ahú'];
+    L.forEach((r) => { if (!lojas.includes(r.unidade)) lojas.push(r.unidade); });
+    if (LOJA !== 'todas') lojas = lojas.filter((l) => l === LOJA);
+    let aviso = 0;
+    lojas.forEach((loja) => {
+      const rs = L.filter((r) => r.unidade === loja);
+      const pes = [...new Set(rs.map((r) => r.nome))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      h += '<div class="pm-caixa"><div class="rot">' + esc(loja) + ' · ' + pes.length + ' motoboy(s) na semana</div><div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th>Motoboy</th>';
+      dias.forEach((d, i) => { const vazio = !rs.some((r) => r.data === d); h += '<th' + (d === hoje ? ' style="color:var(--brand,#c98500)"' : '') + '>' + nomes[i] + ' ' + f(d) + (vazio ? '<div class="pm-ruim" style="text-transform:none">⚠ sem escala</div>' : '') + '</th>'; });
+      h += '</tr></thead><tbody>';
+      pes.forEach((n) => {
+        const casa = rs.some((r) => r.nome === n && r.nome_casa); if (!casa) aviso++;
+        h += '<tr><td><b>' + esc(n) + '</b>' + (casa ? '' : '<div class="pm-ruim" style="font-size:11.5px">⚠ nome não bate com o TrackEat</div>') + '</td>';
+        dias.forEach((d) => {
+          const t = rs.filter((r) => r.nome === n && r.data === d);
+          h += '<td' + (d === hoje ? ' style="background:rgba(255,200,0,.08)"' : '') + '>' + (t.length ? t.map((r) => '<div style="white-space:nowrap"><small>' + esc(r.turno || '') + '</small> ' + esc(r.entrada || '?') + '–' + (r.saida ? esc(r.saida) : 'fechar') + '</div>').join('') : '—') + '</td>';
+        });
+        h += '</tr>';
+      });
+      if (!pes.length) h += '<tr><td colspan="8" class="pm-ruim">⚠ Nenhuma escala desta loja nesta semana.</td></tr>';
+      h += '</tbody></table></div></div>';
+    });
+    h += '<div class="pm-aviso info">“fechar” = escala sem hora de saída: a conta vai até o fechamento da loja.' + (aviso ? ' “nome não bate com o TrackEat” = o nome na escala não foi ligado a nenhum motoboy do aplicativo; nesse caso a tela pode achar que a pessoa estava sem escala.' : '') + '</div>';
+    $('painelObra').innerHTML = h;
+  }
+  $('painelObra').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-escpula]'); if (b) abaEscalas(Number(b.dataset.escpula)); });
+
   function desenharAba() {
     if (!ABAS) return;
+    if (ABA === 'escalas') { abaEscalas(); return; }
     if (ABA === 'maquininha') abaMaquininha(); else if (ABA === 'dobro') abaDobro(); else if (ABA === 'acerto') abaAcerto();
   }
 
@@ -557,7 +609,9 @@ function exigirLogin(recado) {
     ABA = b.dataset.aba; const a = ABA;
     $('painelPagar').hidden = a !== 'pagar'; $('painelRegras').hidden = a !== 'regras'; $('painelObra').hidden = a === 'pagar' || a === 'regras';
     $('diaRot').textContent = ROTULOS[a] || ROTULOS.pagar;
+    document.querySelector('.pm-dia').style.display = a === 'escalas' ? 'none' : '';
     if (a === 'regras') regras();
+    if (a === 'escalas') { abaEscalas(); return; }
     if (!$('painelObra').hidden) carregarAbas();
   });
   $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); desenharAba(); });
