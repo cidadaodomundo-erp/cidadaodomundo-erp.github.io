@@ -1,4 +1,4 @@
-// CONSULTA DE PONTO (rota pcartao, módulo Pessoas). Só LEITURA de rh_pessoa (mínimo) e rh_flash_batida (período escolhido).
+// CONSULTA DE PONTO (rota pcartao, módulo Pessoas). Só LEITURA da visão ponto_pessoa (cadastro mínimo) e rh_flash_batida (período escolhido).
 // Não chama entrarCargos/CARGOS, não lê finanças/salário/CPF, não escreve nada, não guarda dado de pessoa no navegador.
 // Fonte: resumo recebido do Flash no ERP (entrada, saída, contagem). NÃO é espelho completo e NÃO mostra intervalo.
 // Regras de estado vêm de window.PontoCartaoModelo (pessoas/ponto-cartao-modelo.js); aqui só buscar, cruzar e mostrar.
@@ -11,7 +11,7 @@
   'use strict';
 
   const MAX_DIAS = 31;
-  const PESSOAS_PATH = 'rh_pessoa?select=id,nome,unidade,admissao,desligamento,flash_id,usa_ponto&order=id.asc';
+  const PESSOAS_PATH = 'ponto_pessoa?select=id,nome,unidade,admissao,desligamento,flash_id,usa_ponto&order=id.asc';
   const ULTIMA_PATH = 'rh_flash_batida?select=data,lido_em&order=data.desc,flash_id.asc&limit=1';
   const batidasPath = (de, ate) => 'rh_flash_batida?select=data,flash_id,entrada,saida,n_batidas,lido_em&data=gte.' + de + '&data=lte.' + ate + '&order=data.asc,flash_id.asc';
 
@@ -316,7 +316,7 @@
       st.fase = 'carregando'; desenhar();
       const de = st.de, ate = st.ate;
       const sessaoMudou = () => deps.sessaoId() !== sid;
-      const [a, b] = await Promise.all([guarda('pode_ver_ponto'), guarda('pode_cadastrar_pessoal')]);
+      const [a, b] = await Promise.all([guarda('pode_ver_ponto'), Promise.resolve('sim')]);   // 26/11/2026: a chave do ponto basta (cadastro mínimo vem da visão ponto_pessoa)
       if (!vivo()) return;
       if (sessaoMudou()) return falha('sessao');
       const rs = [a, b];

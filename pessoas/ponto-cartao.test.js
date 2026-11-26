@@ -34,7 +34,7 @@ function mk(o = {}) {
   const deps = {
     doc, raiz, log, est,
     rpc: async (fn) => { log.push('rpc:' + fn); const r = o.rpc ? o.rpc(fn) : true; if (r instanceof Error) throw r; return typeof r === 'object' && r && 'status' in r ? r : resp(r); },
-    consultar: async (c) => { log.push(c); return o.consultar ? o.consultar(c) : (c.startsWith('rh_pessoa') ? [P()] : (c.includes('limit=1') ? [] : [])); },
+    consultar: async (c) => { log.push(c); return o.consultar ? o.consultar(c) : (c.startsWith('ponto_pessoa') ? [P()] : (c.includes('limit=1') ? [] : [])); },
     lojaCarregar: async () => (o.info === undefined ? { lojas: ['AGUA VERDE', 'AHU', 'SÃO BRAZ'], travado: false } : o.info),
     lojaAtual: () => est.loja,
     escolherLoja: (l) => { est.loja = l; ouv.forEach((f) => f(l)); },
@@ -80,7 +80,7 @@ test('comportamento: a tela nunca aciona Cargos/folha/custos nem finanças', asy
   const nomes = ['entrarCargos', 'entrarPesCusto', 'entrarPesCalc', 'entrarPesAdm', 'entrarPesHoje', 'entrarFlashRh'];
   nomes.forEach((n) => { globalThis[n] = boom; });
   Object.defineProperty(globalThis, 'CARGOS', { get: boom, configurable: true });
-  try { const t = mk(); await t.c.entrar(); assert.equal(t.c.st.fase, 'semregistros'); assert.ok(tabelas(t.log).every((c) => /^rh_(pessoa|flash_batida)\?/.test(c))); }
+  try { const t = mk(); await t.c.entrar(); assert.equal(t.c.st.fase, 'semregistros'); assert.ok(tabelas(t.log).every((c) => /^(ponto_pessoa|rh_flash_batida)\?/.test(c))); }
   finally { nomes.forEach((n) => { delete globalThis[n]; }); delete globalThis.CARGOS; }
 });
 
@@ -92,9 +92,10 @@ for (const [nome, rpc, fase] of [['false', () => false, 'semacesso'], ['null', (
     assert.equal(t.c.st.fase, fase); assert.deepEqual(tabelas(t.log), []); assert.equal(t.c.st.dados, null); assert.equal(tabelaTxt(t.raiz), '');
   });
 }
-test('uma só guarda false basta; as duas devem ser === true', async () => {
+test('a chave do ponto basta (cadastro de pessoal não é pedido); precisa ser === true', async () => {
   const t = mk({ rpc: (fn) => fn === 'pode_cadastrar_pessoal' ? false : true });
-  await t.c.entrar(); assert.equal(t.c.st.fase, 'semacesso'); assert.deepEqual(tabelas(t.log), []);
+  await t.c.entrar(); assert.notEqual(t.c.st.fase, 'semacesso'); assert.ok(!t.log.includes('rpc:pode_cadastrar_pessoal'));
+  const n = mk({ rpc: (fn) => fn !== 'pode_ver_ponto' }); await n.c.entrar(); assert.equal(n.c.st.fase, 'semacesso'); assert.deepEqual(tabelas(n.log), []);
   const u = mk({ rpc: () => 'true' }); await u.c.entrar(); assert.equal(u.c.st.fase, 'semacesso');
 });
 test('a guarda roda a cada reentrada', async () => {
@@ -197,7 +198,7 @@ test('admissão/desligamento: fora do vínculo sem atribuir; datas inválidas n�
 // ---------- tela ----------
 test('nome malicioso aparece só como texto, nunca como HTML; nada pessoal além de nome/loja', async () => {
   const mal = '<img src=x onerror=alert(1)>‮';
-  const t = mk({ consultar: (c) => (c.startsWith('rh_pessoa') ? [P({ nome: mal })] : [B()]) });
+  const t = mk({ consultar: (c) => (c.startsWith('ponto_pessoa') ? [P({ nome: mal })] : [B()]) });
   await t.c.entrar();   // FEl.innerHTML lançaria
   assert.equal(t.c.st.fase, 'ok');
   assert.match(tabelaTxt(t.raiz), /<img src=x onerror=alert\(1\)>/);
@@ -211,19 +212,19 @@ test('estados distintos: erro de tabela, 401, formato inesperado, sem cadastro, 
   assert.equal((await f(() => { throw new Error('sessão vencida'); })).c.st.fase, 'sessao');
   assert.equal((await f(() => ({ x: 1 }))).c.st.fase, 'dadosinvalidos');
   assert.equal((await f(() => [])).c.st.fase, 'semcadastro');
-  const sr = await f((c) => (c.startsWith('rh_pessoa') ? [P()] : []));
+  const sr = await f((c) => (c.startsWith('ponto_pessoa') ? [P()] : []));
   assert.equal(sr.c.st.fase, 'semregistros'); assert.match(tabelaTxt(sr.raiz), /Sem leitura recebida/);
 });
 test('última data: só aviso de escopo global; falha dela não derruba a consulta', async () => {
-  const t = mk({ consultar: (c) => { if (c.includes('limit=1')) throw new Error('x'); return c.startsWith('rh_pessoa') ? [P()] : [B()]; } });
+  const t = mk({ consultar: (c) => { if (c.includes('limit=1')) throw new Error('x'); return c.startsWith('ponto_pessoa') ? [P()] : [B()]; } });
   await t.c.entrar(); assert.equal(t.c.st.fase, 'ok'); assert.match(t.raiz.textContent, /indisponível/);
-  const u = mk({ consultar: (c) => (c.includes('limit=1') ? [{ data: '2026-11-05', lido_em: '2026-11-05T22:00:00-03:00' }] : c.startsWith('rh_pessoa') ? [P()] : []) });
+  const u = mk({ consultar: (c) => (c.includes('limit=1') ? [{ data: '2026-11-05', lido_em: '2026-11-05T22:00:00-03:00' }] : c.startsWith('ponto_pessoa') ? [P()] : []) });
   await u.c.entrar(); assert.match(u.raiz.textContent, /escopo global, não é cobertura fechada/);
 });
 test('mudança de loja limpa na hora; resposta atrasada da loja antiga é ignorada', async () => {
   let solta; const portao = new Promise((r) => { solta = r; }); let uma = false;
   const pessoas = [P({ id: 1, nome: 'Velha Loja', unidade: 'AGUA VERDE', flash_id: 'V' }), P({ id: 2, nome: 'Nova Loja', unidade: 'AHU', flash_id: 'N' })];
-  const t = mk({ loja: 'AGUA VERDE', consultar: async (c) => { if (c.startsWith('rh_pessoa') && !uma) { uma = true; await portao; } return c.startsWith('rh_pessoa') ? pessoas : []; } });
+  const t = mk({ loja: 'AGUA VERDE', consultar: async (c) => { if (c.startsWith('ponto_pessoa') && !uma) { uma = true; await portao; } return c.startsWith('ponto_pessoa') ? pessoas : []; } });
   const p1 = t.c.entrar(); await settle();
   t.deps.escolherLoja('AHU');
   assert.equal(t.c.st.dados, null); assert.equal(t.c.st.pessoaSel, '');
@@ -232,7 +233,7 @@ test('mudança de loja limpa na hora; resposta atrasada da loja antiga é ignora
   assert.ok(!tabelaTxt(t.raiz).includes('Velha Loja')); assert.match(tabelaTxt(t.raiz), /Nova Loja/); assert.equal(t.c.st.loja, 'AHU');
 });
 test('pessoa escolhida incompatível com a nova loja volta a Todas', async () => {
-  const t = mk({ consultar: (c) => (c.startsWith('rh_pessoa') ? [P({ id: 7, unidade: 'AHU' })] : []) });
+  const t = mk({ consultar: (c) => (c.startsWith('ponto_pessoa') ? [P({ id: 7, unidade: 'AHU' })] : []) });
   await t.c.entrar(); t.c.st.pessoaSel = '7';
   t.deps.escolherLoja('AGUA VERDE'); assert.equal(t.c.st.pessoaSel, ''); await settle();
   assert.equal(t.c.st.fase, 'semcadastro');
@@ -245,7 +246,7 @@ test('reentrada e logoff apagam dados antigos; logoff não mantém memória', as
 });
 test('sessão trocada durante a carga: resultado descartado', async () => {
   let solta; const portao = new Promise((r) => { solta = r; });
-  const t = mk({ consultar: async (c) => { await portao; return c.startsWith('rh_pessoa') ? [P()] : []; } });
+  const t = mk({ consultar: async (c) => { await portao; return c.startsWith('ponto_pessoa') ? [P()] : []; } });
   const p = t.c.entrar(); await settle(); t.est.sess = 'outro-usuario'; solta(); await p;
   assert.equal(t.c.st.dados, null); assert.equal(t.c.st.fase, 'sessao');
 });
@@ -253,7 +254,7 @@ const campos = (raiz) => todos(raiz, (e) => e.tag === 'input');
 const digita = (inp, v) => { inp.value = v; inp.ev.input(); };
 test('editar datas (eventos reais) com consulta pendente: resposta de 10/11 não aparece sob 01/11', async () => {
   let solta; const portao = new Promise((r) => { solta = r; });
-  const t = mk({ consultar: async (c) => { if (c.startsWith('rh_flash_batida?select=data,flash') ) await portao; return c.startsWith('rh_pessoa') ? [P()] : []; } });
+  const t = mk({ consultar: async (c) => { if (c.startsWith('rh_flash_batida?select=data,flash') ) await portao; return c.startsWith('ponto_pessoa') ? [P()] : []; } });
   const p = t.c.entrar(); await settle();
   assert.equal(t.c.st.fase, 'carregando');
   const [de, ate] = campos(t.raiz); digita(de, '2026-11-01'); digita(ate, '2026-11-01');
@@ -263,7 +264,7 @@ test('editar datas (eventos reais) com consulta pendente: resposta de 10/11 não
   assert.equal(de.value, '2026-11-01');
 });
 test('editar datas depois de concluir apaga o quadro na hora; Atualizar busca o novo período', async () => {
-  const t = mk({ consultar: (c) => (c.startsWith('rh_pessoa') ? [P()] : []) });
+  const t = mk({ consultar: (c) => (c.startsWith('ponto_pessoa') ? [P()] : []) });
   await t.c.entrar(); assert.match(tabelaTxt(t.raiz), /10\/11\/2026/);
   const [de, ate] = campos(t.raiz); const antes = tabelas(t.log).length;
   digita(de, '2026-11-01'); digita(ate, '2026-11-02');
@@ -275,8 +276,8 @@ test('editar datas depois de concluir apaga o quadro na hora; Atualizar busca o 
 });
 test('só consome fontes de leitura permitidas', async () => {
   const t = mk(); await t.c.entrar();
-  assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_cadastrar_pessoal', 'rpc:pode_ver_ponto']);
-  assert.ok(tabelas(t.log).every((c) => /^rh_(pessoa|flash_batida)\?select=[a-z_,]+/.test(c)));
+  assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_ver_ponto']);
+  assert.ok(tabelas(t.log).every((c) => /^(ponto_pessoa|rh_flash_batida)\?select=[a-z_,]+/.test(c)));
 });
 
 // ---------- hoje direto no Flash (15/11/2026) ----------
