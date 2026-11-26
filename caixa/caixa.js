@@ -292,6 +292,31 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       }
     });
   });
+  // 25/11/2026 [conserto] (Financeiro 21:40, ensaio de 14 dias; de 25/11 em diante): CONTA JUNTA ou DIVIDIDA com centavos — 1 de um lado
+  // = 2 ou 3 do outro, mesma loja e caixa, mesma bandeira e modalidade, soma com |diferença| ≤ R$ 0,05; as 2–3 a até 20 min entre si
+  // e o par a até 30 min (ex.: cartão 178,14 = vendas 149,56 + 28,58)
+  if (dia >= CAIXA_NOVO_FLUXO) {
+    const livre = (t) => !t._composto;
+    const combina5 = (alvo, pool) => {
+      const P = pool.filter((t) => livre(t) && formaPadrao(t.detalhe) === formaPadrao(alvo.detalhe) && (!alvo.caixa || !t.caixa || t.caixa === alvo.caixa));
+      for (const n of [2, 3]) {
+        const combos = [];
+        (function gera(ini, atual) { if (atual.length === n) { combos.push([...atual]); return; } for (let i = ini; i < P.length; i++) { atual.push(P[i]); gera(i + 1, atual); atual.pop(); } })(0, []);
+        for (const itens of combos) {
+          const soma = itens.reduce((a, t) => a + +t.valor, 0), ms = itens.map((t) => t.t);
+          if (Math.abs(soma - +alvo.valor) <= 0.05 + 1e-9 && Math.max(...ms) - Math.min(...ms) <= 20 && ms.some((m) => Math.abs(m - alvo.t) <= 30)) return itens;
+        }
+      }
+      return null;
+    };
+    [{ alvos: semParS, pool: () => semParR, rotulo: 'PDV cheio = soma na maquininha' }, { alvos: semParR, pool: () => semParS, rotulo: 'maquininha cheia = soma no PDV' }].forEach((q) => {
+      [...q.alvos].forEach((alvo) => {
+        if (alvo._composto) return;
+        const itens = combina5(alvo, q.pool());
+        if (itens) { itens.forEach((t) => { t._composto = true; }); alvo._composto = true; compostos.push({ alvo, itens, rotulo: q.rotulo + ' (centavos)' }); }
+      });
+    });
+  }
   semParS = semParS.filter(t => !t._composto);
   semParR = semParR.filter(t => !t._composto);
 
@@ -303,12 +328,12 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // arredond fica vazio de propósito (outras partes da tela ainda o leem).
   const arredond = [], conferir = [];
   // 25/11/2026 [conserto] (Financeiro 21:20, pedido do dono; vale de 25/11 em diante, o passado em lote não muda): par ÚNICO no dia,
-  // mesma bandeira e modalidade, |diferença| ≤ R$ 0,05 — no SALÃO o cartão pode vir até 90 min ANTES da venda (a mesa fecha depois)
+  // mesma bandeira e modalidade, |diferença| ≤ R$ 0,05 — no SALÃO o cartão pode vir até 180 min ANTES da venda (a mesa fecha depois)
   // e até 15 min depois; no DELIVERY, ±15 min. Casa como "centavos" (resolvido, o centavo fica na sobra ou falta do dia).
   if (dia >= CAIXA_NOVO_FLUXO) {
     const cabe = (s, r) => { const dv = Math.abs(+r.valor - +s.valor), d = s.t - r.t;   // d > 0: o cartão passou antes da venda
       if (dv > 0.05 || formaPadrao(r.detalhe) !== formaPadrao(s.detalhe)) return false;
-      return s.caixa === 'SALÃO' ? (d <= 90 && d >= -15) : Math.abs(d) <= 15; };
+      return s.caixa === 'SALÃO' ? (d <= 180 && d >= -15) : Math.abs(d) <= 15; };   // 25/11 21:40 (Financeiro): mesa que fecha até 168 min depois de pagar
     const S0 = semParS.filter(s => !s._composto), R0 = semParR.filter(r => !r._composto);
     S0.forEach(s => {
       const cand = R0.filter(r => !r._quase && cabe(s, r));
