@@ -7,7 +7,7 @@
 <title>Saúde das rotinas</title>
 <!-- Saúde das rotinas para o Fabio (dono pelo Organizador 25/11 14:48; proposta 2026-11-25-saude-das-rotinas-fabio.md, chat
      Rotinas). Lido AO VIVO de rotina_ficha (RLS: DONO ou pode_ver_plano) + vw_rotinas_placar_7d. Nenhum dado mora neste
-     arquivo. Mesma sessão do painel (localStorage 'rmbSessao'). Quem mexe: o chat "Telas do painel". -->
+     arquivo. 26/11: bloco "Robôs agora" (robo_saude_ler, vigia de 1 em 1 min no pg_cron; chat "Vigiar robôs de minuto em minuto"). Mesma sessão do painel (localStorage 'rmbSessao'). Quem mexe: o chat "Telas do painel". -->
 <style>
   :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
           --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
@@ -97,7 +97,7 @@ function telaLogin(msg) {
 }
 
 
-let FICHA = [], ABERTA = new Set();
+let FICHA = [], ABERTA = new Set(), ROBOS = null;
 const SIT = { RODOU:'verde', ERROU:'vermelho', NAO_RODOU:'vermelho', PRESA:'vermelho' };
 const ROT = { verde:'funcionando', vermelho:'parou', cinza:'aguardando' };
 const DIA = { R:'rodou', E:'deu erro', N:'não rodou', T:'travou', P:'pulou (de propósito)', A:'ainda vai rodar' };
@@ -106,9 +106,11 @@ async function carregar() {
   const s = sessaoValida();
   if (!s) return telaLogin();
   const h = { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } };
-  const [rf, rp] = await Promise.all([
+  const [rf, rp, rr] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/rotina_ficha?select=rotina,nome_simples,o_que_faz,efeito_se_parar,o_que_fazer,roda_em,passada_em&order=nome_simples`, h),
-    fetch(`${SUPABASE_URL}/rest/v1/vw_rotinas_placar_7d?select=rotina,dias,situacao_ultima,conferido_em`, h)]);
+    fetch(`${SUPABASE_URL}/rest/v1/vw_rotinas_placar_7d?select=rotina,dias,situacao_ultima,conferido_em`, h),
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/robo_saude_ler`, { method:'POST', headers:{ ...h.headers, 'Content-Type':'application/json' }, body:'{}' }).catch(() => null)]);
+  ROBOS = rr && rr.ok ? await rr.json() : null;
   if (rf.status === 401 || rp.status === 401) return telaLogin('Sessão vencida, entre de novo.');
   const F = rf.ok ? await rf.json() : [], P = rp.ok ? await rp.json() : [];
   if (!F.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (é só do Neto e do Fabio).</p>
@@ -120,11 +122,30 @@ async function carregar() {
   FICHA.sort((a, b) => ord[a.farol] - ord[b.farol] || String(a.nome_simples).localeCompare(String(b.nome_simples), 'pt-BR'));
   desenhar();
 }
+// Robôs agora: vigia de 1 em 1 min dentro do banco (vigia_robos_rodar, pg_cron) + vigia do vigia no note do Japa e no BENTOIK. Só leitura (robo_saude_ler).
+const COR = { VERMELHO:['vermelho','parado'], AMARELO:['amarelo','atenção'], CINZA:['cinza','parado de propósito'], VERDE:['verde','funcionando'] };
+function blocoRobos() {
+  if (!ROBOS || ROBOS.erro) return '';
+  const v = ROBOS.vigia || {}, ha = v.rodou_em ? Math.round((Date.now() - new Date(v.rodou_em)) / 1000) : null;
+  const vigiaOk = ha !== null && ha < 180;
+  const it = ROBOS.itens || [];
+  const ev = (ROBOS.eventos || []).slice(0, 8);
+  return `<h2 style="font-size:1.15rem;margin:0 0 .3rem">Robôs agora</h2>
+    <p class="lede" style="font-size:.9rem">${vigiaOk ? `O vigia conferiu há ${ha} s (confere de 1 em 1 minuto, sozinho, sem IA).` : `<b style="color:var(--acento)">O VIGIA DE 1 EM 1 MIN PAROU</b>${ha !== null ? ` (último: ${dh(v.rodou_em)})` : ''}. O note do Japa e o BENTOIK avisam no WhatsApp.`}</p>
+    <div class="placar"><span class="f-PRONTO">${v.verdes || 0} funcionando</span>${v.vermelhos ? `<span class="f-RISCO">${v.vermelhos} parado${v.vermelhos > 1 ? 's' : ''}</span>` : ''}${v.amarelos ? `<span class="f-ANDA">${v.amarelos} atenção</span>` : ''}${v.cinzas ? `<span>${v.cinzas} parado de propósito</span>` : ''}</div>
+    ${it.map(x => { const [c, t] = COR[x.cor] || COR.CINZA; return `<div class="lin ${c === 'amarelo' ? '' : c}" style="${c === 'amarelo' ? 'border-left-color:var(--anda)' : ''}"><div class="cab" style="cursor:default">
+      <span class="n">${esc(x.nome)}</span><span class="farol ${c}" style="${c === 'amarelo' ? 'background:var(--anda-fundo);color:var(--anda)' : ''}">${t}</span>
+      <span class="qd">${esc(x.grupo || '')}${x.maquina ? ' · ' + esc(x.maquina) : ''} · sinal ${dh(x.ultimo_sinal)}</span></div>
+      ${x.texto && x.cor !== 'VERDE' ? `<div class="det">${esc(x.texto)}</div>` : ''}</div>`; }).join('')}
+    ${ev.length ? `<details><summary>Últimas mudanças</summary>${ev.map(e => `<div class="card">${dh(e.em)} · <b>${esc(e.nome)}</b>: ${esc((COR[e.de] || ['', e.de || 'novo'])[1])} → ${esc((COR[e.para] || ['', e.para])[1])}${e.texto ? ` <i>(${esc(e.texto)})</i>` : ''}</div>`).join('')}</details>` : ''}
+    <h2 style="font-size:1.15rem;margin:1.6rem 0 .3rem">Rotinas</h2>`;
+}
 function abrir(r) { if (ABERTA.has(r)) ABERTA.delete(r); else ABERTA.add(r); desenhar(); }
 function desenhar() {
   const n = k => FICHA.filter(x => x.farol === k).length;
   app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · rotinas automáticas</p><h1>Saúde das rotinas</h1>
     <p class="lede">As rotinas que rodam sozinhas, sem o Claude. Verde: rodou na última vez. Vermelho: parou — veja o que fazer. Clique numa rotina para ver o que ela faz.</p>
+    ${blocoRobos()}
     <div class="placar"><span class="f-PRONTO">${n('verde')} funcionando</span>${n('vermelho') ? `<span class="f-RISCO">${n('vermelho')} parada${n('vermelho') > 1 ? 's' : ''}</span>` : ''}${n('cinza') ? `<span class="f-ANDA">${n('cinza')} aguardando</span>` : ''}</div>
     <div class="leg">Últimos 7 dias, do mais antigo ao de hoje: <span class="bol"><i class="R"></i></span> rodou <span class="bol"><i class="E"></i></span> não rodou ou deu erro <span class="bol"><i class="P"></i></span> pulou ou ainda vai rodar</div>
     ${FICHA.map(x => { const ab = ABERTA.has(x.rotina) || x.farol === 'vermelho';
@@ -135,9 +156,10 @@ function desenhar() {
         ${ab ? `<div class="det">${x.o_que_faz ? `<div><b>O que faz:</b> ${esc(x.o_que_faz)}</div>` : ''}${x.roda_em ? `<div><b>Quando roda:</b> ${esc(x.roda_em)}</div>` : ''}
           ${x.efeito_se_parar ? `<div><b>Se parar:</b> ${esc(x.efeito_se_parar)}</div>` : ''}${x.o_que_fazer ? `<div><b>O que fazer:</b> ${esc(x.o_que_fazer)}</div>` : ''}</div>` : ''}
       </div>`; }).join('')}
-    <footer>A conferência roda sozinha de 30 em 30 minutos. <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+    <footer>Robôs agora: atualiza sozinho a cada 1 minuto. Rotinas: a conferência roda de 30 em 30 minutos. <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
 }
 carregar();
+setInterval(() => { if (sessaoValida()) carregar(); }, 60000);
 </script>
 </body>
 </html>
