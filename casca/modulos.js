@@ -72,8 +72,7 @@ window.CASCA_MODULOS = [
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },
   { id: 'pessoas', nome: 'Pessoas', icone: '👥',
     lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pseguro', 'pacertos'], acompanhar: ['pcartao', 'pao', 'freelas', 'taxaponto'] },   // ordem do dono (06/11)
-  // 02/11/2026 (dono): junção com o Fabio, passo 1: um cartão em cada painel que abre o outro. Link puro, sem login nem dado.
-  { id: 'portal', nome: 'Portal da operação', icone: '🔗', externo: 'https://cidadaodomundo.github.io/', lancar: [], acompanhar: [] },
+  // 22/11/2026 (Fábio): saiu o cartão 'Portal da operação' que abria o portal antigo. Nenhum atalho para o portal antigo.
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
     lancar: ['usuarios'], acompanhar: ['rotinas', 'conciliacao'] },
 ];
