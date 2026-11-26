@@ -316,7 +316,7 @@
       st.fase = 'carregando'; desenhar();
       const de = st.de, ate = st.ate;
       const sessaoMudou = () => deps.sessaoId() !== sid;
-      const [a, b] = await Promise.all([guarda('pode_ver_pessoal'), guarda('pode_cadastrar_pessoal')]);
+      const [a, b] = await Promise.all([guarda('pode_ver_ponto'), guarda('pode_cadastrar_pessoal')]);
       if (!vivo()) return;
       if (sessaoMudou()) return falha('sessao');
       const rs = [a, b];
