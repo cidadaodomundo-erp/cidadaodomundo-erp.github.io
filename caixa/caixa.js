@@ -2254,7 +2254,7 @@ function caixaAtualBotao(u, dia) {
     const fila = R.filter(x => !x.feito_em), err = R.filter(x => x.feito_em && x.resultado !== 'LANCADO');
     const fim = R.map(x => x.feito_em).concat([P.terminado_em]).filter(Boolean).sort().slice(-1)[0];
     if (fila.length) h = bt('', '↻ Atualizar este dia') + cap('var(--farol-perto)', `relido às ${hh(P.terminado_em)} · enviado ao robô · ${fila.length} lançamento${fila.length > 1 ? 's' : ''} na fila do Saipos`);
-    else if (err.length) h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', 'erro no lançamento: ' + err.map(x => trEscH(x.forma_saipos + ' — ' + x.resultado)).join(' · '));
+    else if (err.length) h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', 'o robô não lançou: ' + err.map(x => trEscH(x.forma_saipos + ' — ' + String(x.resultado || '').replace(/^FALHOU:\s*/, '').replace(/\s*—\s*não lançado$/, ''))).join(' · '));
     else h = bt('', `✓ Atualizado às ${hh(fim)} por ${trEscH(nome(P.quem))}`) + cap('var(--tx-4)', (R.length ? R.length + ' lançado' + (R.length > 1 ? 's' : '') + ' no Saipos · ' : '') + 'clique de novo se corrigir mais alguma coisa');
     if (fila.length) caixaAtualVigiar();
   }
