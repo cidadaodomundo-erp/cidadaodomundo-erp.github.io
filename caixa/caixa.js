@@ -1560,23 +1560,23 @@ function cofreLinhaDia(unidade, dia) {
   }
   return `<div id="cfBox_${k}">${c2}</div>`;   // 25/11: o envelope do dia foi para o cartão da loja (conferência do caixa de ontem)
 }
-async function cofreGravarDia(unidade, dia, k) {
+async function cofreGravarDia(unidade, dia, k, caixa) {
   const el = document.getElementById('cdV_' + k), v = el ? el.value : '';
   if (v === '') { avisoAcao('atencao', '! Digite o dinheiro do fechamento (0 se não teve).'); return; }
   const s = rmbSessao();
   avisoAcao('enviando', 'Gravando o dinheiro do fechamento…');
   try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem_dia?on_conflict=unidade,dia`, { method: 'POST',
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem_dia?on_conflict=unidade,dia,caixa`, { method: 'POST',
       headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify({ unidade, dia, contado: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
+      body: JSON.stringify({ unidade, dia, caixa: caixa || 'LOJA', contado: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     CDIA_CORRIGINDO[k] = false;
     await cofreCarregar();
-    const x = (COFRE_CDIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia);
+    const x = (COFRE_CDIA || []).find((y) => y.unidade === unidade && String(y.dia).slice(0, 10) === dia && (y.caixa || 'LOJA') === (caixa || 'LOJA'));
     const df = x && x.diferenca_envelope != null ? Number(x.diferenca_envelope) : x && x.diferenca != null ? Number(x.diferenca) : null;
     avisoAcao(df != null && Math.abs(df) >= 0.005 ? 'atencao' : 'ok', df == null ? `✓ Gravado às ${avisoHora()}.` : Math.abs(df) < 0.005 ? `✓ Gravado às ${avisoHora()}: bateu com o Saipos.` : `! Gravado às ${avisoHora()}: ${df < 0 ? 'faltou' : 'sobrou'} R$ ${fmt(Math.abs(df))} em relação ao Saipos.`);
     if (document.getElementById('cfBox_' + k)) cofreRedesenhar(unidade, dia); else renderModuloCaixa();
-  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarDia(unidade, dia, k)); }
+  } catch (e) { avisoAcao('erro', '✗ Não consegui gravar: ' + e.message + '. Tente de novo.', () => cofreGravarDia(unidade, dia, k, caixa)); }
 }
 let COFRE_CORRIGINDO = {}, COFRE_CDIA = [], CDIA_CORRIGINDO = {}, COFRE_DATA = {}, COFRE_MOM = {};
 let COFRE_SALDO = {};
@@ -2255,22 +2255,31 @@ function caixaConfHtml(u, dia) {
     return sec(`Conferência do caixa de ${caixaDdm(dia)} · <span style="color:var(--farol-ok);">✓ fechado em lote pelo dono</span>`, `<div id="cxLote_${k}">${caixaLoteCorpo(k)}</div>`);
   }
   // 1) dinheiro do caixa: envelope (Hellen) + gaveta (abertura do dia seguinte no Saipos) = total × dinheiro do dia no Saipos
-  const cd = (COFRE_CDIA || []).find(x => x.unidade === u && String(x.dia).slice(0, 10) === dia) || {};
-  // colunas do Financeiro (82de4b1): gaveta = abertura do caixa SEGUINTE; esperado = abertura do dia + dinheiro do Saipos
+  // 26/11/2026 [dono] (Organizador 13:40: "as contagens do envelope devem ser separadas pra cada setor, delivery e salão"; Financeiro
+  // 13:48): a view traz uma linha por loja, dia e caixa (DELIVERY/SALÃO). 'LOJA' = envelope único de antes da separação: segue numa linha só.
+  const doDia = (COFRE_CDIA || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
+  const unico = doDia.find(x => x.caixa === 'LOJA');
+  const setores = unico ? [unico] : doDia.filter(x => caixaNaFrente(x.caixa)).sort((a, b) => String(a.caixa).localeCompare(String(b.caixa)));
   const num = (v) => v == null ? null : Number(v);
-  const gav = num(cd.gaveta_abertura_dia_seguinte), abre = num(cd.abertura_do_dia);
-  const envGrav = cd.contado != null && !CDIA_CORRIGINDO[k];
-  const envCampo = envGrav ? `<b>${R(cd.contado)}</b> <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${k}']=true; renderModuloCaixa();">corrigir</button>`
-    : `<input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${k}" value="${cd.contado != null ? cd.contado : ''}" style="width:120px;text-align:right;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
-       <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\'")}', '${dia}', '${k}')">Gravar</button>`;
-  const tot = num(cd.total_contado), esp = num(cd.esperado_saipos), df = num(cd.diferenca_total);
   const ag = '<span style="color:var(--tx-4);">aguardando a leitura do Saipos</span>', tr = '<span style="color:var(--tx-4);">—</span>';
   const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
-  const din = ln('Envelope recebido pela Hellen', envCampo)
-    + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando a leitura do Saipos (delivery às 10:10, salão às 11:10)</span>')
-    + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
-    + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
-    + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
+  let envGrav = setores.length > 0;
+  const din = !setores.length ? ln('Envelope recebido pela Hellen', ag) : setores.map(cd => {
+    const cx = cd.caixa || 'LOJA', kc = k + cx.replace(/[^A-Z]/g, '');
+    const gav = num(cd.gaveta_abertura_dia_seguinte), abre = num(cd.abertura_do_dia);
+    const grav = cd.contado != null && !CDIA_CORRIGINDO[kc]; if (!grav) envGrav = false;
+    const envCampo = grav ? `<b>${R(cd.contado)}</b> <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${kc}']=true; renderModuloCaixa();">corrigir</button>`
+      : `<input type="number" step="0.01" min="0" inputmode="decimal" id="cdV_${kc}" value="${cd.contado != null ? cd.contado : ''}" style="width:120px;text-align:right;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
+       <button class="preset-btn active" onclick="cofreGravarDia('${u.replace(/'/g, "\'")}', '${dia}', '${kc}', '${cx}')">Gravar</button>`;
+    const tot = num(cd.total_contado), esp = num(cd.esperado_saipos), df = num(cd.diferenca_total);
+    const tit = cx === 'LOJA' ? 'Envelope único (antes da separação)' : cx === 'DELIVERY' ? 'Delivery' : 'Salão';
+    return `<div style="margin-top:6px;"><div style="font-weight:700;color:var(--tx-2);">${tit}</div>`
+      + ln('Envelope recebido pela Hellen', envCampo)
+      + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando a leitura do Saipos (delivery às 10:10, salão às 11:10)</span>')
+      + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
+      + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
+      + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`) + '</div>';
+  }).join('');
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
     .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i }));
