@@ -2244,7 +2244,7 @@ function caixaAtualBotao(u, dia) {
   const hh = ts => ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
   const nome = e => { const n = String(e || '').split('@')[0].split(/[._]/)[0]; return n ? n.charAt(0).toUpperCase() + n.slice(1) : ''; };
   const P = (CAIXA_ATUAL || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia).slice(-1)[0];
-  const R = !P ? [] : (CAIXA_ROBO || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && !x.cancelado && x.pedido_em && x.pedido_em >= P.pedido_em);
+  let R = !P ? [] : (CAIXA_ROBO || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && !x.cancelado && x.pedido_em && x.pedido_em >= P.pedido_em);
   const bt = (cls, tx) => `<button class="preset-btn${cls}" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\\'")}', '${dia}')">${tx}</button>`;
   const cap = (cor, tx) => ` <span class="caption-label" style="color:${cor};">${tx}</span>`;
   let h;
@@ -2252,7 +2252,10 @@ function caixaAtualBotao(u, dia) {
   else if (P.status === 'PENDENTE' || P.status === 'RODANDO') h = bt('', '↻ Atualizar este dia') + cap('var(--farol-perto)', `relendo o Saipos · pedido às ${hh(P.pedido_em)} por ${trEscH(nome(P.quem))}`);
   else if (P.status !== 'OK') h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', `erro às ${hh(P.terminado_em || P.pedido_em)}: ${trEscH(P.resumo || P.status)} — clique de novo`);
   else {
-    const fila = R.filter(x => !x.feito_em), err = R.filter(x => x.feito_em && x.resultado !== 'LANCADO');
+    // vale que espera a Rede não é erro: o robô não lança de propósito e ele vira pendência no 6º dia (aparece em "vale em espera")
+    const espera = x => /vale aguardando/i.test(String(x.resultado || ''));
+    const fila = R.filter(x => !x.feito_em), err = R.filter(x => x.feito_em && x.resultado !== 'LANCADO' && !espera(x));
+    R = R.filter(x => !espera(x));
     const fim = R.map(x => x.feito_em).concat([P.terminado_em]).filter(Boolean).sort().slice(-1)[0];
     if (fila.length) h = bt('', '↻ Atualizar este dia') + cap('var(--farol-perto)', `relido às ${hh(P.terminado_em)} · enviado ao robô · ${fila.length} lançamento${fila.length > 1 ? 's' : ''} na fila do Saipos`);
     else if (err.length) h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', 'o robô não lançou: ' + err.map(x => trEscH(x.forma_saipos + ' — ' + String(x.resultado || '').replace(/^FALHOU:\s*/, '').replace(/\s*—\s*não lançado$/, ''))).join(' · '));
