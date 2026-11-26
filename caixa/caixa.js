@@ -2307,7 +2307,7 @@ function caixaConfHtml(u, dia) {
   const ok = !pendF.length && !abertosD.length && envGrav;
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pendF.length + abertosD.length + (envGrav ? 0 : 1)} a fazer</span>`}`,
     `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false)
-    + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
+    + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn active" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
 }
 // o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
 const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
