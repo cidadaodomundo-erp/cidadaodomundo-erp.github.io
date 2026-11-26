@@ -1568,6 +1568,7 @@ function cofreLinhaDia(unidade, dia) {
   return `<div id="cfBox_${k}">${c2}</div>`;   // 25/11: o envelope do dia foi para o cartão da loja (conferência do caixa de ontem)
 }
 async function cofreGravarDia(unidade, dia, k, caixa) {
+  if (caixa !== 'DELIVERY' && caixa !== 'SALÃO') { avisoAcao('atencao', '! Grave o envelope no bloco do Delivery ou do Salão.'); return; }
   const el = document.getElementById('cdV_' + k), v = el ? el.value : '';
   if (v === '') { avisoAcao('atencao', '! Digite o dinheiro do fechamento (0 se não teve).'); return; }
   const s = rmbSessao();
@@ -1575,7 +1576,7 @@ async function cofreGravarDia(unidade, dia, k, caixa) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/caixa_contagem_dia?on_conflict=unidade,dia,caixa`, { method: 'POST',
       headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify({ unidade, dia, caixa: caixa || 'LOJA', contado: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
+      body: JSON.stringify({ unidade, dia, caixa, contado: Math.round(Number(v) * 100) / 100, quem: s && s.email, atualizado_em: new Date().toISOString() }) });
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     CDIA_CORRIGINDO[k] = false;
     await cofreCarregar();
@@ -2274,8 +2275,8 @@ function caixaConfHtml(u, dia) {
   // 26/11/2026 [dono] (Organizador 13:40: "as contagens do envelope devem ser separadas pra cada setor, delivery e salão"; Financeiro
   // 13:48): a view traz uma linha por loja, dia e caixa (DELIVERY/SALÃO). 'LOJA' = envelope único de antes da separação: segue numa linha só.
   const doDia = (COFRE_CDIA || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
-  const unico = doDia.find(x => x.caixa === 'LOJA');
-  const setores = unico ? [unico] : doDia.filter(x => caixaNaFrente(x.caixa)).sort((a, b) => String(a.caixa).localeCompare(String(b.caixa)));
+  // 26/11 15:09 (dono: "sempre vai ser diferente os valores de cada caixa"): o envelope único (LOJA) acabou; cada setor grava o seu
+  const setores = doDia.filter(x => x.caixa === 'DELIVERY' || x.caixa === 'SALÃO').filter(x => caixaNaFrente(x.caixa)).sort((a, b) => String(a.caixa).localeCompare(String(b.caixa)));
   const num = (v) => v == null ? null : Number(v);
   const ag = '<span style="color:var(--tx-4);">aguardando a leitura do Saipos</span>', tr = '<span style="color:var(--tx-4);">—</span>';
   const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
