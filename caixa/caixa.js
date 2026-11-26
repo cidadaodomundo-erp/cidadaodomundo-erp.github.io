@@ -698,11 +698,16 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // 06/11/2026 (dono, via Financeiro: "bandeira trocada que já passou fica como registro"): troca com baixa em
   // caixa_pendencia_validada (chave 'troca:<id_sale>') não é mais pendência — fica só o registro na forma
   const trocaBaixa = t => !!valDe['troca:' + t.ref];
+  const bateuItens = (A, P) => A.map(x => ({ hora: hhmm(x.hora), venda: rotVenda(x), saipos: limpa(x.detalhe), outro: x.par ? limpa(x.par.detalhe) + ' às ' + hhmm(x.par.hora) : '', valor: +x.valor || 0 }))
+    .concat(P.map(x => ({ hora: hhmm(x.hora), venda: 'PIX', saipos: String(x.tipo || 'PIX'), outro: 'entrou no banco', valor: +x.valor || 0 })))
+    .sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
   if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas: trocas.filter(t => !trocaBaixa(t)), turnos,
     // 25/11/2026: o "Bateu (N · R$)" da conferência do cartão da loja
     bateu: { n: bateram, v: casados.reduce((a, x) => a + (+x.valor || 0), 0) + pix.filter(x => x.recebido).reduce((a, x) => a + (+x.valor || 0), 0),
+      // 26/11/2026 [dono] (Financeiro 13:01: o dono quer ver o detalhe do verde): os pares que casaram, lado Saipos × maquininha/banco
+      itens: bateuItens(casados, pix.filter(x => x.recebido)),
       porCx: cx => { const A = casados.filter(x => !x.caixa || x.caixa === cx), P = pix.filter(x => x.recebido && (!x.caixa || x.caixa === cx));
-        return { n: A.length + P.length, v: A.reduce((a, x) => a + (+x.valor || 0), 0) + P.reduce((a, x) => a + (+x.valor || 0), 0) }; } } };
+        return { n: A.length + P.length, v: A.reduce((a, x) => a + (+x.valor || 0), 0) + P.reduce((a, x) => a + (+x.valor || 0), 0), itens: bateuItens(A, P) }; } } };
   // virada do dia: casou com a maquininha de outro dia (entra na diferenca da forma, com valor)
   const viradas = [];
   casados.forEach(sRow => { if (sRow.par && !doDia(sRow.par)) viradas.push({ forma: formaPadrao(sRow.detalhe), caixa: sRow.caixa || null, contrib: +sRow.valor, texto: `${rotVenda(sRow)} ${reaisCc(sRow.valor)}: a maquininha registrou em ${String(sRow.par.dia).split('-').reverse().slice(0, 2).join('/')} às ${hhmm(sRow.par.hora)} (virada do dia)` }); });
@@ -2200,12 +2205,18 @@ function caixaPendRow(p, idx, lote) {
         <input id="cxEx_${idx}" placeholder="detalhe (opcional)" ${lote ? 'disabled' : ''} style="flex:1 1 200px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
         ${lote ? '<span style="color:var(--tx-4);font-size:12.5px;">fechado em lote pelo dono — só leitura</span>' : `<button class="preset-btn active" onclick="caixaDecidir(${idx}, this)">Gravar</button>`}</div></div></div>`;
 }
+function caixaBateuTabela(it) {
+  if (!it || !it.length) return '';
+  const td = 'padding:3px 6px;border-top:1px solid var(--line);text-align:left;';
+  return `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;color:var(--tx-3);"><tr><th style="${td}">Hora</th><th style="${td}">Venda</th><th style="${td}">No Saipos</th><th style="${td}">Na maquininha / banco</th><th style="${td}text-align:right;">Valor</th></tr>`
+    + it.map(x => `<tr><td style="${td}white-space:nowrap;">${trEscH(x.hora)}</td><td style="${td}white-space:nowrap;">${trEscH(x.venda)}</td><td style="${td}">${trEscH(x.saipos)}</td><td style="${td}">${trEscH(x.outro)}</td><td style="${td}text-align:right;white-space:nowrap;">R$ ${fmt(x.valor)}</td></tr>`).join('') + '</table></div>';
+}
 function caixaResPendHtml(res, pend, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   if (CAIXA_VER_CX) { pend = pend.filter(p => caixaNaFrente(p.caixa)); if (res && res.porCx) res = res.porCx(CAIXA_VER_CX); }
   // sem nenhuma venda de cartão lida para o dia não é "tudo certo": diz que falta o dado
   if ((!res || !res.n) && !pend.length) return '<div style="color:var(--tx-4);">sem vendas de cartão lidas para este dia (a maquininha ainda não chegou ao painel)</div>';
-  return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
+  return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div>${caixaBateuTabela(res.itens)}</details>` : '')
     + (pend.length ? `<div style="margin-top:6px;font-weight:700;color:var(--farol-perto);">Pendentes (${pend.length})</div>${pend.map((p) => caixaPendRow(p, p.idx, lote)).join('')}`
       : '<div style="color:var(--farol-ok);">✓ nenhuma pendente</div>');
 }
@@ -2256,7 +2267,7 @@ function caixaConfHtml(u, dia) {
   const ag = '<span style="color:var(--tx-4);">aguardando a leitura do Saipos</span>', tr = '<span style="color:var(--tx-4);">—</span>';
   const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
   const din = ln('Envelope recebido pela Hellen', envCampo)
-    + ln('Gaveta (abertura do caixa do dia seguinte)', gav != null ? R(gav) : ag)
+    + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando a leitura do Saipos (delivery às 10:10, salão às 11:10)</span>')
     + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
     + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
     + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
