@@ -1042,6 +1042,8 @@ async function concbConciliarMarcadas(bt) {
 // marcação CONCILIADO + nao_vigiar com a chave da view (vw_fin_conciliacao_saipos_residuo.chave), com o porquê escrito
 async function concbJaExplicado(bt) {
   const d = bt.dataset;
+  // 26/11/2026 [conserto] (dono 14:37: "já explicado" não funcionava para a Hellen): `rs` só existe dentro do render; aqui quebrava calado
+  const rs = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const obs = prompt('O que explica "' + d.desc + '" (R$ ' + rs(Math.abs(Number(d.valor))) + ')?\n\nEx.: pago por outra conta, cai no próximo dia, lançamento duplicado já excluído.');
   if (obs === null) return;
   if (!obs.trim()) { avisoAcao('atencao', 'Escreva em poucas palavras o que explica a linha.'); return; }
