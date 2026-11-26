@@ -110,7 +110,48 @@ function caixaDiaDaVez(u) {
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
 const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [];
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [], CAIXA_FECHDIF = [];
+// 26/11/2026 [dono] (Boletim 16:09: "o que são essa diferenças? porque elas não apareceram pra Hellen justificar no painel";
+// Financeiro 3627b3c): toda forma do fechamento do Saipos com saldo ≠ 0 (vw_caixa_fechamento_diferenca), por setor
+function caixaFechSaiposHtml(u, dia, cx) {
+  const L = (CAIXA_FECHDIF || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && x.caixa === cx);
+  if (!L.length) return '';
+  const R = v => (Number(v) < 0 ? '− ' : '') + 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  const soma = f => L.filter(f).reduce((a, x) => a + Number(x.saldo || 0), 0);
+  const tot = soma(() => true), maq = soma(x => x.situacao === 'MAQUININHA'), din = soma(x => x.situacao === 'DINHEIRO'),
+    agu = soma(x => x.situacao === 'AGUARDANDO'), jus = soma(x => x.situacao === 'PENDENTE' || x.situacao === 'DECIDIDA');
+  const cab = `<div style="font-size:12.5px;color:var(--tx-3);margin-top:6px;">Saipos: saldo do fechamento <b>${R(tot)}</b> = maquininha ${R(maq)} + dinheiro ${R(din)} + aguardando ${R(agu)} + a justificar ${R(jus)}</div>`;
+  const lin = x => {
+    const k = 'fd' + String(x.chave || '').replace(/[^A-Za-z0-9]/g, '');
+    const base = `<b>${trEscH(x.forma)}</b> · ${R(x.saldo)}`;
+    if (x.situacao === 'PENDENTE') return `<div class="cx-fd" style="padding:6px 0;border-top:1px dashed var(--line);">
+      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span>${base} <span style="font-size:12px;color:var(--farol-perto);">a justificar</span></span>
+      <button class="preset-btn" onclick="const d=this.closest('.cx-fd').querySelector('.cx-fd-f'); d.style.display = d.style.display === 'none' ? '' : 'none';">Justificar</button></div>
+      <div class="cx-fd-f" style="display:none;margin-top:6px;"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <select class="cx-fd-d" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DEC_TODAS.slice().reverse().map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
+        <input class="cx-fd-t" placeholder="o que aconteceu (obrigatório)" style="flex:1 1 200px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
+        <button class="preset-btn active" onclick="caixaFechJustificar(this, '${trEscH(String(x.chave)).replace(/'/g, '')}')">Gravar</button></div></div></div>`;
+    if (x.situacao === 'DECIDIDA') return `<div style="padding:4px 0;border-top:1px dashed var(--line);color:var(--farol-ok);">✓ ${base} <span style="font-size:12px;color:var(--tx-3);">— ${trEscH(x.explicacao || '')}${x.decidida_por ? ' (' + trEscH(String(x.decidida_por).split('@')[0]) + ')' : ''}</span></div>`;
+    const cinza = x.situacao === 'MAQUININHA' ? 'conferido na maquininha' : x.situacao === 'DINHEIRO' ? 'conferido no envelope' : x.situacao === 'AGUARDANDO' ? 'aguardando a Rede pagar o vale' : trEscH(x.situacao || '');
+    return `<div style="padding:4px 0;border-top:1px dashed var(--line);color:var(--tx-4);">${base} · ${cinza}</div>`;
+  };
+  const ordem = { PENDENTE: 0, DECIDIDA: 1, AGUARDANDO: 2, MAQUININHA: 3, DINHEIRO: 4 };
+  return cab + L.slice().sort((a, b) => (a.situacao in ordem ? ordem[a.situacao] : 9) - (b.situacao in ordem ? ordem[b.situacao] : 9)).map(lin).join('');
+}
+async function caixaFechJustificar(bt, chave) {
+  const x = (CAIXA_FECHDIF || []).find(y => String(y.chave) === chave); if (!x) return;
+  const box = bt.closest('.cx-fd'), dec = box.querySelector('.cx-fd-d').value, tx = (box.querySelector('.cx-fd-t').value || '').trim();
+  if (tx.length < 3) return avisoAcao('atencao', '! Escreva o que aconteceu.');
+  bt.disabled = true; bt.textContent = 'gravando…';
+  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.unidade, p_dia: String(x.dia).slice(0, 10), p_chave: x.chave, p_bloco: 'FECHAMENTO_SAIPOS',
+    p_valor: Number(x.saldo) || 0, p_explicacao: tx, p_decisao: dec, p_caixa: x.caixa, p_responsavel: null, p_descricao: 'fechamento do Saipos · ' + x.forma });
+  if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaFechJustificar(bt, chave)); }
+  avisoAcao('ok', `✓ Gravado às ${avisoHora()}.`);
+  const un = 'unidade=eq.' + encodeURIComponent(x.unidade);
+  const novo = await consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=eq.' + String(x.dia).slice(0, 10) + '&' + un).catch(() => null);
+  if (novo) CAIXA_FECHDIF = (CAIXA_FECHDIF || []).filter(y => !(y.unidade === x.unidade && String(y.dia).slice(0, 10) === String(x.dia).slice(0, 10))).concat(novo);
+  renderModuloCaixa();
+}
 // 26/11/2026 [dono] (Financeiro 15:43, vw_caixa_envelope_transito): o dinheiro que a filial manda à Água Verde, até a Hellen marcar que chegou
 function caixaTransitoHtml() {
   const L = (CAIXA_TRANSITO || []).filter(x => x.situacao === 'EM TRÂNSITO' || x.alerta);
@@ -1858,6 +1899,7 @@ async function caixaHellenCarregar() {
     // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento com o número da venda"; Financeiro c770577):
     // por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor — salão não tem número no Saipos
     CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []);
+    CAIXA_FECHDIF = await consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=gte.' + des + '&' + un + '&order=dia,caixa,forma').catch(() => []);
     CAIXA_VREF = {};
     (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
@@ -2331,7 +2373,8 @@ function caixaConfHtml(u, dia) {
       + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : `<span style="color:var(--tx-4);">aguardando a leitura do Saipos (${caixaHoraLeitura(u, cx, caixaHellenMais(dia, 1))})</span>`)
       + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
       + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
-      + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`) + '</div>';
+      + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`)
+      + caixaFechSaiposHtml(u, dia, cx) + '</div>';
   }).join('');
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
@@ -2343,8 +2386,10 @@ function caixaConfHtml(u, dia) {
   const ok = !pendF.length && !abertosD.length && envGrav;
   // 26/11 (dono: SB "1 a fazer" com "nenhuma pendente"): diz QUAL é a coisa a fazer
   const faltaEnv = setores.filter(cd => cd.contado == null).map(cd => 'contar o envelope do ' + (cd.caixa === 'SALÃO' ? 'Salão' : 'Delivery'));
+  const fechPend = setores.reduce((a, cd) => a + (CAIXA_FECHDIF || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && x.caixa === cd.caixa && x.situacao === 'PENDENTE').length, 0);
+  if (fechPend) faltaEnv.push(fechPend + (fechPend === 1 ? ' forma do fechamento a justificar' : ' formas do fechamento a justificar'));
   const fazer = faltaEnv.concat(pendF.length ? [pendF.length + (pendF.length === 1 ? ' pendente' : ' pendentes')] : [], abertosD.length ? [abertosD.length + ' desconto(s) sem explicação'] : []);
-  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">a fazer: ${fazer.join(' · ') || 'contar o envelope'}</span>`}`,
+  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok && !fechPend ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">a fazer: ${fazer.join(' · ') || 'contar o envelope'}</span>`}`,
     `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false, !doisCx)
     + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn active" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
 }
