@@ -71,7 +71,9 @@
                         box-shadow:inset 3px 0 0 var(--marca-amarelo); }
   .main-content { flex:1; min-width:0; }
 
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 32px 60px; }
+  /* 26/11/2026 [dono] (Organizador 11:59: "essas bordas podem diminuir em TODAS as telas, quanto maior o espaço, mais fácil de
+     visualizar vai ficar"): a tela usa quase toda a largura, com pouca borda e menos espaço morto nos quadros */
+  .wrap { max-width: none; margin: 0 auto; padding: 14px 16px 40px; }
   /* 29/10/2026 (dono): página com tabela usa a largura toda da tela — a tabela cabe sem barra de lado */
   .wrap:has(div[id^="tabela"]) { max-width:none; }
   .header-row { display:flex; align-items:center; justify-content:center; gap:14px; margin:0 0 6px 0; }
@@ -111,11 +113,11 @@
   .section-label { color:var(--tx-1); font-size:17px; font-weight:700; margin-top:24px; margin-bottom:12px; padding-top:20px; border-top:1px solid var(--line); text-align:center; text-transform:uppercase; letter-spacing:.8px; }
   .caption-label { color:var(--tx-3); font-size:11px; margin:14px 0 12px 0; }
 
-  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:8px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-bottom:8px; }
   /* 6 cards em 2 linhas de 3 (fechamento da DRE): sem card orfao sozinho na 2a linha */
   .cards-3 { grid-template-columns:repeat(3, 1fr); }
   @media (max-width: 700px) { .cards-3 { grid-template-columns:1fr; } }
-  .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; text-align:center; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; text-align:center; }
   .card-lbl { color:#8a897e; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
   .card-val { color:var(--tx-1); font-size:21px; font-weight:800; }
   .card-pct { color:var(--tx-3); font-size:15px; font-weight:600; margin-top:2px; }
@@ -127,8 +129,8 @@
   .preset-btn:hover { border-color:var(--marca-laranja); color:var(--tx-1); }
   .preset-btn.active { background:var(--surface-2); color:var(--tx-1); border-color:var(--marca-amarelo); }
 
-  .contexto { background:var(--zebra); border:1px solid var(--line); border-radius:10px; padding:10px 16px;
-              margin:16px 0 4px; text-align:center; color:var(--tx-3); font-size:12.5px; line-height:1.7; }
+  .contexto { background:var(--zebra); border:1px solid var(--line); border-radius:10px; padding:8px 12px;
+              margin:12px 0 4px; text-align:center; color:var(--tx-3); font-size:12.5px; line-height:1.7; }
   .contexto b { color:var(--tx-1); }
 
   .hero { background:var(--surface); border:1px solid #3fb950; border-radius:16px;
@@ -726,7 +728,7 @@
   html.tema-proposta .card.neutral { border-color:var(--line); }
   html.tema-proposta .card-val { font-weight:700; }
   html.tema-proposta .card-lbl { font-weight:600; }
-  html.tema-proposta .cards { gap:14px; }
+  html.tema-proposta .cards { gap:10px; }
   html.tema-proposta h2 { font-weight:700; }
   html.tema-proposta .section-label { font-weight:700; margin-top:30px; }
   html.tema-proposta .contexto { box-shadow:none; }
@@ -846,7 +848,7 @@
   .login-erro { color:#ff6b6b; font-size:12px; margin-top:10px; }
 
   @media (max-width: 640px) {
-    .wrap { padding: 20px 16px 40px; }
+    .wrap { padding: 10px 8px 32px; }
     .app-layout { flex-direction: column; }
     .sidebar { width:100%; flex:0 0 auto; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line); padding:8px; }
     .sidebar-btn { padding:9px 14px; white-space:nowrap; }
@@ -1032,15 +1034,3 @@
     .card-val { font-size:18px; }
     .card-pct { font-size:13px; }
   }
-
-  /* 22-23/11/2026 (Fábio, portal no celular): campo sem estilo próprio deixava de vir branco do navegador no fundo escuro
-     e ficava baixo demais para o dedo. :where() não pesa nada: qualquer estilo da própria tela continua mandando. */
-  :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select, textarea) {
-    background:var(--surface-2); color:var(--tx-1); border:1px solid var(--line-2, var(--line)); border-radius:8px; padding:6px 10px; font:inherit;
-  }
-  :where(input, select, textarea)::placeholder { color:var(--tx-3, var(--tx-2)); }
-  @media (max-width:700px) {
-    :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select) { min-height:40px; }
-  }
-  :where(button:not([class*="sidebar"])) { color:var(--tx-1); }
-  :where(button:not([class])), :where(.pao-btn) { background:var(--surface-2); border:1px solid var(--line-2, var(--line)); border-radius:8px; padding:6px 12px; font:inherit; cursor:pointer; }

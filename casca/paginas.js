@@ -120,7 +120,7 @@ window.CASCA_PAGINAS = {
   temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
   manutencao: 'manutencao/index.html?v=20261124a#chamados',      // Pedidos de manutenção (abrir, acompanhar, marcar arrumado)
   prestadores: 'manutencao/index.html?v=20261124a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
-  pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
+  pagarmoto: 'delivery/pagar-motoboys.html?v=20261126a',   // 26/11: desenho do painel do Fabio e segue a loja do topo;  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // 17/11/2026: Central do Salão (eventos da cidade, reservas, tablet, Google, equipe)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
@@ -151,5 +151,5 @@ window.CASCA_TELAS_POR_LOJA = ['caixa',
   'estasemana', 'resumo', 'cancelamentos', 'promocoes', 'qualidade', 'site', 'evolucao',
   'negociacoes', 'avaliacoes', 'contestacoes', 'cardapio', 'clientes', 'frete', 'atrasos', 'logfin', 'macertos',
   'hoje', 'placar', 'indicadores', 'fechamento', 'semana', 'dre', 'fluxo', 'despesas', 'lucrouni', 'concbanco', 'contaspagar', 'contasreceber', 'projecao', 'vendasagora',
-  'delivery', 'chegada', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'qualidel', 'avalsalao', 'motodocs', 'garantido', 'escalaclima', 'taxaponto', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
+  'delivery', 'chegada', 'pagarmoto', 'reservas', 'pausados', 'pausadosdel', 'avaldel', 'qualidel', 'avalsalao', 'motodocs', 'garantido', 'escalaclima', 'taxaponto', 'reuniao', 'manutencao', 'freelas'];   // 12/11/2026: o Delivery do dia segue a loja do topo (aoMudarLoja/lojaAtual) e só mostra as lojas autorizadas
 
