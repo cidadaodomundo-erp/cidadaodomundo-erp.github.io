@@ -326,7 +326,8 @@ function exigirLogin(recado) {
     // R$/HORA · GARANTIDO · REFEIÇÃO · A PAGAR · PLANILHA · PIX · DIFERENÇA; a escala combinada fica no clique da linha.
     // Planilha, Pix feito e Diferença aparecem quando o banco mandar (planilha, pix_pago, diferenca); até lá, "—".
     const din = (v) => (v == null || v === '' ? '<span class="pm-fraco" title="ainda não chega a esta tela">—</span>' : brl(v));
-    const difv = l.diferenca != null ? Number(l.diferenca) : null;
+    // DIFERENÇA = a pagar × planilha (Organizador 26/11 12:07): usa a do banco; sem ela, calcula quando a planilha existir
+    const difv = l.diferenca != null ? Number(l.diferenca) : l.planilha != null ? Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100 : null;
     let h = '<tr class="lin" data-k="' + esc(k) + '">' +
       '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
         (l.turnos > 1 ? '<small>2 turnos</small>' : '') + (l.corta_dia ? '<small class="pm-nao">✂ atrasou: sem garantido e refeição</small>' : '') + '</span></td>' +
