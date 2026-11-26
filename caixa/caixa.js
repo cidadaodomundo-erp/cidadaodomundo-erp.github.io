@@ -2165,9 +2165,13 @@ function caixaDecDaOpcao(p, dec) {
   if (dec === '#PAGO') return p.caixa === 'DELIVERY' || p.quem ? 'FALTA_DELIVERY' : '#SALAO';
   return dec;
 }
-function caixaOpcMudou(idx) {
+// 26/11/2026 [conserto] (Organizador 12:53, a Hellen não abria o "Explicar"): o mesmo dia aparece em dois lugares (cartão de ontem e
+// histórico aberto) e os ids se repetiam; o botão abria o bloco do outro lugar. Agora tudo se acha DENTRO da linha clicada (.cx-pend).
+function caixaPendEl(el, idx, pre) { const c = el && el.closest ? el.closest('.cx-pend') : null; return c ? c.querySelector('#' + pre + idx) : document.getElementById(pre + idx); }
+function caixaOpcMudou(idx, el) {
+  if (!el) { document.querySelectorAll('.cx-pend[data-idx="' + idx + '"]').forEach(c => caixaOpcMudou(idx, c)); return; }
   const P = (CAIXA_PEND_IDX || {})[idx]; if (!P) return;
-  const op = document.getElementById('cxOp_' + idx), de = document.getElementById('cxDe_' + idx), tx = document.getElementById('cxEx_' + idx);
+  const op = caixaPendEl(el, idx, 'cxOp_'), de = caixaPendEl(el, idx, 'cxDe_'), tx = caixaPendEl(el, idx, 'cxEx_'); if (!op || !de || !tx) return;
   const [rot, d0] = caixaOpcoes(P)[Number(op.value)] || [];
   const dec = caixaDecDaOpcao(P, d0);
   const lista = dec === '*' ? CX_DEC_TODAS : dec === '#SALAO' ? CX_DECISOES.filter(([v]) => /FALTA_SALAO/.test(v)) : null;
@@ -2175,7 +2179,7 @@ function caixaOpcMudou(idx) {
   de.style.display = lista ? '' : 'none';
   const precisa = dec === '*' || dec === '#SALAO' || /^FALTA/.test(dec || '');
   tx.placeholder = precisa ? 'o que aconteceu (obrigatório)' : 'detalhe (opcional)';
-  const info = document.getElementById('cxDi_' + idx);
+  const info = caixaPendEl(el, idx, 'cxDi_');
   if (info) info.textContent = lista ? '' : (CX_DEC_TODAS.find(([v]) => v === dec) || [, ''])[1];
 }
 let CAIXA_PEND_IDX = {};
@@ -2183,14 +2187,14 @@ function caixaPendRow(p, idx, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   CAIXA_PEND_IDX[idx] = p;
   const ops = caixaOpcoes(p);
-  setTimeout(() => { if (document.getElementById('cxOp_' + idx)) caixaOpcMudou(idx); }, 0);
-  return `<div style="padding:8px 0;border-top:1px dashed var(--line);">
+  setTimeout(() => caixaOpcMudou(idx), 0);
+  return `<div class="cx-pend" data-idx="${idx}" style="padding:8px 0;border-top:1px dashed var(--line);">
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span><b>${trEscH(p.hora || '')}</b> · ${trEscH(p.venda || 'venda')} · ${trEscH(p.forma || '')} · <b>${R(p.valor)}</b>
       <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span></span>
-      <button class="preset-btn" onclick="const d=document.getElementById('cxExp_${idx}'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button></div>
-    <div id="cxExp_${idx}" style="display:none;margin-top:6px;">
+      <button class="preset-btn" onclick="const d=this.closest('.cx-pend').querySelector('.cx-exp'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button></div>
+    <div id="cxExp_${idx}" class="cx-exp" style="display:none;margin-top:6px;">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-        <select id="cxOp_${idx}" ${lote ? 'disabled' : ''} onchange="caixaOpcMudou('${idx}')" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${ops.map(([t], j) => `<option value="${j}">${t}</option>`).join('')}</select>
+        <select id="cxOp_${idx}" ${lote ? 'disabled' : ''} onchange="caixaOpcMudou('${idx}', this)" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${ops.map(([t], j) => `<option value="${j}">${t}</option>`).join('')}</select>
         <select id="cxDe_${idx}" ${lote ? 'disabled' : ''} style="display:none;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;"></select>
         <span id="cxDi_${idx}" style="font-size:12px;color:var(--tx-4);"></span>
         <input id="cxEx_${idx}" placeholder="detalhe (opcional)" ${lote ? 'disabled' : ''} style="flex:1 1 200px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
@@ -2273,10 +2277,10 @@ const caixaBlocoBanco = (b) => ({ cofre: 'dinheiro', difsaipos: 'dinheiro', semc
 async function caixaDecidir(i, bt) {
   const x = CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.itens[i]; if (!x || !x.pend) return;
   const P = (CAIXA_PEND_IDX || {})[i] || {};
-  const opI = Number((document.getElementById('cxOp_' + i) || {}).value || 0), [rot, d0] = caixaOpcoes(P)[opI] || ['Outro', '*'];
+  const opI = Number((caixaPendEl(bt, i, 'cxOp_') || {}).value || 0), [rot, d0] = caixaOpcoes(P)[opI] || ['Outro', '*'];
   const d1 = caixaDecDaOpcao(P, d0);
-  const de = d1 === '*' || d1 === '#SALAO' ? (document.getElementById('cxDe_' + i) || {}).value : d1;
-  const tx = ((document.getElementById('cxEx_' + i) || {}).value || '').trim();
+  const de = d1 === '*' || d1 === '#SALAO' ? (caixaPendEl(bt, i, 'cxDe_') || {}).value : d1;
+  const tx = ((caixaPendEl(bt, i, 'cxEx_') || {}).value || '').trim();
   const precisa = d1 === '*' || d1 === '#SALAO' || /^FALTA/.test(de || '');
   if (precisa && tx.length < 3) return avisoAcao('atencao', '! Escreva o que aconteceu (obrigatório nesta opção).');
   const ex = tx ? rot + ' — ' + tx : rot;
