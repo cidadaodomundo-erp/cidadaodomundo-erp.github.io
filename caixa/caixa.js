@@ -1182,7 +1182,8 @@ async function caixaExplicarItem(d, x) {
 // caixa de cada loja e dia, com unidade e dia próprios; a flechinha do topo só recarrega a tela
 async function caixaAtualizarDia(bt, unidade, dia) {
   const d = unidade && dia ? { unidade, dia } : CAIXA_DRILL_DADOS;
-  if (!d) return;
+  // 26/11 18:47 (Financeiro: o clique do dono no Ahú 25/11 não gravou pedido): nunca sair calado
+  if (!d || !d.unidade || !d.dia) { console.warn('caixaAtualizarDia sem loja/dia', unidade, dia, CAIXA_DRILL_DADOS); avisoAcao('erro', '✗ Não consegui saber a loja e o dia deste botão. Recarregue a tela (F5) e clique de novo.'); return; }
   const s = rmbSessao();
   if (!s || !s.email) { avisoAcao('atencao', '! Sessão expirada — faça login de novo.'); return; }
   const texto = bt.textContent;
