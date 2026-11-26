@@ -2188,6 +2188,8 @@ function caixaOpcMudou(idx, el) {
   if (info) info.textContent = lista ? '' : (CX_DEC_TODAS.find(([v]) => v === dec) || [, ''])[1];
 }
 let CAIXA_PEND_IDX = {};
+// 26/11/2026 [conserto] (dono 14:34: "o Explicar não está funcionando pra Hellen"): a diferença no fechamento do Saipos (dinheiro) não é
+// venda — as opções de venda não serviam. Ela abre a janela de quebra/sobra (caixaHellenExplicar), a mesma do "Para você resolver".
 function caixaPendRow(p, idx, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
   CAIXA_PEND_IDX[idx] = p;
@@ -2196,7 +2198,7 @@ function caixaPendRow(p, idx, lote) {
   return `<div class="cx-pend" data-idx="${idx}" style="padding:8px 0;border-top:1px dashed var(--line);">
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span><b>${trEscH(p.hora || '')}</b> · ${trEscH(p.venda || 'venda')} · ${trEscH(p.forma || '')} · <b>${R(p.valor)}</b>
       <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span></span>
-      <button class="preset-btn" onclick="const d=this.closest('.cx-pend').querySelector('.cx-exp'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button></div>
+      ${p.bloco === 'difsaipos' && !lote ? `<button class="preset-btn" onclick="caixaHellenExplicar(${idx})">Explicar</button>` : `<button class="preset-btn" onclick="const d=this.closest('.cx-pend').querySelector('.cx-exp'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button>`}</div>
     <div id="cxExp_${idx}" class="cx-exp" style="display:none;margin-top:6px;">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
         <select id="cxOp_${idx}" ${lote ? 'disabled' : ''} onchange="caixaOpcMudou('${idx}', this)" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${ops.map(([t], j) => `<option value="${j}">${t}</option>`).join('')}</select>
@@ -2282,7 +2284,7 @@ function caixaConfHtml(u, dia) {
   }).join('');
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
-    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i }));
+    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i, bloco: x.bloco }));
   const abertosD = caixaDescAbertos(u, dia);
   const pendF = pend.filter(p => caixaNaFrente(p.caixa));
   const ok = !pendF.length && !abertosD.length && envGrav;
