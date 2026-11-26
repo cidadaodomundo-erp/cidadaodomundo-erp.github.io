@@ -1883,10 +1883,12 @@ function caixaHellenItens() {
       if (l.tratamento) { (CAIXA_SOBRAFALTA[u] = CAIXA_SOBRAFALTA[u] || []).push({ dia: l.data, valor: v, frente: l.frente || nome, tratamento: l.tratamento }); return; }
       const chave = 'difsai:' + l.id;
       if (valDS[l.data + '|' + chave]) return;
-      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: null, valor: Math.abs(v), hora: '', forma: 'Dinheiro', frente: nome,
+      // 26/11: a frente do Saipos diz o caixa (Salão/Balcão = SALÃO; Delivery/Atendimento = DELIVERY); outra frente fica nos dois filtros
+      const cxF = l.caixa || (/SAL|BALC/i.test(nome) ? 'SALÃO' : /DELIV|ATEND/i.test(nome) ? 'DELIVERY' : null);
+      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: cxF, valor: Math.abs(v), hora: '', forma: 'Dinheiro', frente: nome,
         saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
         leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
-      add({ u, dia: l.data, ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro', frente: nome });
+      add({ u, dia: l.data, caixa: cxF || '', ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro', frente: nome });
     });
     // quebra explicada que ninguém repôs nem descontou
     (H.quebras || []).filter(q => q.unidade === u && q.dia >= corte).forEach(q => add({ u, dia: q.dia, caixa: q.caixa || '', ordem: 5, valor: +q.quebra,
