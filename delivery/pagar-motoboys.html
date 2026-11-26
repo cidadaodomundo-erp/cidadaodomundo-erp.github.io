@@ -540,6 +540,8 @@ function exigirLogin(recado) {
     if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
     if (!r.ok) { $('painelObra').innerHTML = '<div class="pm-aviso">' + esc(r.status === 403 || r.status === 400 ? 'Esta parte é só do dono e de quem cuida do pessoal.' : await trErroDe(r)) + '</div>'; return; }
     ABAS = await r.json();
+    // 26/11/2026 [dono]: conferência da maquininha venda a venda (Rede, Pix e GPS na casa do cliente), como no portal antigo
+    try { const rm = await trRpc('pagar_motoboys_maquininha', { p_dia: dia }); ABAS.maq = rm.ok ? await rm.json() : null; } catch (e) { ABAS.maq = null; }
     if (seq === ABAS_SEQ) desenharAba();
   }
 
@@ -548,7 +550,54 @@ function exigirLogin(recado) {
     if (ABA === 'maquininha') abaMaquininha(); else if (ABA === 'dobro') abaDobro(); else if (ABA === 'acerto') abaAcerto();
   }
 
+  const MAQ_SIT = {
+    NAO_COBROU: ['🔴 Não cobrou', 'pm-ruim', 'O motoboy esteve no endereço (GPS) e não existe cobrança em lugar nenhum: nem Rede, nem Pix, nem cofre.'],
+    SEM_COBRANCA_LONGE: ['❓ Sem cobrança e GPS longe', 'pm-ruim', 'Nenhuma cobrança achada, e o GPS não mostra o motoboy no endereço na hora da entrega.'],
+    SEM_COBRANCA_SEM_GPS: ['❓ Sem cobrança e sem GPS', 'pm-espera', 'Nenhuma cobrança achada e não há leitura de GPS para provar a entrega.'],
+    SO_A_COMIDA: ['⚠️ Só a comida', 'pm-espera', 'Passou o valor sem a taxa de entrega. Faltou cobrar a taxa.'],
+    COBROU_A_MAIS: ['⚠️ Cobrou a mais', 'pm-espera', 'Passou o total na maquininha, mas parte já estava paga pelo app (voucher).'],
+    PIX_SEM_RASTRO: ['❓ Pix sem rastro', 'pm-espera', 'O Saipos diz Pix, mas esse valor não está no extrato (dia ou dia seguinte).'],
+    OUTRO_METODO: ['💳 Pago de outro jeito', 'pm-ok', 'O dinheiro entrou, mas por um meio diferente do que o Saipos anotou.'],
+    COBRADO: ['✅ Cobrado', 'pm-ok', 'A Rede tem esta cobrança, no valor certo, perto da hora da entrega.'],
+    PIX_ACHADO: ['✅ Pix no extrato', 'pm-ok', 'O Pix entrou no extrato com o valor exato.'],
+    DINHEIRO: ['💵 Dinheiro', 'pm-fraco', 'Dinheiro se confere pelo cofre do dia, não por pedido.'],
+    AGUARDANDO_REDE: ['⏳ Rede ainda não chegou', 'pm-fraco', 'A Rede entrega as vendas do dia no dia seguinte, às 9h.'],
+    RESOLVIDO_PIX: ['💠 Pix (conferido)', 'pm-ok', 'Marcado à mão: o cliente pagou por Pix e alguém conferiu.']
+  };
+  const MAQ_ORDEM = ['NAO_COBROU', 'SEM_COBRANCA_LONGE', 'SEM_COBRANCA_SEM_GPS', 'SO_A_COMIDA', 'COBROU_A_MAIS', 'PIX_SEM_RASTRO', 'OUTRO_METODO', 'COBRADO', 'PIX_ACHADO', 'DINHEIRO', 'AGUARDANDO_REDE', 'RESOLVIDO_PIX'];
+  function abaMaquininhaGps() {
+    const M = ABAS.maq, ls = porLoja(M.linhas.map((x) => Object.assign({ loja: x.unidade }, x)));
+    const sit = (k) => MAQ_SIT[k] || [k, 'pm-fraco', ''];
+    let h = '<div class="pm-aviso info">Cada venda paga na porta, cruzada com o <b>Saipos</b>, a <b>Rede</b>, o <b>extrato</b> (Pix) e o <b>GPS</b> do motoboy na casa do cliente (raio de 150 m). Conferência copiada em ' + esc(M.copiado_em || '—') + '.</div>';
+    if (!ls.length) { $('painelObra').innerHTML = h + '<div class="pm-vazio">Nenhuma entrega paga na porta neste dia' + (LOJA !== 'todas' ? ' nesta loja' : '') + '. Tudo veio pago pelo app.</div>'; return; }
+    const cont = {}; ls.forEach((x) => { cont[x.situacao] = (cont[x.situacao] || 0) + 1; });
+    h += '<div class="pm-caixa pm-resumo"><span><b>' + ls.length + '</b> entrega(s) paga(s) na porta</span>' + MAQ_ORDEM.filter((k) => cont[k]).map((k) => '<span class="' + sit(k)[1] + '" title="' + esc(sit(k)[2]) + '">' + sit(k)[0] + ' · ' + cont[k] + '</span>').join('') + '</div>';
+    const pri = ls.slice().sort((a, b) => MAQ_ORDEM.indexOf(a.situacao) - MAQ_ORDEM.indexOf(b.situacao));
+    h += '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th style="text-align:left">Pedido</th><th>Loja</th><th>Motoboy</th><th>Entregue</th><th>Forma</th><th>Na porta</th><th>Rede / Pix</th><th>GPS</th><th>Situação</th></tr></thead><tbody>';
+    pri.forEach((l) => {
+      const r = l.rede, g = l.gps, p = l.pix, x = sit(l.situacao);
+      let rede = '—';
+      if (r) rede = '<b>' + esc(r.hora) + '</b> ' + brl(r.valor) + (r.dif_min > 15 ? ' <span class="pm-fraco">(' + esc(r.dif_min) + ' min da entrega)</span>' : '');
+      else if (p) rede = 'Pix ' + esc(p.data || '');
+      let gps;
+      if (g && g.dist_m != null) gps = (g.dist_m <= g.raio ? '<span class="pm-ok">no endereço</span>' : '<span class="pm-ruim">longe</span>') + ' · ' + esc(g.dist_m) + ' m às ' + esc(g.hora);
+      else if (g && g.sem_endereco) gps = '<span class="pm-fraco">sem endereço do cliente</span>';
+      else gps = '<span class="pm-fraco">sem leitura</span>';
+      if (l.chegou_cliente) gps += '<small class="pm-sub" title="Hora em que o motoboy apertou Cheguei no cliente no app do TrackEat. Não é prova de GPS.">app: chegou ' + esc(l.chegou_cliente) + '</small>';
+      h += '<tr><td data-rot="Pedido"><b>#' + esc(l.pedido) + '</b>' + (l.bairro ? '<small class="pm-sub">' + esc(l.bairro) + (l.origem ? ' · ' + esc(l.origem) : '') + '</small>' : '') + '</td>' +
+        '<td data-rot="Loja">' + esc(l.unidade) + '</td><td data-rot="Motoboy">' + esc(l.motoboy || '—') + '</td>' +
+        '<td data-rot="Entregue">' + esc(l.entregue_em || '—') + '<small class="pm-sub">pedido ' + esc(l.pedido_em || '') + '</small></td>' +
+        '<td data-rot="Forma">' + esc(l.forma || '—') + (l.promessa ? ' <small class="pm-fraco" title="anotada no mesmo minuto do pedido: é o que o cliente prometeu">(prometida)</small>' : '') + '</td>' +
+        '<td data-rot="Na porta"><b>' + brl(l.na_porta) + '</b>' + (Number(l.taxa) > 0 ? '<small class="pm-sub">taxa ' + brl(l.taxa) + '</small>' : '') + '</td>' +
+        '<td data-rot="Rede / Pix">' + rede + '</td><td data-rot="GPS">' + gps + '</td>' +
+        '<td data-rot="Situação" title="' + esc(x[2]) + '"><span class="' + x[1] + '">' + x[0] + '</span></td></tr>';
+    });
+    h += '</tbody></table></div><p class="pm-nota">Passe o mouse na situação para ver o que ela quer dizer. "Não cobrou" e "Sem cobrança" são aviso para conferir com o motoboy e o comprovante, não desconto automático.</p>';
+    $('painelObra').innerHTML = h;
+  }
+
   function abaMaquininha() {
+    if (ABAS.maq && Array.isArray(ABAS.maq.linhas) && ABAS.maq.copiado_em) { abaMaquininhaGps(); return; }
     const ls = porLoja(ABAS.maquininha);
     let h = '<div class="pm-aviso info">Cada venda paga com cartão ou vale na porta, procurada na Rede pelo mesmo valor até 45 min da entrega (vale: até 7 dias). A Rede chega no dia seguinte: hoje ela está carregada até <b>' + esc(dm(ABAS.rede_ate)) + '</b>.</div>';
     if (!ls.length) { $('painelObra').innerHTML = h + '<div class="pm-vazio">Nenhuma venda de cartão na porta neste dia' + (LOJA !== 'todas' ? ' nesta loja' : '') + '.</div>'; return; }
@@ -561,7 +610,7 @@ function exigirLogin(recado) {
       h += '<tr><td data-rot="Motoboy">' + esc(x.motoboy || '—') + '</td><td data-rot="Loja">' + esc(x.loja) + '</td><td data-rot="Hora">' + esc(x.hora || '—') + '</td><td data-rot="Forma">' + esc(x.tipo || x.grupo) +
         '</td><td data-rot="Valor">' + brl(x.valor) + '</td><td data-rot="Rede">' + st + '</td></tr>';
     });
-    h += '</tbody></table></div><p class="pm-nota">"Não achada" é aviso para conferir com o motoboy e com o comprovante, não é desconto automático. A conferência pelo GPS da casa do cliente segue no portal antigo.</p>';
+    h += '</tbody></table></div><p class="pm-nota">"Não achada" é aviso para conferir com o motoboy e com o comprovante, não é desconto automático.</p>';
     $('painelObra').innerHTML = h;
   }
 
