@@ -562,9 +562,10 @@ function exigirLogin(recado) {
     PIX_ACHADO: ['✅ Pix no extrato', 'pm-ok', 'O Pix entrou no extrato com o valor exato.'],
     DINHEIRO: ['💵 Dinheiro', 'pm-fraco', 'Dinheiro se confere pelo cofre do dia, não por pedido.'],
     AGUARDANDO_REDE: ['⏳ Rede ainda não chegou', 'pm-fraco', 'A Rede entrega as vendas do dia no dia seguinte, às 9h.'],
-    RESOLVIDO_PIX: ['💠 Pix (conferido)', 'pm-ok', 'Marcado à mão: o cliente pagou por Pix e alguém conferiu.']
+    RESOLVIDO_PIX: ['💠 Pix (conferido)', 'pm-ok', 'Marcado à mão: o cliente pagou por Pix e alguém conferiu.'],
+    RESOLVIDO: ['✔ Resolvido', 'pm-ok', 'Marcado à mão como resolvido na conferência da maquininha.']
   };
-  const MAQ_ORDEM = ['NAO_COBROU', 'SEM_COBRANCA_LONGE', 'SEM_COBRANCA_SEM_GPS', 'SO_A_COMIDA', 'COBROU_A_MAIS', 'PIX_SEM_RASTRO', 'OUTRO_METODO', 'COBRADO', 'PIX_ACHADO', 'DINHEIRO', 'AGUARDANDO_REDE', 'RESOLVIDO_PIX'];
+  const MAQ_ORDEM = ['NAO_COBROU', 'SEM_COBRANCA_LONGE', 'SEM_COBRANCA_SEM_GPS', 'SO_A_COMIDA', 'COBROU_A_MAIS', 'PIX_SEM_RASTRO', 'OUTRO_METODO', 'COBRADO', 'PIX_ACHADO', 'DINHEIRO', 'AGUARDANDO_REDE', 'RESOLVIDO_PIX', 'RESOLVIDO'];
   function abaMaquininhaGps() {
     const M = ABAS.maq, ls = porLoja(M.linhas.map((x) => Object.assign({ loja: x.unidade }, x)));
     const sit = (k) => MAQ_SIT[k] || [k, 'pm-fraco', ''];
