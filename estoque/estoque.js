@@ -1920,7 +1920,7 @@ async function entrarProdHist() {
   }
 }
 async function histCarregar() {
-  await estNomesCarregar();
+  await Promise.all([estNomesCarregar(), prdCozinhaCarregar()]);
   await Promise.all([
     estHistCarregar('plano', 'vw_est_historico_plano', PLP.unidade, 'data_para.desc'),
     estHistCarregar('sep', 'vw_est_historico_separacao', PLP.unidade, 'criado_em.desc'),
@@ -1941,7 +1941,7 @@ function histRender() {
         placeholder="procurar receita, lista, ordem, pessoa ou data (dd/mm)" style="flex:1; min-width:200px; background:var(--surface-2); border:1px solid var(--line); color:var(--tx-1); border-radius:6px; padding:7px 10px; font-size:13px;">
         ${EST_HIST_BUSCA ? `<button class="preset-btn" onclick="EST_HIST_BUSCA=''; histRender();">✕ limpar</button>` : ''}</div>
     <div class="caption-label" style="text-align:left;">Clique no título para abrir; na linha, o detalhe.</div>`;
-  ['plano', 'sep', 'ordem', 'apont', 'grade'].forEach((ch) => { h += estHistHtml(...EST_HIST_DEF[ch]); });
+  ['plano', 'sep', 'ordem', 'apont', 'grade'].filter((ch) => ch !== 'apont' || !PRD_COZ || PRD_COZ.hist).forEach((ch) => { h += estHistHtml(...EST_HIST_DEF[ch]); });
   alvo.innerHTML = h;
   if (foco) { const i = document.getElementById('histBusca'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 }
@@ -3515,6 +3515,23 @@ function posRender() {
 
 function prdAlvo() { return document.getElementById(EST_TELA === 'ordens' ? 'view-ordens' : 'view-producao'); }
 async function entrarApontar() { EST_TELA = 'producao'; return entrarProducao(); }
+// 26/11/2026 [dono] (Rita pelo dono, 16:04; Estoque, proposta 2026-11-26-apontar-por-cozinha): cada login vê só as ordens e
+// receitas da sua cozinha (est_minha_cozinha: LANCHES, PRATOS, PRODUCAO; null = vê tudo, como antes) e o Histórico dos
+// apontamentos some para quem não deve ver (est_vejo_historico_apontamento). O filtro é só na tela; a gravação segue igual.
+let PRD_COZ = null;
+async function prdCozinhaCarregar() {
+  if (PRD_COZ) return PRD_COZ;
+  try {
+    const [rc, rh] = await Promise.all([trRpc('est_minha_cozinha'), trRpc('est_vejo_historico_apontamento')]);
+    const coz = rc.ok ? await rc.json() : null, hist = rh.ok ? await rh.json() : true;
+    let rec = null;
+    if (coz) rec = new Set((await consultarTudo('vw_est_receita_cozinha?select=nome_base&cozinha=eq.' + encodeURIComponent(coz)).catch(() => [])).map((x) => x.nome_base));
+    PRD_COZ = { coz: coz || null, hist: hist !== false, rec };
+  } catch (e) { PRD_COZ = { coz: null, hist: true, rec: null }; }
+  return PRD_COZ;
+}
+const prdCozNome = (c) => ({ LANCHES: 'Lanches', PRATOS: 'Pratos', PRODUCAO: 'Produção' }[c] || c);
+const prdCozLinha = () => PRD_COZ && PRD_COZ.coz ? `<div class="caption-label" style="text-align:left;margin-bottom:6px;">Cozinha: <b>${trEscH(prdCozNome(PRD_COZ.coz))}</b> — aparecem só as ordens e receitas desta cozinha</div>` : '';
 async function entrarProducao() {
   if (EST_TELA !== 'ordens') EST_TELA = 'producao';
   const alvo = prdAlvo();
@@ -3572,6 +3589,8 @@ async function prdCarregar() {
     .map((r) => { const m = moveDe && moveDe.get(r.nome_base); return { ...r, grupo: grupoDe.get(r.nome_base), move: m ? m.move : null, move_motivo: m ? m.motivo : null }; });
   // 12/11/2026 (Estoque, proposta 2026-11-12-apontar-feito-na-hora): a venda já baixa a matéria-prima dessas receitas.
   // Apontar vale para o plano e o rendimento, sem mexer no saldo: etiqueta, sem alerta. Quem decide é a view (por loja).
+  await prdCozinhaCarregar();
+  if (PRD_COZ.rec) PRD.receitas = PRD.receitas.filter((r) => PRD_COZ.rec.has(r.nome_base));
   PRD.naHora = new Set((Array.isArray(naHora) ? naHora : []).map((x) => x.nome_base));
   PRD.perdas = perdas;
   PRD.itensEst = itensEst;
@@ -3582,7 +3601,7 @@ async function prdCarregar() {
 
 function prdOrdensTela() {
   const alvo = prdAlvo();
-  let h = `<h2>Ordens de produção</h2>` + estFilaHtml() + estPassoHtml('ordem');
+  let h = `<h2>Ordens de produção</h2>` + prdCozLinha() + estFilaHtml() + estPassoHtml('ordem');
   h += prdOrdensHtml();
   alvo.innerHTML = h;
 }
@@ -3601,7 +3620,7 @@ function prdRender() {
 
   // 12/11/2026 (auditoria 07/11): saem a legenda do topo e o card "Receitas da casa" (inventário, não ação; a contagem
   // continua no botão "todas N" da grade)
-  let h = `<h2>Apontar produção</h2>` + estFilaHtml();
+  let h = `<h2>Apontar produção</h2>` + prdCozLinha() + estFilaHtml();
 
   h += `<div class="cards">
       <div class="card ${PRD.lancamentos.length ? 'pos' : 'neutral'}"><div class="card-lbl">Apontado no dia</div>
@@ -3812,6 +3831,9 @@ async function prdOrdensCarregar() {
       nomesRec.length ? consultarTudo(`vw_est_processo_receita?select=nome_base,dias&nome_base=in.(${encodeURIComponent(nomesRec.map((n) => '"' + String(n).replace(/"/g, '\\"') + '"').join(','))})`).catch(() => null) : [],
       estNomesCarregar(),
     ]) : [[], [], [], []];
+    await prdCozinhaCarregar();
+    if (PRD_COZ.rec) { const comCoz = new Set(itens.filter((i) => PRD_COZ.rec.has(i.nome_base)).map((i) => i.id_ordem));
+      for (let j = rel.length - 1; j >= 0; j--) if (!comCoz.has(rel[j].id)) rel.splice(j, 1); }
     PRD.ordens = { rel, itens, contas: new Map(contas.map((c) => [c.id, c])), fam: new Map(fam.map((f) => [f.id, f])), sep: (PRD.ordens && PRD.ordens.sep) || {},
       etapas, etPadrao, etTempo, procs: procs == null ? null : new Map(procs.map((p) => [p.nome_base, p.dias || []])) };
   } catch (e) { PRD.ordens = { erro: e.message, rel: [], itens: [], contas: new Map(), sep: {} }; }
