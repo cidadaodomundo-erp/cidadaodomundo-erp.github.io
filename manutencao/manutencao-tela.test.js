@@ -31,11 +31,12 @@ function montar(o = {}) {
   }
   const ids = {};
   ['bloqueio', 'statusGeral', 'app', 'abaChamados', 'abaPrestadores', 'btnAtualizar', 'btnQuemConserta', 'painelChamados', 'painelPrestadores',
-    'buscaTexto', 'filtroSetor', 'fontePrest', 'statusPrest', 'listaPrest', 'campoLoja', 'lojaInfo'].forEach((id) => { ids[id] = new E('div', id); });
+    'buscaTexto', 'filtroSetor', 'fontePrest', 'statusPrest', 'listaPrest', 'campoLoja', 'lojaInfo',
+    'campoLocal', 'campoProblema', 'campoPrioridade', 'btnAbrir', 'btnAtualizarPed', 'statusEnvio', 'statusPed', 'listaPed'].forEach((id) => { ids[id] = new E('div', id); });
   const est = {
     email: o.email === undefined ? 'a@exemplo.test' : o.email, loja: o.loja === undefined ? 'AHU' : o.loja,
     info: o.info === undefined ? INFO : o.info, hidden: !!o.hidden, urls: [], removidos: [], lojaChamadas: 0, cb: null, reloads: 0,
-    handler: o.handler || (() => resp(200, [])), deferLojas: o.deferLojas || null
+    handler: o.handler || (() => resp(200, [])), rpcs: [], rpc: o.rpc || (() => resp(200, { pedidos: [] })), deferLojas: o.deferLojas || null
   };
   const win = { addEventListener(n, f) { (evW[n] = evW[n] || []).push(f); }, frameElement: null };
   win.parent = win;
@@ -50,7 +51,9 @@ function montar(o = {}) {
     NA_CASCA: !!o.casca, avisarCasca: (m) => { if (o.casca) messages.push(m); },
     localStorage: { removeItem(k) { est.removidos.push(k); est.email = null; } },
     rmbSessao: () => (est.email ? { email: est.email, access_token: 'TOKEN-NUNCA-NO-DOM' } : null),
-    trFetch: async (url, opts) => { est.urls.push({ url, metodo: opts && opts.method }); return est.handler(url, est.urls.length); },
+    trFetch: async (url, opts) => {
+      if (String(url).indexOf('rpc/') === 0) { const c = { fn: url.slice(4), args: JSON.parse((opts && opts.body) || '{}') }; est.rpcs.push(c); return est.rpc(c, est.rpcs.length); }
+      est.urls.push({ url, metodo: opts && opts.method }); return est.handler(url, est.urls.length); },
     lojaCarregar: async () => { est.lojaChamadas++; if (est.deferLojas) await est.deferLojas; return est.info; },
     lojaAtual: () => est.loja,
     lojaNome: (l) => ({ 'AGUA VERDE': 'Água Verde', 'AHU': 'Ahú', 'SÃO BRAZ': 'São Braz' }[l] || l),
@@ -77,7 +80,8 @@ test('aba Chamados (padrão): nenhuma consulta ao diretório; mostra a loja esco
   assert.equal(t.est.urls.length, 0);
   assert.equal(t.ids.painelChamados.hidden, false); assert.equal(t.ids.painelPrestadores.hidden, true);
   assert.match(t.texto('campoLoja'), /Ahú/);
-  assert.match(t.texto('lojaInfo'), /nenhum chamado é gravado/);
+  assert.match(t.texto('lojaInfo'), /Loja escolhida no seletor do topo: Ahú/);
+  assert.deepEqual(t.est.rpcs.map((c) => [c.fn, c.args.p_loja]), [['erp_manutencao_pedidos_ler', 'AHU']]);
   t.est.loja = 'SÃO BRAZ'; t.est.cb('SÃO BRAZ');
   assert.match(t.texto('campoLoja'), /São Braz/);
   assert.equal(t.est.urls.length, 0);
@@ -314,4 +318,61 @@ test('lista que atingiu o teto avisa que é parcial', async () => {
   t.start(); await settle();
   assert.equal(t.est.urls.length, 10);
   assert.match(t.texto('statusPrest'), /Lista parcial/); assert.match(t.texto('listaPrest'), /2000 prestador/);
+});
+
+// ---------------------------------------------------------------- pedidos de manutenção (24/11/2026)
+const ped = (id, extra = {}) => ({ id, loja: 'AHU', equipamento: 'Chapa', problema: 'Não esquenta', prioridade: 'media', situacao: 'aberto', aberto_em: '2026-11-24T15:00:00Z', aberto_por: 'gerente@x.test', ...extra });
+
+test('pedidos: lista abertos e resolvidos separados, com botões de situação', async () => {
+  const t = montar({ rpc: () => resp(200, { pedidos: [ped(1, { prioridade: 'urgente' }), ped(2, { situacao: 'em_andamento' }), ped(3, { situacao: 'resolvido', resolvido_em: '2026-11-24T16:00:00Z' })] }) });
+  t.start(); await settle();
+  const txt = t.texto('listaPed');
+  assert.match(txt, /Para arrumar \(2\)/);
+  assert.match(txt, /Resolvidos ou cancelados nos últimos 30 dias \(1\)/);
+  const cards = t.ids.listaPed.children.filter((c) => c.tagName === 'ARTICLE');
+  assert.equal(cards.length, 3);
+  const botoes = (c) => c.children.find((x) => x.className === 'mn-acoes').children.map((b) => b.textContent);
+  assert.deepEqual(botoes(cards[0]), ['Já estão vendo', '✔ Arrumado', 'Cancelar']);
+  assert.deepEqual(botoes(cards[1]), ['✔ Arrumado', 'Cancelar']);
+  assert.deepEqual(botoes(cards[2]), ['Reabrir']);
+});
+
+test('pedidos: abrir exige campos; envia loja do topo e relê; marcar arrumado chama a função de situação', async () => {
+  let n = 0;
+  const t = montar({ rpc: (c) => c.fn === 'erp_manutencao_pedido_abrir' ? resp(200, 7) : c.fn === 'erp_manutencao_pedido_situacao' ? resp(200, true) : resp(200, { pedidos: n++ ? [ped(7)] : [] }) });
+  t.start(); await settle();
+  t.ids.btnAbrir.click(); await settle();
+  assert.match(t.texto('statusEnvio'), /Preencha/);
+  assert.equal(t.est.rpcs.filter((c) => c.fn === 'erp_manutencao_pedido_abrir').length, 0);
+  t.ids.campoLocal.value = 'Chapa'; t.ids.campoProblema.value = 'Não esquenta'; t.ids.campoPrioridade.value = 'alta';
+  t.ids.btnAbrir.click(); await settle();
+  const ab = t.est.rpcs.find((c) => c.fn === 'erp_manutencao_pedido_abrir');
+  assert.deepEqual(ab.args, { p_loja: 'AHU', p_equipamento: 'Chapa', p_problema: 'Não esquenta', p_prioridade: 'alta' });
+  assert.match(t.texto('statusEnvio'), /Pedido nº 7 aberto para Ahú/);
+  assert.equal(t.ids.campoLocal.value, '');
+  const card = t.ids.listaPed.children.find((c) => c.tagName === 'ARTICLE');
+  card.children.find((x) => x.className === 'mn-acoes').children.find((b) => /Arrumado/.test(b.textContent)).click(); await settle();
+  assert.deepEqual(t.est.rpcs.find((c) => c.fn === 'erp_manutencao_pedido_situacao').args, { p_id: 7, p_situacao: 'resolvido' });
+});
+
+test('pedidos: topo em Rede pede para escolher a loja; erro do banco aparece sem fingir sucesso', async () => {
+  const t = montar({ loja: 'REDE', rpc: (c) => c.fn === 'erp_manutencao_pedido_abrir' ? resp(400, { message: 'escolha uma loja sua' }) : resp(200, { pedidos: [] }) });
+  t.start(); await settle();
+  assert.match(t.texto('campoLoja'), /Escolha a loja/);
+  assert.equal(t.ids.campoLoja.disabled, false);
+  t.ids.campoLocal.value = 'Pia'; t.ids.campoProblema.value = 'Vazando';
+  t.ids.btnAbrir.click(); await settle();
+  assert.match(t.texto('statusEnvio'), /Escolha a loja/);
+  t.ids.campoLoja.value = 'AHU'; t.ids.btnAbrir.click(); await settle();
+  assert.match(t.texto('statusEnvio'), /Não foi possível abrir o pedido: escolha uma loja sua/);
+});
+
+test('pedidos: falha de leitura não vira "nenhum pedido"; sem acesso avisa', async () => {
+  const t = montar({ rpc: () => resp(500, { message: 'x' }) });
+  t.start(); await settle();
+  assert.match(t.texto('statusPed'), /Não foi possível ler os pedidos/);
+  assert.doesNotMatch(t.texto('listaPed'), /Nenhum pedido aberto/);
+  const u = montar({ rpc: () => resp(403, { message: 'sem acesso a esta tela' }) });
+  u.start(); await settle();
+  assert.match(u.texto('statusPed'), /não tem acesso/);
 });

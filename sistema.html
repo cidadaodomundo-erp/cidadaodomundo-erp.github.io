@@ -8,6 +8,12 @@
 <title>Painel · Cidadão do Mundo</title>
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
+<!-- 22/11/2026 (Fábio, app da Lanna no celular): ícone e tela cheia também no iPhone ao "Adicionar à tela inicial" -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cidadão">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
 <!--
@@ -269,10 +275,10 @@
 </div>
 
 <script src="casca/menu.js?v=20261122q"></script>
-<script src="casca/paginas.js?v=20261122r"></script>
-<script src="casca/modulos.js?v=20261122s"></script>
+<script src="casca/paginas.js?v=20261124a"></script>
+<script src="casca/modulos.js?v=20261126a"></script>
 <script src="casca/setores-fabio.js?v=20261122q"></script>
-<script src="casca/busca.js?v=20261119est"></script>
+<script src="casca/busca.js?v=20261124a"></script>
 <script src="casca/modulos-proposta.js?v=20261107f"></script>
 <script src="nucleo/loja.js?v=20261028a"></script>
 <script>
@@ -1050,6 +1056,13 @@ async function montar() {
 })();
 </script>
 <script src="nucleo/ajuda.js?v=20261117rt"></script>
+<script>
+// 22/11/2026 (Fábio, app da Lanna no celular): a casca também liga o sw.js (rede primeiro), para o portal
+// instalar como aplicativo na tela inicial do celular. As telas já faziam isso; faltava a casca.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
 </body>
 </html>
 

@@ -51,7 +51,10 @@ async function entrarNotas() {
   // Só o que falta de verdade: troca da Ambev e "não pagar" (decisão do dono) já saem na função.
   // login fora da exceção recebe vazio: dizer isso, nunca "✓ tudo certo"
   try { const r = await trRpcSeguro('notas_faltam_pode_ler', {}); NF.semAcesso = r.ok ? ((await r.json()) === false) : false; } catch (e) { NF.semAcesso = false; }
-  if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não lê estas notas.</b> A lista é de Compras (Rita). Peça ao Neto para liberar.</div>'; return; }
+  // 25/11/2026 [regra] (Estoque; âncora do selo de Compras; proposta 2026-11-25-notas-recebidas-sem-lancamento.md): a 3ª lista,
+  // "Chegou e não foi lançada" — vw_compra_nf_sem_lancamento (a filial vê a própria loja; não lê o financeiro, a Rita vê)
+  NF.semLanc = await consultarTudo('vw_compra_nf_sem_lancamento?select=chave,unidade,numero,data_emissao,dias,fornecedor,total,recebimento&order=dias.desc').catch(() => null);
+  if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2>' + nfSemLancHtml() + '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);margin-top:14px;"><b style="color:var(--farol-perto);">As listas de conta a pagar não abrem para este login.</b> São de Compras (Rita). Peça ao Neto para liberar.</div>'; return; }
   try {
     const [ra, rb] = await Promise.all([trRpcSeguro('notas_sem_conta_tela', {}), trRpcSeguro('notas_sem_entrada_tela', {})]);
     if (!ra.ok || !rb.ok) { const j = await (ra.ok ? rb : ra).json().catch(() => ({})); throw new Error(j.message || 'erro do banco'); }
@@ -85,9 +88,35 @@ function nfDesenhar() {
       <td class="nf-falta">entrada da nota no estoque</td><td>Compras (Rita): dar entrada da nota no estoque</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Nenhuma nota paga sem entrada nos últimos 60 dias.</b></div>';
   if (E.length > recentes.length) h += `<div style="margin-top:8px;"><button type="button" class="preset-btn" onclick="NF.todas=!NF.todas;nfDesenhar()">${NF.todas ? 'ver só os últimos 60 dias' : `ver também as ${E.length - recentes.length} mais antigas`}</button></div>`;
+  // 3) chegou e não foi lançada
+  h += nfSemLancHtml();
   h += '<div class="caption-label" style="text-align:left;margin-top:10px;">O robô confere estas listas sozinho: quando a nota tem a conta ou a entrada, ela sai daqui e a atividade da agenda fecha.</div>';
   alvo.innerHTML = h;
   if (typeof barrasTopoTabelas === 'function') try { barrasTopoTabelas(); } catch (e) {}
+}
+
+function nfSemLancHtml() {
+  const L = NF.semLanc;
+  let h = `<div class="section-label" style="text-align:left;margin-top:18px;">Chegou e não foi lançada${Array.isArray(L) && L.length ? ` · ${L.length} ${L.length === 1 ? 'nota' : 'notas'} · ${nfR(L.reduce((s, x) => s + Number(x.total || 0), 0))}` : ''}</div>
+    <div class="caption-label" style="text-align:left;">Nota que chegou há 7 dias ou mais e não entrou no estoque. Se é de estoque, lance; se não é, responda aqui.</div>`;
+  if (!Array.isArray(L)) return h + '<div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler esta lista. <button type="button" class="preset-btn" onclick="entrarNotas()">Tentar de novo</button></div>';
+  if (!L.length) return h + '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Toda nota que chegou há 7 dias ou mais foi lançada ou respondida.</b></div>';
+  return h + `<div id="tabelaNfSemLancamento" style="overflow-x:auto;"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Loja</th><th>Valor</th><th>Chegou</th><th>Não é de estoque?</th></tr></thead><tbody>
+    ${L.map((x) => { const k = nfE(JSON.stringify(x.chave)); return `<tr><td>NF ${nfE(x.numero)}<div style="font-size:11px;color:var(--tx-4);">emitida ${nfD(x.data_emissao)}</div></td>
+      <td style="white-space:normal;">${nfE(nfNome(x.fornecedor))}</td><td>${nfE(nfLoja(x.unidade))}</td><td>${nfR(x.total)}</td>
+      <td>${x.recebimento ? nfD(x.recebimento) + '<div style="font-size:11px;color:var(--tx-4);">' : '<div style="font-size:11px;color:var(--tx-4);">'}há ${Number(x.dias || 0)} dias</div></td>
+      <td style="white-space:nowrap;"><button type="button" class="preset-btn" onclick='nfResponder(${k}, "NAO_E_ESTOQUE", this)'>Não é de estoque</button>
+        <button type="button" class="preset-btn" onclick='nfResponder(${k}, "ANTIGA", this)'>Antiga, o Saipos não aceita mais</button></td></tr>`; }).join('')}</tbody></table></div>`;
+}
+async function nfResponder(chave, resp, bt) {
+  const txt = bt.textContent; bt.disabled = true; bt.textContent = 'gravando…';
+  avisoAcao('enviando', 'Gravando a resposta…');
+  const r = await trRpcSeguro('compra_nf_sem_lancamento_responder', { p_chave: chave, p_resposta: resp });
+  if (!r.ok) { bt.disabled = false; bt.textContent = txt; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => nfResponder(chave, resp, bt)); }
+  const g = await r.json().catch(() => '');
+  NF.semLanc = (NF.semLanc || []).filter((x) => x.chave !== chave);
+  avisoAcao('ok', `✓ Respondido${g ? ': ' + nfE(String(g)) : ''} — às ${avisoHora()}. A nota saiu da lista.`);
+  if (NF.semAcesso) entrarNotas(); else nfDesenhar();
 }
 
 const TELA = 'notasfaltam';

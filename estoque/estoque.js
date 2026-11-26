@@ -105,7 +105,7 @@ async function ctgCarregar() {
   // 13/11/2026 (dono 01:48, "regra simples"; Estoque): onde contar cada item (vale para folha a partir de 19/11) e o aviso
   // de ordem/separação aberta antes de abrir a folha. Leitura que nunca derruba a tela.
   const [ondeC, ordAb] = await Promise.all([
-    consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde,em_producao_numero&unidade=eq.${u}&order=nome_base`).catch(() => []),
+    consultarTudo(`vw_est_contagem_onde_contar?select=nome_base,onde_contar,dica,vale_para_contagem_desde,em_producao_numero,qtd_em_producao,un_em_producao&unidade=eq.${u}&order=nome_base`).catch(() => []),
     consultarTudo(`vw_est_contagem_ordem_aberta?select=tipo,numero,data_para,situacao,texto&unidade=eq.${u}&order=data_para,numero`).catch(() => [])]);
   if (ondeC) { CTG.ondeContar = new Map(ondeC.map((x) => [x.nome_base, x])); CTG.ondeContarDe = CTG.unidade; }
   // 13/11/2026 (dono #439): CONTAGEM CURTA — a loja com lista em est_contagem_curta_item conta SÓ ela na folha CURVA_A
@@ -119,6 +119,11 @@ async function ctgCarregar() {
   CTG.curtaOnde = new Map((curtaV || []).map((x) => [x.nome_base, x]));
   CTG.calendario = cal || [];
   CTG.ordemAberta = ordAb || [];
+  // 25/11/2026 [migracao] (dono: selo por módulo, margem ±3%; livro chat-frente-organizador/respostas/selo-por-modulo-e-margem-3)
+  const [seloR, seloI] = await Promise.all([
+    consultarTudo(`vw_est_selo_resumo?select=unidade,data_partida,data_contagem,itens,confiaveis,texto,selo_modulo,valor_fora_da_margem&unidade=eq.${u}`).catch(() => []),
+    consultarTudo(`vw_est_selo_item?select=nome_saipos,un,esperado,contado,diferenca,dif_pct,valor_dif,selo,motivo,conserto&unidade=eq.${u}`).catch(() => [])]);
+  CTG.selo = (seloR || [])[0] || null; CTG.seloItens = seloI || [];
   CTG.foraBase = CTG.folha ? await consultarTudo(`vw_est_contagem_fora_da_base?select=nome_saipos,nome_base,problema,quem,o_que_fazer&id_inventario=eq.${CTG.folha.id}`).catch(() => []) : [];
   CTG.fotos = [];
   CTG.fotoLinhas = [];
@@ -216,6 +221,7 @@ function ctgRender() {
   const dia = new Date(hoje + 'T12:00:00').getDay();   // 3 = quarta
 
   let h = `<h2>Contagem de estoque</h2>`;
+  h += ctgSeloHtml();
   h += ctgNfDepoisHtml();
   // 13/11/2026 (#439): a loja com lista curta conta 14 itens seg e qui; a geral é quinzenal (vw_est_contagem_calendario)
   const curta = !!(CTG.curtaSet && CTG.curtaSet.size), nCurta = CTG.curtaItens || 0;
@@ -223,7 +229,7 @@ function ctgRender() {
 
   // 13/11/2026: ordem ou separação aberta → avisa antes de abrir a folha (não bloqueia)
   if ((CTG.ordemAberta || []).length) h += `<div class="contexto" style="text-align:left; border-color:var(--info);">
-      <b>Em produção agora</b> (os itens dela saem marcados "EM PRODUÇÃO — não contar"; o resto conta normal): ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
+      <b>Em produção agora</b> — os itens dessas ordens <b>se contam</b>: conte o que está no estoque, sem o que já foi separado para a ordem; o separado soma sozinho no fechamento. ${CTG.ordemAberta.map((o) => trEscH(o.texto || `${o.numero} aberta`)).join(' · ')}</div>`;
   h += `<div class="contexto" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <b>${CTG.unidade}</b>
       ${f ? `<span>folha de <b>${f.data.split('-').reverse().join('/')}</b> · ${f.escopo === 'CURVA_A' ? (curta ? 'contagem curta' : 'só os de maior valor') : 'tudo'} · ${aberta ? 'aberta' : 'fechada'}</span>` : '<span>nenhuma folha ainda</span>'}
@@ -641,7 +647,7 @@ function ctgHtmlFotos() {
     linhas.forEach((l) => {
       h += `<tr${l.duvida ? ' style="background:var(--surface-2);"' : ''}>
         <td style="color:var(--tx-5);">${l.linha == null ? '' : l.linha}</td>
-        <td>${ctgNomeHtml(l.nome_saipos)}${ctgOndeTag(CTG.folha, ctgBaseDe(l.nome_saipos))}${l.nota ? `<div class="caption-label" style="color:var(--farol-perto);">${l.nota}</div>` : ''}</td>
+        <td>${ctgNomeHtml(l.nome_saipos)}${ctgOndeTag(CTG.folha, ctgBaseDe(l.nome_saipos))}${ctgDicaProdHtml(ctgBaseDe(l.nome_saipos))}${l.nota ? `<div class="caption-label" style="color:var(--farol-perto);">${l.nota}</div>` : ''}</td>
         <td>${ctgEmProducao(ctgBaseDe(l.nome_saipos)) ? '<span style="color:var(--farol-fora); font-weight:700;">não contar</span>' : `<input type="number" step="0.001" id="fl_${l.id}" value="${l.qtd_lida == null ? '' : l.qtd_lida}"
              style="width:110px; background:var(--surface-2); border:1px solid ${l.duvida ? 'var(--farol-perto)' : 'var(--line)'}; border-radius:8px; color:var(--tx-1); padding:6px 8px;">`}</td>
         ${ctgUnidadeCelulas(l.nome_saipos)}
@@ -705,11 +711,43 @@ function ctgOnde(f, nomeBase) {
   if (/^EM PRODU/i.test(x.onde_contar || '')) return `EM PRODUÇÃO${x.em_producao_numero ? ' (' + x.em_producao_numero + ')' : ''} — não contar`;
   return f && x.vale_para_contagem_desde && String(f.data) >= String(x.vale_para_contagem_desde) ? x.onde_contar : null;
 }
+// 25/11/2026 [migracao]: o selo do módulo — "X de Y itens confiáveis" (±3% entre o esperado e o contado), vermelho primeiro
+function ctgSeloHtml() {
+  const s = CTG.selo; if (!s) return '';
+  const ok = s.selo_modulo === 'CONFIÁVEL' || s.selo_modulo === 'CONFIAVEL';
+  const cor = ok ? 'var(--farol-ok)' : 'var(--farol-fora)';
+  const I = (CTG.seloItens || []).slice().sort((a, b) => (a.selo === b.selo ? 0 : a.selo === 'EM CONSERTO' ? -1 : 1) || Math.abs(Number(b.valor_dif) || 0) - Math.abs(Number(a.valor_dif) || 0));
+  const f3 = (v) => v == null ? '—' : fmt(Number(v));
+  return `<div class="contexto" style="text-align:left; border-color:${cor};">
+    <div style="display:flex; flex-wrap:wrap; gap:8px 14px; align-items:baseline;">
+      <b style="font-size:20px; color:${cor};">${trEscH(s.texto || `${s.confiaveis} de ${s.itens} itens confiáveis`)}</b>
+      <span style="font-weight:800; font-size:12px; color:${cor}; border:1px solid ${cor}; border-radius:6px; padding:0 8px;">${ok ? 'CONFIÁVEL' : 'EM CONSERTO'}</span>
+      <span style="color:var(--tx-4); font-size:12.5px;">contagem de ${ctgDM(s.data_contagem)} contra a de ${ctgDM(s.data_partida)} · margem de 3%</span></div>
+    ${I.length ? `<details style="margin-top:6px;"><summary style="cursor:pointer; font-size:13px;">ver item a item (${I.length})</summary>
+      <div id="tabelaSeloEstoque" style="overflow-x:auto;"><table><thead><tr><th>Item</th><th>Esperado</th><th>Contado</th><th>Diferença</th><th>Selo</th><th>Por quê</th><th>O que falta</th></tr></thead><tbody>
+      ${I.map((x) => { const c = x.selo === 'EM CONSERTO' ? 'var(--farol-fora)' : 'var(--farol-ok)'; const un = x.un ? ' ' + trEscH(String(x.un).toLowerCase()) : '';
+        return `<tr><td>${trEscH(x.nome_saipos)}</td><td style="white-space:nowrap;">${f3(x.esperado)}${un}</td><td style="white-space:nowrap;">${f3(x.contado)}${un}</td>
+          <td style="white-space:nowrap; color:${c};">${f3(x.diferenca)}${un}${x.dif_pct != null ? ` (${fmt(Number(x.dif_pct))}%)` : ''}</td>
+          <td style="color:${c}; font-weight:700; white-space:nowrap;">${x.selo === 'EM CONSERTO' ? 'em conserto' : 'confiável'}</td>
+          <td style="white-space:normal; font-size:12.5px;">${trEscH(x.motivo || '')}</td><td style="white-space:normal; font-size:12.5px;">${trEscH(x.conserto || '')}</td></tr>`; }).join('')}
+      </tbody></table></div></details>` : ''}</div>`;
+}
+const ctgDM = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) : '—';
 function ctgEmProducao(nomeBase) {
   const cu = CTG.folha && CTG.folha.escopo === 'CURVA_A' && CTG.curtaOnde && nomeBase ? CTG.curtaOnde.get(nomeBase) : null;
   if (cu && /^EM PRODU/i.test(cu.onde_contar || '')) return true;
   const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null; return !!(x && /^EM PRODU/i.test(x.onde_contar || '')); }
 function ctgBaseDe(nomeSaipos) { ctgNomeHtml(nomeSaipos); return (CTG._nomeBase && CTG._nomeBase.get(nomeSaipos)) || null; }
+// 23/11/2026 (dono, livro chat-frente-estoque/respostas/contagem-item-em-producao-conta-o-estoque): item com ordem aberta SE
+// CONTA (sem o separado); a dica do banco traz o número da ordem e quanto foi separado
+function ctgDicaProd(nomeBase) {
+  const x = CTG.ondeContar && nomeBase ? CTG.ondeContar.get(nomeBase) : null;
+  return x && x.em_producao_numero && x.dica && !/^EM PRODU/i.test(x.onde_contar || '') ? x.dica : null;
+}
+function ctgDicaProdHtml(nomeBase) {
+  const d = ctgDicaProd(nomeBase);
+  return d ? `<div class="caption-label" style="color:var(--info);">${trEscH(d)}</div>` : '';
+}
 function ctgOndeTag(f, nomeBase) {
   const o = ctgOnde(f, nomeBase);
   if (!o) return '';
@@ -788,7 +826,7 @@ async function ctgImprimir(soEsteGrupo) {
     ${grupos.map((g, iG) => `<div class="grupo${iG ? ' quebra' : ''}"><h2>${g} — ${porGrupo[g].length} itens · linhas ${comeca[g] + 1} a ${comeca[g] + porGrupo[g].length}</h2><table>
       <tr><th class="n">#</th><th>Item</th><th class="un">Un</th><th class="box">Contado</th></tr>
       ${porGrupo[g].map((i, k) => { n = comeca[g] + k + 1; return `<tr><td class="n">${n}</td>
-        <td>${i.nome_base || i.nome_saipos}${ctgOnde(f, i.nome_base) ? ` <span class="so${ctgEmProducao(i.nome_base) ? ' prod' : ''}">${ctgOnde(f, i.nome_base)}</span>` : ''}</td>
+        <td>${i.nome_base || i.nome_saipos}${ctgOnde(f, i.nome_base) ? ` <span class="so${ctgEmProducao(i.nome_base) ? ' prod' : ''}">${ctgOnde(f, i.nome_base)}</span>` : ''}${ctgDicaProd(i.nome_base) ? `<div style="font-size:9.5px;">${trEscH(ctgDicaProd(i.nome_base))}</div>` : ''}</td>
         <td class="un">${(i.un_saipos || '').toLowerCase()}</td><td class="box${ctgEmProducao(i.nome_base) ? ' risc' : ''}">${ctgEmProducao(i.nome_base) ? 'NÃO CONTAR' : ''}</td></tr>`; }).join('')}
     </table></div>`).join('')}
   </body></html>`);
@@ -1010,7 +1048,9 @@ function ctgHtmlConferencia(f) {
     const temNome = Number(x.explicado_reais || 0) !== 0;
     const un = x.un ? ` <span style="color:var(--tx-4); font-size:11px;">${trEscH(x.un)}</span>` : '';
     h += `<tr><td>${ctgNomeHtml(x.nome_saipos)}</td>
-      <td style="white-space:nowrap;">${fmt(Number(x.qtd_contada))}${un}</td>
+      <td style="white-space:nowrap;">${fmt(Number(x.qtd_contada))}${un}${(() => {   // 23/11: o contado já inclui o separado para a ordem
+        const it = x.qtd_em_producao != null ? x : (CTG.itens || []).find((y) => y.nome_saipos === x.nome_saipos) || {};
+        return it.qtd_em_producao != null && Number(it.qtd_em_producao) ? `<div class="caption-label" style="color:var(--info);">inclui ${fmt(Number(it.qtd_em_producao))} separado para a ordem</div>` : ''; })()}</td>
       <td style="white-space:nowrap;">${x.esperado === null ? '—' : fmt(Number(x.esperado)) + un}</td>
       <td style="white-space:nowrap; color:${cor};">${x.diferenca === null ? '—' : fmt(Number(x.diferenca)) + un}</td>
       <td style="white-space:nowrap; color:${cor};">${x.diferenca_reais === null ? '—' : 'R$ ' + fmt(Number(x.diferenca_reais))}</td>
@@ -1192,7 +1232,7 @@ function ctgHtmlBrancos() {
     const nome = JSON.stringify(b.nome).replace(/"/g, '&quot;');
     const e = ctgEscopoDe(b.nome) || (CTG.escopo || []).find((x) => x.nome_saipos === b.nome_saipos_conta) || {};
     h += `<tr><td style="color:var(--tx-5);">${b.linha == null ? '' : b.linha}</td>
-      <td><b>${trEscH(b.nome)}</b>${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}${
+      <td><b>${trEscH(b.nome)}</b>${ctgDicaProdHtml(b.nome)}${b.situacao === 'EM BRANCO NO FIM DA PAGINA' ? '<div class="caption-label">no fim da página</div>' : ''}${
         b.qtd_lida != null ? `<div class="caption-label" style="color:var(--farol-perto);">a foto leu ${fmt(Number(b.qtd_lida))} ${trEscH(b.un || '')} — confira e digite</div>` : ''}</td>
       <td style="color:var(--tx-4);">${trEscH(b.grupo || '')}</td>
       <td style="white-space:nowrap;">${ctgEmProducao(b.nome) ? `${ctgOndeTag(CTG.folha, b.nome)}` : `<input type="number" step="0.001" min="0" inputmode="decimal" placeholder="0 ou o valor"
@@ -1252,7 +1292,7 @@ function ctgHtmlConferir() {
                  onchange="ctgMarcar(${JSON.stringify(j.nome_saipos).replace(/"/g, '&quot;')}, this.checked)"
                  style="width:20px; height:20px;">`}</td>
       <td style="color:var(--tx-5);">${lf.linha || ''}</td>
-      <td>${ctgNomeHtml(j.nome_saipos)}</td>
+      <td>${ctgNomeHtml(j.nome_saipos)}${ctgDicaProdHtml(ctgBaseDe(j.nome_saipos))}</td>
       <td style="color:var(--tx-4); font-size:12px;">${trEscH(lf.grupo || 'fora da folha')}</td>
       <td style="white-space:nowrap;"><input type="number" step="0.001" inputmode="decimal"
            id="ctgr_${id}" value="${j.qtd_contada}"

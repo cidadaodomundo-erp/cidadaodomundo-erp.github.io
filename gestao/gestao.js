@@ -472,7 +472,7 @@ async function entrarConcbanco() {
     // 12/11/2026 (usabilidade 07/11): sairam as 4 consultas sem uso na tela (saldo do dia, maturidade,
     // avisos da rotina e conferencia SALDO NAO FECHA) — a tela abre mais rapido; nada delas era desenhado.
     const [placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer,
-           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura, ofxFalta] = await Promise.all([
+           diaSaldo, duvidas, sresiduo, parcial, robo, cobertura, ofxFalta, notaChat] = await Promise.all([
       consultarTudo('vw_fin_conciliacao_placar?select=*&order=data.desc'),
       consultarTudo('vw_fin_conciliacao_pendencias?select=*&order=dias.desc'),
       consultarTudo('rmb_pessoas?select=pessoa,email&ativo=is.true'),
@@ -486,7 +486,7 @@ async function entrarConcbanco() {
       // A VIEW, nao a tabela crua: ela esconde o residuo que o dono ja validou
       // no chat (marcacao 'saipos|...' com nao_vigiar) — caso Flavio/Viviane de
       // 28/08/2026, que reaparecia como alarme depois de validado.
-      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao&order=data'),
+      consultarTudo('vw_fin_conciliacao_saipos_residuo?select=conta,data,valor,subtipo,descricao,id,chave,id_titulo&order=data'),
       // 07/11/2026 (auditoria lote 1, dinheiro-18): o dia cujo extrato veio parcial (OFX baixado no meio do dia)
       consultarTudo('vw_fin_saldo_partida?select=conta,ultimo_extrato_parcial_dia,hora_extrato').catch(() => []),
       // 12/11/2026 (proposta 09/11, dono: a baixa do que o banco pagou no centavo é do robô): o que o robô está baixando
@@ -496,9 +496,11 @@ async function entrarConcbanco() {
       consultarTudo('vw_fin_conta_cobertura?select=conta,situacao,coberto_ate,esperado_em,nota').catch(() => null),
       // 18/11/2026 (dono 12:28: "hoje novamente a Hellen não mandou os OFX, se confundiu achando que a conciliação estava rodando")
       consultarTudo('vw_fin_ofx_ontem_faltando?select=conta,falta').catch(() => null),
+      // 23/11/2026 (dono pelo Boletim): a nota que um chat deixou na linha aparece junto dela
+      consultarTudo('vw_fin_conciliacao_nota_chat?select=conta,data,valor,nota').catch(() => []),
     ]);
     CONCB = { placar, pend, pessoas, marcadas, naoConf, saldoConf, aFazer, sresiduo,
-              diaSaldo, duvidas, parcial, robo, cobertura, ofxFalta };
+              diaSaldo, duvidas, parcial, robo, cobertura, ofxFalta, notaChat };
   } catch (e) {
     alvo.innerHTML = '<div class="contexto">Não consegui carregar a conciliação: ' + e.message + '</div>';
     return;
@@ -1036,6 +1038,70 @@ async function concbConciliarMarcadas(bt) {
   await entrarConcbanco();
 }
 
+// 23/11/2026 (dono pelo Boletim): linha "lançado no Saipos, sem movimento no banco" que já tem explicação sai da tela —
+// marcação CONCILIADO + nao_vigiar com a chave da view (vw_fin_conciliacao_saipos_residuo.chave), com o porquê escrito
+async function concbJaExplicado(bt) {
+  const d = bt.dataset;
+  const obs = prompt('O que explica "' + d.desc + '" (R$ ' + rs(Math.abs(Number(d.valor))) + ')?\n\nEx.: pago por outra conta, cai no próximo dia, lançamento duplicado já excluído.');
+  if (obs === null) return;
+  if (!obs.trim()) { avisoAcao('atencao', 'Escreva em poucas palavras o que explica a linha.'); return; }
+  const quem = await concbGarantirQuem();
+  if (!quem) return;
+  const s = rmbSessao();
+  const corpo = { conta: d.conta, fitid: d.chave, tipo: 'CONCILIADO', quem, email: (s && s.email) || null,
+    observacao: obs.trim().slice(0, 300), valor_marcado: Number(d.valor), nao_vigiar: true };
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const url = `${SUPABASE_URL}/rest/v1/fin_conciliacao_marcacao`;
+  const ir = () => fetch(url, { method: 'POST', headers: rmbHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(corpo) });
+  let r = await ir();
+  if (await rmbRenovarSeExpirado(r)) r = await ir();
+  bt.disabled = false; bt.textContent = 'já explicado';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + (await r.text()).slice(0, 140), () => concbJaExplicado(bt)); return; }
+  avisoAcao('ok', '✓ Explicado às ' + concbHora() + ' · a linha saiu da tela');
+  CONCB = null;
+  await entrarConcbanco();
+}
+
+// 23/11/2026 (dono pelo Boletim): os outros dois botões da linha do Saipos sem movimento no banco. Gravam por função
+// (fin_conc_pedir_exclusao / fin_conc_trocar_data): excluir vira pedido à Hellen (o robô não exclui, por regra) e trocar
+// data entra na fila do robô do financeiro, que troca no Saipos.
+async function concbRpc(fn, corpo) {
+  const url = `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
+  const ir = () => fetch(url, { method: 'POST', headers: rmbHeaders(), body: JSON.stringify(corpo) });
+  let r = await ir();
+  if (await rmbRenovarSeExpirado(r)) r = await ir();
+  if (r.ok) return { ok: true };
+  const t = await r.text();
+  let msg = t; try { msg = JSON.parse(t).message || t; } catch (e) {}
+  return { ok: false, msg: String(msg).slice(0, 160) };
+}
+const concbDescRes = (d) => '"' + d.desc + '" de ' + d.data.split('-').reverse().join('/') + ' (R$ ' + Math.abs(Number(d.valor)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ')';
+async function concbResExcluir(bt) {
+  const d = bt.dataset;
+  const motivo = prompt('Excluir do Saipos ' + concbDescRes(d) + '?\n\nA Hellen recebe o pedido no aviso dela. Escreva o motivo (ex.: lançado em dobro, não foi pago).');
+  if (motivo === null) return;
+  if (!motivo.trim()) { avisoAcao('atencao', 'Escreva o motivo da exclusão.'); return; }
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const r = await concbRpc('fin_conc_pedir_exclusao', { p_id_residuo: Number(d.id), p_motivo: motivo.trim() });
+  bt.disabled = false; bt.textContent = 'excluir';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + r.msg, () => concbResExcluir(bt)); return; }
+  avisoAcao('ok', '✓ Pedido de exclusão enviado à Hellen às ' + concbHora() + ' · a linha sai quando ela excluir');
+}
+async function concbResTrocarData(bt) {
+  const d = bt.dataset;
+  const txt = prompt('Trocar a data de ' + concbDescRes(d) + ' no Saipos.\n\nQual a data em que aparece no extrato? (dd/mm)');
+  if (txt === null) return;
+  const m = String(txt).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (!m) { avisoAcao('atencao', 'Data no formato dd/mm, ex.: 17/11.'); return; }
+  const ano = m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : d.data.slice(0, 4);
+  const nova = ano + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  bt.disabled = true; bt.textContent = 'gravando...';
+  const r = await concbRpc('fin_conc_trocar_data', { p_id_residuo: Number(d.id), p_data_nova: nova, p_motivo: 'data do extrato' });
+  bt.disabled = false; bt.textContent = 'trocar data';
+  if (!r.ok) { avisoAcao('erro', '✗ Não gravou: ' + r.msg, () => concbResTrocarData(bt)); return; }
+  avisoAcao('ok', '✓ Troca para ' + nova.split('-').reverse().join('/') + ' na fila do robô às ' + concbHora() + ' · a linha sai quando ele trocar no Saipos');
+}
+
 async function concbDesmarcar(conta, fitid) {
   const url = `${SUPABASE_URL}/rest/v1/fin_conciliacao_marcacao`
     + `?conta=eq.${encodeURIComponent(conta)}&fitid=eq.${encodeURIComponent(fitid)}`;
@@ -1409,32 +1475,46 @@ function renderConcbanco() {
   // entradas sao a propria fila (banco tem, Saipos nao); as saidas tem DOIS
   // lados, e o segundo — lancado no Saipos sem debito no banco — nunca aparecia
   // na tela. Aqui os dois fecham no centavo com o numero do cabecalho.
-  const blocoDiferenca = naoFecharam.map(conta => {
-    const c = contas[conta];
-    if (Math.abs(c.difEnt) < CONCB_TOL_CENTAVOS && Math.abs(c.difSai) < CONCB_TOL_CENTAVOS) return '';
+  // 23/11/2026: TODA conta com linha do Saipos sem movimento no banco no dia, não só as que "não fecharam" pela fila —
+  // a ITAU AV de 19/11 tinha a fila zerada (✗ só pelo saldo) e o RECEBIMENTOS ALELO de 925,50 nunca aparecia.
+  const blocoDiferenca = nomes.map(conta => {
     const filaDia = abertas.filter(p => p.conta === conta && dias.includes(p.data));
     const fe = filaDia.filter(p => n(p.valor) > 0).reduce((s, p) => s + n(p.valor), 0);
     const fs = filaDia.filter(p => n(p.valor) < 0).reduce((s, p) => s - n(p.valor), 0);
+    // 23/11/2026 (dono pelo Boletim: "não tem como interagir com eles pelo painel"): as DUAS mãos (saída lançada sem
+    // débito e entrada lançada sem crédito), a nota que um chat deixou na linha e o botão "já explicado", que grava a
+    // marcação nao_vigiar com a chave da própria view (a mesma que o filtro dela usa) — a linha some de vez.
     const sres = (cru.sresiduo || []).filter(r => r.conta === conta && dias.includes(r.data));
-    const srSai = sres.filter(r => n(r.valor) < 0);
-    const srTot = srSai.reduce((s, r) => s - n(r.valor), 0);
-    const linhaSr = srSai.map(r =>
-      '<tr><td style="text-align:left">' + esc(r.descricao || '') + '</td>' +
+    const srSai = sres.slice().sort((a, b) => (n(a.valor) > 0) - (n(b.valor) > 0) || (a.data < b.data ? -1 : 1));
+    const srTot = srSai.reduce((s, r) => s + n(r.valor), 0);
+    const notaDe = (r) => (cru.notaChat || []).filter(x => x.conta === conta
+      && (!x.data || x.data === r.data) && Math.abs(Math.abs(n(x.valor)) - Math.abs(n(r.valor))) < 0.005).map(x => x.nota);
+    const linhaSr = srSai.map(r => {
+      const ent = n(r.valor) > 0, notas = notaDe(r);
+      return '<tr><td style="text-align:left;white-space:nowrap;font-size:12px">' + ddmm(r.data) + '</td>' +
+      '<td style="text-align:left;white-space:normal">' + esc(r.descricao || '') +
+        notas.map(t => '<div class="caption-label" style="color:var(--info);white-space:normal">nota: ' + esc(t) + '</div>').join('') + '</td>' +
       '<td style="text-align:left">' + esc(r.subtipo || '') + '</td>' +
-      '<td style="text-align:left">' + rs(Math.abs(n(r.valor))) + '</td></tr>').join('');
+      '<td style="text-align:left;white-space:nowrap;color:' + (ent ? 'var(--farol-ok)' : 'var(--farol-fora)') + '">' + (ent ? '+ ' : '− ') + rs(Math.abs(n(r.valor))) + '</td>' +
+      '<td style="text-align:left">' + (r.id_titulo ? '<button class="preset-btn concb-res-excluir" style="margin:2px 4px 2px 0" data-id="' + r.id +
+        '" data-valor="' + n(r.valor) + '" data-data="' + esc(r.data) + '" data-desc="' + esc(r.descricao || '') + '">excluir</button>' +
+        '<button class="preset-btn concb-res-data" style="margin:2px 4px 2px 0" data-id="' + r.id +
+        '" data-valor="' + n(r.valor) + '" data-data="' + esc(r.data) + '" data-desc="' + esc(r.descricao || '') + '">trocar data</button>' : '') +
+        (r.chave ? '<button class="preset-btn concb-explica" style="margin:2px 0" data-conta="' + esc(r.conta) + '" data-chave="' + esc(r.chave) +
+        '" data-valor="' + n(r.valor) + '" data-desc="' + esc(r.descricao || '') + '">já explicado</button>' : '') + '</td></tr>'; }).join('');
     // Dono, 03/09/2026: o titulo "A conta da diferenca" e a frase de somas
     // sairam — "podemos manter somente as grades com as diferencas". Fica so a
     // tabela do lado que a fila nao mostra (Saipos sem banco), com o nome da
     // conta no cabecalho; a fila abaixo ja e a grade do outro lado.
     return (srSai.length
         ? '<div id="tabelaConcbSres' + esc(conta).replace(/\W/g, '') + '" style="overflow-x:auto"><table style="width:100%">' +
-          '<thead><tr><th style="text-align:left">' + esc(nomeConta(conta)) + ' — lançado no Saipos, sem débito no banco no dia</th>' +
-          '<th style="text-align:left">Categoria</th><th style="text-align:left">Valor</th></tr></thead>' +
+          '<thead><tr><th style="text-align:left">Data</th><th style="text-align:left">' + esc(nomeConta(conta)) + ' — lançado no Saipos, sem movimento no banco no dia</th>' +
+          '<th style="text-align:left">Categoria</th><th style="text-align:left">Valor</th><th style="text-align:left">Ação</th></tr></thead>' +
           '<tbody>' + linhaSr +
-          '<tr class="liq"><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:left"><b>' +
-          rs(srTot) + '</b></td></tr></tbody></table></div>' +
+          '<tr class="liq"><td></td><td style="text-align:left"><b>Total</b></td><td></td><td style="text-align:left"><b>' +
+          (srTot < 0 ? '− ' : '+ ') + rs(Math.abs(srTot)) + '</b></td><td></td></tr></tbody></table></div>' +
           // 12/11/2026 (T4): legenda de uma linha
-          '<div class="caption-label" style="text-align:left">Não lance de novo: confira se o lançamento do Saipos está certo.</div>'
+          '<div class="caption-label" style="text-align:left">Não lance de novo: confira o lançamento no Saipos. Se já está explicado, clique <b>já explicado</b> e a linha sai da tela.</div>'
         : '');
   }).join('');
 
@@ -1759,6 +1839,9 @@ function renderConcbanco() {
     if (CONCB_VER_TODAS.has(k)) CONCB_VER_TODAS.delete(k); else CONCB_VER_TODAS.add(k);
     renderConcbanco();
   }));
+  alvo.querySelectorAll('.concb-explica').forEach(b => b.addEventListener('click', () => concbJaExplicado(b)));
+  alvo.querySelectorAll('.concb-res-excluir').forEach(b => b.addEventListener('click', () => concbResExcluir(b)));
+  alvo.querySelectorAll('.concb-res-data').forEach(b => b.addEventListener('click', () => concbResTrocarData(b)));
   alvo.querySelectorAll('.concb-desmarca').forEach(b => b.addEventListener('click', () =>
     concbDesmarcar(b.dataset.conta, b.dataset.fitid)));
   alvo.querySelectorAll('.concb-ir').forEach(tr => tr.addEventListener('click', () => {
@@ -1822,6 +1905,8 @@ function cargaUltimoDia(fonte) {
 // com a meta de venda, que é sem a promoção). EVOL_PROMO = 'unidade|dia' com a promoção do iFood já chegada (1–2 dias depois).
 let EVOL_PROMO = null;
 async function evolLer() {
+  // 25/11/2026 [regra] (auditoria de regime #1, #2 e #6): vw_venda_evolucao e vw_ticket_canal_dia são COMPETÊNCIA (pela data
+  // da venda) — a tela diz isso no subtítulo de "Semana em curso", "Valor médio por canal" e "Vendido até ontem" (RG_VENDA)
   const [rows, tk] = await Promise.all([
     consultarTudo('vw_venda_evolucao?select=data,unidade,canal,faixa,pedidos,total,canceladas,total_cancelado&order=data'),
     consultarTudo('vw_ticket_canal_dia?select=dia,unidade,faturamento,promo_ok&canal=eq.IFOOD').catch(() => null),
@@ -3223,7 +3308,8 @@ function hojeTicketCanalHtml(V, varTxt) {   // varTxt: o mesmo texto de variaç�
   const L = Object.entries(ac).filter(([, o]) => o.p > 0).sort((x, y) => y[1].p - x[1].p);
   if (!L.length) return '';
   const nome = (c) => ({ IFOOD: 'iFood', 'SALÃO': 'Salão', 'BALCÃO': 'Balcão', 'SITE PRÓPRIO': 'Site próprio', 'VNDX TECNOLOGIA': 'VNDX' }[c] || c);
-  return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + '</div>' +
+  // regime (auditoria #2): vw_ticket_canal_dia, pela data da venda (competência)
+  return '<div class="section-label" style="margin-top:10px;">Valor médio por canal · ' + (so ? lojaNome(so) : 'Rede') + rgSub(RG_VENDA) + '</div>' +
     '<div id="tabelaHojeTicket"><table><tr><th>Canal</th><th>Pedidos</th><th>Valor médio</th><th title="Os mesmos dias da semana anterior, nos dias em que a loja abriu nas duas">vs semana anterior</th></tr>' +
     L.map(([c, o]) => '<tr><td>' + nome(c) + (c === 'IFOOD' && ifoodAte && ifoodAte < V.fimIso ? ' <span style="color:var(--tx-5); font-size:11px;">até ' + ifoodAte.slice(8, 10) + '/' + ifoodAte.slice(5, 7) + ' (a promoção dos dias seguintes ainda não chegou)</span>' : '') + '</td><td>' + fxInt(o.p) + '</td><td>R$ ' + fmt(o.f / o.p) + '</td><td>' +
       (o.cp && o.bp ? varTxt(o.cf / o.cp, o.bf / o.bp) : '—') + '</td></tr>').join('') + '</table></div>' +
@@ -4968,7 +5054,9 @@ function fxCaixaLoja(u) {
   // espalhava o repasse do iFood (cai só na quarta) e somava o atacado duas vezes (AV quinta a domingo: 91 mil × 14,3 mil certo).
   const dowHoje = ((new Date(FX_S.hoje + 'T12:00:00').getDay() + 6) % 7) + 1;
   const recDiaU = (FX_S.recDia || []).filter(r => r.unidade === u && Number(r.dia_semana) >= dowHoje);
-  const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : mediaSem * diasRest / 7, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
+  // 25/11/2026 [regra] (Financeiro, prova semana-regime-em-cada-bloco): o caixa até domingo vem do Fluxo projetado — FXL,
+  // saldo_final do domingo (fxCaixaFluxo, abaixo). A média semanal × dias ÷ 7 saiu; sem o Fluxo, só a média por dia da semana.
+  const esperado = FX_S.recDia ? fxSoma(recDiaU, 'media_4sem') : 0, recLanc = fxSoma(receberAte, 'credito'), pagar = fxSoma(pagarAte, 'debito');
   // o que esta loja recebe de OUTRA loja da Rede ate domingo: conta para ela, nao para a soma da Rede (07/10/2026)
   const recEntre = fxSoma(receberAte.filter(projEntreLojas), 'credito');
   const base = { u, banco, cofre, dataPartida: F ? F.dataPartida : null, recLanc, recEntre, esperado, pagar, vencidas: fxSoma(venc, 'debito'), nVenc: venc.length, pagarProx: fxSoma(pagarProx, 'debito'), sobra: banco + cofre + recLanc + esperado - pagar, diasRest, mediaSem, fim, fluxo: null };
@@ -6862,6 +6950,53 @@ async function entrarContasPagar() {
   await cpCarregar();
   renderContasPagar();
   cxhAplicarIr('contaspagar');
+  sispagCard();
+}
+
+// ---------- ARQUIVOS DO SISPAG (25/11/2026; dono pelo Organizador 12:56: o arquivo sai por um BOTÃO no painel; proposta
+// 2026-11-25-sispag-baixar-arquivo.md, chat Itaú: API). Card próprio ACIMA da lista (o render de Contas a pagar regrava o
+// view inteiro; o card mora fora dele). Só aparece se rpc itau_sispag_pode_ver() = true (Neto e Hellen); o conteúdo só sai
+// pela rpc itau_sispag_baixar, que marca baixado. O arquivo vai byte a byte: CRLF do banco, sem trim nem replace.
+async function sispagCard() {
+  const alvo = document.getElementById('view-contaspagar');
+  if (!alvo) return;
+  let box = document.getElementById('sispagCard');
+  let pode = false;
+  try { const r = await trRpcSeguro('itau_sispag_pode_ver', {}); pode = r.ok && (await r.json()) === true; } catch (e) { pode = false; }
+  if (!pode) { if (box) box.remove(); return; }
+  if (!box) { box = document.createElement('div'); box.id = 'sispagCard'; alvo.parentNode.insertBefore(box, alvo); }
+  let L;
+  try {
+    L = await consultarTudo('itau_sispag_remessa?select=id,empresa,conta,tipo,nome_arquivo,qtd_pagamentos,valor_total,resumo,gerado_em,baixado_em,baixado_por,retorno_status,retorno_em&order=gerado_em.desc&limit=20');
+  } catch (e) { box.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler os arquivos do SISPAG: ${trEscH(e.message)} <button class="preset-btn" onclick="sispagCard()">Tentar de novo</button></div>`; return; }
+  const dh = (t) => t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '';
+  const rs = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const selo = (t) => t === 'PRODUCAO'
+    ? `<span style="display:inline-block;border:2px solid var(--farol-fora);color:var(--farol-fora);border-radius:8px;padding:2px 8px;font-weight:800;">PRODUÇÃO — subir na Transmissão de produção</span><div class="caption-label" style="text-align:left;">Os pagamentos ficam esperando a sua aprovação no Bankline.</div>`
+    : `<span style="display:inline-block;border:2px solid var(--marca-laranja);color:var(--marca-laranja);border-radius:8px;padding:2px 8px;font-weight:800;">TESTE — subir em Transmissão (Teste)</span><div class="caption-label" style="text-align:left;">Em teste o Itaú só confere o arquivo: não paga nada.</div>`;
+  box.innerHTML = `<div class="section-label" style="text-align:left;border-top:none;margin-top:0;padding-top:0;">Arquivos do SISPAG (pagamentos pelo Itaú)</div>
+    <div class="caption-label" style="text-align:left;">Baixe o arquivo e suba no Bankline: Mais… → Transmissão de Arquivo. Os pagamentos ficam para aprovar no Bankline.</div>
+    ${(L || []).length ? `<div id="tabelaSispag" style="overflow-x:auto;"><table><thead><tr><th>Gerado em</th><th>Conta</th><th>Tipo</th><th>Pagamentos</th><th>Resumo</th><th>Baixado</th><th>Retorno</th><th>Ação</th></tr></thead><tbody>
+      ${L.map((x) => `<tr><td style="white-space:nowrap;">${dh(x.gerado_em)}</td><td>${trEscH(x.conta || x.empresa || '')}</td><td style="white-space:normal;min-width:190px;">${selo(x.tipo)}</td>
+        <td style="white-space:nowrap;">${Number(x.qtd_pagamentos) || 0} · ${rs(x.valor_total)}</td><td style="white-space:normal;font-size:12.5px;">${trEscH(x.resumo || '')}</td>
+        <td style="white-space:nowrap;">${x.baixado_em ? `${dh(x.baixado_em)}${x.baixado_por ? ' · ' + trEscH(String(x.baixado_por).split('@')[0]) : ''}` : '<span style="color:var(--tx-4);">ainda não</span>'}</td>
+        <td style="white-space:normal;">${x.retorno_status ? trEscH(x.retorno_status) + (x.retorno_em ? `<div class="caption-label">${dh(x.retorno_em)}</div>` : '') : '<span style="color:var(--tx-4);">aguardando retorno</span>'}</td>
+        <td><button class="preset-btn active" onclick="sispagBaixar(${Number(x.id)}, this)">Baixar</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="caption-label" style="text-align:left;">Nenhum arquivo gerado ainda.</div>'}
+    <div style="height:14px;"></div>`;
+}
+async function sispagBaixar(id, bt) {
+  const txt = bt.textContent; bt.disabled = true; bt.textContent = 'baixando…';
+  const r = await trRpcSeguro('itau_sispag_baixar', { p_id: id });
+  bt.disabled = false; bt.textContent = txt;
+  if (!r.ok) { avisoAcao('erro', '✗ Não baixou: ' + (await trErroDe(r)), () => sispagBaixar(id, bt)); return; }
+  const j = await r.json(), a = Array.isArray(j) ? j[0] : j;
+  if (!a || a.conteudo == null) { avisoAcao('erro', '✗ Não baixou: o arquivo veio vazio.', () => sispagBaixar(id, bt)); return; }
+  const url = URL.createObjectURL(new Blob([a.conteudo], { type: 'text/plain' }));
+  const ln = document.createElement('a'); ln.href = url; ln.download = a.nome_arquivo || ('sispag-' + id + '.txt');
+  document.body.appendChild(ln); ln.click(); ln.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  avisoAcao('ok', `✓ Arquivo baixado: ${a.nome_arquivo || ''} — às ${avisoHora()}.`);
+  sispagCard();
 }
 
 async function entrarContasReceber() {
@@ -7363,6 +7498,8 @@ function renderContasPagar() {
 // Fonte: vw_fin_sobra_filial_plano (a conta de cada quarta) + vw_fin_sobra_filial_a_lancar (o título de cada lado no Saipos).
 // A RLS das views só entrega a dono e financeiro: sem linha, o bloco não aparece (filial não vê). Cada view leva ~5 s:
 // carrega uma vez, por fora, sem segurar a tela.
+// 25/11/2026 [regra] (auditoria de regime #51): o repasse do iFood no banco da filial (repasse_valor) vem de
+// fin_repasse_ifood_situacao(), por dentro de vw_fin_sobra_filial_plano — é CAIXA; o bloco diz "pelo caixa" (RG_CAIXA).
 const SOBRA = { plano: null, lancar: null, cob: {}, carregando: false, erro: null };
 async function sobraFilialCarregar(forcar) {
   if (SOBRA.carregando || (SOBRA.plano && !forcar)) return;
@@ -7370,7 +7507,7 @@ async function sobraFilialCarregar(forcar) {
   // uma view de cada vez, e uma segunda tentativa 3 s depois (banco ocupado com a carga da tela)
   const ler = async (q) => { try { return await consultarTudo(q); } catch (e) { await new Promise((ok) => setTimeout(ok, 3000)); return consultarTudo(q); } };
   try {
-    SOBRA.plano = await ler('vw_fin_sobra_filial_plano?select=sigla,quarta,abate_lista,lista_fica_aberta,bonus,bonus_estimado,lucro,sai_da_filial,travado,repasse_valor,resto_lista_no_vencimento,falta_caixa_no_vencimento,lista_mes_pergunta&order=quarta,sigla');
+    SOBRA.plano = await ler('vw_fin_sobra_filial_plano?select=sigla,quarta,abate_lista,lista_fica_aberta,bonus,bonus_estimado,lucro,sai_da_filial,travado,repasse_valor,resto_lista_no_vencimento,falta_caixa_no_vencimento,saldo_min_depois,lista_mes_pergunta&order=quarta,sigla');
     SOBRA.lancar = Array.isArray(SOBRA.plano) && SOBRA.plano.length
       ? await ler('vw_fin_sobra_filial_a_lancar?select=quem,quarta,componente,sentido,acao,id_titulo,valor_painel,motivo,id_cobranca&order=quarta,quem') : [];
     // total da lista do mês = tr_cobrancas.valor_total pela id_cobranca da linha LISTA (Financeiro 18/11 15:40)
@@ -7400,7 +7537,11 @@ function sobraLado(L, quarta, outro) {
 function sobraFilialHtml() {
   if (SOBRA.erro) return `<div id="sobraFilialWrap" class="caption-label" style="text-align:left;">✗ A sobra das filiais não carregou (o banco demorou). <button type="button" class="preset-btn" onclick="sobraFilialCarregar(true)">Tentar de novo</button></div>`;
   if (!Array.isArray(SOBRA.plano) || !SOBRA.plano.length) return '<div id="sobraFilialWrap"></div>';
-  const v = (x) => x == null ? '<span style="opacity:.4">—</span>' : sobraR(x);
+  // 25/11/2026 [conserto] (dono, print: "arruma a tabulação dessa tabela"): grade fixa sem rolagem no desktop, números à
+  // direita (tabular-nums), "—" centralizado, observação em linha menor dentro da coluna, Lucro explicado embaixo
+  const v = (x) => x == null ? '<span style="display:block;text-align:center;opacity:.4">—</span>' : sobraR(x);
+  const nota = (t, c) => `<div style="font-size:11px;line-height:1.25;color:${c || 'var(--tx-4)'};white-space:normal;margin-top:2px;">${t}</div>`;
+  const tdN = 'style="text-align:left;padding:6px 8px;vertical-align:top;"', tdT = 'style="text-align:left;padding:6px 8px;vertical-align:top;"';
   const nome = { AHU: 'Ahú', SB: 'São Braz' };
   const cor = { ok: 'var(--farol-ok)', perto: 'var(--farol-perto)', fora: 'var(--farol-fora)', na: 'var(--tx-4)' };
   const lanc = SOBRA.lancar || [];
@@ -7413,16 +7554,20 @@ function sobraFilialHtml() {
     const tot = cobId != null && SOBRA.cob[cobId] != null ? SOBRA.cob[cobId] : null;
     const jaPago = tot != null && p.abate_lista != null && p.lista_fica_aberta != null ? tot - Number(p.abate_lista) - Number(p.lista_fica_aberta) : null;
     if (fil.cls === 'fora' || av.cls === 'fora' || fil.cls === 'perto' || av.cls === 'perto') furos++;
-    const pergunta = Number(p.lista_mes_pergunta) > 0 ? `<div style="font-size:11.5px;color:var(--farol-perto);">sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)</div>` : '';
+    const pergunta = Number(p.lista_mes_pergunta) > 0 ? nota(`sobraria ${sobraR(p.lista_mes_pergunta)} para adiantar a lista do mês (pergunta ao dono)`, 'var(--farol-perto)') : '';
     const bonus = p.bonus != null ? sobraR(p.bonus) : p.bonus_estimado != null ? `≈ ${sobraR(p.bonus_estimado)}` : v(null);
     // repasse_valor = repasse semanal do iFood que caiu no banco da FILIAL (Financeiro 18/11 15:47); o PIX para a AV é sai_da_filial
-    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null ? `<div style="font-size:11.5px;color:var(--tx-4);">repasse do iFood no banco da filial: ${sobraR(p.repasse_valor)}</div>` : '');
+    const total = p.sai_da_filial == null ? v(null) : sobraR(p.sai_da_filial) + (p.travado && p.repasse_valor != null ? nota(`repasse do iFood no banco da filial: ${sobraR(p.repasse_valor)}`) : '');
     const sit = p.travado ? '<b style="color:var(--farol-ok);">no banco</b>' : p.resto_lista_no_vencimento != null ? '<span style="color:var(--farol-perto);">vence o resto da lista</span>' : '<span style="color:var(--tx-4);">previsão</span>';
-    const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? `<div style="font-size:11.5px;color:var(--farol-fora);">falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}</div>` : ''}` : v(p.lista_fica_aberta);
+    const falta = p.resto_lista_no_vencimento != null ? `${sobraR(p.resto_lista_no_vencimento)}${p.falta_caixa_no_vencimento > 0 ? nota(`falta caixa: ${sobraR(p.falta_caixa_no_vencimento)}`, 'var(--farol-fora)') : ''}` : v(p.lista_fica_aberta);
     const lado = (x) => `<span style="color:${cor[x.cls]};font-weight:700;" title="${trEscH(x.tit)}">${x.txt}</span>`;
-    return `<tr><td>${agDmSobra(p.quarta)}</td><td><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td>${sit}</td>
-      <td>${v(tot)}</td><td>${v(jaPago)}</td><td>${v(p.abate_lista)}</td><td>${falta}</td><td>${bonus}</td><td>${v(p.lucro)}</td><td><b>${total}</b>${pergunta}</td>
-      <td>${lado(fil)}</td><td>${lado(av)}</td></tr>`;
+    // 25/11/2026 [conserto] (Organizador 17:38; Financeiro f04f47b, regra lista-do-mes-quita-no-proximo-repasse): a lista paga na
+    // quarta mesmo que o saldo mínimo depois fique negativo — a tela diz quanto do limite do banco isso usa
+    const limite = Number(p.abate_lista) > 0 && p.saldo_min_depois != null && Number(p.saldo_min_depois) < 0
+      ? nota(`usa ${sobraR(-Number(p.saldo_min_depois))} do limite`, 'var(--farol-perto)') : '';
+    return `<tr><td ${tdT}>${agDmSobra(p.quarta)}</td><td ${tdT}><b>${nome[p.sigla] || trEscH(p.sigla)}</b></td><td ${tdT}>${sit}</td>
+      <td ${tdN}>${v(tot)}</td><td ${tdN}>${v(jaPago)}</td><td ${tdN}>${v(p.abate_lista)}${limite}</td><td ${tdN}>${falta}</td><td ${tdN}>${bonus}</td><td ${tdN}>${v(p.lucro)}</td><td ${tdN}><b>${total}</b>${pergunta}</td>
+      <td class="centro" style="padding:6px 8px;vertical-align:top;">${lado(fil)}</td><td class="centro" style="padding:6px 8px;vertical-align:top;">${lado(av)}</td></tr>`;
   }).join('');
   const hoje = sobraHoje(), prox = (SOBRA.plano.map((p) => String(p.quarta)).filter((d) => d >= hoje).sort()[0]) || null;
   const daQuarta = prox ? SOBRA.plano.filter((p) => String(p.quarta) === prox && Number(p.sai_da_filial) > 0) : [];
@@ -7431,8 +7576,9 @@ function sobraFilialHtml() {
       <div class="card-val">${sobraR(p.sai_da_filial)}</div><div class="card-pct">${p.travado ? 'um PIX só, desta filial' : 'previsão: o valor fecha na quarta'}</div></div>`).join('')}</div>` : '';
   return `<div id="sobraFilialWrap">${pix}<details class="detalhes-extra"${furos ? ' open' : ''}><summary>Sobra das filiais → Água Verde — lista, bônus e lucro de cada quarta <span style="color:var(--tx-4); font-weight:normal;">· ${RG_CAIXA}</span>${furos ? ` · <span style="color:var(--farol-fora);">${furos} quarta${furos > 1 ? 's' : ''} com título faltando ou diferente no Saipos</span>` : ' · <span style="color:var(--farol-ok);">✓ Saipos certo dos dois lados</span>'}</summary>
     <div class="caption-label" style="text-align:left;">Toda quarta a filial manda à Água Verde: a parcela da lista, o bônus do iFood e o lucro. As duas últimas colunas dizem se o título está no Saipos dos dois lados (passe o mouse para ver cada parte).</div>
-    <div style="overflow-x:auto;"><table style="white-space:nowrap;"><thead><tr><th>Quarta</th><th>Filial</th><th>Situação</th><th>Lista do mês</th><th>Lista: já pago</th><th>Lista: paga nesta quarta</th><th>Lista: quanto falta</th><th>Bônus do iFood</th><th title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro<br><span style="font-weight:normal;font-size:11px;">repassado por PIX (caixa) — não é o resultado do mês</span></th><th>Total do repasse</th><th>Saipos: filial paga</th><th>Saipos: AV recebe</th></tr></thead>
-    <tbody>${linhas}</tbody></table></div></details></div>`;
+    <div id="tabelaSobraFilial" style="overflow-x:auto;"><table style="width:100%;min-width:900px;table-layout:fixed;font-variant-numeric:tabular-nums;"><colgroup><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:6.5%"><col style="width:6.5%"></colgroup><thead><tr><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Quarta</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Filial</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Situação</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista do mês</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista já paga</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Lista paga nesta quarta</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Falta da lista</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Bônus do iFood</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;" title="o lucro que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE">Lucro</th><th style="text-align:left;vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Total do repasse</th><th class="centro" style="vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Saipos: filial paga</th><th class="centro" style="vertical-align:bottom;white-space:normal;line-height:1.2;padding:6px 8px;">Saipos: AV recebe</th></tr></thead>
+    <tbody>${linhas}</tbody></table></div>
+    <div class="caption-label" style="text-align:left;">Lucro = o que a filial manda por PIX na quarta (caixa); não é o resultado do mês da DRE.</div></details></div>`;
 }
 // hoje em Curitiba (AAAA-MM-DD), para o farol: quarta que já passou com título faltando = vermelho
 const sobraHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
@@ -8712,6 +8858,9 @@ function projCalc(unidade) {
 let FXL = null;   // null = sem as views novas: a tela de antes
 
 const FXL_DIA0_PREV = ['MEDIA', 'PROVISAO_RECEITA', 'PROVISAO_NF', 'COSTUMA_SAIR', 'BONUS'];
+// 25/11/2026 [regra] (auditoria de regime #30): o "previsto pelo vendido" (PROVISAO_RECEITA) vem de vw_fin_receita_provisao,
+// lida por dentro de vw_fin_previsto_detalhe — é CAIXA (o dia em que o dinheiro cai no banco); os quadros do Fluxo dizem
+// "pelo caixa" no subtítulo (RG_CAIXA).
 
 const FXL_ORIGEM = { SAIPOS: 'título do Saipos', SAIPOS_PAGO: 'pago no Saipos depois do extrato', MEDIA: 'média de vendas',
   PROVISAO_RECEITA: 'previsto pelo vendido', PROVISAO_NF: 'mercadoria prevista (fornecedor)', COSTUMA_SAIR: 'costuma sair',

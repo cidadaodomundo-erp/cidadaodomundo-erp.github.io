@@ -118,16 +118,16 @@ window.CASCA_PAGINAS = {
   freelas: 'freelas/index.html?v=20261116a',        // 16/11/2026: Taxas e Freelas (consulta + loja de cada freela)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
   temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
-  manutencao: 'manutencao/index.html?v=20261115a#chamados',      // Manutenção (chamados só preparados)
-  prestadores: 'manutencao/index.html?v=20261115a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
+  manutencao: 'manutencao/index.html?v=20261124a#chamados',      // Pedidos de manutenção (abrir, acompanhar, marcar arrumado)
+  prestadores: 'manutencao/index.html?v=20261124a#prestadores',  // Quem conserta (diretório de prestador, só consulta)
   pagarmoto: 'delivery/pagar-motoboys.html?v=20261116f',  // 16/11/2026: Pagar motoboys (pagar_motoboys_dia, só leitura); só quem vê pessoal
   chegada: 'delivery/chegada.html',  // 12/11/2026: Chegada dos motoboys (fabio-delivery-chegada, só leitura); permissão = a do Delivery
   salao: 'salao/index.html',         // 17/11/2026: Central do Salão (eventos da cidade, reservas, tablet, Google, equipe)
   reservas: 'reservas/index.html',   // 12/11/2026: Reservas (GetIn), mesma página, religada no novo local do Fábio
   pausados: 'pausados/index.html?modo=salao&v=20261116a',   // 16/11/2026: Itens pausados do Salão = só Goomer (tablet)
   pausadosdel: 'pausados/index.html?modo=delivery&v=20261116a',   // 16/11/2026: Itens pausados do Delivery = iFood x Site (Accon), iFood é a referência
-  garantido: 'jaison/index.html?v=20261122b',   // 22/11/2026 (Fábio): a página do Jaison (garantido + escala) dentro do Delivery; donos, quem vê pessoal e o Jaison
-  motodocs: 'delivery/motoboys-documentos.html?v=20261122a',   // 17/11/2026: Documentos dos motoboys (erp_motoboys_ler); só quem vê pessoal. 22/11: redesenho
+  garantido: 'jaison/index.html?v=20261122e',   // 22/11/2026 (Fábio): a página do Jaison (garantido + escala) dentro do Delivery; donos, quem vê pessoal e o Jaison
+  motodocs: 'delivery/motoboys-documentos.html?v=20261122b',   // 17/11/2026: Documentos dos motoboys (erp_motoboys_ler); só quem vê pessoal. 22/11: redesenho
   escalaclima: 'delivery/escala.html?v=20261117a',   // 17/11/2026: Escala e Clima (erp_escala_clima_ler + Open-Meteo), só leitura
   taxaponto: 'taxa/painel.html?v=20261117a',   // 17/11/2026: Ponto dos taxas pelo QR (erp_taxa_ponto_ler, taxa_qr_codigo_da_semana)
   qualidel: 'delivery/qualidade.html?v=20261122b',   // 22/11/2026 (Fábio): Qualidade e avaliações do Delivery (erp_qualidade_delivery); só os donos

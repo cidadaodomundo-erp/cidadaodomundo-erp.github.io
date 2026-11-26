@@ -39,14 +39,20 @@
 
 <script src="../nucleo/nucleo.js?v=20261122d"></script>
 <script>
-const CC = { cartoes: [], compras: [], faturas: null, erro: null, cancelando: null, pend: null, pendAberto: null, mesmoAssim: false };
+// 25/11/2026 (dono 24/11 12:36 e 13:15; proposta 2026-11-25-compra-no-cartao-grade.md): a tela vira a grade do cartão —
+// filtro por cartão (nome do Saipos), Lançar compra no topo, faturas com a situação no Saipos e no banco, cobranças sem
+// registro com Classificar / Ensinar regra (molde do concbFormEnsinar) e as regras ensinadas.
+const CC = { cartoes: [], compras: [], faturas: null, erro: null, cancelando: null, pend: null, pendAberto: null, mesmoAssim: false,
+  status: null, regras: null, cats: null, filtro: null, fatFiltro: null, sel: new Set(), classAberto: false,
+  form: { categoria: '', descricao: '', fornecedor: '', loja: '', ensinar: false, padrao: '', soEste: true } };
 const ccE = (s) => trEscH(String(s == null ? '' : s));
 const ccR = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ccD = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '–';
 const ccHoje = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 const ccLoja = (u) => ({ 'AGUA VERDE': 'AV', AHU: 'Ahú', 'SÃO BRAZ': 'SB', BOQUEIRAO: 'Boqueirão' }[u] || u || '');
 // "AV final 1540 (vence 03)" — nunca o nome da conta (proposta do Financeiro)
-const ccRotulo = (c) => `${ccLoja(c.unidade)} final ${(c.finais || []).join('/')}${c.dia_vencimento ? ` (vence ${String(c.dia_vencimento).padStart(2, '0')})` : ''}`;
+// 25/11/2026 (dono 24/11: "atualizar os cartões com os novos nomes do Saipos"): o nome do Saipos, quando o banco devolve
+const ccRotulo = (c) => c.nome ? c.nome : `${ccLoja(c.unidade)} final ${(c.finais || []).join('/')}${c.dia_vencimento ? ` (vence ${String(c.dia_vencimento).padStart(2, '0')})` : ''}`;
 const ccSit = { REGISTRADA: ['registrada', 'var(--tx-3)'], LANCADA: ['lançada', 'var(--info)'], CONFERIDA: ['conferida na fatura', 'var(--farol-ok)'], CANCELADA: ['cancelada', 'var(--tx-5)'] };
 
 async function ccRpcJson(fn, args) {
@@ -64,9 +70,15 @@ async function entrarCartao() {
   // as faturas já anexadas: só quem vê o financeiro lê; os outros não veem a lista (o anexar continua valendo)
   // 18/11/2026 (Cartões; proposta 2026-11-18-fatura-cartao-conferir-no-anexo): o resultado da leitura de cada fatura
   // (estado, leitura_obs) e as cobranças da fatura fechada que ninguém registrou
-  [CC.faturas, CC.pend] = await Promise.all([
+  [CC.faturas, CC.pend, CC.status, CC.regras, CC.cats] = await Promise.all([
     consultarTudo('fin_cartao_fatura?select=id,conta_cartao,vencimento,total,anexado_por,anexado_em,estado,leitura_obs,lido_em&order=vencimento.desc,conta_cartao&limit=24').catch(() => null),
-    consultarTudo('vw_fin_cartao_fatura_pendente?select=fatura_id,conta_cartao,unidade,vencimento,linha_id,data_compra,descricao,final_cartao,parcela,parcelas,valor,grupo&order=grupo,data_compra').catch(() => null)]);
+    consultarTudo('vw_fin_cartao_fatura_pendente?select=fatura_id,conta_cartao,unidade,vencimento,linha_id,data_compra,descricao,final_cartao,parcela,parcelas,valor,grupo&order=grupo,data_compra').catch(() => null),
+    consultarTudo('vw_fin_cartao_fatura_status?select=*&vencimento=gte.2026-11-01&order=vencimento.desc,cartao').catch(() => null),
+    consultarTudo('fin_cartao_regra?ativo=is.true&select=padrao,conta_cartao,categoria,descricao,usos,ultimo_uso,ensinado_por&order=criado_em.desc').catch(() => null),
+    consultarTudo('fin_de_para_categoria?usar=is.true&select=categoria_nossa').then((L) => [...new Set((L || []).map((x) => x.categoria_nossa).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))).catch(() => null)]);
+  // linha marcada que já saiu da grade (foi para a fila) não fica presa na seleção
+  const vivas = new Set((CC.pend || []).map((x) => Number(x.linha_id)));
+  CC.sel = new Set([...CC.sel].filter((id) => vivas.has(id)));
   ccDesenhar();
 }
 function ccDesenhar() {
@@ -75,21 +87,14 @@ function ccDesenhar() {
   if (!CC.cartoes.length) { alvo.innerHTML = '<h2>Compra no cartão</h2><div class="contexto" style="text-align:left;border-color:var(--farol-perto);"><b style="color:var(--farol-perto);">Este login não tem cartão liberado.</b> Peça ao Neto.</div>'; return; }
   const opc = CC.cartoes.map((c) => `<option value="${ccE(c.conta)}">${ccE(ccRotulo(c))}</option>`).join('');
   const nomeCartao = (conta) => { const c = CC.cartoes.find((x) => x.conta === conta); return c ? ccRotulo(c) : conta; };
-  let h = '<h2>Compra no cartão</h2>';
-  // 1) ANEXAR FATURA (dono 02:29: a Hellen manda a fatura de cada cartão)
-  h += `<div class="section-label" style="text-align:left;border-top:none;margin-top:0;padding-top:0;">Anexar fatura</div>
-    <div class="cc-form">
-      <label>Cartão<select id="ccFatCartao">${opc}</select></label>
-      <label>Vencimento escrito na fatura<input id="ccFatVenc" type="date"></label>
-      <label>Total da fatura (opcional)<input id="ccFatTotal" inputmode="decimal" placeholder="0,00"></label>
-      <label>Arquivo da fatura (PDF)<input id="ccFatArq" type="file" accept=".pdf,.jpg,.jpeg,.png"></label>
-      <button type="button" class="preset-btn active" style="padding:10px 14px;" onclick="ccAnexarFatura()">Anexar fatura</button>
-    </div>`;
-  if (CC.faturas && CC.faturas.length) h += `<div id="tabelaCcFaturas" style="margin-top:8px;"><table><thead><tr><th>Cartão</th><th>Vencimento</th><th>Total</th><th>Anexada</th></tr></thead><tbody>
-    ${CC.faturas.map((f) => `<tr><td>${ccE(nomeCartao(f.conta_cartao))}</td><td>${ccD(f.vencimento)}</td><td>${f.total == null ? '–' : ccR(f.total)}</td>
-      <td style="white-space:normal;">${ccFatSituacao(f)}</td></tr>`).join('')}</tbody></table></div>`;
-  // 2) REGISTRAR COMPRA
-  h += `<div class="section-label" style="text-align:left;margin-top:18px;">Registrar compra</div>
+  let h = '<h2>Compra no cartão</h2><div class="caption-label" style="text-align:left;margin:-4px 0 8px;"><a href="../guia-cartao.html" target="_blank" rel="noopener">Como funciona (guia) ›</a></div>';
+  // 0) FILTRO POR CARTÃO (vale para as faturas e para as cobranças sem registro)
+  if (CC.cartoes.length > 1) h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;">
+    <button type="button" class="preset-btn${CC.filtro ? '' : ' active'}" onclick="ccFiltrar(null)">Todos</button>
+    ${CC.cartoes.map((c) => `<button type="button" class="preset-btn${CC.filtro === c.conta ? ' active' : ''}" onclick='ccFiltrar(${ccE(JSON.stringify(c.conta))})'>${ccE(ccRotulo(c))}</button>`).join('')}</div>`;
+  // 1) LANÇAR COMPRA (no topo; dono 24/11 13:15)
+  h += `<div class="section-label" style="text-align:left;border-top:none;margin-top:0;padding-top:0;">Lançar compra</div>
+    <div class="caption-label" style="text-align:left;margin-bottom:6px;">Para compra que não vem do Mercado Livre nem da Amazon e não é conta fixa nem parcela já lançada.</div>
     <div class="cc-form">
       <label>Cartão<select id="ccCartao">${opc}</select></label>
       <label>Data da compra<input id="ccData" type="date" value="${ccHoje()}"></label>
@@ -100,8 +105,19 @@ function ccDesenhar() {
       <label>Nº da NF (opcional)<input id="ccNf"></label>
       <label>Comprovante (opcional)<input id="ccComp" type="file" accept=".pdf,.jpg,.jpeg,.png"></label>
       <label style="flex-direction:row;align-items:center;gap:6px;color:var(--tx-2);"><input id="ccAssin" type="checkbox" style="width:auto;"> É assinatura (todo mês)</label>
-      <button type="button" class="preset-btn active" style="padding:10px 14px;" onclick="ccRegistrar()">Registrar compra</button>
+      <button type="button" class="preset-btn active" style="padding:10px 14px;" onclick="ccRegistrar()">Lançar compra</button>
     </div>`;
+  // 2) FATURAS: a situação de cada uma no Saipos e no banco (vw_fin_cartao_fatura_status) + o formulário de anexo
+  h += ccFaturasHtml(nomeCartao);
+  h += `<div class="cc-form" style="margin-top:8px;">
+      <label>Cartão<select id="ccFatCartao">${opc}</select></label>
+      <label>Vencimento escrito na fatura<input id="ccFatVenc" type="date"></label>
+      <label>Total da fatura (opcional)<input id="ccFatTotal" inputmode="decimal" placeholder="0,00"></label>
+      <label>Arquivo da fatura (PDF ou a planilha .xlsx do Itaú)<input id="ccFatArq" type="file" accept=".pdf,.xlsx"></label>
+      <button type="button" class="preset-btn active" style="padding:10px 14px;" onclick="ccAnexarFatura()">Anexar fatura</button>
+    </div>
+    <div class="caption-label" style="text-align:left;">A fatura anexada é lida às 06:40 e às 19:40.</div>`;
+  // 3) COBRANÇAS SEM REGISTRO (a grade, com Classificar / Ensinar regra)
   h += ccPendHtml();
   // 3) MINHAS COMPRAS, por fatura
   const L = CC.compras.slice().sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
@@ -114,7 +130,46 @@ function ccDesenhar() {
       return `<tr><td>${ccD(x.fatura_vencimento)}</td><td>${ccE(nomeCartao(x.conta_cartao))}</td><td>${ccD(x.data_compra)}</td><td style="white-space:normal;">${ccE(x.descricao)}${x.origem === 'ASSINATURA' ? ' <span style="font-size:11px;color:var(--tx-4);">· assinatura</span>' : ''}</td>
         <td>${Number(x.parcela) || 1}/${Number(x.parcelas) || 1}</td><td>${ccR(x.valor_parcela)}</td><td style="color:${cor};font-weight:700;">${st}</td><td style="white-space:nowrap;">${acao}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="caption-label" style="text-align:left;">Nenhuma compra registrada ainda.</div>';
+  // 4) REGRAS ENSINADAS (recolhido)
+  if (Array.isArray(CC.regras) && CC.regras.length) h += `<details style="margin-top:18px;"><summary style="cursor:pointer;font-weight:600;">Regras ensinadas · ${CC.regras.length}</summary>
+    <div class="caption-label" style="text-align:left;">Rodam sozinhas às 06:40 e 19:40: cobrança nova que tem o trecho vai direto à fila do robô.</div>
+    <div id="tabelaCcRegras"><table><thead><tr><th>Trecho da fatura</th><th>Cartão</th><th>Categoria</th><th>Descrição no Saipos</th><th>Usos</th><th>Ensinada por</th></tr></thead><tbody>
+    ${CC.regras.map((r) => `<tr><td><b>${ccE(r.padrao)}</b></td><td>${r.conta_cartao ? ccE(nomeCartao(r.conta_cartao)) : 'todos'}</td><td>${ccE(r.categoria)}</td>
+      <td style="white-space:normal;">${ccE(r.descricao)}</td><td>${Number(r.usos) || 0}${r.ultimo_uso ? ` · ${ccD(String(r.ultimo_uso).slice(0, 10))}` : ''}</td>
+      <td style="white-space:normal;font-size:12px;color:var(--tx-4);">${ccE(r.ensinado_por || '')}</td></tr>`).join('')}</tbody></table></div></details>`;
   alvo.innerHTML = h;
+}
+function ccFiltrar(conta) { CC.filtro = conta; CC.fatFiltro = null; CC.sel = new Set(); ccDesenhar(); }
+// a tabela das faturas: Cartão · Fechamento · Vencimento · Fatura · Saipos · Banco · Situação
+function ccFaturasHtml(nomeCartao) {
+  const S = (CC.status || []).filter((f) => !CC.filtro || f.conta_cartao === CC.filtro);
+  let h = `<div class="section-label" style="text-align:left;margin-top:18px;">Faturas</div>`;
+  if (!Array.isArray(CC.status)) return h + '<div class="caption-label" style="text-align:left;">Anexe a fatura de cada cartão depois do fechamento.</div>';
+  if (!S.length) return h + '<div class="caption-label" style="text-align:left;">Nenhuma fatura deste cartão ainda.</div>';
+  const v = (x) => x == null ? '<span style="color:var(--tx-5);">–</span>' : ccR(x);
+  return h + `<div id="tabelaCcFaturas"><table><thead><tr><th>Cartão</th><th>Fechamento</th><th>Vencimento</th><th>Fatura</th><th>Saipos</th><th>Banco</th><th>Situação</th></tr></thead><tbody>
+    ${S.map((f) => `<tr><td>${ccE(f.cartao || nomeCartao(f.conta_cartao))}</td><td>${ccD(f.fechamento)}</td><td>${ccD(f.vencimento)}</td>
+      <td>${v(f.total_fatura)}</td><td>${v(f.lancado_saipos)}</td><td>${v(f.pago_banco)}${f.data_pagamento ? `<div class="caption-label">${ccD(f.data_pagamento)}</div>` : ''}</td>
+      <td style="white-space:normal;">${ccStatusHtml(f)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function ccStatusHtml(f) {
+  const conta = ccE(JSON.stringify(f.conta_cartao)), venc = ccE(String(f.vencimento || ''));
+  const anexar = (rot) => ` <button type="button" class="preset-btn" style="margin-left:6px;" onclick='ccAnexarDeNovo(${conta}, "${venc}")'>${rot}</button>`;
+  const fila = Number(f.cobrancas_na_fila) > 0 ? `<div class="caption-label" style="text-align:left;">${Number(f.cobrancas_na_fila)} na fila do robô</div>` : '';
+  if (f.leitura_obs) return `<span style="color:var(--farol-fora);font-weight:700;">✗ ${ccE(f.leitura_obs)}</span>${anexar('Anexar de novo')}${fila}`;
+  const dif = Math.abs(Number(f.diferenca) || 0);
+  const st = {
+    'ABERTA': `<span style="color:var(--tx-4);">fecha em ${ccD(f.fechamento).slice(0, 5)}</span>`,
+    'FALTA ANEXAR': `<span style="color:var(--farol-perto);font-weight:700;">falta anexar</span>${anexar('Anexar')}`,
+    'BATIDA': '<span style="color:var(--farol-ok);font-weight:700;">batida</span> <span style="color:var(--tx-4);font-size:12px;">— baixa sozinha quando o banco pagar</span>',
+    'FALTA LANCAR': `<span style="color:var(--farol-fora);font-weight:700;">faltam ${ccR(dif)}</span> <button type="button" class="preset-btn" style="margin-left:6px;" onclick="ccVerCobrancas(${Number(f.fatura_id) || 'null'})">Ver cobranças</button>`,
+    'SOBRA NO SAIPOS': `<span style="color:var(--farol-fora);font-weight:700;">sobram ${ccR(dif)} no Saipos</span>`,
+    'BAIXADA': '<span style="color:var(--farol-ok);font-weight:700;">✓ baixada</span>' }[f.status];
+  return (st || ccE(String(f.status || '').toLowerCase())) + fila;
+}
+function ccVerCobrancas(faturaId) {
+  CC.fatFiltro = faturaId; CC.sel = new Set(); ccDesenhar();
+  const t = document.getElementById('tabelaCcPendente'); if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 // a coluna "Anexada" diz se o arquivo é a fatura pedida (o leitor do servidor grava estado e leitura_obs)
 function ccFatSituacao(f) {
@@ -131,21 +186,90 @@ function ccAnexarDeNovo(conta, venc) {
   const a = document.getElementById('ccFatArq'); if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
 }
 // "A fatura cobrou e ninguém registrou": linha da fatura FECHADA sem compra registrada nem título no Saipos, por grupo
+// 25/11/2026 (dono 24/11 12:36: "mostrar na grade os lançamentos que faltam com filtro por cartão e interação pro usuario
+// informar do que se trata a compra, parecido com o que temos na conciliação, ensina regra"): caixinha por linha (e por
+// grupo), Classificar → rpc fin_cartao_linhas_classificar → fila do robô (fin_robo_abrir; nada à mão no Saipos).
 function ccPendHtml() {
-  const P = CC.pend;
-  if (!Array.isArray(P) || !P.length) return '';
-  const tot = P.reduce((t, x) => t + Number(x.valor || 0), 0);
-  const G = {}; P.forEach((x) => { (G[x.grupo || 'Outros'] = G[x.grupo || 'Outros'] || []).push(x); });
   const nomeCartao = (conta) => { const c = CC.cartoes.find((x) => x.conta === conta); return c ? ccRotulo(c) : conta; };
+  const P = (Array.isArray(CC.pend) ? CC.pend : []).filter((x) => (!CC.filtro || x.conta_cartao === CC.filtro) && (!CC.fatFiltro || Number(x.fatura_id) === Number(CC.fatFiltro)));
+  if (!Array.isArray(CC.pend)) return '';
+  const tot = P.reduce((t, x) => t + Number(x.valor || 0), 0);
+  let h = `<div class="section-label" style="text-align:left;margin-top:18px;">Cobranças sem registro · ${P.length} ${P.length === 1 ? 'cobrança' : 'cobranças'} · ${ccR(tot)}</div>`;
+  if (CC.fatFiltro) h += `<div style="margin:0 0 6px;"><button type="button" class="preset-btn" onclick="CC.fatFiltro=null; CC.sel=new Set(); ccDesenhar()">só a fatura escolhida ✕</button></div>`;
+  if (!P.length) return h + `<div class="caption-label" style="text-align:left;">Nada a classificar${CC.filtro || CC.fatFiltro ? ' neste filtro' : ''}: toda cobrança das faturas fechadas tem registro.</div>`;
+  const G = {}; P.forEach((x) => { (G[x.grupo || 'Outros'] = G[x.grupo || 'Outros'] || []).push(x); });
   const grupos = Object.entries(G).sort((a, b) => b[1].reduce((t, x) => t + Number(x.valor || 0), 0) - a[1].reduce((t, x) => t + Number(x.valor || 0), 0));
-  return `<div class="section-label" style="text-align:left;margin-top:18px;">A fatura cobrou e ninguém registrou · ${P.length} ${P.length === 1 ? 'cobrança' : 'cobranças'} · ${ccR(tot)}</div>
-    <div class="caption-label" style="text-align:left;">Clique no grupo para ver as linhas. Se a compra é sua, "É minha: registrar" preenche o formulário acima.</div>
-    <div id="tabelaCcPendente"><table><thead><tr><th>Grupo</th><th>Cobranças</th><th>Valor</th></tr></thead><tbody>
-    ${grupos.map(([g, L]) => { const ab = CC.pendAberto === g, soma = L.reduce((t, x) => t + Number(x.valor || 0), 0);
-      return `<tr style="cursor:pointer;" onclick="CC.pendAberto = CC.pendAberto === ${ccE(JSON.stringify(g))} ? null : ${ccE(JSON.stringify(g))}; ccDesenhar()"><td><b>${ab ? '▾' : '▸'} ${ccE(g)}</b></td><td>${L.length}</td><td>${ccR(soma)}</td></tr>`
-        + (ab ? L.map((x) => `<tr><td colspan="3" style="white-space:normal;padding-left:22px;font-size:12.5px;">${ccD(x.data_compra)} · ${ccE(x.descricao)}${x.parcelas > 1 ? ` (${x.parcela}/${x.parcelas})` : ''} · final ${ccE(x.final_cartao || '')} · <b>${ccR(x.valor)}</b> · fatura de ${ccD(x.vencimento)} (${ccE(nomeCartao(x.conta_cartao))})
-          ${Number(x.valor) > 0 ? ` <button type="button" class="preset-btn" onclick='event.stopPropagation(); ccEhMinha(${JSON.stringify({ c: x.conta_cartao, d: x.data_compra, v: x.valor, t: x.descricao })})'>É minha: registrar</button>` : ' <span style="color:var(--tx-4);">estorno</span>'}</td></tr>`).join('') : '');
+  const marcadas = P.filter((x) => CC.sel.has(Number(x.linha_id)));
+  const somaSel = marcadas.reduce((t, x) => t + Number(x.valor || 0), 0);
+  h += `<div class="caption-label" style="text-align:left;">Marque as cobranças do mesmo assunto e clique <b>Classificar</b>: o robô lança no Saipos. Se a compra é sua, "É minha: registrar" preenche o Lançar compra.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0;">
+      <button type="button" class="preset-btn${marcadas.length ? ' active' : ''}" ${marcadas.length ? '' : 'disabled'} onclick="CC.classAberto=!CC.classAberto; ccPreencherPadrao(); ccDesenhar()">Classificar${marcadas.length ? ` ${marcadas.length} · ${ccR(somaSel)}` : ''}</button>
+      ${marcadas.length ? '<button type="button" class="preset-btn" onclick="CC.sel=new Set(); CC.classAberto=false; ccDesenhar()">desmarcar</button>' : ''}</div>`;
+  if (CC.classAberto && marcadas.length) h += ccFormClassificarHtml(marcadas);
+  h += `<div id="tabelaCcPendente"><table><thead><tr><th style="width:34px;">✓</th><th>Data</th><th>Descrição na fatura</th><th>Cartão</th><th>Fatura</th><th>Valor</th><th></th></tr></thead><tbody>
+    ${grupos.map(([g, L]) => { const soma = L.reduce((t, x) => t + Number(x.valor || 0), 0), todas = L.every((x) => CC.sel.has(Number(x.linha_id)));
+      return `<tr style="background:var(--surface-2);"><td><input type="checkbox" ${todas ? 'checked' : ''} style="width:18px;height:18px;" onchange='ccMarcarGrupo(${ccE(JSON.stringify(L.map((x) => Number(x.linha_id))))}, this.checked)' aria-label="marcar o grupo"></td>
+        <td colspan="4"><b>${ccE(g)}</b> <span style="color:var(--tx-4);font-size:12px;">· ${L.length} ${L.length === 1 ? 'cobrança' : 'cobranças'}</span></td><td><b>${ccR(soma)}</b></td><td></td></tr>`
+        + L.map((x) => `<tr><td><input type="checkbox" ${CC.sel.has(Number(x.linha_id)) ? 'checked' : ''} style="width:18px;height:18px;" onchange="ccMarcar(${Number(x.linha_id)}, this.checked)" aria-label="marcar"></td>
+          <td style="white-space:nowrap;">${ccD(x.data_compra).slice(0, 5)}</td>
+          <td style="white-space:normal;">${ccE(x.descricao)}${x.parcelas > 1 ? ` (${x.parcela}/${x.parcelas})` : ''} <span style="color:var(--tx-4);font-size:12px;">· final ${ccE(x.final_cartao || '')}</span></td>
+          <td style="font-size:12px;">${ccE(nomeCartao(x.conta_cartao))}</td><td style="white-space:nowrap;">${ccD(x.vencimento).slice(0, 5)}</td>
+          <td style="white-space:nowrap;color:${Number(x.valor) < 0 ? 'var(--farol-ok)' : 'var(--tx-1)'};">${ccR(x.valor)}</td>
+          <td>${Number(x.valor) > 0 ? `<button type="button" class="preset-btn" onclick='ccEhMinha(${ccE(JSON.stringify({ c: x.conta_cartao, d: x.data_compra, v: x.valor, t: x.descricao }))})'>É minha: registrar</button>` : '<span style="color:var(--tx-4);font-size:12px;">estorno</span>'}</td></tr>`).join('');
     }).join('')}</tbody></table></div>`;
+  return h;
+}
+function ccMarcar(id, on) { if (on) CC.sel.add(id); else CC.sel.delete(id); if (!CC.sel.size) CC.classAberto = false; ccPreencherPadrao(); ccDesenhar(); }
+function ccMarcarGrupo(ids, on) { ids.forEach((id) => { if (on) CC.sel.add(id); else CC.sel.delete(id); }); if (!CC.sel.size) CC.classAberto = false; ccPreencherPadrao(); ccDesenhar(); }
+// o trecho que identifica: o começo da descrição da 1ª linha marcada, até o primeiro espaço (ex.: PADDLE.NET*)
+function ccPreencherPadrao() {
+  const x = (CC.pend || []).find((l) => CC.sel.has(Number(l.linha_id)));
+  if (x && !CC.form._padraoMexido) CC.form.padrao = String(x.descricao || '').trim().split(/\s+/)[0] || '';
+}
+function ccFormCampo(k, v) { CC.form[k] = v; if (k === 'padrao') CC.form._padraoMexido = true; }
+function ccFormClassificarHtml(marcadas) {
+  const F = CC.form;
+  const cats = (CC.cats || []).map((c) => `<option value="${ccE(c)}"${F.categoria === c ? ' selected' : ''}>${ccE(c)}</option>`).join('');
+  const lojas = [['', 'a do cartão'], ['AGUA VERDE', 'Água Verde'], ['AHU', 'Ahú'], ['SÃO BRAZ', 'São Braz'], ['BOQUEIRAO', 'Boqueirão']]
+    .map(([v, r]) => `<option value="${ccE(v)}"${F.loja === v ? ' selected' : ''}>${r}</option>`).join('');
+  const umCartao = new Set(marcadas.map((x) => x.conta_cartao)).size === 1;
+  return `<div class="contexto" style="text-align:left;border-color:var(--info);margin:6px 0 10px;">
+    <b>Classificar ${marcadas.length} ${marcadas.length === 1 ? 'cobrança' : 'cobranças'} · ${ccR(marcadas.reduce((t, x) => t + Number(x.valor || 0), 0))}</b>
+    <div class="cc-form" style="margin-top:8px;">
+      <label>Categoria<select onchange="ccFormCampo('categoria', this.value)"><option value="">escolha…</option>${cats}</select></label>
+      <label style="grid-column:span 2;">Descrição no Saipos <span style="color:var(--tx-5);">({mes} vira MM/AA)</span><input value="${ccE(F.descricao)}" oninput="ccFormCampo('descricao', this.value)" placeholder="ex.: FRETES ATACADO UBER (CORRIDAS DE {mes})"></label>
+      <label>Fornecedor (opcional)<input value="${ccE(F.fornecedor)}" oninput="ccFormCampo('fornecedor', this.value)"></label>
+      <label>Loja<select onchange="ccFormCampo('loja', this.value)">${lojas}</select></label>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;"><input type="checkbox" ${F.ensinar ? 'checked' : ''} onchange="ccFormCampo('ensinar', this.checked); ccDesenhar()" style="width:18px;height:18px;"> Ensinar regra para as próximas</label>
+    ${F.ensinar ? `<div class="cc-form" style="margin-top:6px;">
+      <label>Trecho da fatura que identifica<input value="${ccE(F.padrao)}" oninput="ccFormCampo('padrao', this.value)"></label>
+      ${umCartao ? `<label style="flex-direction:row;align-items:center;gap:6px;color:var(--tx-2);"><input type="checkbox" ${F.soEste ? 'checked' : ''} onchange="ccFormCampo('soEste', this.checked)" style="width:auto;"> Só neste cartão</label>` : ''}</div>` : ''}
+    <div style="margin-top:10px;display:flex;gap:8px;"><button type="button" id="ccClassBt" class="preset-btn active" style="padding:9px 14px;" onclick="ccClassificar()">Mandar ao robô</button>
+      <button type="button" class="preset-btn" onclick="CC.classAberto=false; ccDesenhar()">fechar</button></div></div>`;
+}
+async function ccClassificar() {
+  const F = CC.form, ids = [...CC.sel];
+  if (!ids.length) return avisoAcao('atencao', '! Marque as cobranças.');
+  if (!F.categoria) return avisoAcao('atencao', '! Escolha a categoria.');
+  if (!String(F.descricao || '').trim()) return avisoAcao('atencao', '! Escreva a descrição do Saipos.');
+  if (F.ensinar && String(F.padrao || '').trim().length < 3) return avisoAcao('atencao', '! O trecho da fatura precisa de pelo menos 3 letras.');
+  const marcadas = (CC.pend || []).filter((x) => CC.sel.has(Number(x.linha_id)));
+  const umCartao = new Set(marcadas.map((x) => x.conta_cartao)).size === 1;
+  const bt = document.getElementById('ccClassBt'); if (bt) { bt.disabled = true; bt.textContent = 'enviando…'; }
+  avisoAcao('enviando', 'Mandando ao robô…');
+  let r;
+  try {
+    r = await ccRpcJson('fin_cartao_linhas_classificar', { p_linhas: ids, p_categoria: F.categoria, p_descricao: String(F.descricao).trim().toUpperCase(),
+      p_fornecedor: String(F.fornecedor || '').trim() || null, p_loja: F.loja || null, p_ensinar: !!F.ensinar,
+      p_padrao: F.ensinar ? String(F.padrao).trim() : null, p_so_este_cartao: F.ensinar ? !!(F.soEste && umCartao) : false });
+  } catch (e) { if (bt) { bt.disabled = false; bt.textContent = 'Mandar ao robô'; } return avisoAcao('erro', '✗ Não foi: ' + e.message, () => ccClassificar()); }
+  const regra = r && r.regra ? ' · regra ensinada' : '';
+  avisoAcao('ok', r && r.robo_abrir ? `✓ Na fila do robô: lança no Saipos na próxima rodada (${ccR(r.valor)})${regra} — às ${avisoHora()}.`
+    : `✓ Se anulam, nada a lançar${regra} — às ${avisoHora()}.`);
+  CC.sel = new Set(); CC.classAberto = false;
+  CC.form = { categoria: '', descricao: '', fornecedor: '', loja: '', ensinar: false, padrao: '', soEste: true };
+  await entrarCartao();
 }
 function ccEhMinha(x) {
   const g = (id) => document.getElementById(id);
@@ -153,7 +277,7 @@ function ccEhMinha(x) {
   if (g('ccData')) g('ccData').value = String(x.d || '').slice(0, 10);
   if (g('ccValor')) g('ccValor').value = Number(x.v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (g('ccDesc')) { g('ccDesc').value = ''; g('ccDesc').placeholder = 'o que foi (na fatura: ' + x.t + ')'; g('ccDesc').scrollIntoView({ block: 'center' }); g('ccDesc').focus(); }
-  avisoAcao('atencao', '! Escreva o que foi comprado e clique em "Registrar compra".');
+  avisoAcao('atencao', '! Escreva o que foi comprado e clique em "Lançar compra".');
 }
 // Antes de subir: a 1ª página do PDF diz o cartão (FINAL nnnn), se está Fechada ou Aberta e o vencimento. Se não bate com o
 // que foi escolhido, não sobe e diz por quê. Sem conseguir ler o PDF (imagem, foto), sobe como antes: o leitor do servidor confere.
@@ -195,9 +319,20 @@ async function ccAnexarFatura() {
   if (!venc) return avisoAcao('atencao', '! Escreva o vencimento que está na fatura.');
   if (!arq) return avisoAcao('atencao', '! Escolha o arquivo da fatura.');
   if (Number.isNaN(total)) return avisoAcao('atencao', '! O total da fatura não é um número.');
+  if (!/\.(pdf|xlsx)$/i.test(arq.name || '')) return avisoAcao('atencao', '! A fatura vai em PDF ou na planilha .xlsx do Itaú.');
   if (!CC.mesmoAssim) {
     avisoAcao('enviando', 'Conferindo o arquivo…');
-    const erro = await ccConferirPdf(arq, conta, venc);
+    // 25/11/2026: a fatura só fecha no dia de fechamento do cartão (dia_fechamento < dia_vencimento → mesmo mês do
+    // vencimento; senão, o mês anterior). Antes disso, o arquivo é da fatura ainda aberta.
+    const cc = CC.cartoes.find((x) => x.conta === conta);
+    let erro = null;
+    if (cc && cc.dia_fechamento && cc.dia_vencimento) {
+      const [a, m] = venc.split('-').map(Number);
+      const dt = new Date(a, m - 1 - (Number(cc.dia_fechamento) < Number(cc.dia_vencimento) ? 0 : 1), Number(cc.dia_fechamento));
+      const fech = dt.toLocaleDateString('en-CA');
+      if (ccHoje() <= fech) erro = `essa fatura só fecha em ${ccD(fech)}: anexe depois do fechamento.`;
+    }
+    if (!erro) erro = await ccConferirPdf(arq, conta, venc);
     if (erro) {
       CC.mesmoAssim = false;
       return avisoAcao('erro', `✗ A fatura NÃO foi anexada: ${erro} Escolha o arquivo certo. Se tem certeza de que este arquivo está certo, "Tentar de novo" anexa mesmo assim.`, () => { CC.mesmoAssim = true; ccAnexarFatura(); });
@@ -205,13 +340,26 @@ async function ccAnexarFatura() {
   }
   CC.mesmoAssim = false;
   avisoAcao('enviando', 'Enviando a fatura…');
+  let idFat;
   try {
     const caminho = await ccSubir(arq, 'faturas-cartao/' + conta.replace(/[^A-Za-z0-9]/g, '_'));
-    await ccRpcJson('fin_cartao_fatura_anexar', { p_conta_cartao: conta, p_vencimento: venc, p_arquivo: caminho, p_total: total });
+    idFat = await ccRpcJson('fin_cartao_fatura_anexar', { p_conta_cartao: conta, p_vencimento: venc, p_arquivo: caminho, p_total: total });
   } catch (e) { return avisoAcao('erro', '✗ A fatura NÃO foi anexada: ' + e.message, () => ccAnexarFatura()); }
   const c = CC.cartoes.find((x) => x.conta === conta);
-  avisoAcao('ok', `✓ Fatura anexada: ${c ? ccRotulo(c) : conta}, vencimento ${ccD(venc)} — às ${avisoHora()}.`);
+  // pedido 4 (Cartões 18/11; PDF ou XLSX desde 25/11): a cópia vai ao banco para o robô ler às 06:40 e 19:40
+  const copia = await ccCopiaParaRobo(idFat, arq);
+  if (copia) avisoAcao('ok', `✓ Fatura anexada: ${c ? ccRotulo(c) : conta}, vencimento ${ccD(venc)} — às ${avisoHora()}. É lida às 06:40 e às 19:40.`);
   await entrarCartao();
+}
+async function ccCopiaParaRobo(id, arq) {
+  try {
+    const b64 = await new Promise((ok, erro) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => erro(new Error('não consegui ler o arquivo')); fr.readAsDataURL(arq); });
+    await ccRpcJson('fin_cartao_fatura_pdf_gravar', { p_id: Number(id), p_pdf_base64: b64 });
+    return true;
+  } catch (e) {
+    avisoAcao('erro', '! A fatura foi anexada, mas a cópia para o robô não foi (' + e.message + '): tente de novo.', async () => { if (await ccCopiaParaRobo(id, arq)) avisoAcao('ok', `✓ Cópia para o robô enviada — às ${avisoHora()}.`); });
+    return false;
+  }
 }
 async function ccRegistrar() {
   const g = (id) => document.getElementById(id);

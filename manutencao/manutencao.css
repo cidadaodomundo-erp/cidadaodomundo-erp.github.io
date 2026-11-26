@@ -43,6 +43,14 @@
 #bloqueio { border: 1px solid var(--farol-fora, #ff6b6b); border-radius: 10px; padding: 14px; margin: 12px 0; }
 #bloqueio p { margin: 0 0 10px; }
 
+.mn-sub { grid-column: 1 / -1; font-size: 15px; margin: 14px 0 2px; }
+.mn-problema { font-size: 14px; margin: 0 0 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.mn-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.mn-btn-ok { background: var(--brand, #c8102e); border-color: var(--brand, #c8102e); color: #fff; }
+.mn-ped.mn-pr-urgente { border-left: 4px solid var(--farol-fora, #ff6b6b); }
+.mn-ped.mn-pr-alta { border-left: 4px solid var(--farol-perto, #f5a623); }
+.mn-estado.mn-ok { border-left: 3px solid var(--farol-ok, #3fb950); padding-left: 10px; }
+
 @media (min-width: 600px) {
   .mn-lista { grid-template-columns: 1fr 1fr; }
   .mn-form { grid-template-columns: 1fr 1fr; }

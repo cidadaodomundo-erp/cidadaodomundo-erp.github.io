@@ -59,6 +59,27 @@
   .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
   .erro { color:var(--acento); font-size:.85rem; }
   footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  /* 25/11/2026 [migracao]: seção "Migração sem Claude — entrega 01/12" (dono pelo Organizador 14:58; fonte migracao_passos) */
+  .mig { background:var(--papel); border:1px solid var(--linha); border-radius:8px; padding:14px 16px; margin:0 0 1rem; }
+  .mig-nums { display:flex; flex-wrap:wrap; gap:8px; margin:.2rem 0 .8rem; }
+  .mig-nums span { padding:4px 12px; border-radius:999px; font-size:.85rem; font-weight:700; background:var(--alt); color:var(--mudo); }
+  .mig-nums .feito { background:var(--ok-fundo); color:var(--ok); } .mig-nums .andamento { background:var(--anda-fundo); color:var(--anda); }
+  .mig-nums .travado { background:var(--acento-fundo); color:var(--acento); }
+  .mig-barra { position:relative; height:12px; background:var(--alt); border-radius:999px; overflow:hidden; }
+  .mig-barra i { position:absolute; left:0; top:0; bottom:0; background:var(--ok); border-radius:999px; }
+  .mig-tempo { position:relative; height:18px; font-size:.72rem; color:var(--mudo); margin-top:4px; }
+  .mig-tempo b { position:absolute; transform:translateX(-50%); color:var(--acento); white-space:nowrap; }
+  .mig-tempo span { position:absolute; } .mig-tempo span.fim { right:0; }
+  .mig-filtro { display:flex; flex-wrap:wrap; gap:6px; margin:.9rem 0 .2rem; }
+  .mig-filtro button { border:1px solid var(--forte); background:var(--papel); color:var(--tinta); border-radius:999px; padding:4px 11px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .mig-filtro button.on { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .mig-l { display:flex; gap:10px; align-items:flex-start; border-top:1px solid var(--linha); padding:7px 0; font-size:.92rem; }
+  .mig-l .bola { width:10px; height:10px; border-radius:50%; margin-top:7px; flex:none; background:var(--forte); }
+  .mig-l .bola.feito { background:var(--ok); } .mig-l .bola.andamento { background:var(--anda); } .mig-l .bola.travado { background:var(--acento); }
+  .mig-l .tx { flex:1; min-width:0; } .mig-l .meta { font-size:.75rem; color:var(--mudo); }
+  .mig-l .meta .atraso { color:var(--acento); font-weight:700; } .mig-l .trav { font-size:.82rem; color:var(--acento); }
+  .mig-l.feito .tx { color:var(--mudo); }
+  .chk { font-size:.72rem; color:var(--mudo); white-space:nowrap; } .chk.sim { color:var(--ok); } .chk.nao { color:var(--acento); }
 </style>
 </head>
 <body>
@@ -113,9 +134,146 @@ async function carregar() {
     { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } });
   if (r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
   ITENS = r.ok ? await r.json() : [];
+  // 25/11/2026 [migracao]: os passos da migração sem Claude (mesma RLS pode_ver_plano)
+  const rm = await fetch(`${SUPABASE_URL}/rest/v1/migracao_passos?select=id,fase,passo,responsavel,prazo,situacao,travado_por,atualizado_em&order=fase,prazo,id`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
+  MIG = rm && rm.ok ? await rm.json() : [];
+  // 25/11/2026 17:00 [migracao] (rumo final do dono, livro chat-frente-organizador/respostas/migrar-rotinas-escritas-fabio-escolhe):
+  // a migração é POR ROTINA (rotina_migracao, RLS pode_ver_plano)
+  const rr = await fetch(`${SUPABASE_URL}/rest/v1/rotina_migracao?select=rotina,tipo,nome,lote,lote_data,situacao,placar_ok,texto_ok,regras_ok,atualizado_em&order=lote,nome`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
+  ROTM = rr && rr.ok ? await rr.json() : [];
+  // 25/11/2026 [migracao]: selo do estoque ("X de Y itens confiáveis", ±3%; livro chat-frente-organizador/respostas/selo-por-modulo-e-margem-3)
+  const hh = { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } };
+  const [rs1, rs2] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_resumo?select=unidade,data_partida,data_contagem,itens,confiaveis,texto,selo_modulo`, hh).catch(() => null),
+    fetch(`${SUPABASE_URL}/rest/v1/vw_est_selo_item?select=unidade,nome_saipos,un,esperado,contado,diferenca,dif_pct,selo,motivo,conserto`, hh).catch(() => null)]);
+  SELO = { res: rs1 && rs1.ok ? await rs1.json() : [], itens: rs2 && rs2.ok ? await rs2.json() : [] };
+  // 25/11/2026 17:02 [migracao] (Organizador: o dono quer o selo de TODOS os módulos no mesmo lugar do andamento): vw_modulo_selo,
+  // select=* para aceitar as colunas novas que o chat Regras puser (âncora)
+  const rms = await fetch(`${SUPABASE_URL}/rest/v1/vw_modulo_selo?select=*`, hh).catch(() => null);
+  MSELO = rms && rms.ok ? await rms.json() : [];
   if (!ITENS.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso ao plano (é só do Neto e do Fabio).</p>
       <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
   desenhar();
+}
+
+// ---- Migração sem Claude — entrega 01/12 (25/11/2026 [migracao]; dono: "um passo a passo dessa migração, resumido e
+// objetivo, onde eu possa ver o que está em andamento, já foi feito, etc."). Travados primeiro, depois por prazo.
+let MIG = [], MIG_F = 'todos';
+// 25/11 15:10 (dono: "vai depender do Claude, mas do Claude do Fabio"): 4 fases
+const MIG_FASES = { 1:'1. Consertar e congelar', 2:'2. Regras por módulo', 3:'3. Trocar as contas para o Fabio', 4:'4. Teste' };
+const MIG_ORD = { travado:0, andamento:1, 'a fazer':2, feito:3 };
+const MIG_INICIO = '2026-11-25', MIG_FIM = '2026-12-01';
+// ---- Rotina a rotina (rumo final 25/11 15:25: "garantir que cada rotina esteja escrita 100% corretamente e ir passando
+// isso pro robo do Fabio"). Situação: escrita → validada → entregue → migrada. Lista por lote, com a ficha no GitHub.
+let ROTM = [], ROTM_F = 'todos';
+const ROTM_SIT = ['escrita', 'validada', 'entregue', 'migrada'];
+const ROTM_COR = { escrita:'var(--forte)', validada:'var(--anda)', entregue:'var(--acento)', migrada:'var(--ok)' };
+const ROTM_LOTE = { 1:'Financeiro', 2:'Estoque e compras', 3:'RH e avisos', 4:'iFood, promoções, cardápio e entrega', 5:'Vigias e infraestrutura' };
+const ROTM_FICHA = 'https://github.com/cidadaodomundo-erp/ifood-dashboard-core/blob/master/contexto/para-fabio/rotinas/';
+function migHtml() {
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+  const dias = (a, b) => (new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5;
+  const posHoje = Math.max(0, Math.min(100, dias(MIG_INICIO, hoje) * 100 / dias(MIG_INICIO, MIG_FIM)));
+  let h = `<h2>Migração para o Fabio — entrega 01/12</h2>
+    <p class="rascunho"><a href="saude-rotinas.html">Saúde das rotinas ›</a> — as rotinas que rodam sozinhas, com farol e o que fazer se parar.</p>` + mseloHtml();
+  if (ROTM.length) {
+    const n = k => ROTM.filter(x => x.situacao === k).length, T = ROTM.length;
+    const sem = new Date(hoje + 'T12:00:00');
+    const dsem = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()];
+    const ok = (v, rot) => `<span class="chk ${v === true ? 'sim' : v === false ? 'nao' : ''}" title="${rot}: ${v === true ? 'ok' : v === false ? 'falta' : 'ainda não conferido'}">${v === true ? '✓' : v === false ? '✗' : '–'} ${rot}</span>`;
+    const vis = ROTM.filter(x => ROTM_F === 'todos' || x.situacao === ROTM_F);
+    const lotes = [...new Set(ROTM.map(x => x.lote))].sort((a, b) => a - b);
+    const corpo = lotes.map(l => { const L = vis.filter(x => x.lote === l); if (!L.length) return '';
+      const d = (ROTM.find(x => x.lote === l) || {}).lote_data, atr = d && d < hoje;
+      return `<div class="fase">${l}. ${esc(ROTM_LOTE[l] || 'Lote ' + l)}${d ? ` · ${dsem(d)} ${dataBR(d)}` : ''} · ${L.length}</div>` + L.map(x => `
+        <div class="mig-l"><span class="bola" style="background:${ROTM_COR[x.situacao] || 'var(--forte)'}" title="${esc(x.situacao)}"></span><div class="tx">${esc(x.nome || x.rotina)}
+          <div class="meta">${esc(x.situacao)}${atr && x.situacao !== 'migrada' ? ' <span class="atraso">(lote passou do dia)</span>' : ''} · ${x.tipo === 'windows' ? 'tarefa do Windows' : 'rotina do Claude'} · ${ok(x.placar_ok, '7 dias sem falha')} ${ok(x.texto_ok, 'texto')} ${ok(x.regras_ok, 'regras')}
+            · <a href="${ROTM_FICHA}${encodeURIComponent(x.rotina)}.md" target="_blank" rel="noopener">ficha ›</a></div></div></div>`).join(''); }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
+    h += `<div class="mig">
+      <div class="mig-nums">${ROTM_SIT.map(k => `<span style="background:var(--alt);color:var(--tinta)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${ROTM_COR[k]};margin-right:5px"></i>${n(k)} ${k}${n(k) === 1 ? '' : 's'}</span>`).join('')}</div>
+      <div class="mig-barra" title="de ${T} rotinas">${(() => { let acc = 0; return ROTM_SIT.slice().reverse().map(k => { const w = n(k) * 100 / T; const s = `<i style="left:${acc}%;width:${w}%;background:${ROTM_COR[k]};border-radius:0"></i>`; acc += w; return s; }).join(''); })()}</div>
+      <div class="mig-tempo"><span>${n('migrada')} de ${T} migradas · 25/11</span><b style="left:${posHoje}%">hoje</b><span class="fim">ter 01/12</span></div>
+      <div class="mig-filtro">${[['todos', 'Todas'], ...ROTM_SIT.map(k => [k, k[0].toUpperCase() + k.slice(1) + 's'])]
+        .map(([k, t]) => `<button class="${ROTM_F === k ? 'on' : ''}" onclick="ROTM_F='${k}';desenhar()">${t} · ${k === 'todos' ? T : n(k)}</button>`).join('')}</div>
+      ${corpo}
+      <p class="rascunho" style="margin-top:.6rem">Cada rotina passa por: escrita (a ficha) → validada (conferida rodando) → entregue (ao robô do Fabio) → migrada. A ficha abre no GitHub, com o login do GitHub.</p>
+    </div>`;
+  }
+  h += seloHtml();
+  if (MIG.length) h += `<details class="bloco"><summary>Consertos, regras e contas <span class="n" style="font-weight:400;color:var(--mudo)">${MIG.filter(x => x.situacao === 'feito').length} de ${MIG.length} feitos</span></summary><div class="corpo">${migPassosHtml()}</div></details>`;
+  return h;
+}
+// ---- Selo dos módulos (vw_modulo_selo): uma linha por módulo, em conserto primeiro; clicar abre o detalhe
+let MSELO = [], MSELO_ABERTO = new Set();
+const MSELO_NOME = { 'm-atacado':'Atacado', 'm-avaliacoes':'Avaliações', 'm-caixa':'Fechamento de caixa', 'm-cardapio':'Cardápio', 'm-cartoes':'Cartões',
+  'm-compliance':'Vencimentos e renovações', 'm-compras':'Compras', 'm-contestacao':'Contestação', 'm-dre':'DRE e resultado', 'm-estoque':'Estoque',
+  'm-financeiro':'Financeiro', 'm-listas':'Listas entre lojas', 'm-lojinha':'Lojinha', 'm-promocoes':'Promoções', 'm-rh':'RH e folha',
+  'm-tempo-entrega':'Tempo de entrega', 'pagar-motoboys':'Pagar motoboys' };
+const MSELO_COLS = ['modulo', 'selo', 'nao_usar', 'ate', 'vermelhas', 'verdes', 'cinzas', 'nao_medidas', 'regras', 'pendencias', 'ancora', 'ancora_o_que_compara', 'ancora_detalhe'];
+function mseloCor(s) { s = String(s || '').toLowerCase(); return s.startsWith('confi') ? 'var(--ok)' : s.includes('conserto') ? 'var(--acento)' : 'var(--anda)'; }
+function mseloHtml() {
+  if (!MSELO.length) return '';
+  const ord = s => { s = String(s || '').toLowerCase(); return s.includes('conserto') ? 0 : s.startsWith('confi') ? 2 : 1; };
+  const L = MSELO.slice().sort((a, b) => ord(a.selo) - ord(b.selo) || (Number(b.vermelhas) || 0) - (Number(a.vermelhas) || 0)
+    || String(MSELO_NOME[a.modulo] || a.modulo).localeCompare(String(MSELO_NOME[b.modulo] || b.modulo), 'pt-BR'));
+  const n = k => MSELO.filter(x => ord(x.selo) === k).length;
+  const lista = t => String(t || '').split(' | ').filter(Boolean);
+  return `<div class="mig"><p class="grp" style="margin:0 0 .4rem;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mudo);font-weight:600">Selo dos módulos</p>
+    <div class="mig-nums"><span class="feito">${n(2)} confiáve${n(2) === 1 ? 'l' : 'is'}</span>${n(0) ? `<span class="travado">${n(0)} em conserto</span>` : ''}${n(1) ? `<span class="andamento">${n(1)} sem âncora ou sem prova</span>` : ''}</div>
+    ${L.map(x => { const ab = MSELO_ABERTO.has(x.modulo), nu = lista(x.nao_usar), pe = lista(x.pendencias);
+      const extra = Object.keys(x).filter(k => !MSELO_COLS.includes(k) && x[k] != null && x[k] !== '');
+      return `<div class="mig-l" style="cursor:pointer" onclick="MSELO_ABERTO.has('${esc(x.modulo)}') ? MSELO_ABERTO.delete('${esc(x.modulo)}') : MSELO_ABERTO.add('${esc(x.modulo)}'); desenhar()">
+        <span class="bola" style="background:${mseloCor(x.selo)}"></span><div class="tx"><b>${esc(MSELO_NOME[x.modulo] || x.modulo)}</b> · <span style="color:${mseloCor(x.selo)};font-weight:700">${esc(x.selo || '')}</span>
+        <div class="meta">${nu.length ? `<span class="atraso">não usar: ${nu.length}</span> · ` : ''}${Number(x.vermelhas) ? `<span class="atraso">${x.vermelhas} vermelha${Number(x.vermelhas) > 1 ? 's' : ''}</span> · ` : ''}${x.ancora ? `âncora: <span style="color:${/não|nao/i.test(x.ancora) ? 'var(--acento)' : /bate/i.test(x.ancora) ? 'var(--ok)' : 'var(--anda)'};font-weight:700">${esc(x.ancora)}</span> · ` : ''}${Number(x.nao_medidas ?? x.cinzas) || 0} não medida${Number(x.nao_medidas ?? x.cinzas) === 1 ? '' : 's'} · ${Number(x.verdes) || 0} de ${Number(x.regras) || 0} regras verdes${pe.length ? ` · ${pe.length} pendência${pe.length > 1 ? 's' : ''} de migração` : ''}${x.ate ? ` · até ${dataBR(String(x.ate))}` : ''} · ${ab ? 'fechar ▴' : 'detalhe ▾'}</div>
+        ${ab ? `${x.ancora_o_que_compara ? `<div class="meta" style="margin-top:4px"><b>Âncora (o que se compara com o mundo real):</b> ${esc(x.ancora_o_que_compara)}${x.ancora_detalhe ? ' — ' + esc(x.ancora_detalhe) : ''}</div>` : ''}${nu.length ? `<div class="trav" style="margin-top:4px"><b>Não usar enquanto em conserto:</b><br>${nu.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
+          ${pe.length ? `<div class="meta" style="margin-top:4px"><b>Pendências de migração:</b><br>${pe.map(t => '• ' + esc(t)).join('<br>')}</div>` : ''}
+          ${extra.map(k => `<div class="meta"><b>${esc(k.replace(/_/g, ' '))}:</b> ${esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])}</div>`).join('')}
+          ${!nu.length && !pe.length && !extra.length && !x.ancora_o_que_compara ? '<div class="meta">Nada pendente neste módulo.</div>' : ''}` : ''}
+        </div></div>`; }).join('')}
+    <p class="rascunho" style="margin-top:.6rem">Confiável = a âncora bate com o mundo real e nenhuma regra está vermelha; em conserto = a âncora não bate ou alguma regra está vermelha (o "não usar" diz o quê); sem âncora = ainda não há comparação com o mundo real.</p></div>`;
+}
+
+// selo por módulo: hoje só o estoque tem (uma linha por loja); vermelho primeiro, sem botões
+let SELO = { res: [], itens: [] };
+function seloHtml() {
+  if (!SELO.res.length) return '';
+  const num = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+  return SELO.res.map(r => { const ok = /CONFI/i.test(r.selo_modulo || '');
+    const I = SELO.itens.filter(x => x.unidade === r.unidade).sort((a, b) => (a.selo === b.selo ? 0 : a.selo === 'EM CONSERTO' ? -1 : 1) || String(a.nome_saipos).localeCompare(String(b.nome_saipos)));
+    return `<details class="bloco"><summary>Selo do estoque (${esc(r.unidade)}): <span style="color:${ok ? 'var(--ok)' : 'var(--acento)'}">${esc(r.texto || '')} · ${ok ? 'confiável' : 'em conserto'}</span>
+      <span class="n" style="font-weight:400;color:var(--mudo)">contagem de ${dataBR(r.data_contagem)} contra ${dataBR(r.data_partida)} · margem 3%</span></summary>
+      <div class="corpo">${I.map(x => { const v = x.selo === 'EM CONSERTO'; return `<div class="mig-l"><span class="bola" style="background:${v ? 'var(--acento)' : 'var(--ok)'}"></span><div class="tx">${esc(x.nome_saipos)}
+        <div class="meta">esperado ${num(x.esperado)} · contado ${num(x.contado)} ${esc(String(x.un || '').toLowerCase())} · diferença ${x.dif_pct != null ? num(x.dif_pct) + '%' : '—'} · ${v ? 'em conserto' : 'confiável'}</div>
+        ${x.motivo ? `<div class="meta">por quê: ${esc(x.motivo)}${x.conserto ? ' · o que falta: ' + esc(x.conserto) : ''}</div>` : ''}</div></div>`; }).join('')}</div></details>`; }).join('');
+}
+function migPassosHtml() {
+  if (!MIG.length) return '';
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+  const n = k => MIG.filter(x => x.situacao === k).length;
+  const pct = Math.round(n('feito') * 100 / MIG.length);
+  const dias = (a, b) => (new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5;
+  const posHoje = Math.max(0, Math.min(100, dias(MIG_INICIO, hoje) * 100 / dias(MIG_INICIO, MIG_FIM)));
+  const vis = MIG.filter(x => MIG_F === 'todos' || x.situacao === MIG_F);
+  const linha = x => { const atrasado = x.prazo && x.prazo < hoje && x.situacao !== 'feito';
+    return `<div class="mig-l ${esc(x.situacao)}"><span class="bola ${esc(x.situacao)}" title="${esc(x.situacao)}"></span><div class="tx">${esc(x.passo)}
+      <div class="meta">${esc(x.responsavel || '')}${x.prazo ? ` · <span class="${atrasado ? 'atraso' : ''}">até ${dataBR(x.prazo)}${atrasado ? ' (passou)' : ''}</span>` : ''} · ${esc(x.situacao)}</div>
+      ${x.situacao === 'travado' && x.travado_por ? `<div class="trav">travado por: ${esc(x.travado_por)}</div>` : ''}</div></div>`; };
+  const fases = [...new Set(MIG.map(x => x.fase))].sort();
+  const corpo = fases.map(f => { const l = vis.filter(x => x.fase === f).sort((a, b) => (MIG_ORD[a.situacao] ?? 9) - (MIG_ORD[b.situacao] ?? 9) || String(a.prazo || '9').localeCompare(String(b.prazo || '9')));
+    return l.length ? `<div class="fase">${esc(MIG_FASES[f] || 'Fase ' + f)} · ${l.length}</div>${l.map(linha).join('')}` : ''; }).join('') || '<p class="vazio">Nada aqui para este filtro.</p>';
+  const ult = MIG.map(x => x.atualizado_em).filter(Boolean).sort().pop();
+  return `<div class="mig" style="border:0;padding:0;margin:0">
+      <div class="mig-nums"><span class="feito">${n('feito')} feito${n('feito') === 1 ? '' : 's'}</span><span class="andamento">${n('andamento')} em andamento</span>
+        <span>${n('a fazer')} a fazer</span>${n('travado') ? `<span class="travado">${n('travado')} travado${n('travado') === 1 ? '' : 's'}</span>` : ''}</div>
+      <div class="mig-barra" title="${pct}% feito"><i style="width:${pct}%"></i></div>
+      <div class="mig-tempo"><span>${pct}% feito · 25/11</span><b style="left:${posHoje}%">hoje</b><span class="fim">ter 01/12</span></div>
+      <div class="mig-filtro">${[['todos', 'Todos'], ['travado', 'Travados'], ['andamento', 'Em andamento'], ['a fazer', 'A fazer'], ['feito', 'Feitos']]
+        .map(([k, t]) => `<button class="${MIG_F === k ? 'on' : ''}" onclick="MIG_F='${k}';desenhar()">${t} · ${k === 'todos' ? MIG.length : n(k)}</button>`).join('')}</div>
+      ${corpo}
+      ${ult ? `<p class="rascunho" style="margin-top:.6rem">Situação atualizada em ${dataBR(ult.slice(0, 10))} ${new Date(ult).toLocaleTimeString('pt-BR', { timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit' })}; parte dela se atualiza sozinha de 30 em 30 minutos.</p>` : ''}
+    </div>`;
 }
 
 function card(i) {
@@ -157,6 +315,7 @@ function desenhar() {
     <p class="eyebrow">Cidadão do Mundo · só Neto e Fabio${ult ? ' · atualizado em ' + dataBR(ult) : ''}</p>
     <h1>Plano de saída</h1>
     <p class="missao"><b>A missão até 31/12:</b> entregar e fazer rodar. Quem assume cada coisa depois é decisão do Fabio.</p>
+    ${migHtml()}
     <h2>As 6 entregas até 31/12</h2>
     <p class="rascunho">O prazo é 31/12. As outras datas são referência de trabalho.</p>
     ${entregas || '<p class="vazio">Todas entregues.</p>'}

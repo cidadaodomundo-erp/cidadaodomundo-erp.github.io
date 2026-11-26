@@ -610,7 +610,7 @@ const CG_TELAS = {
   // 29/10/2026 14:24 (dono): o que era "Acompanhar" virou tela própria (custo) ou foi para o Financeiro (acertos)
   pcusto: { titulo: 'Custo da folha', leg: 'Quanto a folha custou de verdade (contas a pagar), por pessoa e por setor. Só consulta.', abas: [['custo', 'Custo por pessoa'], ['setor', 'Por setor']] },
   pacertos: { titulo: 'Acertos da folha no Saipos', leg: 'As provisões de adiantamento, VT e VA que o robô acerta no Saipos.', abas: [['saipos', 'Acertos no Saipos']] },
-  pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento.',
+  pcalc: { titulo: 'Cálculos da folha', leg: 'O que a casa calcula para a folha, na ordem de vencimento · pela competência: o mês trabalhado.',
            abas: [['adt', 'Adiantamento · dia 20'], ['dez', 'Gratificações · dia 25'], ['vtva', 'VT e VA · fim do mês'], ['bonif', 'Bonificação'], ['ffcalc', 'Por fora']] },
   pferias: { titulo: 'Férias', leg: 'As que vão vencer e as já lançadas. O simulador de valores e a projeção no contas a pagar entram aqui.', abas: [['ferias', 'Férias']] },
   presc: { titulo: 'Rescisões', leg: 'Simulador e conferência das rescisões enviadas pela contabilidade, com projeção no contas a pagar.', abas: [['resc', 'Rescisões']] },
@@ -2469,6 +2469,7 @@ async function cgFeriasCarregar() {
   try {
     const [per, gozo, aPagar] = await Promise.all([consultarTudo('vw_rh_ferias?select=*&order=limite_gozo.nullslast,nome'),
                                            consultarTudo('vw_rh_ferias_gozo?select=*&order=inicio.desc').catch(() => []),
+                                           // regime (auditoria #64): férias a pagar = CAIXA (o dia em que sai do banco)
                                            consultarTudo('vw_rh_previsao_a_pagar?select=dia,unidade,valor,confianca&tipo=eq.FERIAS').catch(() => null)]);
     CARGOS.ferias = { per, gozo, aPagar };
   } catch (e) { CARGOS.ferias = { erro: e.message }; }
@@ -2508,7 +2509,7 @@ function cgAbaFerias() {
       ${card('podem', 'Podem tirar', podem, totalDe(podem))}
       ${card('marcadas', 'Marcadas na Flash', U.filter(marcada), cgR0(U.filter(marcada).reduce((a, x) => a + cgN(x.valor_programado), 0)))}
       ${card('formacao', 'Em formação', U.filter(formacao), `provisão ${totalDe(U.filter(formacao))}`)}
-      ${P60 ? `<div class="card neutral"><div class="card-lbl">A pagar em 60 dias</div><div class="card-val">${cgR0(soma60())}</div><div class="card-pct">provisão ${cgR0(soma60('ESTIMATIVA'))} · despesa ${cgR0(soma60('CALCULADO'))}</div></div>` : ''}
+      ${P60 ? `<div class="card neutral"><div class="card-lbl">A pagar em 60 dias</div><div class="card-val">${cgR0(soma60())}</div><div class="card-pct">provisão ${cgR0(soma60('ESTIMATIVA'))} · despesa ${cgR0(soma60('CALCULADO'))} · pelo caixa (dia do pagamento)</div></div>` : ''}
     </div>
     ${cgFiltroUnidade(CARGOS.pessoas)}`;
   const vis = (F.ferCard === 'podem' ? podem : F.ferCard === 'marcadas' ? U.filter(marcada) : F.ferCard === 'formacao' ? U.filter(formacao) : U.filter((x) => !formacao(x) || marcada(x)))
@@ -2555,6 +2556,7 @@ async function cgHojeCarregar() {
   const ler = (q) => consultarTudo(q).catch((e) => ({ erro: e.message }));
   try {
     const [L, r, calc, fer] = await Promise.all([ler('vw_rh_flash_caixa?select=*&order=faltam_dias.asc.nullslast,parado_dias.desc.nullslast'), trRpcSeguro('rh_flash_caixa_leitura', {}),
+      // regime (auditoria #62): os cálculos da folha são COMPETÊNCIA (o mês trabalhado); a legenda da tela diz isso
       ler('vw_rh_calculos_mes?select=*&order=data_limite'), ler('vw_rh_ferias_alertas?select=*&order=limite_gozo')]);
     if (!r.ok) throw new Error(await trErroDe(r));
     const lemb = await ler('vw_rh_lembretes_hoje?select=*&order=data,tipo,lembrete_id,pessoa_id');
@@ -3928,20 +3930,26 @@ async function mbCancelar(id) {
 
 // ---------- SEGURO DE VIDA (RH, 13/11/2026; proposta 2026-11-13-rh-seguro-vida.md) ----------
 // Pedido do dono (12/11 13:31): todo mês, quem está na Capemisa × funcionários ativos e motoboys com contrato rodando.
-// Só leitura: o envio ao corretor é do dono, pela agenda (item rh:seguro-movimentacao-AAAA-MM). RLS pode_ver_pessoal().
-let SEG = null, SEG_F = { apolice: null, acao: 'acao' };
+// RLS pode_ver_pessoal().
+// v2 (25/11/2026; proposta 2026-11-25-rh-seguro-vida-v2.md; dono 24/11 13:30: "ordenar as colunas, atualizar com as novas
+// regras que definimos, podia ter um botão de conferencia pra Hellen aprovar e vc já disparar o email"; livro
+// chat-frente-rh/respostas/capemisa-hellen-aprova-robo-envia): colunas ordenáveis, faixa do Jaison, chips do "rodando sem
+// contrato" e o botão "Conferido, pode enviar" (rpc rh_seguro_envio_aprovar; quem envia é o robô, seguro_capemisa.py --enviar).
+let SEG = null, SEG_F = { apolice: null, acao: 'acao' }, SEG_S = { col: null, dir: 1 };
 const SEG_PASTA = 'https://drive.google.com/drive/folders/1ZBQgb48DbVTb7we-vJwpAfDsw1gJEGg5';
 const SEG_COR = { 'Certo': 'var(--farol-ok)', 'Incluir no seguro': 'var(--farol-perto)', 'Tirar do seguro': 'var(--farol-fora)',
   'Conferir': 'var(--amber-2)', 'Rodando sem contrato': 'var(--farol-fora)' };
+const SEG_ORDEM_ACAO = { 'Incluir no seguro': 1, 'Tirar do seguro': 2, 'Conferir': 3, 'Rodando sem contrato': 4, 'Certo': 5 };
 async function entrarPesSeguro() {
   const alvo = document.getElementById('view-pseguro');
   if (!alvo) return;
   alvo.innerHTML = '<div class="contexto">Carregando o seguro de vida...</div>';
   try {
-    const [res, lin] = await Promise.all([
+    const [res, lin, env] = await Promise.all([
       consultarTudo('vw_rh_seguro_resumo?select=*&order=apolice_nome'),
-      consultarTudo('vw_rh_seguro_conferencia?select=competencia,apolice_nome,nome,tipo,acao_texto,motivo,data_mov,certificado,desde,entregas_30d,falta_dado,gerado_em&order=apolice_nome,nome,certificado')]);
-    SEG = { res, lin };
+      consultarTudo('vw_rh_seguro_conferencia?select=competencia,apolice_nome,nome,tipo,acao_texto,motivo,data_mov,certificado,desde,entregas_30d,falta_dado,gerado_em&order=apolice_nome,nome,certificado'),
+      consultarTudo('rh_seguro_envio?select=competencia,aprovado_por,aprovado_em,enviado_em,enviado_por,resultado').catch(() => [])]);
+    SEG = { res, lin, env: env || [] };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto" style="border-color:var(--farol-fora);">Não consegui carregar o seguro de vida: ${cgEsc(e.message)}</div>`;
     return;
@@ -3949,16 +3957,66 @@ async function entrarPesSeguro() {
   segRender();
 }
 function segFiltrar(campo, v) { SEG_F[campo] = SEG_F[campo] === v ? (campo === 'acao' ? 'todos' : null) : v; segRender(); }
+function segOrdenar(col) { SEG_S = SEG_S.col === col ? { col, dir: -SEG_S.dir } : { col, dir: 1 }; segRender(); }
+const segDataHora = (t) => t ? new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '—';
+// o "rodando sem contrato" diz o que fazer pelo começo do motivo (REATIVAR / AVISAR O ALEJO / AVULSO)
+function segMotivoHtml(m) {
+  const t = String(m || '');
+  const chip = (cor, txt) => `<span style="display:inline-block; border:1px solid ${cor}; color:${cor}; border-radius:10px; padding:0 8px; font-size:11.5px; font-weight:700; margin-right:6px;">${txt}</span>`;
+  let mm;
+  if ((mm = t.match(/^REATIVAR:\s*/i))) return chip('var(--farol-ok)', 'reativar contrato') + cgEsc(t.slice(mm[0].length));
+  if ((mm = t.match(/^AVISAR O ALEJO:\s*/i))) return chip('var(--farol-perto)', 'aviso ao Alejo') + cgEsc(t.slice(mm[0].length));
+  if (/^AVULSO/i.test(t)) return chip('var(--tx-4)', 'avulso') + cgEsc(t.replace(/^AVULSO\s*(\([^)]*\))?\s*:?\s*/i, ''));
+  return cgEsc(t);
+}
+// o que vai na planilha: quem tem dado faltando fica para a próxima
+const segVaiNaPlanilha = (x) => !x.falta_dado;
+function segEnvioHtml(comp) {
+  const e = (SEG.env || []).find((x) => String(x.competencia).slice(0, 10) === comp) || {};
+  const L = (SEG.lin || []).filter((x) => String(x.competencia).slice(0, 10) === comp);
+  const entram = L.filter((x) => x.acao_texto === 'Incluir no seguro' && segVaiNaPlanilha(x)).length;
+  const saem = L.filter((x) => x.acao_texto === 'Tirar do seguro' && segVaiNaPlanilha(x)).length;
+  if (e.resultado && /^NÃO ENVIADO/i.test(e.resultado))
+    return `<div class="contexto" style="text-align:left; border-color:var(--farol-fora); color:var(--farol-fora); font-weight:700;">${cgEsc(e.resultado)}</div>`;
+  if (e.enviado_em)
+    return `<span style="color:var(--farol-ok); font-weight:700;">✓ Enviado ao Milton em ${segDataHora(e.enviado_em)}</span>${e.resultado ? ` <span style="color:var(--tx-4); font-size:12px;">· ${cgEsc(e.resultado)}</span>` : ''}`;
+  if (e.aprovado_em)
+    return `<span style="color:var(--farol-ok); font-weight:700;">✓ Aprovado por ${cgEsc(e.aprovado_por || '')} em ${segDataHora(e.aprovado_em)}: o robô envia ao Milton na próxima rodada (07:40)</span>`;
+  return `<button id="segAprovar" class="preset-btn" style="background:var(--serie-3); border-color:var(--serie-3); color:var(--tx-creme); font-weight:700;"
+      onclick="segAprovar('${comp}', ${entram}, ${saem}, this)">Conferido, pode enviar</button>`;
+}
+async function segAprovar(comp, entram, saem, bt) {
+  const mmaa = comp.slice(5, 7) + '/' + comp.slice(0, 4);
+  if (!confirm(`Enviar ao Milton (14 Bis) a movimentação de ${mmaa}: entram ${entram}, saem ${saem}?`)) return;
+  const txt = bt.textContent; bt.disabled = true; bt.textContent = 'enviando…';
+  const ir = () => fetch(`${SUPABASE_URL}/rest/v1/rpc/rh_seguro_envio_aprovar`, { method: 'POST', headers: rmbHeaders(), body: JSON.stringify({ p_competencia: comp }) });
+  let r;
+  try { r = await ir(); if (await rmbRenovarSeExpirado(r)) r = await ir(); }
+  catch (e) { bt.disabled = false; bt.textContent = txt; avisoAcao('erro', '✗ Não deu: ' + e.message, () => segAprovar(comp, entram, saem, bt)); return; }
+  if (!r.ok) {
+    const t = await r.text(); let m = t; try { m = JSON.parse(t).message || t; } catch (e) {}
+    bt.disabled = false; bt.textContent = txt;
+    avisoAcao('erro', '✗ Não deu: ' + String(m).slice(0, 160), () => segAprovar(comp, entram, saem, bt)); return;
+  }
+  const res = String(await r.json().catch(() => '')).replace(/"/g, '');
+  avisoAcao('ok', res === 'JA_ENVIADO' ? `✓ A movimentação de ${mmaa} já tinha sido enviada — às ${avisoHora()}.`
+    : `✓ Aprovado às ${avisoHora()}: o robô envia ao Milton na próxima rodada (07:40).`);
+  await entrarPesSeguro();
+}
 function segRender() {
   const alvo = document.getElementById('view-pseguro');
   if (!alvo || !SEG) return;
   const n = (v) => Number(v) || 0;
   const L = SEG.lin || [];
   const r0 = (SEG.res || [])[0] || (L[0] || {});
-  const comp = r0.competencia ? `${String(r0.competencia).slice(5, 7)}/${String(r0.competencia).slice(0, 4)}` : '—';
-  const quando = r0.gerado_em ? new Date(r0.gerado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '—';
+  const compIso = r0.competencia ? String(r0.competencia).slice(0, 10) : null;
+  const comp = compIso ? `${compIso.slice(5, 7)}/${compIso.slice(0, 4)}` : '—';
+  const quando = segDataHora(r0.gerado_em);
   let h = `<h2>Seguro de vida</h2>
-    <div class="caption-label" style="text-align:left;">Relação da Capemisa de ${comp}, conferida em ${quando} · <a href="${SEG_PASTA}" target="_blank" rel="noopener">planilha do mês ›</a></div>`;
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+      <div class="caption-label" style="text-align:left;">Relação da Capemisa de ${comp}, conferida em ${quando} · <a href="${SEG_PASTA}" target="_blank" rel="noopener">planilha do mês ›</a></div>
+      ${L.length && compIso ? segEnvioHtml(compIso) : ''}</div>
+    <div class="contexto" style="text-align:left; border-color:var(--info); margin-top:8px;"><b>Motoboy no seguro:</b> só quem está na lista do Jaison (14/11): Rhyan, Erick, Felipe Pilatti, José Eduardo, Mirian e Lucas Cestari.</div>`;
   if (!L.length) { alvo.innerHTML = h + `<div class="contexto">Nenhuma relação conferida ainda.</div>`; return; }
   // cartões: um por apólice (número = incluir + tirar) e o dos motoboys rodando sem contrato; clicar filtra a lista
   const cartao = (chave, lbl, num, pct) => {
@@ -3981,16 +4039,24 @@ function segRender() {
     + FILTROS.map(([k, rot, f]) => { const q = conta(f); return (q || k === 'acao' || k === 'todos') ? `<button class="preset-btn${SEG_F.acao === k ? ' active' : ''}" onclick="SEG_F.acao='${k}'; segRender();">${rot} · ${q}</button>` : ''; }).join('')
     + (SEG_F.apolice ? `<button class="preset-btn" onclick="segFiltrar('apolice', null)">${cgEsc(SEG_F.apolice)} ✕</button>` : '') + `</div>`;
   const fAt = (FILTROS.find(([k]) => k === SEG_F.acao) || FILTROS[0])[2];
-  const vis = daApolice.filter(fAt);
-  h += `<div id="tabelaSeguro"><table><thead><tr><th>Pessoa</th><th>Apólice</th><th>Ação</th><th>Motivo</th><th>Falta</th></tr></thead><tbody>`
+  // ordem: a coluna clicada (de novo inverte); sem clique, Ação (incluir, tirar, conferir, rodando, certo) e Pessoa
+  const COLS = [['nome', 'Pessoa'], ['apolice_nome', 'Apólice'], ['acao_texto', 'Ação'], ['motivo', 'Motivo'], ['entregas_30d', 'Entregas 30 dias'], ['falta_dado', 'Falta']];
+  const chave = (x, c) => c === 'acao_texto' ? (SEG_ORDEM_ACAO[x.acao_texto] || 9) : c === 'entregas_30d' ? (x.entregas_30d == null ? -1 : n(x.entregas_30d)) : String(x[c] || '');
+  const cmp = (a, b, c) => { const va = chave(a, c), vb = chave(b, c); return typeof va === 'number' ? va - vb : va.localeCompare(vb, 'pt-BR'); };
+  const vis = daApolice.filter(fAt).sort((a, b) => SEG_S.col ? (cmp(a, b, SEG_S.col) * SEG_S.dir || cmp(a, b, 'nome'))
+    : (cmp(a, b, 'acao_texto') || cmp(a, b, 'nome')));
+  const seta = (c) => SEG_S.col === c ? (SEG_S.dir > 0 ? ' ▲' : ' ▼') : '';
+  h += `<div id="tabelaSeguro"><table><thead><tr>${COLS.map(([c, rot]) => `<th style="cursor:pointer; user-select:none;" onclick="segOrdenar('${c}')" title="clique para ordenar">${rot}${seta(c)}</th>`).join('')}</tr></thead><tbody>`
     + (vis.length ? vis.map((x) => `<tr>
         <td style="font-weight:600;">${cgEsc(x.nome || "")}</td>
         <td>${cgEsc(x.apolice_nome || '')}</td>
         <td style="font-weight:700; color:${SEG_COR[x.acao_texto] || 'var(--tx-3)'};">${cgEsc(String(x.acao_texto || '').toLowerCase())}</td>
-        <td style="white-space:normal; font-size:12.5px;">${cgEsc(x.motivo || '')}</td>
+        <td style="white-space:normal; font-size:12.5px;">${segMotivoHtml(x.motivo)}</td>
+        <td>${x.entregas_30d == null ? '<span style="color:var(--tx-5);">—</span>' : n(x.entregas_30d)}</td>
         <td>${x.falta_dado ? `<span style="display:inline-block; border:1px solid var(--farol-perto); color:var(--farol-perto); border-radius:10px; padding:1px 8px; font-size:12px; white-space:normal;">${cgEsc(x.falta_dado)}</span>` : '<span style="color:var(--tx-5);">—</span>'}</td></tr>`).join('')
-      : `<tr><td colspan="5">Ninguém neste filtro.</td></tr>`)
+      : `<tr><td colspan="6">Ninguém neste filtro.</td></tr>`)
     + `</tbody></table></div>`;
-  h += `<div class="caption-label" style="text-align:left; margin-top:6px;">Sem botão de envio: o envio ao corretor é do dono, pela agenda.</div>`;
+  const faltam = L.filter((x) => x.falta_dado && (x.acao_texto === 'Incluir no seguro' || x.acao_texto === 'Tirar do seguro')).length;
+  h += `<div class="caption-label" style="text-align:left; margin-top:6px;">${faltam ? `${faltam} ${faltam === 1 ? 'fica' : 'ficam'} para a próxima: falta dado (CPF, nascimento ou CNPJ). ` : ''}Depois do <b>Conferido, pode enviar</b>, o robô manda a planilha ao Milton com cópia para a Hellen.</div>`;
   alvo.innerHTML = h;
 }

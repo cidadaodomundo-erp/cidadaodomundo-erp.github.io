@@ -1,6 +1,6 @@
 /* Reunião semanal. Usa as variáveis do nucleo.css (escuro por padrão; html.tema-proposta = claro). */
 .na-casca body::before { display: none !important; }
-.rn { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; color: var(--tx-1, #fff); }
+.rn { max-width: 860px; margin: 0 auto; padding: 8px 16px 40px; color: var(--tx-1, #fff); }
 .rn h1 { font-size: 20px; margin: 4px 0 8px; }
 .rn h2 { font-size: 15px; margin: 22px 0 8px; }
 .rn-obras { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
