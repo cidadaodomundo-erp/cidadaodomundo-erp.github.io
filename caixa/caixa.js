@@ -1198,6 +1198,7 @@ async function caixaAtualizarDia(bt, unidade, dia) {
     if (r.status === 401) { await rmbRenovarSeExpirado(r); r = await pede(); }
     if (!r.ok) throw new Error((await r.text()).slice(0, 160));
     const pedido = (await r.json())[0];
+    if (unidade && pedido) CAIXA_ATUAL = (CAIXA_ATUAL || []).concat([pedido]);
     const t0 = Date.now(), limite = t0 + 300000;
     let estado = 'PENDENTE', resumo = '';
     while (Date.now() < limite && (estado === 'PENDENTE' || estado === 'RODANDO')) {
@@ -1214,6 +1215,7 @@ async function caixaAtualizarDia(bt, unidade, dia) {
       avisoAcao('ok', `✓ Dia ${d.dia.split('-').reverse().join('/')} relido do Saipos — às ${avisoHora()}.`);
       bt.textContent = 'refazendo a conferência...';
       CAIXA_DIAS = null;              // recarrega tudo do banco
+      if (unidade) { CAIXA_HELLEN = null; await entrarCaixa(); return; }   // relê também o estado do botão (caixaHellenCarregar)
       await entrarCaixa();
       if (!unidade) await abrirDiaConcartao(d.unidade, d.dia); else renderModuloCaixa();
       return;
@@ -1909,7 +1911,7 @@ async function caixaHellenCarregar() {
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     // 26/11/2026 [conserto] (dono 18:32: "a tela dos caixas de Ahu e SB estão demorando"): tudo numa leva só — antes eram
     // 8 leituras uma depois da outra depois desta leva (~4 s a mais)
-    const [trs, pix, cobr, forma, onl, robo, quebras, transito, fechdif, fiado, valeD, valeS, vref, desc, motos, aberto] = await Promise.all([
+    const [trs, pix, cobr, forma, onl, robo, quebras, transito, fechdif, fiado, valeD, valeS, vref, desc, motos, aberto, atual, roboCx] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
       consultarTudo('vw_pix_conciliacao?select=dia,dia_turno,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
@@ -1931,7 +1933,11 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []),
       // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
       consultarTudo('vw_loja_dia_aberto?select=unidade,dia,aberto&dia=gte.' + caixaHellenMais(hoje, -40)).catch(() => []),
+      // 26/11 18:35 (dono: "tem como a tela informar que já foi atualizado?"): o pedido de reler e o que o robô lançou depois
+      consultarTudo('caixa_atualizacao_pedido?select=id,unidade,dia,quem,pedido_em,status,terminado_em,resumo&dia=gte.' + des + '&' + un + '&order=id').catch(() => []),
+      consultarTudo('fin_robo_em_caixa?select=unidade,dia,caixa,forma_saipos,pedido_em,feito_em,resultado,cancelado&dia=gte.' + des + '&' + un).catch(() => []),
     ]);
+    CAIXA_ATUAL = atual || []; CAIXA_ROBO = roboCx || [];
     CAIXA_TRANSITO = transito; CAIXA_FECHDIF = fechdif; CAIXA_FIADO = fiado;
     CAIXA_VALE = (valeD || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.frente || 'DELIVERY', valor: x.valor, id: x.id_sale }))
       .concat((valeS || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.caixa, valor: x.valor, id: x.referencia })));
@@ -2229,7 +2235,48 @@ function caixaHistoricoHtml() {
 // 1) envelope recebido pela Hellen × o que o Saipos mandou para o envelope; 2) venda a venda: "Bateu" recolhido e "Pendente" aberto,
 // cada pendente com explicação OBRIGATÓRIA e a decisão (caixa_pendencia_decidir); 3) ✓ só sem pendente; 4) descontos sem motivo ou
 // sem autorização, cada um com explicação.
-let CAIXA_BATEU = {}, CAIXA_ABERTO = {};
+let CAIXA_BATEU = {}, CAIXA_ABERTO = {}, CAIXA_ATUAL = [], CAIXA_ROBO = [], CAIXA_ATUAL_VIGIA = null;
+// 26/11/2026 [dono] (Organizador 18:35: "o botão fica aberto e não dá pro usuário saber se já foi feito ou não"): o botão
+// "Atualizar este dia" diz o estado — relendo o Saipos → enviado ao robô → ✓ atualizado (lançado no Saipos) ou o erro.
+// Lê caixa_atualizacao_pedido (o pedido de reler) e fin_robo_em_caixa (o que o robô lança depois). Sempre pode clicar de novo.
+function caixaAtualBotao(u, dia) {
+  const hh = ts => ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+  const nome = e => { const n = String(e || '').split('@')[0].split(/[._]/)[0]; return n ? n.charAt(0).toUpperCase() + n.slice(1) : ''; };
+  const P = (CAIXA_ATUAL || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia).slice(-1)[0];
+  const R = !P ? [] : (CAIXA_ROBO || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && !x.cancelado && x.pedido_em && x.pedido_em >= P.pedido_em);
+  const bt = (cls, tx) => `<button class="preset-btn${cls}" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\\'")}', '${dia}')">${tx}</button>`;
+  const cap = (cor, tx) => ` <span class="caption-label" style="color:${cor};">${tx}</span>`;
+  let h;
+  if (!P) h = bt(' active', '↻ Atualizar este dia') + cap('var(--tx-4)', 'depois de corrigir no Saipos');
+  else if (P.status === 'PENDENTE' || P.status === 'RODANDO') h = bt('', '↻ Atualizar este dia') + cap('var(--farol-perto)', `relendo o Saipos · pedido às ${hh(P.pedido_em)} por ${trEscH(nome(P.quem))}`);
+  else if (P.status !== 'OK') h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', `erro às ${hh(P.terminado_em || P.pedido_em)}: ${trEscH(P.resumo || P.status)} — clique de novo`);
+  else {
+    const fila = R.filter(x => !x.feito_em), err = R.filter(x => x.feito_em && x.resultado !== 'LANCADO');
+    const fim = R.map(x => x.feito_em).concat([P.terminado_em]).filter(Boolean).sort().slice(-1)[0];
+    if (fila.length) h = bt('', '↻ Atualizar este dia') + cap('var(--farol-perto)', `relido às ${hh(P.terminado_em)} · enviado ao robô · ${fila.length} lançamento${fila.length > 1 ? 's' : ''} na fila do Saipos`);
+    else if (err.length) h = bt(' active', '↻ Atualizar este dia') + cap('var(--farol-fora)', 'erro no lançamento: ' + err.map(x => trEscH(x.forma_saipos + ' — ' + x.resultado)).join(' · '));
+    else h = bt('', `✓ Atualizado às ${hh(fim)} por ${trEscH(nome(P.quem))}`) + cap('var(--tx-4)', (R.length ? R.length + ' lançado' + (R.length > 1 ? 's' : '') + ' no Saipos · ' : '') + 'clique de novo se corrigir mais alguma coisa');
+    if (fila.length) caixaAtualVigiar();
+  }
+  if (P && (P.status === 'PENDENTE' || P.status === 'RODANDO')) caixaAtualVigiar();
+  return h;
+}
+// enquanto houver pedido ou lançamento em andamento, relê o estado a cada 30 s (só o estado, não a tela inteira de dados)
+function caixaAtualVigiar() {
+  if (CAIXA_ATUAL_VIGIA) return;
+  CAIXA_ATUAL_VIGIA = setTimeout(async () => {
+    CAIXA_ATUAL_VIGIA = null;
+    const H = CAIXA_HELLEN; if (!H || !H.lojas || !H.des) return;
+    const un = 'unidade=in.(' + H.lojas.map(u => '"' + encodeURIComponent(u) + '"').join(',') + ')';
+    const [a, b] = await Promise.all([
+      consultarTudo('caixa_atualizacao_pedido?select=id,unidade,dia,quem,pedido_em,status,terminado_em,resumo&dia=gte.' + H.des + '&' + un + '&order=id').catch(() => null),
+      consultarTudo('fin_robo_em_caixa?select=unidade,dia,caixa,forma_saipos,pedido_em,feito_em,resultado,cancelado&dia=gte.' + H.des + '&' + un).catch(() => null)]);
+    if (a) CAIXA_ATUAL = a; if (b) CAIXA_ROBO = b;
+    if (MODULO_ATUAL === 'caixa') renderModuloCaixa();
+  }, 30000);
+}
+// 26/11 18:35 (dono: "no Ahu pode tirar o salão, lá é só o caixa delivery"): loja de um caixa só não mostra o filtro Salão/Delivery
+const CAIXA_SO_DELIVERY = new Set(['AHU']);
 // 26/11/2026 [dono] (Organizador 11:30: "precisa separar salão e delivery, pensei em botão de filtro logo acima do primeiro quadro"):
 // "Todos · Salão · Delivery" filtra a tela inteira (cartões, descontos, Para a Hellen, Últimos 7 dias, Bateu/Pendentes). A contagem
 // do cofre é da loja inteira e não se filtra. Item sem frente conhecida aparece nos dois (nunca some por falta de dado).
@@ -2238,6 +2285,8 @@ const caixaNaFrente = cx => !CAIXA_VER_CX || !cx || cx === CAIXA_VER_CX;
 const caixaFrenteDoCanal = c => !c ? '' : /SAL|BALC|MESA/i.test(String(c)) ? 'SALÃO' : 'DELIVERY';
 function caixaFrenteSel(cx) { CAIXA_VER_CX = cx; renderModuloCaixa(); }
 function caixaFrenteHtml() {
+  const lj = typeof caixaHellenLojas === 'function' ? caixaHellenLojas() : [];
+  if (lj.length && lj.every(u => CAIXA_SO_DELIVERY.has(u))) { CAIXA_VER_CX = ''; return ''; }
   const b = (v, t) => `<button class="preset-btn${CAIXA_VER_CX === v ? ' active' : ''}" onclick="caixaFrenteSel('${v}')">${t}</button>`;
   return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 8px;"><span style="font-size:12.5px;color:var(--tx-3);">Ver:</span>${b('', 'Todos')}${b('SALÃO', 'Salão')}${b('DELIVERY', 'Delivery')}</div>`;
 }
@@ -2421,7 +2470,7 @@ function caixaConfHtml(u, dia) {
   const fazer = faltaEnv.concat(pendF.length ? [pendF.length + (pendF.length === 1 ? ' pendente' : ' pendentes')] : [], abertosD.length ? [abertosD.length + ' desconto(s) sem explicação'] : []);
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok && !fechPend ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">a fazer: ${fazer.join(' · ') || 'contar o envelope'}</span>`}`,
     `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false, !doisCx)
-    + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn active" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
+    + (podeConf ? `<div style="margin-top:8px;">${caixaAtualBotao(u, dia)}</div>` : ''));
 }
 // o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
 const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
