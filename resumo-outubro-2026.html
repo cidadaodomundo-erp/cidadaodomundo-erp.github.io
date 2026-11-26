@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Resumo de outubro/2026</title>
+<!-- Resumo de outubro/2026 v3 ao Fabio (Financeiro 26/11 10:38; Organizador 10:36 liberou; v2 aprovado pelo dono 23/11).
+     Página travada só para Neto e Fabio: nenhum número aqui, o conteúdo vem de plano_pagina (slug resumo-outubro-2026,
+     RLS pode_ver_plano) depois do login, num iframe srcdoc. Molde: logistica-estudo.html. Quem mexe: o chat "Telas do painel". -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma coluna de leitura, blocos numerados pela ordem da decisão; números em tabela tabular */
+:root{
+  --bg:#f6f7f5; --card:#ffffff; --fg:#1d2420; --muted:#5f6b64; --line:#dde3df;
+  --accent:#1f6f54; --accent-soft:#e3f0ea; --warn:#a15c07; --warn-soft:#fbefdc; --bad:#b3261e; --bad-soft:#fbe5e3;
+  --bar-propria:#1f6f54; --bar-fs:#4a6fa5; --bar-sob:#b3261e;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141917; --card:#1c2320; --fg:#e7ece9; --muted:#9aa8a0; --line:#2e3833;
+  --accent:#5cc49b; --accent-soft:#1e3a2f; --warn:#e6a54a; --warn-soft:#3a2c17; --bad:#f08a80; --bad-soft:#3d2120;
+  --bar-propria:#5cc49b; --bar-fs:#8fb0e3; --bar-sob:#f08a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --card:#1c2320; --fg:#e7ece9; --muted:#9aa8a0; --line:#2e3833;
+  --accent:#5cc49b; --accent-soft:#1e3a2f; --warn:#e6a54a; --warn-soft:#3a2c17; --bad:#f08a80; --bad-soft:#3d2120;
+  --bar-propria:#5cc49b; --bar-fs:#8fb0e3; --bar-sob:#f08a80; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:860px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:30px;line-height:1.15}
+h2{font-size:20px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+p{margin:0;max-width:68ch}
+section{display:flex;flex-direction:column;gap:12px}
+.answer{background:var(--accent-soft);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.answer ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.kpi .v{font-family:var(--display);font-size:26px;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:13px;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+.neg{color:var(--bad)} .good{color:var(--accent);font-weight:600}
+.bars{display:flex;flex-direction:column;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.bar{display:grid;grid-template-columns:170px 1fr 92px;gap:10px;align-items:center;font-size:14px}
+.bar .track{background:var(--line);height:14px;border-radius:7px;overflow:hidden}
+.bar .fill{height:100%;border-radius:7px}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted)}
+.flag{border-left:4px solid var(--warn);background:var(--warn-soft);padding:12px 14px;border-radius:0 8px 8px 0}
+.flag.bad{border-color:var(--bad);background:var(--bad-soft)}
+@media (max-width:520px){.bar{grid-template-columns:110px 1fr 70px} h1{font-size:25px}}
+body{margin:0}
+.login { max-width: 360px; margin: 12vh auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display:flex; flex-direction:column; gap:8px; }
+.login label { display:flex; flex-direction:column; gap:4px; font-size:.9rem; color: var(--muted); }
+.login input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+.login button, .sair { background: var(--accent); color: var(--card); border: 0; border-radius: 6px; padding: 10px 14px; font: inherit; cursor: pointer; }
+.sair { background: transparent; color: var(--muted); border: 1px solid var(--line); padding: 4px 10px; font-size: .8rem; }
+.erro { color: var(--bad); font-size: .85rem; }
+.sub { color: var(--muted); }
+.foot { max-width:860px; margin:0 auto 40px; padding:0 16px; color: var(--muted); font-size:.8rem; }
+</style>
+</head>
+<body>
+<div id="app"><p class="sub" style="padding:24px 16px;">Carregando…</p></div>
+<script>
+const SLUG = 'resumo-outubro-2026';
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app');
+// Mesma sessão do painel (localStorage 'rmbSessao'). NUNCA renova o token (refresh de uso único derrubaria o painel).
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><h1 style="font-size:1.3rem">Resumo de outubro/2026</h1>
+    <p class="sub">Página só do Neto e do Fabio. Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome (ex.: fabio)"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const nome = String(document.getElementById('e').value || '').trim();
+    const email = !nome || nome.includes('@') ? nome : nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br';
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: document.getElementById('s').value }) });
+    const s = await r.json().catch(() => ({}));
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token: s.access_token, refresh_token: s.refresh_token, email: (s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = (e) => { if (e.key === 'Enter') ir(); };
+}
+async function carregar() {
+  const s = sessaoValida();
+  if (!s) return telaLogin();
+  let r;
+  try { r = await fetch(`${SUPABASE_URL}/rest/v1/plano_pagina?slug=eq.${encodeURIComponent(SLUG)}&select=titulo,conteudo`, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${s.access_token}` } }); }
+  catch (e) { app.innerHTML = `<p class="erro">Sem conexão agora. <button class="sair" onclick="carregar()">tentar de novo</button></p>`; return; }
+  if (r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  const L = r.ok ? await r.json() : [];
+  if (!L.length) { app.innerHTML = `<p class="sub">Esta página é só do Neto e do Fabio.</p><button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  desenhar(L[0], s);
+}
+// o conteúdo é escrito só pela porta do SQL (plano_pagina não aceita escrita pela API)
+function desenhar(p, s) {
+  const c = p.conteudo || {};
+  app.innerHTML = (c.html || '<p class="sub">Página sem conteúdo.</p>')
+    + `<p class="foot">${c.fonte ? 'Fonte: ' + esc(c.fonte) + ' · ' : ''}Entrou como ${esc(s.email || '')} · <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></p>`;
+}
+carregar();
+</script>
+</body>
+</html>

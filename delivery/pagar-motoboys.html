@@ -19,7 +19,7 @@
   if (NA_CASCA) document.documentElement.classList.add('na-casca');
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
-<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261126m">
 <style>
   .na-casca body::before { display:none !important; }
   .pm-topo { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:flex-end; margin:8px 0 12px; border-bottom:1px solid var(--line); padding-bottom:10px; }
@@ -153,6 +153,7 @@
 </div>
 
 <script src="../nucleo/nucleo.js?v=20261122d"></script>
+<script src="../nucleo/loja.js?v=20261028a"></script>
 <script>
 function exigirLogin(recado) {
   if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
@@ -321,34 +322,37 @@ function exigirLogin(recado) {
     const prev = horasEsc(l) != null ? horasEsc(l) : (Number(l.horas_garantido) || null);
     const dif = prev ? Number(l.horas) - prev : null;
     const curta = dif != null && dif < -DADOS.tolerancia_min / 60;
+    // 26/11/2026 [dono] (Organizador 11:59: "o visual pode manter igual do Fabio"): MOTOBOY · CHEGADA · SAÍDA · HORAS · ENTREGAS ·
+    // R$/HORA · GARANTIDO · REFEIÇÃO · A PAGAR · PLANILHA · PIX · DIFERENÇA; a escala combinada fica no clique da linha.
+    // Planilha, Pix feito e Diferença aparecem quando o banco mandar (planilha, pix_pago, diferenca); até lá, "—".
+    const din = (v) => (v == null || v === '' ? '<span class="pm-fraco" title="ainda não chega a esta tela">—</span>' : brl(v));
+    const difv = l.diferenca != null ? Number(l.diferenca) : null;
     let h = '<tr class="lin" data-k="' + esc(k) + '">' +
       '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
         (l.turnos > 1 ? '<small>2 turnos</small>' : '') + (l.corta_dia ? '<small class="pm-nao">✂ atrasou: sem garantido e refeição</small>' : '') + '</span></td>' +
-      '<td data-rot="Escala: entrada" class="esc" title="Escala do Jaison">' + celEsc(l, 'ini') + '</td>' +
-      '<td data-rot="Escala: saída" class="esc">' + celEsc(l, 'fim') + '</td>' +
-      '<td data-rot="Escala: horas" class="esc fim"><b>' + (horasEsc(l) != null ? horasTxt(horasEsc(l)) : (turnosEsc(l).length ? '<span class="pm-tarde">?</span>' : '—')) + '</b></td>' +
-      '<td data-rot="Chegou" class="real' + (tarde ? ' pm-tarde' : '') + '" title="1ª coleta no TrackEat">' + celReal(l, 'ch') + '</td>' +
-      '<td data-rot="Saiu" class="real" title="Última entrega no TrackEat">' + celReal(l, 'sai') + '</td>' +
-      '<td data-rot="Rodou" class="real' + (curta ? ' pm-tarde' : '') + '"' + (curta ? ' title="Rodou menos que o combinado na escala (da 1ª coleta à última entrega)"' : '') + '><b>' + horasTxt(l.horas) + '</b>' +
-        (dif != null ? '<span class="pm-dif ' + (curta ? 'pm-tarde' : 'pm-fraco') + '">' + (dif >= 0 ? '+' : '−') + horasTxt(Math.abs(dif)) + '</span>' : '') + '</td>' +
+      '<td data-rot="Chegada" class="' + (tarde ? 'pm-tarde' : '') + '" title="Entrada no pátio (ou 1ª coleta no TrackEat)">' + celReal(l, 'ch') + '</td>' +
+      '<td data-rot="Saída" title="Última entrega no TrackEat">' + celReal(l, 'sai') + '</td>' +
+      '<td data-rot="Horas" class="' + (curta ? 'pm-tarde' : '') + '"' + (curta ? ' title="Rodou menos que o combinado na escala"' : '') + '><b>' + horasTxt(l.horas) + '</b></td>' +
       '<td data-rot="Entregas">' + esc(l.entregas) + '</td>' +
-      '<td data-rot="Taxas">' + brl(l.taxas) + '</td>' +
       '<td data-rot="R$/hora"><span class="pm-vh">' + brl(l.valor_hora) + '</span></td>' +
       '<td data-rot="Garantido">' + (Number(l.garantido) > 0 ? '<span class="pm-sim">' + brl(l.garantido) + '</span>' : '<span class="pm-nao">Não</span>') + '</td>' +
       '<td data-rot="Refeição">' + refeicaoTxt(l) + (Number(l.cobrar_refeicao) > 0 ? '<br><small class="pm-nao">cobra ' + brl(l.cobrar_refeicao) + '</small>' : '') + '</td>' +
       '<td data-rot="A pagar" class="pm-pagar">' + brl(l.pagar) + '</td>' +
-      '<td data-rot="Pix">' + (l.chave_pix ? '<span class="pm-sim">tem</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td data-rot="Planilha">' + din(l.planilha) + '</td>' +
+      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td data-rot="Diferença">' + (difv == null ? din(null) : Math.abs(difv) < 0.005 ? '<span class="pm-sim">bateu</span>' : '<span class="pm-nao">' + (difv < 0 ? '− ' : '+ ') + brl(Math.abs(difv)) + '</span>') + '</td>' +
       '<td class="pm-fraco">' + (ABERTO[k] ? '▾' : '▸') + '</td></tr>';
     if (ABERTO[k]) {
       const itens = String(l.detalhe || '').split(' · ').filter(Boolean);
       itens.unshift('Taxas das entregas ' + brl(l.taxas) + ' × garantido ' + brl(l.garantido) + ': paga o maior' +
         (Number(l.ajustes) ? ', ' + (l.ajustes > 0 ? '+ ' : '− ') + brl(Math.abs(l.ajustes)) + ' de acerto' : '') +
         (Number(l.cobrar_refeicao) ? ', − ' + brl(l.cobrar_refeicao) + ' de lanche além do direito' : '') + ' = ' + brl(l.pagar) + '.');
-      if (turnosEsc(l).length) itens.push('Escala do Jaison: ' + turnosEsc(l).map((x) => (x.r === 'alm' ? 'almoço ' : 'jantar ') + x.ini + ' às ' + (x.fim || 'fecha') + (x.h != null ? ' (' + horasTxt(x.h) + ')' : '')).join(' · ') +
+      if (turnosEsc(l).length) itens.splice(1, 0, 'Escala do Jaison: ' + turnosEsc(l).map((x) => (x.r === 'alm' ? 'almoço ' : 'jantar ') + x.ini + ' às ' + (x.fim || 'fecha') + (x.h != null ? ' (' + horasTxt(x.h) + ')' : '')).join(' · ') +
         (horasEsc(l) != null ? ' = ' + horasTxt(horasEsc(l)) + ' combinadas; rodou ' + horasTxt(l.horas) : ''));
+      else itens.splice(1, 0, 'Fora da escala do Jaison neste dia.');
       itens.push('Lanches na comanda Z Motoboys: ' + l.lanches + ' (direito: ' + l.direito_refeicoes + ')');
       if (l.reprovadas) itens.push(l.reprovadas + ' corrida(s) reprovada(s) no TrackEat ficaram fora');
-      h += '<tr class="pm-det"><td colspan="15">' + turnosBox(l, k) + '<ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
+      h += '<tr class="pm-det"><td colspan="13">' + turnosBox(l, k) + '<ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
     }
     return h;
   }
@@ -375,14 +379,14 @@ function exigirLogin(recado) {
     (LOJA === 'todas' ? LOJAS : [LOJA]).forEach((lj) => {
       const g = ls.filter((l) => l.loja === lj); if (!g.length) return;
       h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' +
-        '<div class="pm-tab-wrap"><table class="pm-tab"><thead><tr><th></th><th colspan="3" class="grp esc fim">COMBINADO NA ESCALA</th><th colspan="3" class="grp real">O QUE FEZ (TRACKEAT)</th><th colspan="8"></th></tr>' +
-        '<tr><th>Motoboy</th><th class="esc">Entrada</th><th class="esc">Saída</th><th class="esc fim">Horas</th><th class="real">Chegou</th><th class="real">Saiu</th><th class="real">Rodou</th><th>Entregas</th><th>Taxas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Pix</th><th></th></tr></thead><tbody>' +
+        '<div class="pm-tab-wrap"><table class="pm-tab"><thead>' +
+        '<tr><th style="text-align:left">Motoboy</th><th>Chegada</th><th>Saída</th><th>Horas</th><th>Entregas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Planilha</th><th>Pix</th><th>Diferença</th><th></th></tr></thead><tbody>' +
         g.map(linhaHtml).join('') + '</tbody></table></div>';
     });
     const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
     if (sd.length) h += '<div class="pm-aviso" style="margin-top:12px">🍔 <b>' + sd.length + ' lanche(s) sem dono</b> na comanda Z Motoboys — ninguém está sendo cobrado: ' +
       sd.map((x) => esc(x.loja) + ' venda ' + esc(x.numero_venda) + ' (' + esc(x.produto) + ')').join(' · ') + '. Falta o nome do motoboy na observação do lanche.</div>';
-    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. Planilha dos meninos, Pix feito e diferença (a Prova real) ainda estão no portal antigo. Quem decide é você.</p>';
+    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. A escala combinada aparece no clique. Planilha, Pix feito e diferença aparecem aqui quando chegarem ao banco.</p>';
     $('conteudo').innerHTML = h;
   }
 
@@ -541,9 +545,14 @@ function exigirLogin(recado) {
   $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
   $('dia').onchange = carregar;
   $('btnAtualizar').onclick = carregar;
+  // 26/11/2026 [dono] (Organizador 11:59): a loja escolhida no topo do painel vale aqui também
+  const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'SAO BRAZ': 'São Braz', 'AHU': 'Ahú' };
+  const lojaDaCasca = () => { const l = typeof lojaAtual === 'function' ? lojaAtual() : null; return !l || l === 'REDE' ? 'todas' : (LOJA_NOME[l] || l); };
+  LOJA = lojaDaCasca();
+  if (typeof aoMudarLoja === 'function') aoMudarLoja(() => { LOJA = lojaDaCasca(); if (DADOS) { desenhar(); desenharAba(); } });
   $('dia').max = somaDias(hojeSP(), -1);
   $('dia').value = somaDias(hojeSP(), -1);
-  carregar();
+  (async () => { try { if (typeof lojaCarregar === 'function') await lojaCarregar(); } catch (e) {} LOJA = lojaDaCasca(); carregar(); })();
 })();
 </script>
 </body>

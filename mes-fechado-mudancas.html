@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Meses fechados que mudaram</title>
+<!-- 26/11/2026 [regra] (Financeiro 10:25; livro chat-frente-financeiro/respostas/regra-atrasado-entra-no-mes-corrente):
+     o "avisar o Fabio" quando um mês fechado é reaberto, recebe o que chegou atrasado e é congelado de novo.
+     Só a casca: o conteúdo vem AO VIVO de plano_pagina (slug 'mes-fechado-mudancas'), RLS pode_ver_plano = Neto e Fabio.
+     Nenhum número mora neste arquivo (o repositório é público). Molde: plano-saida.html. -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.7rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .regra { background:var(--acento-fundo); border-left:4px solid var(--acento); border-radius:4px; padding:10px 14px; margin:0 0 1.2rem; }
+  .ev { background:var(--papel); border:1px solid var(--linha); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+  .ev-topo { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; justify-content:space-between; }
+  .ev-mes { font-size:1.15rem; font-weight:700; }
+  .selo { font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 9px; border-radius:999px; background:var(--alt); color:var(--mudo); }
+  .selo.re { background:var(--anda-fundo); color:var(--anda); }
+  .quando { font-size:.8rem; color:var(--mudo); }
+  .efeito { font-size:1.05rem; margin:.5rem 0 .2rem; }
+  .sobe { color:var(--ok); font-weight:700; } .desce { color:var(--acento); font-weight:700; }
+  .motivo { font-size:.88rem; color:var(--suave); margin:0 0 .4rem; }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; margin-top:.4rem; }
+  th { text-align:left; font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--mudo); font-weight:600; padding:4px 8px 4px 0; border-bottom:1px solid var(--forte); }
+  td { text-align:left; padding:5px 8px 5px 0; border-bottom:1px solid var(--linha); }
+  .sub { font-size:.78rem; font-weight:600; color:var(--mudo); margin:.9rem 0 0; text-transform:uppercase; letter-spacing:.08em; }
+  details > summary { cursor:pointer; color:var(--mudo); font-size:.85rem; margin-top:.6rem; }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app');
+// Mesma sessão do painel (localStorage 'rmbSessao'); esta página NUNCA renova o token (o refresh_token é de uso único).
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl = v => 'R$ ' + Math.abs(Number(v || 0)).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const sinal = v => Number(v) < 0 ? '− ' + brl(v) : '+ ' + brl(v);
+const NOMES = { 'AGUA VERDE':'Água Verde', 'AHU':'Ahú', 'SÃO BRAZ':'São Braz', 'BOQUEIRAO':'Boqueirão', 'BOQUEIRÃO':'Boqueirão' };
+const loja = u => NOMES[u] || u;
+
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Meses fechados que mudaram</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const t0 = String(document.getElementById('e').value || '').trim();
+    const email = !t0 || t0.includes('@') ? t0 : t0.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br';
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST',
+      headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token,
+      email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+
+async function carregar() {
+  const s = sessaoValida();
+  if (!s) return telaLogin();
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/plano_pagina?select=conteudo,atualizado_em&slug=eq.mes-fechado-mudancas`,
+    { headers:{ apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}` } }).catch(() => null);
+  if (r && r.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  const L = r && r.ok ? await r.json() : [];
+  if (!L.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso a esta página (é só do Neto e do Fabio).</p>
+      <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  desenhar(L[0].conteudo || {});
+}
+
+function cartao(e) {
+  const re = e.acao === 'RECONGELADO';
+  const ant = e.antes || {}, dep = e.depois || {};
+  const lojas = [...new Set([...Object.keys(ant), ...Object.keys(dep)])];
+  const tabLojas = lojas.length ? `<p class="sub">Resultado por loja${re ? ': antes → depois' : ''}</p><div class="scroll"><table>
+      <tr><th>Loja</th>${re ? '<th>Antes</th>' : ''}<th>${re ? 'Depois' : 'Resultado'}</th>${re ? '<th>Mudou</th>' : ''}</tr>
+      ${lojas.map(u => { const a = ant[u], d = dep[u], m = a != null && d != null ? d - a : null;
+        return `<tr><td>${esc(loja(u))}</td>${re ? `<td>${a != null ? (a < 0 ? '− ' : '') + brl(a) : '—'}</td>` : ''}<td>${d != null ? (d < 0 ? '− ' : '') + brl(d) : '—'}</td>${re ? `<td class="${m == null ? '' : m < 0 ? 'desce' : 'sobe'}">${m == null ? '—' : sinal(m)}</td>` : ''}</tr>`; }).join('')}
+    </table></div>` : '';
+  const ln = e.linhas || [];
+  const tabLinhas = ln.length ? `<details><summary>O que entrou (${ln.length} ${ln.length === 1 ? 'linha' : 'linhas'})</summary><div class="scroll"><table>
+      <tr><th>Loja</th><th>Quadro</th><th>Grupo</th><th>Linha</th><th>Valor</th></tr>
+      ${ln.map(x => `<tr><td>${esc(loja(x.loja))}</td><td>${esc(x.quadro)}</td><td>${esc(x.grupo)}</td><td>${esc(x.linha)}</td><td>${Number(x.valor) < 0 ? '− ' : ''}${brl(x.valor)}</td></tr>`).join('')}
+    </table></div></details>` : '';
+  return `<div class="ev">
+    <div class="ev-topo"><span><span class="ev-mes">${esc(e.mes)}</span> <span class="selo ${re ? 're' : ''}">${re ? 'congelado de novo' : 'congelado'}</span></span>
+      <span class="quando">${esc(e.quando || '')}${e.versao != null ? ' · versão ' + esc(e.versao) : ''}</span></div>
+    ${re && e.efeito != null ? `<div class="efeito">Resultado da rede: <span class="${Number(e.efeito) < 0 ? 'desce' : 'sobe'}">${sinal(e.efeito)}</span></div>` : ''}
+    ${e.motivo ? `<p class="motivo">${esc(e.motivo)}</p>` : ''}
+    ${tabLojas}${tabLinhas}</div>`;
+}
+
+function desenhar(c) {
+  const ev = c.eventos || [];
+  app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · Financeiro</p>
+    <h1>Meses fechados que mudaram</h1>
+    <p class="lede">Quando chega algo atrasado de um mês já fechado, o sistema reabre o mês, inclui, congela de novo e registra aqui.</p>
+    ${c.regra ? `<div class="regra">${esc(c.regra)}</div>` : ''}
+    ${ev.length ? ev.map(cartao).join('') : '<p class="vazio">Nenhum mês fechado mudou até agora.</p>'}
+    <footer>Atualizado em ${esc(c.atualizado || '')} · <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+carregar();
+</script>
+</body>
+</html>
