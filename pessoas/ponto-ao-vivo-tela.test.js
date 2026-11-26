@@ -185,7 +185,7 @@ test('somente leitura: só as 4 tabelas permitidas, só as 2 guardas, nada de re
   await t.c.entrar(); await settle();
   assert.ok(t.log.length > 0);
   assert.ok(t.log.every((c) => /^rh_(pessoa|flash_batida|flash_ausencia|ocorrencia)\?/.test(c)), t.log.join('\n'));
-  assert.deepEqual([...new Set(t.rpcs)].sort(), ['pode_cadastrar_pessoal', 'pode_ver_pessoal']);
+  assert.deepEqual([...new Set(t.rpcs)].sort(), ['pode_cadastrar_pessoal', 'pode_ver_ponto']);
 });
 
 test('guarda recusada não lê tabela nenhuma', async () => {

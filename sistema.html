@@ -542,7 +542,8 @@ function visivel(chave) {
   if (chave === 'notaschegou') return visivel('contagem') || visivel('comprateto');
   // item de junção que não é tela (Motoboys): visível se o login abre alguma das abas
   if (JUNCOES[chave] && !abasJuncao(chave).includes(chave)) return abasJuncao(chave).some((k) => visivel(k));
-  if (SO_PESSOAL.has(chave) && VE_PESSOAL === false) return false;
+  // 26/11/2026: quem tem a chave só do ponto (rmb_config.emails_ponto) e a tela no painel_acesso também abre; o banco confere (pode_ver_ponto)
+  if (SO_PESSOAL.has(chave) && VE_PESSOAL === false && !(chave === 'pcartao' && Array.isArray(PODE) && PODE.includes('pcartao'))) return false;
   if (SO_PESSOAL_E_CADASTRO.has(chave) && !(VE_PESSOAL === true && VE_CADASTRA === true)) return false;
   if (SO_GESTAO.has(chave) && VE_GESTAO === false) return false;
   if (SO_DONO.has(chave) && !ehDono() && !(chave === 'agenda' && VE_EQUIPE === true)) return false;

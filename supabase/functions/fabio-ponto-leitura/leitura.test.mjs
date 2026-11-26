@@ -45,7 +45,7 @@ function mkFetch(o = {}) {
       return R(flashDia(u.searchParams.get('date')));
     }
     if (p === '/auth/v1/user') return o.auth || R({ id: 'u1', email: 'x@y.z' });
-    if (p === '/rest/v1/rpc/pode_ver_pessoal') return R(o.ver === undefined ? true : o.ver);
+    if (p === '/rest/v1/rpc/pode_ver_ponto') return R(o.ver === undefined ? true : o.ver);
     if (p === '/rest/v1/rpc/pode_cadastrar_pessoal') return R(o.cad === undefined ? true : o.cad);
     if (p === '/rest/v1/rpc/painel_minhas_lojas') return R(o.painel === undefined ? [{ lojas: ['AGUA VERDE', 'AHU'], loja_inicial: 'AGUA VERDE', travado: false }] : o.painel);   // formato real: RETURNS TABLE => array de 1 linha
     const tabela = { '/rest/v1/rh_pessoa': o.pessoas || PESSOAS, '/rest/v1/vendas_saipos': o.vendas || VENDAS, '/rest/v1/saipos_itens_venda': o.itens || ITENS }[p];
@@ -119,7 +119,7 @@ test('JWT recusado pelo /auth/v1/user: 401 e nenhuma leitura de dado', async () 
   assert.deepEqual(r.f.chamadas.map((c) => c.path), ['/auth/v1/user']);
 });
 test('auth fora do ar: 502 (não libera)', async () => { assert.equal((await rodar({ auth: R({}, 500) })).status, 502); });
-test('exige pode_ver_pessoal E pode_cadastrar_pessoal === true; qualquer outra coisa é 403 sem ler pessoa/Flash/Saipos', async () => {
+test('exige pode_ver_ponto E pode_cadastrar_pessoal === true; qualquer outra coisa é 403 sem ler pessoa/Flash/Saipos', async () => {
   for (const [ver, cad] of [[false, true], [true, false], [null, true], [true, 'true'], [{}, true], [1, 1]]) {
     const r = await rodar({ ver, cad });
     assert.equal(r.status, 403, JSON.stringify([ver, cad]));

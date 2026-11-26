@@ -260,7 +260,7 @@
       if (!sid) return falha('sessao');
       if (!silencioso) { st.dados = null; st.fase = 'carregando'; st.msg = ''; desenhar(); }
       const dia = st.dia;
-      const [a, b] = await Promise.all([guarda('pode_ver_pessoal'), guarda('pode_cadastrar_pessoal')]);
+      const [a, b] = await Promise.all([guarda('pode_ver_ponto'), guarda('pode_cadastrar_pessoal')]);
       if (!vivo()) return;
       if (deps.sessaoId() !== sid) return falha('sessao');
       if ([a, b].includes('sessao')) { if (deps.sessaoVencida) deps.sessaoVencida(); return falha('sessao'); }

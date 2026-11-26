@@ -99,7 +99,7 @@ test('uma só guarda false basta; as duas devem ser === true', async () => {
 });
 test('a guarda roda a cada reentrada', async () => {
   const t = mk(); await t.c.entrar(); await t.c.entrar();
-  assert.equal(t.log.filter((x) => x === 'rpc:pode_ver_pessoal').length, 2);
+  assert.equal(t.log.filter((x) => x === 'rpc:pode_ver_ponto').length, 2);
 });
 
 // ---------- período ----------
@@ -275,7 +275,7 @@ test('editar datas depois de concluir apaga o quadro na hora; Atualizar busca o 
 });
 test('só consome fontes de leitura permitidas', async () => {
   const t = mk(); await t.c.entrar();
-  assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_cadastrar_pessoal', 'rpc:pode_ver_pessoal']);
+  assert.deepEqual(t.log.filter((x) => x.startsWith('rpc:')).sort(), ['rpc:pode_cadastrar_pessoal', 'rpc:pode_ver_ponto']);
   assert.ok(tabelas(t.log).every((c) => /^rh_(pessoa|flash_batida)\?select=[a-z_,]+/.test(c)));
 });
 
