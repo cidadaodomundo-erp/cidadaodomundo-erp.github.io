@@ -110,7 +110,34 @@ function caixaDiaDaVez(u) {
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
 const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {};
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [];
+// 26/11/2026 [dono] (Financeiro 15:43, vw_caixa_envelope_transito): o dinheiro que a filial manda à Água Verde, até a Hellen marcar que chegou
+function caixaTransitoHtml() {
+  const L = (CAIXA_TRANSITO || []).filter(x => x.situacao === 'EM TRÂNSITO' || x.alerta);
+  if (!L.length) return '';
+  const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  const dd = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
+  const nomeL = u => (typeof lojaNome === 'function' ? lojaNome(u) : u);
+  return `<div class="section-label" style="text-align:left;margin-top:16px;">Dinheiro enviado à Água Verde · ${L.length}</div>
+    <div class="contexto" style="text-align:left;">${L.map(x => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);">
+      <span>${trEscH(nomeL(x.unidade_origem))} · enviado ${dd(x.lancado_no_saipos_em)} · <b>${R(x.valor_enviado)}</b> ·
+        <span style="color:${x.alerta ? 'var(--farol-fora)' : 'var(--tx-3)'};">${trEscH(x.situacao)}${x.situacao === 'EM TRÂNSITO' ? ' há ' + x.dias_em_transito + ' dia(s)' : ''}${x.diferenca && Math.abs(+x.diferenca) >= 0.005 ? ' · diferença ' + R(x.diferenca) : ''}</span></span>
+      ${x.situacao === 'EM TRÂNSITO' ? `<button class="preset-btn active" onclick="caixaTransitoReceber(${Number(x.saida_id_titulo)}, ${Number(x.valor_enviado) || 0}, this)">Chegou</button>` : ''}</div>`).join('')}</div>`;
+}
+async function caixaTransitoReceber(id, valor, bt) {
+  const v = prompt('Quanto chegou na Água Verde? (enviado: R$ ' + fmt(valor) + ')', String(valor).replace('.', ','));
+  if (v === null) return;
+  const n = Number(String(v).replace(/\./g, '').replace(',', '.'));
+  if (!(n >= 0)) return avisoAcao('atencao', '! Digite o valor que chegou (0 se não chegou nada).');
+  const obs = Math.abs(n - valor) >= 0.005 ? (prompt('Chegou diferente do enviado. O que aconteceu?') || '') : '';
+  bt.disabled = true; bt.textContent = 'gravando…';
+  const r = await trRpcSeguro('caixa_envelope_receber', { p_saida_id_titulo: id, p_valor: n, p_observacao: obs || null });
+  if (!r.ok) { bt.disabled = false; bt.textContent = 'Chegou'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r))); }
+  const frase = await r.json().catch(() => '');
+  avisoAcao('ok', '✓ ' + (typeof frase === 'string' && frase ? frase : 'Gravado às ' + avisoHora() + '.'));
+  CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => CAIXA_TRANSITO);
+  renderModuloCaixa();
+}
 // id_sale da chave da pendência (dif:/pdv:/pix:/quase:/troca:/divid: o 1º) e a linha de detalhe da venda
 const caixaIdDaChave = (c) => (String(c || '').match(/^(?:dif|pdv|pix|quase|troca|divid):(\d+)/) || [])[1] || null;
 function caixaRefTxt(id) { const v = id && CAIXA_VREF[String(id)]; if (!v) return ''; return [v.ref_venda, String(v.hora || '').slice(0, 5), v.caixa ? 'setor ' + (v.caixa === 'SALÃO' ? 'salão' : 'delivery') : ''].filter(Boolean).join(' · '); }
@@ -1830,6 +1857,7 @@ async function caixaHellenCarregar() {
     ]);
     // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento com o número da venda"; Financeiro c770577):
     // por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor — salão não tem número no Saipos
+    CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []);
     CAIXA_VREF = {};
     (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
@@ -2036,6 +2064,7 @@ function caixaHellenHtml() {
     return `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);"><span style="flex:1 1 auto;">${t}</span>${b}</div>`; }).join('');
   return `<div class="section-label" style="text-align:left;">Caixa de ontem (${caixaDdm(caixaHellenMais(hojeSP, -1))}) · conferência de hoje</div>
     <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">${hoje}</div>
+    ${caixaHellenLojas().includes('AGUA VERDE') ? caixaTransitoHtml() : ''}
     ${caixaDescontosHtml()}
     <div class="section-label" style="text-align:left;margin-top:16px;">Para a Hellen${deHellen.length ? ' · ' + deHellen.length : ''}</div>
     ${deHellen.length || semMot ? `<div class="contexto" style="text-align:left;">${lista}</div>` : `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);">${ok('nada para resolver')}</div>`}`;
@@ -2228,9 +2257,14 @@ function caixaBateuTabela(it) {
   return `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;color:var(--tx-3);"><tr><th style="${td}">Hora</th><th style="${td}">Venda</th><th style="${td}">Setor</th><th style="${td}">No Saipos</th><th style="${td}">Na maquininha / banco</th><th style="${td}text-align:right;">Valor</th></tr>`
     + it.map(x => `<tr><td style="${td}white-space:nowrap;">${trEscH(x.hora)}</td><td style="${td}white-space:nowrap;">${trEscH(x.venda)}</td><td style="${td}">${trEscH(x.setor || '')}</td><td style="${td}">${trEscH(x.saipos)}</td><td style="${td}">${trEscH(x.outro)}</td><td style="${td}text-align:right;white-space:nowrap;">R$ ${fmt(x.valor)}</td></tr>`).join('') + '</table></div>';
 }
-function caixaResPendHtml(res, pend, lote) {
+// hora em que o robô lê a abertura (gaveta) do Saipos — SB salão: seg, qua a sex 16:10; sáb e dom 11:10; terça fechado (Financeiro 15:43)
+function caixaHoraLeitura(u, cx, diaLeitura) {
+  if (u === 'SÃO BRAZ' && cx === 'SALÃO') { const w = new Date(diaLeitura + 'T12:00:00').getDay(); return w === 2 ? 'terça o salão está fechado' : w === 0 || w === 6 ? 'salão às 11:10' : 'salão às 16:10'; }
+  return cx === 'SALÃO' ? 'salão às 11:10' : 'delivery às 10:10';
+}
+function caixaResPendHtml(res, pend, lote, semFiltro) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
-  if (CAIXA_VER_CX) { pend = pend.filter(p => caixaNaFrente(p.caixa)); if (res && res.porCx) res = res.porCx(CAIXA_VER_CX); }
+  if (CAIXA_VER_CX && !semFiltro) { pend = pend.filter(p => caixaNaFrente(p.caixa)); if (res && res.porCx) res = res.porCx(CAIXA_VER_CX); }
   // sem nenhuma venda de cartão lida para o dia não é "tudo certo": diz que falta o dado
   if ((!res || !res.n) && !pend.length) return '<div style="color:var(--tx-4);">sem vendas de cartão lidas para este dia (a maquininha ainda não chegou ao painel)</div>';
   return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div>${caixaBateuTabela(res.itens)}</details>` : '')
@@ -2276,12 +2310,14 @@ function caixaConfHtml(u, dia) {
   // 13:48): a view traz uma linha por loja, dia e caixa (DELIVERY/SALÃO). 'LOJA' = envelope único de antes da separação: segue numa linha só.
   const doDia = (COFRE_CDIA || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
   // 26/11 15:09 (dono: "sempre vai ser diferente os valores de cada caixa"): o envelope único (LOJA) acabou; cada setor grava o seu
-  const setores = doDia.filter(x => x.caixa === 'DELIVERY' || x.caixa === 'SALÃO').filter(x => caixaNaFrente(x.caixa)).sort((a, b) => String(a.caixa).localeCompare(String(b.caixa)));
+  // 26/11 15:28 (dono: Ahú "não abre a contagem e não mostra"): loja de um caixa só (o Ahú: o balcão entra no Atendimento) não some no filtro
+  const doisCx = doDia.filter(x => x.caixa === 'DELIVERY' || x.caixa === 'SALÃO').length > 1;
+  const setores = doDia.filter(x => x.caixa === 'DELIVERY' || x.caixa === 'SALÃO').filter(x => !doisCx || caixaNaFrente(x.caixa)).sort((a, b) => String(a.caixa).localeCompare(String(b.caixa)));
   const num = (v) => v == null ? null : Number(v);
   const ag = '<span style="color:var(--tx-4);">aguardando a leitura do Saipos</span>', tr = '<span style="color:var(--tx-4);">—</span>';
   const ln = (rot, val) => `<div style="display:flex;gap:10px;justify-content:space-between;padding:4px 0;"><span>${rot}</span><span style="text-align:right;">${val}</span></div>`;
   let envGrav = setores.length > 0;
-  const din = !setores.length ? ln('Envelope recebido pela Hellen', ag) : setores.map(cd => {
+  const din = !setores.length ? ln('Envelope contado', ag) : setores.map(cd => {
     const cx = cd.caixa || 'LOJA', kc = k + cx.replace(/[^A-Z]/g, '');
     const gav = num(cd.gaveta_abertura_dia_seguinte), abre = num(cd.abertura_do_dia);
     const grav = cd.contado != null && !CDIA_CORRIGINDO[kc]; if (!grav) envGrav = false;
@@ -2291,8 +2327,8 @@ function caixaConfHtml(u, dia) {
     const tot = num(cd.total_contado), esp = num(cd.esperado_saipos), df = num(cd.diferenca_total);
     const tit = cx === 'LOJA' ? 'Envelope único (antes da separação)' : cx === 'DELIVERY' ? 'Delivery' : 'Salão';
     return `<div style="margin-top:6px;"><div style="font-weight:700;color:var(--tx-2);">${tit}</div>`
-      + ln('Envelope recebido pela Hellen', envCampo)
-      + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : '<span style="color:var(--tx-4);">aguardando a leitura do Saipos (delivery às 10:10, salão às 11:10)</span>')
+      + ln('Envelope contado', envCampo)
+      + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : `<span style="color:var(--tx-4);">aguardando a leitura do Saipos (${caixaHoraLeitura(u, cx, caixaHellenMais(dia, 1))})</span>`)
       + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
       + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
       + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`) + '</div>';
@@ -2303,10 +2339,13 @@ function caixaConfHtml(u, dia) {
   const abertosD = caixaDescAbertos(u, dia);
   const eu = String((rmbSessao() || {}).email || '').toLowerCase();
   const podeConf = (typeof souODono === 'function' && souODono()) || (CAIXA_RESP || []).some(r => r.unidade === u && String(r.email).toLowerCase() === eu);
-  const pendF = pend.filter(p => caixaNaFrente(p.caixa));
+  const pendF = doisCx ? pend.filter(p => caixaNaFrente(p.caixa)) : pend;
   const ok = !pendF.length && !abertosD.length && envGrav;
-  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pendF.length + abertosD.length + (envGrav ? 0 : 1)} a fazer</span>`}`,
-    `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false)
+  // 26/11 (dono: SB "1 a fazer" com "nenhuma pendente"): diz QUAL é a coisa a fazer
+  const faltaEnv = setores.filter(cd => cd.contado == null).map(cd => 'contar o envelope do ' + (cd.caixa === 'SALÃO' ? 'Salão' : 'Delivery'));
+  const fazer = faltaEnv.concat(pendF.length ? [pendF.length + (pendF.length === 1 ? ' pendente' : ' pendentes')] : [], abertosD.length ? [abertosD.length + ' desconto(s) sem explicação'] : []);
+  return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">a fazer: ${fazer.join(' · ') || 'contar o envelope'}</span>`}`,
+    `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false, !doisCx)
     + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn active" style="font-weight:600;" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
 }
 // o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
