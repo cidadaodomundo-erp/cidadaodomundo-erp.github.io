@@ -16,6 +16,8 @@ window.CASCA_MODULOS_CFG = {
     macertos: 'Motoboys · Acertos',
     contestacoes: 'Cancelamentos · Contestações',
     reembolsos: 'Pedir reembolso',
+    manutencao: 'Pedidos de manutenção',
+    prestadores: 'Técnicos de manutenção',
   },
   // telas que não estão no menu.js e entram no menu novo
   extras: { reembolsos: { rotulo: 'Pedir reembolso', icone: '💸' },   // dono 07/11: fica, para pedir daqui pra frente (com o Histórico)
@@ -61,7 +63,10 @@ window.CASCA_MODULOS = [
     lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
   { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto', 'mercadolivre'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
-    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist', 'temperaturas', 'manutencao', 'prestadores'] },   // o ciclo, na ordem (dono, 27/10)
+    lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
+  // 24/11/2026: Manutenção virou módulo próprio (saiu da Produção): pedidos de manutenção, técnicos e temperaturas das câmaras.
+  { id: 'manutencao', nome: 'Manutenção', icone: '🔧',
+    lancar: ['manutencao'], acompanhar: ['prestadores', 'temperaturas'] },
   { id: 'listas', nome: 'Listas', icone: '🧺', lancar: ['listas'], acompanhar: ['listasfin'] },
   { id: 'cardapiocusto', nome: 'Cardápio e custo', icone: '📋', lancar: ['fichas'], acompanhar: ['engcard', 'rateio', 'saiposcod'] },
   { id: 'atacado', nome: 'Atacado', icone: '🚚', lancar: ['orcamentos', 'lojaempresas'], acompanhar: [] },

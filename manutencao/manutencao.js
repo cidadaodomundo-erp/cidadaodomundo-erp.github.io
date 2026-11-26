@@ -1,10 +1,11 @@
-/* Manutenção e Quem conserta — camada de tela. Chamados: só campos preparados e desabilitados (nada é enviado ou salvo).
+/* Manutenção e Quem conserta — camada de tela. Pedidos de manutenção (24/11/2026): abre pedido, lista os abertos e marca
+ * em andamento / resolvido / cancelado, só pelas funções erp_manutencao_* do ERP (elas conferem tela e loja da conta).
  * Quem conserta: consulta (GET) do cadastro de prestadores que já existe no ERP, diretório geral (sem loja).
  * Depende de nucleo.js (rmbSessao, trFetch), loja.js (lojaCarregar, lojaAtual, aoMudarLoja, lojaNome),
  * manutencao-modelo.js, manutencao-dados.js e de NA_CASCA / avisarCasca definidos no index.html.
  * Sem innerHTML, sem timers, sem armazenamento de dados. O único acesso a rmbSessao é para ler o e-mail (identidade)
  * e, num 401 que sobrou depois da renovação, encerrar a sessão da MESMA conta que fez a leitura.
- * Só a aba Quem conserta consulta o ERP; a aba Chamados só mostra a loja escolhida (precisa da lista de lojas). */
+ * A aba Chamados (Pedidos) precisa da lista de lojas. */
 (function () {
   'use strict';
   var M = window.ModeloManutencao;
@@ -24,6 +25,10 @@
   var LOJA = null;             // loja que a aba Chamados está mostrando
   var FILTRO = { texto: '', setor: '' };
   var LEIT = novaLeitura();
+  var LOJAS_LISTA = [];        // lojas da conta (sem 'REDE'), para escolher onde abrir o pedido quando o topo está na Rede
+  var PED = { gen: 0, fase: 'inicial', lista: [], quando: null, msg: null, enviando: false };
+  var PRIOR = [['urgente', 'Urgente'], ['alta', 'Alta'], ['media', 'Média'], ['baixa', 'Baixa']];
+  var SIT = { aberto: 'Aberto', em_andamento: 'Em andamento', resolvido: 'Resolvido', cancelado: 'Cancelado' };
 
   function novaLeitura() { return { gen: 0, fase: 'inicial', dados: null, quando: null }; }
 
@@ -91,7 +96,8 @@
   }
   function bloquear(tipo, texto) {
     descartarTudo();
-    LOJAS_OK = false; PENDENTE = false; LOJA = null;
+    PED = { gen: PED.gen + 1, fase: 'inicial', lista: [], quando: null, msg: null, enviando: false };
+    LOJAS_OK = false; PENDENTE = false; LOJA = null; LOJAS_LISTA = [];
     BLOQUEIO = { tipo: tipo, texto: texto };
     FILTRO = { texto: '', setor: '' };
     desenhar();
@@ -162,8 +168,10 @@
       if (BLOQUEIO) return;
       if (!info || !Array.isArray(info.lojas)) { LOJAS_FALHA = true; desenhar(); return; }   // falha NÃO é lista vazia
       LOJAS_OK = true;
+      LOJAS_LISTA = info.lojas.filter(function (l) { return l && l !== 'REDE'; });
       LOJA = typeof lojaAtual === 'function' ? lojaAtual() : null;
       desenhar();
+      carregarPedidos();
     });
   }
 
@@ -172,6 +180,68 @@
     if (!emailAtual() || emailAtual() !== IDENT) { guarda(); return; }
     LOJA = typeof lojaAtual === 'function' ? lojaAtual() : null;
     desenhar();
+    carregarPedidos(true);
+  }
+
+  // ------------------------------------------------------------------ pedidos de manutenção
+  async function rpc(fn, args) {
+    var r;
+    try { r = await trFetch('rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) }); }
+    catch (e) { return { ok: false, status: 0, msg: 'Sem conexão agora.' }; }
+    if (r.status === 401) return { ok: false, status: 401 };
+    var j = null;
+    try { j = await r.json(); } catch (e) { j = null; }
+    if (!r.ok) return { ok: false, status: r.status, msg: (j && (j.message || j.hint)) || ('Erro ' + r.status) };
+    return { ok: true, dados: j };
+  }
+
+  async function carregarPedidos(forcar) {
+    if (ABA !== 'chamados' || !LOJAS_OK || BLOQUEIO) return;
+    if (!forcar && PED.fase !== 'inicial') return;
+    if (!telaVisivel()) { PENDENTE = true; return; }
+    var ident = IDENT, gen = ++PED.gen;
+    PED.fase = 'carregando'; desenharPedidos();
+    var r = await rpc('erp_manutencao_pedidos_ler', { p_loja: LOJA || null });
+    if (gen !== PED.gen || BLOQUEIO) return;
+    if (emailAtual() !== ident) { guarda(); return; }
+    if (!r.ok && r.status === 401) { sessaoRecusada(ident); return; }
+    PED.quando = Date.now();
+    if (!r.ok) { PED.fase = r.status === 403 || /acesso/.test(r.msg || '') ? 'naoliberada' : 'falha'; PED.lista = []; PED.msg = r.msg || null; }
+    else { PED.fase = 'ok'; PED.lista = (r.dados && Array.isArray(r.dados.pedidos)) ? r.dados.pedidos : []; }
+    desenharPedidos();
+  }
+
+  async function abrirPedido() {
+    if (!guarda() || PED.enviando) return;
+    var loja = LOJA && LOJA !== 'REDE' ? LOJA : $('campoLoja').value;
+    var eq = ($('campoLocal').value || '').trim(), pb = ($('campoProblema').value || '').trim(), pr = $('campoPrioridade').value || 'media';
+    var st = $('statusEnvio'); limpar(st);
+    if (!loja) { st.appendChild(el('p', 'mn-estado mn-erro', 'Escolha a loja.')); return; }
+    if (!eq || !pb) { st.appendChild(el('p', 'mn-estado mn-erro', 'Preencha o que precisa arrumar e qual é o problema.')); return; }
+    PED.enviando = true; $('btnAbrir').disabled = true;
+    st.appendChild(el('p', 'mn-estado', 'Enviando…'));
+    var ident = IDENT;
+    var r = await rpc('erp_manutencao_pedido_abrir', { p_loja: loja, p_equipamento: eq, p_problema: pb, p_prioridade: pr });
+    PED.enviando = false; $('btnAbrir').disabled = false;
+    if (emailAtual() !== ident) { guarda(); return; }
+    if (!r.ok && r.status === 401) { sessaoRecusada(ident); return; }
+    limpar(st);
+    if (!r.ok) { st.appendChild(el('p', 'mn-estado mn-erro', 'Não foi possível abrir o pedido: ' + (r.msg || 'erro') + '.')); return; }
+    $('campoLocal').value = ''; $('campoProblema').value = ''; $('campoPrioridade').value = 'media';
+    st.appendChild(el('p', 'mn-estado mn-ok', 'Pedido nº ' + r.dados + ' aberto para ' + rotuloLoja(loja) + '.'));
+    carregarPedidos(true);
+  }
+
+  async function mudarSituacao(id, sit) {
+    if (!guarda() || PED.enviando) return;
+    PED.enviando = true;
+    var ident = IDENT;
+    var r = await rpc('erp_manutencao_pedido_situacao', { p_id: id, p_situacao: sit });
+    PED.enviando = false;
+    if (emailAtual() !== ident) { guarda(); return; }
+    if (!r.ok && r.status === 401) { sessaoRecusada(ident); return; }
+    if (!r.ok) { var st = $('statusEnvio'); limpar(st); st.appendChild(el('p', 'mn-estado mn-erro', 'Não foi possível mudar o pedido nº ' + id + ': ' + (r.msg || 'erro') + '.')); return; }
+    carregarPedidos(true);
   }
 
   /* Retoma o que foi pulado (tela oculta) e revalida a identidade. Nunca lê nada por conta própria enquanto oculta. */
@@ -183,7 +253,7 @@
       // lojas ainda não carregadas: só retoma o que foi pulado por tela oculta; falha de lojas pede o botão (sem repetição sozinha)
       if (!LOJAS_OK) { if (PENDENTE && !LOJAS_FALHA) { PENDENTE = false; carregarLojas(); } return; }
       PENDENTE = false;
-      aoLoja();
+      if (PED.fase === 'inicial') carregarPedidos(); else aoLoja();
       return;
     }
     if (PENDENTE || LEIT.fase === 'inicial') { PENDENTE = false; carregarPrest(); }
@@ -191,7 +261,7 @@
 
   // ------------------------------------------------------------------ desenho
   function limparDom() {
-    ['listaPrest', 'statusPrest', 'fontePrest', 'statusGeral', 'lojaInfo', 'campoLoja'].forEach(function (id) { limpar($(id)); });
+    ['listaPrest', 'statusPrest', 'fontePrest', 'statusGeral', 'lojaInfo', 'campoLoja', 'listaPed', 'statusPed', 'statusEnvio'].forEach(function (id) { limpar($(id)); });
     $('buscaTexto').value = '';
     limpar($('filtroSetor'));
     $('filtroSetor').value = '';
@@ -247,17 +317,79 @@
     }
   }
 
-  // Chamados: só mostra a loja escolhida no seletor do topo. Nada é gravado.
+  // Pedidos: o formulário abre pedido na loja do topo (ou na loja escolhida, quando o topo está na Rede).
   function desenharChamados() {
     var sel = $('campoLoja'), info = $('lojaInfo');
     limpar(sel); limpar(info);
-    var nome = LOJA ? rotuloLoja(LOJA) : null;
-    var o = el('option', null, nome || 'Sem loja cadastrada para esta conta');
-    o.value = '';
-    sel.appendChild(o);
-    info.appendChild(el('p', 'mn-nota', nome
-      ? 'Loja escolhida no seletor do topo: ' + nome + '. Ela só aparece aqui; nenhum chamado é gravado.'
-      : 'O cadastro de loja desta conta ainda está pendente. Nenhum chamado é gravado.'));
+    var naRedeTopo = LOJA === 'REDE';
+    if (!LOJA) {
+      var o = el('option', null, 'Sem loja cadastrada para esta conta'); o.value = ''; sel.appendChild(o);
+      sel.disabled = true;
+      info.appendChild(el('p', 'mn-nota', 'O cadastro de loja desta conta ainda está pendente. Sem loja, não dá para abrir pedido.'));
+    } else if (naRedeTopo) {
+      var o0 = el('option', null, 'Escolha a loja'); o0.value = ''; sel.appendChild(o0);
+      LOJAS_LISTA.forEach(function (l) { var x = el('option', null, rotuloLoja(l)); x.value = l; sel.appendChild(x); });
+      sel.disabled = false;
+      info.appendChild(el('p', 'mn-nota', 'O topo está em Rede: a lista mostra os pedidos de todas as suas lojas.'));
+    } else {
+      var o1 = el('option', null, rotuloLoja(LOJA)); o1.value = LOJA; sel.appendChild(o1);
+      sel.disabled = true;
+      info.appendChild(el('p', 'mn-nota', 'Loja escolhida no seletor do topo: ' + rotuloLoja(LOJA) + '.'));
+    }
+    $('btnAbrir').disabled = !LOJA || PED.enviando;
+    desenharPedidos();
+  }
+
+  function desenharPedidos() {
+    var lista = $('listaPed'), status = $('statusPed');
+    if (!lista || !status) return;
+    limpar(lista); limpar(status);
+    var f = PED.fase;
+    if (f === 'inicial') return;
+    if (f === 'carregando') { status.appendChild(el('p', 'mn-estado', 'Carregando os pedidos…')); return; }
+    if (f === 'naoliberada') { status.appendChild(el('p', 'mn-estado mn-aviso', 'Esta conta ainda não tem acesso aos pedidos de manutenção.')); return; }
+    if (f === 'falha') {
+      status.appendChild(el('p', 'mn-estado mn-erro', 'Não foi possível ler os pedidos agora. Isto não quer dizer que não haja pedidos.'));
+      botaoRetentar(status, 'Tentar de novo', function () { carregarPedidos(true); });
+      return;
+    }
+    status.appendChild(el('p', 'mn-fonte', 'Fonte: pedidos de manutenção deste sistema · consultado em ' + (PED.quando ? M.formatarDataHora(PED.quando) : '—') + '.'));
+    var abertos = PED.lista.filter(function (p) { return p.situacao === 'aberto' || p.situacao === 'em_andamento'; });
+    var fechados = PED.lista.filter(function (p) { return !(p.situacao === 'aberto' || p.situacao === 'em_andamento'); });
+    lista.appendChild(el('h2', 'mn-sub', 'Para arrumar (' + abertos.length + ')'));
+    if (!abertos.length) lista.appendChild(el('p', 'mn-estado', 'Nenhum pedido aberto. 👍'));
+    abertos.forEach(function (p) { lista.appendChild(cartaoPedido(p, true)); });
+    if (fechados.length) {
+      lista.appendChild(el('h2', 'mn-sub', 'Resolvidos ou cancelados nos últimos 30 dias (' + fechados.length + ')'));
+      fechados.forEach(function (p) { lista.appendChild(cartaoPedido(p, false)); });
+    }
+  }
+
+  function quando(iso) { var t = Date.parse(iso); return isFinite(t) ? M.formatarDataHora(t) : '—'; }
+  function cartaoPedido(p, aberto) {
+    var card = el('article', 'mn-card mn-ped mn-pr-' + (p.prioridade || 'media'));
+    card.appendChild(el('h3', 'mn-nome', '#' + p.id + ' · ' + (p.equipamento || '—')));
+    card.appendChild(el('p', 'mn-problema', p.problema || ''));
+    var dl = el('dl', 'mn-dados');
+    var pr = PRIOR.filter(function (x) { return x[0] === p.prioridade; })[0];
+    [['Loja', rotuloLoja(p.loja)], ['Prioridade', pr ? pr[1] : p.prioridade], ['Situação', SIT[p.situacao] || p.situacao],
+     ['Aberto', quando(p.aberto_em) + (p.aberto_por ? ' · ' + String(p.aberto_por).split('@')[0] : '')]]
+      .concat(p.resolvido_em ? [['Resolvido', quando(p.resolvido_em) + (p.resolvido_por ? ' · ' + String(p.resolvido_por).split('@')[0] : '')]] : [])
+      .forEach(function (par) {
+        var g = el('div', 'mn-par'); g.appendChild(el('dt', null, par[0])); g.appendChild(el('dd', null, par[1] || '—')); dl.appendChild(g);
+      });
+    card.appendChild(dl);
+    var acoes = el('div', 'mn-acoes');
+    var botoes = aberto
+      ? (p.situacao === 'aberto' ? [['em_andamento', 'Já estão vendo']] : []).concat([['resolvido', '✔ Arrumado'], ['cancelado', 'Cancelar']])
+      : [['aberto', 'Reabrir']];
+    botoes.forEach(function (b) {
+      var x = el('button', 'mn-btn' + (b[0] === 'resolvido' ? ' mn-btn-ok' : ''), b[1]); x.type = 'button';
+      x.addEventListener('click', function () { mudarSituacao(p.id, b[0]); });
+      acoes.appendChild(x);
+    });
+    card.appendChild(acoes);
+    return card;
   }
 
   function carimbo() { return LEIT.quando ? M.formatarDataHora(LEIT.quando) : '—'; }
@@ -323,6 +455,7 @@
     desenhar();
     if (a === 'prestadores') carregarPrest();
     else if (!LOJAS_OK) { if (telaVisivel()) carregarLojas(); else PENDENTE = true; }
+    else carregarPedidos();
   }
   /* Dentro da casca cada aba é uma rota da própria casca: o pedido vai por mensagem (a casca valida o nome contra o menu).
    * Fora da casca troca a aba aqui mesmo. */
@@ -344,6 +477,8 @@
     $('abaChamados').addEventListener('click', function () { clicarAba('chamados'); });
     $('abaPrestadores').addEventListener('click', function () { clicarAba('prestadores'); });
     $('btnQuemConserta').addEventListener('click', function () { clicarAba('prestadores'); });
+    $('btnAbrir').addEventListener('click', abrirPedido);
+    $('btnAtualizarPed').addEventListener('click', function () { if (guarda()) carregarPedidos(true); });
     $('btnAtualizar').addEventListener('click', function () { if (guarda()) carregarPrest(true); });
     $('buscaTexto').addEventListener('input', function () {
       if (!guarda()) return;

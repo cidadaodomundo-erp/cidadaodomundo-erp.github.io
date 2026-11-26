@@ -27,7 +27,7 @@ function preservaOriginais(atual, originais, nome) {
   assert.deepEqual(atual.filter((k) => originais.includes(k)), originais, nome + ': item original removido ou reordenado');
 }
 
-test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rotas casca na MESMA página, no módulo Compras', () => {
+test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rotas casca na MESMA página, no módulo Manutenção', () => {
   const m = itensMenu.filter((i) => i.chave === 'manutencao'), p = itensMenu.filter((i) => i.chave === 'prestadores');
   assert.equal(m.length, 1); assert.equal(p.length, 1);
   assert.equal(m[0].rotulo, 'Manutenção'); assert.equal(p[0].rotulo, 'Quem conserta');
@@ -35,7 +35,7 @@ test('rotas: Manutenção e Quem conserta, um item cada (origem fabio), duas rot
   assert.match(C.CASCA_PAGINAS.manutencao, /^manutencao\/index\.html(\?v=\d{8}[a-z])?#chamados$/);
   assert.match(C.CASCA_PAGINAS.prestadores, /^manutencao\/index\.html(\?v=\d{8}[a-z])?#prestadores$/);
   assert.ok(fs.existsSync(path.join(RAIZ, 'manutencao', 'index.html')));
-  ['manutencao', 'prestadores'].forEach((k) => assert.deepEqual(C.CASCA_MODULOS.filter((x) => [...x.lancar, ...x.acompanhar].includes(k)).map((x) => x.id), ['compras'], k));
+  ['manutencao', 'prestadores'].forEach((k) => assert.deepEqual(C.CASCA_MODULOS.filter((x) => [...x.lancar, ...x.acompanhar].includes(k)).map((x) => x.id), ['manutencao'], k));
   const termos = (k) => C.CASCA_BUSCA[k] || [];
   ['manutencao', 'chamado', 'conserto'].forEach((t) => assert.ok(termos('manutencao').includes(t), t));
   ['quem conserta', 'prestador'].forEach((t) => assert.ok(termos('prestadores').includes(t), t));
@@ -69,7 +69,7 @@ test('sistema.html: só os quatro carimbos de versão mudaram (cada script uma v
   assert.ok(!/manutencao|prestador/i.test(html), 'sistema.html não ganhou lógica de manutenção');
 });
 
-test('index.html: chamados só preparados e desabilitados, sem Salvar habilitado, scripts na ordem, sem links de contato nem handlers inline', () => {
+test('index.html: formulário de pedido ligado (sem <form>/submit), scripts na ordem, sem links de contato nem handlers inline', () => {
   const html = ler('manutencao', 'index.html');
   const ordem = ['nucleo/nucleo.js', 'nucleo/loja.js', 'manutencao-modelo.js', 'manutencao-dados.js', 'manutencao.js'].map((s) => html.indexOf(s));
   assert.ok(ordem.every((n) => n > 0) && ordem.every((n, i) => i === 0 || n > ordem[i - 1]));
@@ -77,14 +77,14 @@ test('index.html: chamados só preparados e desabilitados, sem Salvar habilitado
   assert.ok(!/service_?role|eyJ[A-Za-z0-9_-]{20,}|apikey|supabase\.co|Authorization/i.test(html));
   assert.ok(!/<a\s|href="(tel|https?|whatsapp|mailto)/i.test(html.replace(/<link[^>]*>/g, '')));
   assert.match(html, /<div id="app" hidden>/);
-  assert.match(html, /Em construção\.<\/strong> A abertura e o acompanhamento de chamados ainda não estão ligados\. Nada é enviado ou salvo aqui\./);
-  assert.match(html, /Os campos estão preparados para a próxima etapa/);
-  assert.match(html, /<fieldset class="mn-form" disabled>/);
-  const form = /<fieldset class="mn-form" disabled>[\s\S]*?<\/fieldset>/.exec(html)[0];
-  ['Loja', 'Equipamento/local', 'Problema', 'Prioridade', 'Responsável', 'Prazo', 'Situação'].forEach((c) => assert.ok(form.includes('>' + c + '<'), c));
+  assert.ok(!/Em construção/.test(html));
+  const form = /<fieldset class="mn-form">[\s\S]*?<\/fieldset>/.exec(html)[0];
+  ['Loja', 'O que precisa arrumar (equipamento ou lugar)', 'Qual é o problema', 'Prioridade'].forEach((c) => assert.ok(form.includes('>' + c + '<'), c));
+  ['campoLocal', 'campoProblema', 'campoPrioridade', 'btnAbrir', 'statusEnvio'].forEach((id) => assert.match(form, new RegExp('id="' + id + '"')));
+  ['urgente', 'alta', 'media', 'baixa'].forEach((v) => assert.match(form, new RegExp('value="' + v + '"')));
   assert.ok(!/<form/i.test(html));
   assert.ok(!/type="submit"/i.test(html));
-  for (const campo of form.match(/<(input|select|textarea|button)\b[^>]*>/g)) assert.match(campo, /\bdisabled\b/, campo);
+  ['listaPed', 'statusPed', 'btnAtualizarPed'].forEach((id) => assert.match(html, new RegExp('id="' + id + '"')));
   assert.match(html, /Diretório geral\.<\/strong> Este cadastro não tem loja/);
   ['abaChamados', 'abaPrestadores', 'btnAtualizar', 'btnQuemConserta', 'buscaTexto', 'filtroSetor'].forEach((id) => assert.match(html, new RegExp('id="' + id + '"')));
   const refs = [...html.matchAll(/(?:src|href)="([^"?#]+)(?:\?[^"]*)?"/g)].map((m) => m[1]).filter((r) => !/^https?:/.test(r));
@@ -92,8 +92,15 @@ test('index.html: chamados só preparados e desabilitados, sem Salvar habilitado
 });
 
 for (const arq of ['manutencao.js', 'manutencao-modelo.js', 'manutencao-dados.js']) {
-  test('guarda de fonte ' + arq + ': só GET, sem escrita, sem persistência, sem timer, sem innerHTML, sem log, sem contato externo', () => {
-    const src = ler('manutencao', arq).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+  test('guarda de fonte ' + arq + ': escrita só pelas funções de pedido, sem persistência, sem timer, sem innerHTML, sem log, sem contato externo', () => {
+    let src = ler('manutencao', arq).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+    if (arq === 'manutencao.js') {
+      // 24/11/2026: os pedidos gravam, mas só por estas três funções do ERP (elas conferem tela e loja da conta)
+      const fns = [...src.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]).sort();
+      assert.deepEqual([...new Set(fns)], ['erp_manutencao_pedido_abrir', 'erp_manutencao_pedido_situacao', 'erp_manutencao_pedidos_ler']);
+      assert.equal((src.match(/trFetch\('rpc\/' \+ fn, \{ method: 'POST'/g) || []).length, 1);
+      src = src.replace("trFetch('rpc/' + fn, { method: 'POST'", "trFetch(RPC, {");
+    }
     [/localStorage\s*\.\s*(set|get)Item/, /sessionStorage/, /indexedDB/, /XMLHttpRequest/, /sendBeacon/, /WebSocket/, /EventSource/,
       /\.innerHTML/, /insertAdjacentHTML/, /document\.write/, /\beval\s*\(/, /new Function/, /setInterval/, /setTimeout/, /requestAnimationFrame/,
       /service_?role/i, /Authorization/, /apikey/i, /access_token|refresh_token/, /eyJ[A-Za-z0-9_-]{20,}/, /supabase\.co/,
