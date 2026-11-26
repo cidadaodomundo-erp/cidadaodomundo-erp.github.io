@@ -2444,6 +2444,7 @@ function caixaConfHtml(u, dia) {
   let envGrav = setores.length > 0;
   const din = !setores.length ? ln('Envelope contado', ag) : setores.map(cd => {
     const cx = cd.caixa || 'LOJA', kc = k + cx.replace(/[^A-Z]/g, '');
+    // 26/11 18:56 (dono, Financeiro): abertura de até R$ 0,01 vale R$ 0,00 — o Saipos não abre zerado; a view já devolve 0 e a tela diz "sem troco"
     const gav = num(cd.gaveta_abertura_dia_seguinte), abre = num(cd.abertura_do_dia);
     const grav = cd.contado != null && !CDIA_CORRIGINDO[kc]; if (!grav) envGrav = false;
     const envCampo = grav ? `<b>${R(cd.contado)}</b> <button class="preset-btn" style="margin-left:6px;" onclick="CDIA_CORRIGINDO['${kc}']=true; renderModuloCaixa();">corrigir</button>`
@@ -2453,9 +2454,9 @@ function caixaConfHtml(u, dia) {
     const tit = cx === 'LOJA' ? 'Envelope único (antes da separação)' : cx === 'DELIVERY' ? 'Delivery' : 'Salão';
     return `<div style="margin-top:6px;"><div style="font-weight:700;color:var(--tx-2);">${tit}</div>`
       + ln('Envelope contado', envCampo)
-      + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? R(gav) : `<span style="color:var(--tx-4);">aguardando a leitura do Saipos (${caixaHoraLeitura(u, cx, caixaHellenMais(dia, 1))})</span>`)
+      + ln(`Gaveta = abertura do Saipos de ${caixaDdm(caixaHellenMais(dia, 1))} (lida pelo robô)`, gav != null ? (Math.abs(gav) < 0.015 ? '<span style="color:var(--tx-3);">sem troco</span>' : R(gav)) : `<span style="color:var(--tx-4);">aguardando a leitura do Saipos (${caixaHoraLeitura(u, cx, caixaHellenMais(dia, 1))})</span>`)
       + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
-      + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
+      + ln(`Esperado no Saipos (abertura ${abre != null ? (Math.abs(abre) < 0.015 ? 'sem troco' : R(abre)) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
       + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`)
       + caixaFechSaiposHtml(u, dia, cx) + caixaFiadoValeHtml(u, dia, cx) + '</div>';
   }).join('');
