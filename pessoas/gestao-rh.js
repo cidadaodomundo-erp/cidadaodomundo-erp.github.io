@@ -1,6 +1,7 @@
-// GESTÃO DO RH — ERROS DO DIA (rota prh, Operação das lojas > RH). Só LEITURA: um GET ao leitor próprio
-// (Edge Function fabio-ponto-leitura, com o JWT de quem está logado) por dia/loja escolhidos. Não escreve nada, não tem
-// temporizador, não guarda dado de pessoa no navegador, não toca em robô/tabela/tela do Neto.
+// GESTÃO DO RH — ERROS DO DIA (rota prh, Operação das lojas > RH). Lê o ponto por um GET ao leitor próprio
+// (Edge Function fabio-ponto-leitura, com o JWT de quem está logado) por dia/loja escolhidos. A única escrita é a
+// anotação "o que foi feito" (tabela ponto_feito, só pela função ponto_feito_gravar, que confere a chave do ponto).
+// Não muda ponto, cadastro nem folha; não tem temporizador, não guarda dado de pessoa no navegador, não toca em robô do Neto.
 // Regras em window.GestaoRhModelo (pessoas/gestao-rh-modelo.js); aqui só buscar e mostrar. Todo texto entra por textContent.
 (function (root, factory) {
   'use strict';
@@ -43,7 +44,8 @@
   }
 
   function criar(deps) {
-    const st = { ativo: false, fase: 'carregando', dia: null, loja: null, filtro: 'ERROS', dados: null, gen: 0, montado: false, ligado: false, abort: null };
+    const st = { ativo: false, fase: 'carregando', dia: null, loja: null, filtro: 'ERROS', dados: null, gen: 0, montado: false, ligado: false, abort: null,
+      feitos: {}, feitoErro: false, rascunho: {}, salvando: {}, msgFeito: {} };
     const ui = {};
     const el = (t, c, txt) => { const e = deps.doc.createElement(t); if (c) e.className = c; if (txt !== undefined) e.textContent = txt; return e; };
     const dias = () => M.diasPermitidos(deps.diaOperacional());
@@ -53,7 +55,7 @@
       const raiz = deps.doc.getElementById('view-prh'); if (!raiz) return;
       raiz.replaceChildren();
       raiz.appendChild(el('h2', 'grh-titulo', 'Gestão do RH — erros do dia'));
-      raiz.appendChild(el('p', 'grh-sub', 'Somente leitura. Mostra, por pessoa, o que precisa de atenção no ponto e na refeição do dia escolhido. Nada aqui muda cadastro, ponto ou folha.'));
+      raiz.appendChild(el('p', 'grh-sub', 'Mostra, por pessoa, o que precisa de atenção no ponto e na refeição do dia escolhido. Em "O que foi feito" você anota como resolveu (fica gravado com seu nome e a hora). Nada aqui muda cadastro, ponto ou folha.'));
       const barra = el('div', 'grh-barra');
       ui.ant = el('button', 'grh-btn', '‹ dia anterior'); ui.ant.type = 'button'; barra.appendChild(ui.ant);
       ui.dia = el('strong', 'grh-dia'); barra.appendChild(ui.dia);
@@ -106,7 +108,7 @@
       if (!lista.length) ui.rol.appendChild(el('p', 'grh-vazio', d.kpis.TOTAL ? (st.filtro === 'ERROS' ? 'Nenhum apontamento neste dia para quem bateu ponto.' : 'Ninguém neste filtro.') : 'Nenhuma batida lida neste dia para esta loja.'));
       else {
         const tab = el('table', 'grh-tab'); const th = el('tr');
-        ['Pessoa', 'Batidas', 'Trabalhou · intervalo', 'Apontamentos', 'Refeição'].forEach((t) => th.appendChild(el('th', null, t)));
+        ['Pessoa', 'Batidas', 'Trabalhou · intervalo', 'Apontamentos', 'Refeição', 'O que foi feito'].forEach((t) => th.appendChild(el('th', null, t)));
         const thead = el('thead'); thead.appendChild(th); tab.appendChild(thead);
         const tb = el('tbody');
         lista.forEach((l) => {
@@ -121,6 +123,7 @@
           l.apontamentos.forEach((a) => { const p = el('div', 'grh-ap grh-a-' + a.nivel); p.appendChild(el('b', null, a.rotulo + ': ')); p.appendChild(deps.doc.createTextNode(a.texto)); c4.appendChild(p); });
           tr.appendChild(c4);
           const c5 = el('td', 'grh-ref grh-r-' + l.refeicao.estado + (l.refeicaoErro ? ' grh-r-erro' : ''), textoRefeicao(l, d.fechado)); c5.setAttribute('data-rot', 'Refeição'); tr.appendChild(c5);
+          tr.appendChild(celulaFeito(l));
           tb.appendChild(tr);
         });
         tab.appendChild(tb); ui.rol.appendChild(tab);
@@ -137,6 +140,44 @@
       notas.forEach((a) => ui.avisos.appendChild(el('div', 'grh-aviso', a)));
     }
 
+    // ---------- "o que foi feito": anotação por pessoa e dia ----------
+    function celulaFeito(l) {
+      const c = el('td', 'grh-feito'); c.setAttribute('data-rot', 'O que foi feito');
+      (st.feitos[l.id] || []).forEach((f) => {
+        const p = el('div', 'grh-f-item'); p.appendChild(deps.doc.createTextNode(f.texto));
+        p.appendChild(el('span', 'grh-f-quem', ' — ' + quem(f.autor_email) + (f.em ? ' às ' + horaBrt(f.em) : ''))); c.appendChild(p);
+      });
+      if (st.feitoErro) { c.appendChild(el('div', 'grh-f-msg grh-erro', 'Não foi possível ler as anotações agora.')); return c; }
+      if (!deps.feitoGravar) return c;
+      const caixa = el('textarea', 'grh-f-txt'); caixa.rows = 2; caixa.maxLength = 500;
+      caixa.placeholder = 'Ex.: folga combinada; atestado lançado na Flash; esqueceu de bater, conferido com a loja';
+      caixa.value = st.rascunho[l.id] || ''; caixa.disabled = !!st.salvando[l.id];
+      caixa.addEventListener('input', () => { st.rascunho[l.id] = caixa.value; });
+      const b = el('button', 'grh-btn grh-f-btn', st.salvando[l.id] ? 'Salvando…' : 'Salvar'); b.type = 'button'; b.disabled = !!st.salvando[l.id];
+      b.addEventListener('click', () => salvarFeito(l));
+      c.appendChild(caixa); c.appendChild(b);
+      if (st.msgFeito[l.id]) c.appendChild(el('div', 'grh-f-msg' + (st.msgFeito[l.id].erro ? ' grh-erro' : ''), st.msgFeito[l.id].txt));
+      return c;
+    }
+    const quem = (email) => (typeof email === 'string' && email.includes('@') ? email.split('@')[0] : 'alguém');
+    async function salvarFeito(l) {
+      const texto = String(st.rascunho[l.id] || '').trim();
+      if (!texto) { st.msgFeito[l.id] = { erro: true, txt: 'Escreva o que foi feito antes de salvar.' }; return desenhar(); }
+      if (texto.length > 500) { st.msgFeito[l.id] = { erro: true, txt: 'Máximo de 500 letras.' }; return desenhar(); }
+      const dia = st.dia, loja = st.loja;
+      st.salvando[l.id] = true; st.msgFeito[l.id] = null; desenhar();
+      try {
+        const f = await deps.feitoGravar({ dia, pessoa_id: l.id, unidade: loja, texto });
+        if (st.dia !== dia || st.loja !== loja) return;
+        (st.feitos[l.id] = st.feitos[l.id] || []).push(f && typeof f.texto === 'string' ? f : { texto, autor_email: deps.sessaoId(), em: new Date().toISOString() });
+        st.rascunho[l.id] = ''; st.msgFeito[l.id] = { erro: false, txt: 'Salvo.' };
+      } catch (e) {
+        const c = classeDoErro(e);
+        st.msgFeito[l.id] = { erro: true, txt: c === 'semacesso' ? 'Seu acesso não permite anotar no ponto.' : c === 'sessao' ? 'Sessão vencida. Entre de novo e salve outra vez.' : 'Não salvou. Tente de novo.' };
+        if (c === 'sessao' && deps.sessaoVencida) deps.sessaoVencida();
+      } finally { st.salvando[l.id] = false; if (st.ativo) desenhar(); }
+    }
+
     async function carregar() {
       const gen = ++st.gen; const vivo = () => st.ativo && gen === st.gen;
       if (st.abort) st.abort.abort();
@@ -150,13 +191,18 @@
       if (!vivo()) return;
       const atual = deps.lojaAtual();
       if (!info || !Array.isArray(info.lojas) || typeof atual !== 'string' || !info.lojas.includes(atual)) { st.loja = null; return falha('semloja'); }
-      st.loja = atual; const dia = st.dia; desenhar();
+      st.loja = atual; const dia = st.dia; st.feitos = {}; st.feitoErro = false; st.rascunho = {}; st.msgFeito = {}; desenhar();
       let resp;
+      const pFeitos = deps.feitoListar ? deps.feitoListar({ dia, unidade: atual, signal: ac ? ac.signal : undefined }).then((v) => ({ v }), (e) => ({ e })) : Promise.resolve({ v: [] });
       try { resp = await deps.leituraDireta({ dia, unidade: atual, signal: ac ? ac.signal : undefined }); }
       catch (e) { if (!vivo()) return; const c = classeDoErro(e); if (c === 'sessao' && deps.sessaoVencida) deps.sessaoVencida(); return falha(c); }
       if (!vivo() || st.dia !== dia || deps.lojaAtual() !== atual) return;
       const r = M.apontar(resp, { hojeOperacional: deps.diaOperacional() });
       if (!r.ok || r.dia !== dia) return falha('dadosinvalidos');
+      const fr = await pFeitos;
+      if (!vivo() || st.dia !== dia || deps.lojaAtual() !== atual) return;
+      if (fr.e || !Array.isArray(fr.v)) st.feitoErro = true;
+      else fr.v.forEach((f) => { if (f && f.pessoa_id != null && typeof f.texto === 'string') (st.feitos[f.pessoa_id] = st.feitos[f.pessoa_id] || []).push(f); });
       st.dados = r; st.fase = 'ok'; desenhar();
     }
     const recomecar = () => carregar();
@@ -185,6 +231,23 @@
       aoMudarLoja: (fn) => aoMudarLoja(fn),
       aoMudarSessao: (fn) => window.addEventListener('storage', (e) => { if (e.key === 'rmbSessao' || e.key === null) fn(); }),
       sessaoId: () => { const s = rmbSessao(); return s && s.access_token ? String(s.email || 'sessao') : null; },
+      // anotações "o que foi feito" do dia/loja (leitura liberada pela chave do ponto)
+      feitoListar: async ({ dia, unidade, signal }) => {
+        const s = rmbSessao(); if (!s || !s.access_token) throw Object.assign(new Error('401'), { status: 401 });
+        const r = await fetch(SUPABASE_URL + '/rest/v1/ponto_feito?select=pessoa_id,texto,autor_email,em&order=em.asc&dia=eq.' + encodeURIComponent(dia) + '&unidade=eq.' + encodeURIComponent(unidade),
+          { method: 'GET', headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token }, signal });
+        if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+        return await r.json();
+      },
+      // única escrita da tela: a função do banco confere a chave do ponto e grava quem escreveu
+      feitoGravar: async ({ dia, pessoa_id, unidade, texto }) => {
+        const s = rmbSessao(); if (!s || !s.access_token) throw Object.assign(new Error('401'), { status: 401 });
+        const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/ponto_feito_gravar', { method: 'POST',
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_dia: dia, p_pessoa_id: pessoa_id, p_unidade: unidade, p_texto: texto }) });
+        if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+        return await r.json();
+      },
       sessaoVencida: () => { if (typeof exigirLogin === 'function') exigirLogin('Sua sessão venceu. Entre de novo.'); },
       // mesmo dia operacional do Ponto ao Vivo: antes das 07:00 (Brasília) ainda é ontem
       diaOperacional: () => {
