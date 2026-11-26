@@ -941,7 +941,8 @@ const caixaEhFalta = v => !!v && (v.tipo === 'PERDA_SALAO' || v.tipo === 'PERDA_
 const caixaFaltaAConfirmar = v => caixaEhFalta(v) && !v.confirmada_em;
 function caixaEstadoFalta(v) {
   if (!caixaEhFalta(v)) return '';
-  if (!v.confirmada_em) return '<span style="color:var(--farol-perto);">a confirmar</span>';
+  // 25/11/2026 (Financeiro 22:20): desfazer deixa rastro — "desfeita em dd/mm por X: motivo"
+  if (!v.confirmada_em) return '<span style="color:var(--farol-perto);">a confirmar</span>' + (v.desfeita_em ? ` <span style="color:var(--tx-4);font-size:11.5px;">(desfeita em ${String(v.desfeita_em).slice(0, 10).split('-').reverse().slice(0, 2).join('/')}${v.desfeita_por ? ' por ' + trEscH(String(v.desfeita_por).split('@')[0]) : ''}${v.desfeita_motivo ? ': ' + trEscH(v.desfeita_motivo) : ''})</span>` : '');
   const quem = String(v.confirmada_por || '').split('@')[0], dd = String(v.confirmada_em).slice(0, 10).split('-').reverse().slice(0, 2).join('/');
   return `<span style="color:var(--farol-ok);">confirmada${quem ? ' por ' + trEscH(quem) : ''} em ${dd}</span>`
     + (caixaPodeConfirmar() ? ' ' + caixaBotaoConfirmar(v.chave, true) : '');
@@ -963,10 +964,18 @@ async function caixaConfirmarFalta(i, desfazer) {
   if (!chave) return;
   const s = rmbSessao();
   if (!s || !s.email) { avisoAcao('atencao', '! Sessão expirada — faça login de novo.'); return; }
+  // 25/11/2026 (Financeiro 22:20): para DESFAZER o motivo é obrigatório (≥ 3 letras) e fica no rastro (caixa_falta_evento)
+  let motivo = null;
+  if (desfazer) {
+    motivo = prompt('Por que desfazer a confirmação desta falta?' + String.fromCharCode(10, 10) + 'Ex.: o motoboy provou que cobrou.');
+    if (motivo === null) return;
+    motivo = motivo.trim();
+    if (motivo.length < 3) { avisoAcao('atencao', '! Para desfazer, diga o motivo.'); return; }
+  }
   avisoAcao('enviando', desfazer ? 'Desfazendo a confirmação…' : 'Confirmando a falta…');
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/caixa_confirmar_falta`, {
-      method: 'POST', headers: rmbHeaders(), body: JSON.stringify({ p_chave: chave, p_desfazer: !!desfazer }) });
+      method: 'POST', headers: rmbHeaders(), body: JSON.stringify(desfazer ? { p_chave: chave, p_desfazer: true, p_motivo: motivo } : { p_chave: chave, p_desfazer: false }) });
     const txt = await r.text();
     if (!r.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch (e) { /* texto cru */ } throw new Error(String(m).slice(0, 200)); }
     avisoAcao('ok', (desfazer ? '✓ Confirmação desfeita' : '✓ Falta confirmada — agora entra no desconto') + ` — às ${avisoHora()}.`);
