@@ -2109,12 +2109,12 @@ let CAIXA_BATEU = {}, CAIXA_ABERTO = {};
 // 26/11/2026 [dono] (Organizador 11:30: "precisa separar salão e delivery, pensei em botão de filtro logo acima do primeiro quadro"):
 // "Todos · Salão · Delivery" filtra a tela inteira (cartões, descontos, Para a Hellen, Últimos 7 dias, Bateu/Pendentes). A contagem
 // do cofre é da loja inteira e não se filtra. Item sem frente conhecida aparece nos dois (nunca some por falta de dado).
-let CAIXA_FRENTE = '';
-const caixaNaFrente = cx => !CAIXA_FRENTE || !cx || cx === CAIXA_FRENTE;
+let CAIXA_VER_CX = '';
+const caixaNaFrente = cx => !CAIXA_VER_CX || !cx || cx === CAIXA_VER_CX;
 const caixaFrenteDoCanal = c => !c ? '' : /SAL|BALC|MESA/i.test(String(c)) ? 'SALÃO' : 'DELIVERY';
-function caixaFrenteSel(cx) { CAIXA_FRENTE = cx; renderModuloCaixa(); }
+function caixaFrenteSel(cx) { CAIXA_VER_CX = cx; renderModuloCaixa(); }
 function caixaFrenteHtml() {
-  const b = (v, t) => `<button class="preset-btn${CAIXA_FRENTE === v ? ' active' : ''}" onclick="caixaFrenteSel('${v}')">${t}</button>`;
+  const b = (v, t) => `<button class="preset-btn${CAIXA_VER_CX === v ? ' active' : ''}" onclick="caixaFrenteSel('${v}')">${t}</button>`;
   return `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 8px;"><span style="font-size:12.5px;color:var(--tx-3);">Ver:</span>${b('', 'Todos')}${b('SALÃO', 'Salão')}${b('DELIVERY', 'Delivery')}</div>`;
 }
 // sem linha na vw_loja_dia_aberto = não se sabe: trata como aberta (nunca esconde dia por falta de dado)
@@ -2195,7 +2195,7 @@ function caixaPendRow(p, idx, lote) {
 }
 function caixaResPendHtml(res, pend, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
-  if (CAIXA_FRENTE) { pend = pend.filter(p => caixaNaFrente(p.caixa)); if (res && res.porCx) res = res.porCx(CAIXA_FRENTE); }
+  if (CAIXA_VER_CX) { pend = pend.filter(p => caixaNaFrente(p.caixa)); if (res && res.porCx) res = res.porCx(CAIXA_VER_CX); }
   // sem nenhuma venda de cartão lida para o dia não é "tudo certo": diz que falta o dado
   if ((!res || !res.n) && !pend.length) return '<div style="color:var(--tx-4);">sem vendas de cartão lidas para este dia (a maquininha ainda não chegou ao painel)</div>';
   return (res ? `<details><summary style="cursor:pointer;color:var(--farol-ok);">Resolvidos (${res.n} · ${R(res.v)})</summary><div class="caption-label" style="text-align:left;">a maquininha e o banco mostram o mesmo que o Saipos</div></details>` : '')
