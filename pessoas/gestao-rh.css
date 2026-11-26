@@ -35,6 +35,11 @@
 #view-prh .grh-det summary { cursor: pointer; color: var(--tx-3, #555); }
 #view-prh .grh-det ul { margin: 6px 0 0 18px; columns: 2; }
 #view-prh .grh-aviso { margin: 2px 0; font-size: .88em; color: var(--farol-perto, #6b4e00); }
+#view-prh .grh-feito { min-width: 220px; }
+#view-prh .grh-f-item { margin-bottom: 4px; }
+#view-prh .grh-f-quem { color: var(--tx-3, #777); font-size: .85em; }
+#view-prh .grh-f-txt { width: 100%; box-sizing: border-box; font: inherit; font-size: .92em; margin: 2px 0 4px; }
+#view-prh .grh-f-msg { font-size: .85em; margin-top: 2px; color: var(--farol-ok, #1b6b2f); }
 @media (max-width: 700px) {
   #view-prh .grh-tab thead { display: none; }
   #view-prh .grh-tab td { display: block; border: 0; padding: 2px 8px; white-space: normal; }

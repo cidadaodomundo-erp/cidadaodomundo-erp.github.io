@@ -178,13 +178,56 @@ test('tela: erros do leitor viram mensagem clara e nada é exibido', async () =>
   assert.equal(t3.st.fase, 'dadosinvalidos');
 });
 
-test('tela: só leitura — um GET ao leitor próprio, sem escrita, sem temporizador, sem HTML montado com dado', () => {
+test('tela: lê pelo leitor próprio; a única escrita é a anotação pela função do banco; sem temporizador nem HTML montado com dado', () => {
   const src = ler('pessoas', 'gestao-rh.js') + ler('pessoas', 'gestao-rh-modelo.js');
   assert.doesNotMatch(src, /innerHTML|insertAdjacentHTML|document\.write|setInterval|localStorage\.setItem|sessionStorage\.setItem/);
-  assert.doesNotMatch(src, /method:\s*'(POST|PATCH|PUT|DELETE)'|\/rest\/v1|rpc\(/);
-  assert.equal((src.match(/fetch\(/g) || []).length, 1);
+  assert.doesNotMatch(src, /method:\s*'(PATCH|PUT|DELETE)'|rpc\(/);
+  assert.equal((src.match(/method:\s*'POST'/g) || []).length, 1);
+  assert.deepEqual([...new Set(src.match(/\/rest\/v1\/[a-z_\/]+/g))].sort(), ['/rest/v1/ponto_feito', '/rest/v1/rpc/ponto_feito_gravar']);
+  assert.equal((src.match(/fetch\(/g) || []).length, 3);
   assert.match(src, /functions\/v1\/fabio-ponto-leitura/);
   assert.doesNotMatch(src, /cidadaodomundo\.github\.io|kqvoatdprjwxyadhvtdd/);
+});
+
+test('o que foi feito: mostra as anotações do dia, salva pela função do banco e avisa quando não pode', async () => {
+  const gravados = [];
+  const { deps, doc } = fazDeps({
+    feitoListar: async (a) => { assert.equal(a.unidade, 'AGUA VERDE'); return a.dia !== DIA ? [] : [{ pessoa_id: 2, texto: 'Folga <b>combinada</b>', autor_email: 'arissa@exemplo.com', em: '2026-11-12T12:30:00Z' }]; },
+    feitoGravar: async (a) => { gravados.push(a); return { pessoa_id: a.pessoa_id, texto: a.texto, autor_email: 'arissa@exemplo.com', em: '2026-11-12T13:00:00Z' }; },
+  });
+  const t = T.criar(deps); await t.entrar(); t.passo(-1); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
+  assert.equal(t.st.fase, 'ok'); assert.equal(t.st.dia, DIA);
+  let txt = todoTexto(doc.raiz);
+  assert.match(txt, /O que foi feito/); assert.match(txt, /Folga <b>combinada<\/b>/); assert.match(txt, /arissa às 09:30/);
+  const caixas = achar(doc.raiz, (e) => e.tagName === 'textarea'); assert.equal(caixas.length, 2, 'uma caixa por pessoa listada');
+  const btns = achar(doc.raiz, (e) => /grh-f-btn/.test(e.className));
+  btns[1].listeners.click(); await new Promise((r) => setImmediate(r));
+  assert.equal(gravados.length, 0); assert.match(todoTexto(doc.raiz), /Escreva o que foi feito/);
+  const cx = achar(doc.raiz, (e) => e.tagName === 'textarea')[1]; cx.value = '  Esqueceu de bater, conferido  '; cx.listeners.input();
+  achar(doc.raiz, (e) => /grh-f-btn/.test(e.className))[1].listeners.click(); await new Promise((r) => setImmediate(r));
+  assert.deepEqual(gravados, [{ dia: DIA, pessoa_id: 3, unidade: 'AGUA VERDE', texto: 'Esqueceu de bater, conferido' }]);
+  txt = todoTexto(doc.raiz); assert.match(txt, /Esqueceu de bater, conferido/); assert.match(txt, /Salvo\./);
+  // sem acesso: mensagem clara, nada some
+  const sem = fazDeps({ diaOperacional: () => DIA, feitoListar: async () => [], feitoGravar: async () => { throw Object.assign(new Error('x'), { status: 403 }); } });
+  const t2 = T.criar(sem.deps); await t2.entrar();
+  const c2 = achar(sem.doc.raiz, (e) => e.tagName === 'textarea')[0]; c2.value = 'teste'; c2.listeners.input();
+  achar(sem.doc.raiz, (e) => /grh-f-btn/.test(e.className))[0].listeners.click(); await new Promise((r) => setImmediate(r));
+  assert.match(todoTexto(sem.doc.raiz), /não permite anotar/);
+  // leitura das anotações fora do ar: o ponto aparece igual e a caixa avisa
+  const fora = fazDeps({ diaOperacional: () => DIA, feitoListar: async () => { throw new Error('x'); }, feitoGravar: async () => ({}) });
+  const t3 = T.criar(fora.deps); await t3.entrar();
+  assert.equal(t3.st.fase, 'ok'); assert.match(todoTexto(fora.doc.raiz), /Não foi possível ler as anotações/);
+  assert.equal(achar(fora.doc.raiz, (e) => e.tagName === 'textarea').length, 0);
+});
+
+test('o que foi feito: SQL tem a chave do ponto, só função grava e existe o desfazer', () => {
+  const sql = ler('supabase', 'ponto-feito.sql');
+  assert.match(sql, /create table if not exists public\.ponto_feito/);
+  assert.match(sql, /enable row level security/); assert.match(sql, /revoke all on public\.ponto_feito from anon, authenticated/);
+  assert.doesNotMatch(sql, /grant (insert|update|delete)/i);
+  assert.match(sql, /ponto_feito_ler[^;]*pode_ver_ponto/); assert.match(sql, /security definer/); assert.match(sql, /not coalesce\(public\.pode_ver_ponto\(\), false\)/);
+  assert.match(sql, /auth\.jwt\(\) ->> 'email'/);
+  assert.match(ler('supabase', 'ponto-feito-desfazer.sql'), /drop table if exists public\.ponto_feito/);
 });
 
 test('ligação: página, menu com selo Fábio, busca, por loja e setor RH do agrupamento Operação das lojas', () => {

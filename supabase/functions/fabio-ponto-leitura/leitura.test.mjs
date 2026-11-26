@@ -48,7 +48,7 @@ function mkFetch(o = {}) {
     if (p === '/rest/v1/rpc/pode_ver_ponto') return R(o.ver === undefined ? true : o.ver);
     if (p === '/rest/v1/rpc/pode_cadastrar_pessoal') return R(o.cad === undefined ? true : o.cad);
     if (p === '/rest/v1/rpc/painel_minhas_lojas') return R(o.painel === undefined ? [{ lojas: ['AGUA VERDE', 'AHU'], loja_inicial: 'AGUA VERDE', travado: false }] : o.painel);   // formato real: RETURNS TABLE => array de 1 linha
-    const tabela = { '/rest/v1/rh_pessoa': o.pessoas || PESSOAS, '/rest/v1/vendas_saipos': o.vendas || VENDAS, '/rest/v1/saipos_itens_venda': o.itens || ITENS }[p];
+    const tabela = { '/rest/v1/ponto_pessoa': o.pessoas || PESSOAS, '/rest/v1/vendas_saipos': o.vendas || VENDAS, '/rest/v1/saipos_itens_venda': o.itens || ITENS }[p];
     if (tabela !== undefined) {
       if (o.rest) { const x = o.rest(p); if (x) return x; }
       const sd = u.searchParams.get('shift_date');
@@ -119,12 +119,16 @@ test('JWT recusado pelo /auth/v1/user: 401 e nenhuma leitura de dado', async () 
   assert.deepEqual(r.f.chamadas.map((c) => c.path), ['/auth/v1/user']);
 });
 test('auth fora do ar: 502 (não libera)', async () => { assert.equal((await rodar({ auth: R({}, 500) })).status, 502); });
-test('exige pode_ver_ponto E pode_cadastrar_pessoal === true; qualquer outra coisa é 403 sem ler pessoa/Flash/Saipos', async () => {
-  for (const [ver, cad] of [[false, true], [true, false], [null, true], [true, 'true'], [{}, true], [1, 1]]) {
-    const r = await rodar({ ver, cad });
-    assert.equal(r.status, 403, JSON.stringify([ver, cad]));
+test('exige pode_ver_ponto === true (chave do ponto basta; cadastro não é pedido); qualquer outra coisa é 403 sem ler pessoa/Flash/Saipos', async () => {
+  for (const ver of [false, null, 'true', {}, 1]) {
+    const r = await rodar({ ver });
+    assert.equal(r.status, 403, JSON.stringify(ver));
     assert.ok(r.f.chamadas.every((c) => c.path.startsWith('/auth/') || c.path.includes('/rpc/')));
   }
+  const so = await rodar({ ver: true, cad: false });
+  assert.equal(so.status, 200, 'só a chave do ponto, sem cadastro de pessoal');
+  assert.ok(!so.f.chamadas.some((c) => c.path.endsWith('/rpc/pode_cadastrar_pessoal')));
+  assert.ok(!so.f.chamadas.some((c) => c.path.endsWith('/rh_pessoa')), 'nunca lê a tabela com salário');
 });
 test('painel_minhas_lojas real (array de 1 linha): autoriza só as lojas da linha; REDE só se estiver nela', async () => {
   const linha = (lojas) => [{ lojas, loja_inicial: lojas[0] || null, travado: false }];
@@ -138,7 +142,7 @@ test('painel_minhas_lojas: array com 0 ou 2+ linhas, linha sem lojas, lojas fora
   const ok = { lojas: ['AGUA VERDE'], loja_inicial: 'AGUA VERDE', travado: false };
   for (const painel of [[], [ok, ok], [{}], [{ lojas: 'AGUA VERDE' }], [{ lojas: ['AGUA VERDE', 7] }], [null], ['AGUA VERDE'], [[ok]], null, 'AGUA VERDE', 7, { lojas: [1] }]) {
     const r = await rodar({ painel }); assert.equal(r.status, 403, JSON.stringify(painel));
-    assert.ok(!r.f.chamadas.some((x) => x.host === 'api.flashapp.services' || x.path.endsWith('/rh_pessoa')));
+    assert.ok(!r.f.chamadas.some((x) => x.host === 'api.flashapp.services' || x.path.endsWith('/ponto_pessoa')));
   }
 });
 test('painel_minhas_lojas inválido, unidade fora da lista ou REDE sem permissão: 403; unidade inexistente: 400', async () => {
@@ -159,7 +163,7 @@ test('REDE só com REDE na lista: expande para as lojas reais da lista (e nenhum
 test('SÃO BRAZ com acento ou sem: mesma empresa', async () => {
   const r = await rodar({ painel: { lojas: ['SÃO BRAZ'] }, ctx: { query: { dia: DIA, unidade: 'SAO BRAZ' } } });
   assert.equal(r.status, 200); assert.deepEqual(flashCalls(r.f).map((c) => c.q.get('companyId')), [L.EMPRESAS['SAO BRAZ']]);
-  assert.ok(r.f.chamadas.some((c) => c.path.endsWith('/rh_pessoa') && c.q.get('unidade') === 'in.("SAO BRAZ","SÃO BRAZ")'));
+  assert.ok(r.f.chamadas.some((c) => c.path.endsWith('/ponto_pessoa') && c.q.get('unidade') === 'in.("SAO BRAZ","SÃO BRAZ")'));
 });
 test('dia: formato, calendário, futuro e fora dos últimos 7 dias são 400; hoje e 6 dias atrás passam', async () => {
   for (const dia of ['12/11/2026', '2026-02-30', '2026-11-13', '2026-11-05', '', undefined]) assert.equal((await rodar({ ctx: { query: { dia, unidade: 'AGUA VERDE' } } })).status, 400, String(dia));
@@ -190,7 +194,7 @@ test('resposta: contrato, só quem tem cadastro, nenhum dado proibido; Flash com
 });
 test('leituras REST pedem o mínimo: unidade, dia, vigência e ordem estável', async () => {
   const r = await rodar();
-  const pes = r.f.chamadas.find((x) => x.path.endsWith('/rh_pessoa'));
+  const pes = r.f.chamadas.find((x) => x.path.endsWith('/ponto_pessoa'));
   assert.equal(pes.q.get('select'), 'id,nome,unidade,admissao,desligamento,flash_id,usa_ponto,cargo_confianca');
   assert.equal(pes.q.get('unidade'), 'in.("AGUA VERDE")'); assert.equal(pes.q.get('admissao'), 'lte.' + DIA); assert.equal(pes.q.get('or'), '(desligamento.is.null,desligamento.gte.2026-11-11)');
   const it = r.f.chamadas.find((x) => x.path.endsWith('/saipos_itens_venda'));
@@ -228,7 +232,7 @@ test('madrugada: um único dia lido (o operacional); não existe mais leitura de
 test('dia operacional é o teto e a base dos 7 dias: antes das 07h o dia civil atual é futuro (400); às 07h passa; base op-6', async () => {
   const at = (iso, dia) => rodar({ ctx: Object.assign({ query: { dia, unidade: 'AGUA VERDE' } }, noAgora(iso)) });
   const fut = await at('2026-11-13T07:00:00Z', '2026-11-13');   // 04:00 BRT, operacional 12/11
-  assert.equal(fut.status, 400); assert.deepEqual(fut.corpo, { erro: 'dia_fora_da_janela' }); assert.ok(!fut.f.chamadas.some((x) => x.host === 'api.flashapp.services' || x.path.endsWith('/rh_pessoa')), 'rejeitado antes de ler dados');
+  assert.equal(fut.status, 400); assert.deepEqual(fut.corpo, { erro: 'dia_fora_da_janela' }); assert.ok(!fut.f.chamadas.some((x) => x.host === 'api.flashapp.services' || x.path.endsWith('/ponto_pessoa')), 'rejeitado antes de ler dados');
   assert.equal((await at('2026-11-13T05:59:00Z', '2026-11-13')).status, 400);   // 02:59
   assert.equal((await at('2026-11-13T09:59:00Z', '2026-11-13')).status, 400);   // 06:59
   assert.equal((await at('2026-11-13T10:00:00Z', '2026-11-13')).status, 200);   // 07:00
@@ -286,15 +290,15 @@ test('paginação: junta todas as páginas; múltiplo exato fecha na página vaz
   const muitas = Array.from({ length: 5 }, (_, i) => Object.assign({}, PESSOAS[0], { id: i + 1, nome: 'P' + i, flash_id: 'F' + i }));
   const r = await rodar({ pessoas: muitas, ctx: { pageSize: 2 } });
   assert.equal(r.status, 200); assert.equal(r.corpo.pessoas.length, 5);
-  const pg = r.f.chamadas.filter((x) => x.path.endsWith('/rh_pessoa')); assert.deepEqual(pg.map((x) => x.q.get('offset')), ['0', '2', '4']); assert.ok(pg.every((x) => x.q.get('limit') === '2'));
+  const pg = r.f.chamadas.filter((x) => x.path.endsWith('/ponto_pessoa')); assert.deepEqual(pg.map((x) => x.q.get('offset')), ['0', '2', '4']); assert.ok(pg.every((x) => x.q.get('limit') === '2'));
   const exato = await rodar({ pessoas: muitas.slice(0, 4), ctx: { pageSize: 2 } });
-  assert.equal(exato.corpo.pessoas.length, 4); assert.equal(exato.f.chamadas.filter((x) => x.path.endsWith('/rh_pessoa')).length, 3);
+  assert.equal(exato.corpo.pessoas.length, 4); assert.equal(exato.f.chamadas.filter((x) => x.path.endsWith('/ponto_pessoa')).length, 3);
   const corta = await rodar({ pessoas: muitas, ctx: { pageSize: 2, maxPaginas: 2 } });
   assert.equal(corta.status, 502); assert.equal(corta.corpo.erro, 'rest_truncado');
 });
 test('resposta REST fora do formato ou 401 do REST', async () => {
-  assert.equal((await rodar({ rest: (p) => (p.endsWith('rh_pessoa') ? R({ x: 1 }) : null) })).corpo.erro, 'rest_formato');
-  assert.equal((await rodar({ rest: (p) => (p.endsWith('rh_pessoa') ? R([], 401) : null) })).status, 401);
+  assert.equal((await rodar({ rest: (p) => (p.endsWith('ponto_pessoa') ? R({ x: 1 }) : null) })).corpo.erro, 'rest_formato');
+  assert.equal((await rodar({ rest: (p) => (p.endsWith('ponto_pessoa') ? R([], 401) : null) })).status, 401);
 });
 
 // ---------- refeição ----------

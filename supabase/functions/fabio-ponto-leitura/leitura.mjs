@@ -130,8 +130,9 @@ async function rpc(c, headers, fn) {
 }
 // exige pode_ver_ponto === true (RH inteiro OU só ponto, rmb_config emails_ponto) E pode_cadastrar_pessoal === true; devolve o painel de lojas
 export async function exigirPermissoes(c, headers) {
-  const [ver, cad, painel] = await Promise.all([rpc(c, headers, 'pode_ver_ponto'), rpc(c, headers, 'pode_cadastrar_pessoal'), rpc(c, headers, 'painel_minhas_lojas')]);
-  if (ver !== true || cad !== true) throw new ErroLeitura('sem_permissao', 403);
+  // 26/11/2026: basta a chave do ponto; o cadastro vem da visão ponto_pessoa (só as colunas do ponto, nunca salário)
+  const [ver, painel] = await Promise.all([rpc(c, headers, 'pode_ver_ponto'), rpc(c, headers, 'painel_minhas_lojas')]);
+  if (ver !== true) throw new ErroLeitura('sem_permissao', 403);
   // painel_minhas_lojas() RETURNS TABLE(lojas text[], loja_inicial text, travado boolean) => o PostgREST devolve ARRAY de 1 linha.
   // Aceita exatamente 1 elemento objeto válido (ou, por compatibilidade, o próprio objeto válido); 0, 2+ ou tipo errado = 403.
   const linha = Array.isArray(painel) ? (painel.length === 1 ? painel[0] : null) : painel;
@@ -268,7 +269,7 @@ export function criarCache({ ttlMs = TTL_CACHE_MS, agora = Date.now, max = 64 } 
   };
 }
 
-// ---------- cadastro (rh_pessoa, só o mínimo) ----------
+// ---------- cadastro (visão ponto_pessoa sobre rh_pessoa, só o mínimo) ----------
 const dataOuNull = (v) => (v === null || v === undefined ? null : (dataValida(v) ? v : undefined));
 export function projetarPessoas(rows, unidades) {
   const out = []; let invalidas = 0;
@@ -286,7 +287,7 @@ export function projetarPessoas(rows, unidades) {
 }
 const lista = (vs) => '(' + vs.map((v) => '"' + v + '"').join(',') + ')';
 const COLS_PESSOA = 'id,nome,unidade,admissao,desligamento,flash_id,usa_ponto,cargo_confianca';
-export const pessoasPath = (variantes, dia) => 'rh_pessoa?select=' + COLS_PESSOA + '&unidade=in.' + lista(variantes) + '&admissao=lte.' + dia
+export const pessoasPath = (variantes, dia) => 'ponto_pessoa?select=' + COLS_PESSOA + '&unidade=in.' + lista(variantes) + '&admissao=lte.' + dia
   + '&or=(desligamento.is.null,desligamento.gte.' + diaAnterior(dia) + ')&order=id.asc';
 export const vendasPath = (variantes, dia) => 'vendas_saipos?select=id_sale,shift_date,unidade,comanda_id,nome_venda,cliente_nome,cancelada,hora_venda&shift_date=eq.' + dia
   + '&unidade=in.' + lista(variantes) + '&cancelada=not.is.true&order=id_sale.asc';
