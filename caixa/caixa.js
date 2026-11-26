@@ -110,7 +110,23 @@ function caixaDiaDaVez(u) {
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
 const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [], CAIXA_FECHDIF = [], CAIXA_FIADO = [];
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [], CAIXA_FECHDIF = [], CAIXA_FIADO = [], CAIXA_VALE = [];
+// 26/11 16:33 (dono: "listar todos os fiados, até pra Hellen poder conferir se o fiado dela, Fabio e Jane"; "os voucher acho que pode
+// aparecer no dia, pra Hellen saber que está em espera por conta do delay deles com a Rede"): bloco próprio por setor
+function caixaFiadoValeHtml(u, dia, cx) {
+  const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  const doSet = L => (L || []).filter(f => f.unidade === u && String(f.dia).slice(0, 10) === dia && (f.caixa || 'DELIVERY') === cx);
+  const F = doSet(CAIXA_FIADO), V = doSet(CAIXA_VALE);
+  let h = '';
+  if (V.length) h += `<div style="font-size:12.5px;color:var(--tx-3);margin-top:6px;">${V.map(x => `vale em espera · ${R(x.valor)}${x.id && CAIXA_VREF[String(x.id)] ? ' · ' + trEscH(CAIXA_VREF[String(x.id)].ref_venda || '') : ''} · atraso da Rede · vira pendência em ${caixaDdm(caixaHellenMais(dia, 6))}`).join('<br>')}</div>`;
+  if (!F.length) return h;
+  const hora = f => /\d\d\/\d\d/.test(String(f.hora || '')) ? String(f.hora) : caixaDdm(dia) + ' ' + String(f.hora || '').slice(0, 5);
+  const lin = f => `<div style="font-size:12px;padding-left:10px;color:${f.situacao === 'ALERTA' ? 'var(--farol-fora)' : 'var(--tx-4)'};">${trEscH(f.ref_venda || 'venda')} · ${trEscH(hora(f))} · ${trEscH(f.cliente || 'sem cliente')} · ${R(f.valor)}</div>`;
+  const grupo = (tit, L, cor) => L.length ? `<div style="font-size:12.5px;margin-top:4px;color:${cor};">${tit} (${L.length})</div>${L.map(lin).join('')}` : '';
+  const al = F.filter(f => f.situacao === 'ALERTA'), au = F.filter(f => f.situacao === 'AUTORIZADO'), rf = F.filter(f => f.situacao !== 'ALERTA' && f.situacao !== 'AUTORIZADO');
+  return h + `<details style="margin-top:6px;"${al.length ? ' open' : ''}><summary style="cursor:pointer;">Fiado do dia (${F.length})${al.length ? ` · <b style="color:var(--farol-fora);">⚠ ${al.length} não autorizado${al.length > 1 ? 's' : ''}</b>` : ''}</summary>`
+    + grupo('Não autorizados', al, 'var(--farol-fora)') + grupo('Autorizados (Fabio, Hellen, Jane) — confira', au, 'var(--tx-2)') + grupo('Refeições de funcionário e motoboy', rf, 'var(--tx-4)') + '</details>';
+}
 // 26/11/2026 [dono] (Boletim 16:09: "o que são essa diferenças? porque elas não apareceram pra Hellen justificar no painel";
 // Financeiro 3627b3c): toda forma do fechamento do Saipos com saldo ≠ 0 (vw_caixa_fechamento_diferenca), por setor
 function caixaFechSaiposHtml(u, dia, cx) {
@@ -124,7 +140,7 @@ function caixaFechSaiposHtml(u, dia, cx) {
   const lin = x => {
     const k = 'fd' + String(x.chave || '').replace(/[^A-Za-z0-9]/g, '');
     // 26/11 16:17 (dono: "não estamos mais aceitando fiado, com exceção de compras do Fabio, Hellen e Jane"): as vendas do Fiado abertas
-    const fiado = /fiado/i.test(x.forma || '') ? (CAIXA_FIADO || []).filter(f => f.unidade === u && String(f.dia).slice(0, 10) === dia && f.caixa === cx) : [];
+    const fiado = [];   // 26/11 16:33: o fiado tem bloco próprio (caixaFiadoValeHtml), com todos, inclusive os de R$ 0
     const fiadoTx = fiado.map(f => `<div style="font-size:12px;color:${f.situacao === 'ALERTA' ? 'var(--farol-fora)' : 'var(--tx-4)'};padding-left:10px;">${trEscH(f.ref_venda || 'venda')} · ${/\d\d\/\d\d/.test(String(f.hora || '')) ? trEscH(String(f.hora)) : caixaDdm(String(f.dia).slice(0, 10)) + ' ' + trEscH(String(f.hora || '').slice(0, 5))} · ${trEscH(f.cliente || 'sem cliente')} · ${R(f.valor)}${f.situacao === 'ALERTA' ? ' · ⚠ fiado não autorizado' : f.situacao === 'AUTORIZADO' ? ' · autorizado' : f.situacao === 'SEM VALOR' ? ' · refeição sem valor' : ''}</div>`).join('');
     const base = `<b>${trEscH(x.forma)}</b> · ${R(x.saldo)}`;
     if (x.situacao === 'PENDENTE') return `<div class="cx-fd" style="padding:6px 0;border-top:1px dashed var(--line);">
@@ -1905,6 +1921,12 @@ async function caixaHellenCarregar() {
     CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []);
     CAIXA_FECHDIF = await consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=gte.' + des + '&' + un + '&order=dia,caixa,forma').catch(() => []);
     CAIXA_FIADO = await consultarTudo('vw_caixa_fiado?select=*&dia=gte.' + des + '&' + un + '&order=dia,hora').catch(() => []);
+    // 26/11 16:33 (dono): o vale aparece no próprio dia, em espera pela Rede (delivery: cobrança VOUCHER aguardando; salão: vale_aguardando)
+    const [valeD, valeS] = await Promise.all([
+      consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,valor,frente&grupo=eq.VOUCHER&aguardando=is.true&dia=gte.' + des + '&' + un).catch(() => []),
+      consultarTudo('vw_caixa_pendencias_dia?select=dia,unidade,caixa,valor,referencia&tipo=eq.vale_aguardando&dia=gte.' + des + '&' + un).catch(() => [])]);
+    CAIXA_VALE = (valeD || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.frente || 'DELIVERY', valor: x.valor, id: x.id_sale }))
+      .concat((valeS || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.caixa, valor: x.valor, id: x.referencia })));
     CAIXA_VREF = {};
     (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
@@ -2379,7 +2401,7 @@ function caixaConfHtml(u, dia) {
       + ln('Total contado (envelope + gaveta)', tot != null ? `<b>${R(tot)}</b>` : tr)
       + ln(`Esperado no Saipos (abertura ${abre != null ? R(abre) : '…'} + dinheiro do dia ${cd.dinheiro_saipos != null ? R(cd.dinheiro_saipos) : '…'})`, esp != null ? `<b>${R(esp)}</b>` : (abre == null ? ag : tr))
       + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`)
-      + caixaFechSaiposHtml(u, dia, cx) + '</div>';
+      + caixaFechSaiposHtml(u, dia, cx) + caixaFiadoValeHtml(u, dia, cx) + '</div>';
   }).join('');
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
