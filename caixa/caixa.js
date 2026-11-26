@@ -1907,7 +1907,9 @@ async function caixaHellenCarregar() {
       consultarTudo('caixa_frente_nome?select=unidade,caixa_usuario,nome&order=unidade,caixa_usuario').catch(() => []),
       consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito,frente,tipo,tratamento,caixa,id_titulo,hora_fechamento,operador&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
-    const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
+    // 26/11/2026 [conserto] (dono 18:32: "a tela dos caixas de Ahu e SB estão demorando"): tudo numa leva só — antes eram
+    // 8 leituras uma depois da outra depois desta leva (~4 s a mais)
+    const [trs, pix, cobr, forma, onl, robo, quebras, transito, fechdif, fiado, valeD, valeS, vref, desc, motos, aberto] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
       consultarTudo('vw_pix_conciliacao?select=dia,dia_turno,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
@@ -1915,27 +1917,28 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_caixa_online_dia?select=*&canal_ok=not.is.true' + faixa(des, ate) + '&order=hora'),
       consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
-    ]);
-    // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento com o número da venda"; Financeiro c770577):
-    // por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor — salão não tem número no Saipos
-    CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []);
-    CAIXA_FECHDIF = await consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=gte.' + des + '&' + un + '&order=dia,caixa,forma').catch(() => []);
-    CAIXA_FIADO = await consultarTudo('vw_caixa_fiado?select=*&dia=gte.' + des + '&' + un + '&order=dia,hora').catch(() => []);
-    // 26/11 16:33 (dono): o vale aparece no próprio dia, em espera pela Rede (delivery: cobrança VOUCHER aguardando; salão: vale_aguardando)
-    const [valeD, valeS] = await Promise.all([
+      // 26/11/2026 [dono] (Financeiro c770577): por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor
+      consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []),
+      consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=gte.' + des + '&' + un + '&order=dia,caixa,forma').catch(() => []),
+      consultarTudo('vw_caixa_fiado?select=*&dia=gte.' + des + '&' + un + '&order=dia,hora').catch(() => []),
+      // 26/11 16:33 (dono): o vale aparece no próprio dia, em espera pela Rede (delivery: cobrança VOUCHER aguardando; salão: vale_aguardando)
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,valor,frente&grupo=eq.VOUCHER&aguardando=is.true&dia=gte.' + des + '&' + un).catch(() => []),
-      consultarTudo('vw_caixa_pendencias_dia?select=dia,unidade,caixa,valor,referencia&tipo=eq.vale_aguardando&dia=gte.' + des + '&' + un).catch(() => [])]);
+      consultarTudo('vw_caixa_pendencias_dia?select=dia,unidade,caixa,valor,referencia&tipo=eq.vale_aguardando&dia=gte.' + des + '&' + un).catch(() => []),
+      consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => []),
+      // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
+      consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,canal,frente,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []),
+      // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
+      consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []),
+      // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
+      consultarTudo('vw_loja_dia_aberto?select=unidade,dia,aberto&dia=gte.' + caixaHellenMais(hoje, -40)).catch(() => []),
+    ]);
+    CAIXA_TRANSITO = transito; CAIXA_FECHDIF = fechdif; CAIXA_FIADO = fiado;
     CAIXA_VALE = (valeD || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.frente || 'DELIVERY', valor: x.valor, id: x.id_sale }))
       .concat((valeS || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.caixa, valor: x.valor, id: x.referencia })));
     CAIXA_VREF = {};
-    (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
-    // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
-    const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,canal,frente,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
-    // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
-    const motos = await consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []);
-    // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
+    (vref || []).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     CAIXA_ABERTO = {};
-    (await consultarTudo('vw_loja_dia_aberto?select=unidade,dia,aberto&dia=gte.' + caixaHellenMais(hoje, -40)).catch(() => [])).forEach((x) => {
+    (aberto || []).forEach((x) => {
       const kk = x.unidade + '|' + String(x.dia).slice(0, 10); CAIXA_ABERTO[kk] = !!(CAIXA_ABERTO[kk] || x.aberto); });
     CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc, motos };
   } catch (e) { CAIXA_HELLEN = { lojas, erro: e.message }; }
