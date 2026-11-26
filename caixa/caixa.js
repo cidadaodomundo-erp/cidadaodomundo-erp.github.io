@@ -1090,8 +1090,10 @@ async function caixaExplicarItem(d, x) {
 // so le o banco; o pedido vai para caixa_atualizacao_pedido e o atendente
 // (script/atender_caixa.py, tarefa "Painel - Atender caixa") rele o dia no Saipos e
 // recalcula as mvs da conciliacao. Mesmo desenho do botao da Hellen na conciliacao.
-async function caixaAtualizarDia(bt) {
-  const d = CAIXA_DRILL_DADOS;
+// 26/11/2026 [conserto] (dono 15:01: "o atualizar este dia é a flechinha lá em cima?"): o botão também mora na conferência do
+// caixa de cada loja e dia, com unidade e dia próprios; a flechinha do topo só recarrega a tela
+async function caixaAtualizarDia(bt, unidade, dia) {
+  const d = unidade && dia ? { unidade, dia } : CAIXA_DRILL_DADOS;
   if (!d) return;
   const s = rmbSessao();
   if (!s || !s.email) { avisoAcao('atencao', '! Sessão expirada — faça login de novo.'); return; }
@@ -1125,7 +1127,7 @@ async function caixaAtualizarDia(bt) {
       bt.textContent = 'refazendo a conferência...';
       CAIXA_DIAS = null;              // recarrega tudo do banco
       await entrarCaixa();
-      await abrirDiaConcartao(d.unidade, d.dia);
+      if (!unidade) await abrirDiaConcartao(d.unidade, d.dia); else renderModuloCaixa();
       return;
     }
     if (estado === 'ERRO') avisoAcao('erro', '✗ A atualização falhou: ' + resumo + '. Tente de novo.');
@@ -1900,7 +1902,8 @@ function caixaHellenItens() {
       // 26/11: a frente do Saipos diz o caixa (Salão/Balcão = SALÃO; Delivery/Atendimento = DELIVERY); outra frente fica nos dois filtros
       const cxF = l.caixa || (/SAL|BALC/i.test(nome) ? 'SALÃO' : /DELIV|ATEND/i.test(nome) ? 'DELIVERY' : null);
       // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento"): lançamento, hora do fechamento e operador
-      const detF = [l.id_titulo ? 'lançamento ' + l.id_titulo : '', l.hora_fechamento ? 'fechado ' + l.hora_fechamento : '', l.operador ? 'operador ' + l.operador : '', cxF ? 'setor ' + (cxF === 'SALÃO' ? 'salão' : 'delivery') : ''].filter(Boolean).join(' · ');
+      // 26/11 14:57 (dono: "o numero do lançamento do Saipos não nos ajuda"): só caixa e hora do fechamento; id_titulo e operador ficam fora
+      const detF = [cxF ? 'caixa ' + (cxF === 'SALÃO' ? 'Salão' : 'Delivery') : '', l.hora_fechamento ? 'fechado ' + l.hora_fechamento : ''].filter(Boolean).join(' · ');
       const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: cxF, valor: Math.abs(v), hora: String(l.hora_fechamento || '').slice(-5), forma: 'Dinheiro', frente: nome, detalheFech: detF,
         saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
         leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
@@ -2297,10 +2300,13 @@ function caixaConfHtml(u, dia) {
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
     .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i, bloco: x.bloco, detalhe: x.pend.detalheFech || caixaRefTxt(caixaIdDaChave(x.pend.chave)) }));
   const abertosD = caixaDescAbertos(u, dia);
+  const eu = String((rmbSessao() || {}).email || '').toLowerCase();
+  const podeConf = (typeof souODono === 'function' && souODono()) || (CAIXA_RESP || []).some(r => r.unidade === u && String(r.email).toLowerCase() === eu);
   const pendF = pend.filter(p => caixaNaFrente(p.caixa));
   const ok = !pendF.length && !abertosD.length && envGrav;
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pendF.length + abertosD.length + (envGrav ? 0 : 1)} a fazer</span>`}`,
-    `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false));
+    `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false)
+    + (podeConf ? `<div style="margin-top:8px;"><button class="preset-btn" title="relê este dia no Saipos (1 a 2 min) e refaz a conferência — use depois de corrigir lá" onclick="caixaAtualizarDia(this, '${u.replace(/'/g, "\'")}', '${dia}')">↻ Atualizar este dia</button> <span class="caption-label">depois de corrigir no Saipos</span></div>` : ''));
 }
 // o nome do TrackEat ("Leonardo Borges") e o do cadastro podem diferir em acento e caixa: casa pelo começo
 const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
