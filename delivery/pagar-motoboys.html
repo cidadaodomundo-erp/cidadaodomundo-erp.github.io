@@ -184,8 +184,24 @@ function exigirLogin(recado) {
     if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
     if (!r.ok) { erro(r.status === 403 || r.status === 400 ? 'Esta tela é só do dono e de quem cuida do pessoal.' : await trErroDe(r)); return; }
     DADOS = await r.json(); ABERTO = {};
+    await juntarConferencia(dia, seq);
     if (seq === SEQ) desenhar();
     if (seq === SEQ && !$('painelObra').hidden) carregarAbas();
+  }
+  // 26/11 [dono] Planilha da Hellen, Pix feito e diferença: função à parte do Financeiro (c2c1378), sem mexer na conta do Fabio.
+  // Cruza pelo loja + id_entregador. Se falhar, as colunas ficam "—" e a conta segue igual.
+  async function juntarConferencia(dia, seq) {
+    let c = null;
+    try { const r = await trRpc('pagar_motoboys_conferencia', { p_dia: dia }); if (r.ok) c = await r.json(); } catch (e) {}
+    if (seq !== SEQ || !c || !DADOS) return;
+    DADOS.conf = c;
+    const m = {};
+    (c.linhas || []).forEach((x) => { m[x.loja + '|' + x.id_entregador] = x; });
+    (DADOS.linhas || []).forEach((l) => {
+      const x = m[l.loja + '|' + l.id_entregador]; if (!x) return;
+      l.planilha = x.planilha; l.pix_pago = x.pix_pago; l.diferenca = x.diferenca;
+      l.pix_segunda_somado = x.pix_segunda_somado; l.pix_sem_mapa = x.pix_sem_mapa;
+    });
   }
   // Chegada no pátio: a MESMA fonte da tela Chegada (fila do TrackEat, GPS do pátio, anotado no balcão e a decisão à mão
   // de garantido/refeição). Só leitura (GET). Se falhar, a conta sai sem hora do pátio e não corta ninguém.
@@ -340,7 +356,9 @@ function exigirLogin(recado) {
       '<td data-rot="Refeição">' + refeicaoTxt(l) + (Number(l.cobrar_refeicao) > 0 ? '<br><small class="pm-nao">cobra ' + brl(l.cobrar_refeicao) + '</small>' : '') + '</td>' +
       '<td data-rot="A pagar" class="pm-pagar">' + brl(l.pagar) + '</td>' +
       '<td data-rot="Planilha">' + din(l.planilha) + '</td>' +
-      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) :
+        l.pix_segunda_somado != null ? '<span class="pm-fraco" title="Pix de sexta a domingo cai somado na segunda: ' + esc(brl(l.pix_segunda_somado)) + ' nos 3 dias">somado na seg</span>' :
+        l.pix_sem_mapa ? '<span class="pm-nao" title="Pix sem nome ligado a este motoboy">sem mapa</span>' : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
       '<td data-rot="Diferença">' + (difv == null ? din(null) : Math.abs(difv) < 0.005 ? '<span class="pm-sim">bateu</span>' : '<span class="pm-nao">' + (difv < 0 ? '− ' : '+ ') + brl(Math.abs(difv)) + '</span>') + '</td>' +
       '<td class="pm-fraco">' + (ABERTO[k] ? '▾' : '▸') + '</td></tr>';
     if (ABERTO[k]) {
@@ -387,7 +405,9 @@ function exigirLogin(recado) {
     const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
     if (sd.length) h += '<div class="pm-aviso" style="margin-top:12px">🍔 <b>' + sd.length + ' lanche(s) sem dono</b> na comanda Z Motoboys — ninguém está sendo cobrado: ' +
       sd.map((x) => esc(x.loja) + ' venda ' + esc(x.numero_venda) + ' (' + esc(x.produto) + ')').join(' · ') + '. Falta o nome do motoboy na observação do lanche.</div>';
-    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. A escala combinada aparece no clique. Planilha, Pix feito e diferença aparecem aqui quando chegarem ao banco.</p>';
+    const cf = d.conf || {};
+    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. A escala combinada aparece no clique. ' +
+      (d.conf ? 'Planilha = "Fechamento Motoboys" da Hellen, lida ' + esc(cf.planilha_lida_em || '—') + ', vai até ' + esc(cf.planilha_ate || '—') + '. Diferença = a pagar − planilha. Pix em branco: o dia do Pix ainda não acabou' + (cf.pix_somado_fds ? '; de sexta a domingo o Pix cai somado na segunda' : '') + '.' : 'Planilha, Pix feito e diferença não chegaram agora.') + '</p>';
     $('conteudo').innerHTML = h;
   }
 
