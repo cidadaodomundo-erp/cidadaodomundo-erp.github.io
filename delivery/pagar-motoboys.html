@@ -180,7 +180,7 @@ function exigirLogin(recado) {
   const brl = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const LOJAS = ['Água Verde', 'São Braz', 'Ahú'];
   let DADOS = null, LOJA = 'todas', ABERTO = {}, SEQ = 0;
-  let CONF = null, DOBRO = {}, ORD = { k: null, dir: 1 };
+  let DOBRO = {}, ORD = { k: null, dir: 1 };
 
   function hojeSP() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
   function somaDias(d, n) { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
@@ -199,34 +199,22 @@ function exigirLogin(recado) {
     if (r.status === 401) { exigirLogin('Sua sessão venceu.'); return; }
     if (!r.ok) { erro(r.status === 403 || r.status === 400 ? 'Esta tela é só do dono e de quem cuida do pessoal.' : await trErroDe(r)); return; }
     DADOS = await r.json(); ABERTO = {};
+    await juntarConferencia(dia, seq);
     if (seq === SEQ) desenhar();
     if (seq === SEQ && !$('painelObra').hidden) carregarAbas();
     if (seq === SEQ) carregarConferir(dia, seq);
   }
-  // 26/11/2026 [dono]: planilha da loja e Pix feito (pagar_motoboys_conferir, extrato Itaú do dia seguinte) e o selo de
-  // corrida em dobro (pagar_motoboys_abas). Só leitura. Se falhar, a tela continua com "—".
+  // 26/11/2026 [dono]: selo de corrida em dobro (pagar_motoboys_abas). Só leitura.
   async function carregarConferir(dia, seq) {
-    CONF = null; DOBRO = {};
-    let rc = null, ra = null;
-    try { [rc, ra] = await Promise.all([trRpc('pagar_motoboys_conferir', { p_dia: dia }), trRpc('pagar_motoboys_abas', { p_dia: dia })]); } catch (e) { return; }
-    if (seq !== SEQ || !DADOS) return;
-    if (rc && rc.ok) {
-      CONF = await rc.json(); const mp = {};
-      (CONF.linhas || []).forEach((x) => { mp[x.loja + '|' + x.id_entregador] = x; });
-      (DADOS.linhas || []).forEach((l) => {
-        const x = mp[l.loja + '|' + l.id_entregador]; if (!x) return;
-        if (l.pix_pago == null && x.pix_pago != null) l.pix_pago = Number(x.pix_pago);
-        if (l.planilha == null && x.planilha != null) l.planilha = Number(x.planilha);
-        l.pix_itens = x.pix || [];
-      });
-    }
-    if (ra && ra.ok) {
-      const a = await ra.json();
-      (a.corridas || []).forEach((c) => { const k = c.loja + '|' + c.id_entregador; const d = DOBRO[k] || (DOBRO[k] = { rep: 0, pen: 0 }); if (c.status_financeiro === 'Reprovado') d.rep++; else d.pen++; });
-    }
+    DOBRO = {};
+    let ra = null;
+    try { ra = await trRpc('pagar_motoboys_abas', { p_dia: dia }); } catch (e) { return; }
+    if (seq !== SEQ || !DADOS || !ra || !ra.ok) return;
+    const a = await ra.json();
+    (a.corridas || []).forEach((c) => { const k = c.loja + '|' + c.id_entregador; const d = DOBRO[k] || (DOBRO[k] = { rep: 0, pen: 0 }); if (c.status_financeiro === 'Reprovado') d.rep++; else d.pen++; });
     if (seq === SEQ) desenhar();
   }
-  function pixEsperando() { return !!(CONF && DADOS && CONF.extrato_ate && CONF.extrato_ate < somaDias(DADOS.dia, 1)); }
+  function pixEsperando() { const c = DADOS && DADOS.conf; return !!(c && c.pix_cai_em && c.pix_cai_em >= hojeSP()); }
   function dm2(d) { const p = String(d || '').slice(0, 10).split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
   // O clique no motoboy: o resumo em bolinhas (verde = certo, vermelho = problema, laranja = esperando), como no portal antigo
   function veredito(l, k) {
@@ -253,14 +241,14 @@ function exigirLogin(recado) {
     const d = DOBRO[k];
     if (d && d.pen) add('alerta', d.pen + ' corrida(s) <b>pendente(s)</b> no TrackEat ainda contam: confira na aba 🔎 Corrida em dobro');
     if (d && d.rep) add('ok', d.rep + ' corrida(s) reprovada(s) no TrackEat ficaram fora da conta');
-    if (l.planilha == null) add('esp', 'Planilha da loja: <b>ainda não chegou</b> ao portal novo');
-    else { const df = Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100; add(Math.abs(df) < 0.01 ? 'ok' : 'alerta', 'Planilha da loja: ' + brl(l.planilha) + (Math.abs(df) < 0.01 ? ', <b>igual</b>' : ', sistema paga <b>' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + '</b>'), 'planilha de fechamento da loja'); }
+    if (l.planilha == null) add('esp', 'Planilha da Hellen: <b>ainda sem este motoboy</b> neste dia');
+    else { const df = Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100; add(Math.abs(df) < 0.01 ? 'ok' : 'alerta', 'Planilha da Hellen: ' + brl(l.planilha) + (Math.abs(df) < 0.01 ? ', <b>igual</b>' : ', sistema paga <b>' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + '</b>'), 'Fechamento Motoboys da Hellen'); }
     if (l.pix_pago != null) {
       const df = Math.round((Number(l.pix_pago) - Number(l.pagar || 0)) * 100) / 100;
-      add(Math.abs(df) < 1 ? 'ok' : 'alerta', 'Pix: <b>saiu ' + brl(l.pix_pago) + '</b>' + (Math.abs(df) < 0.01 ? ', igual ao a pagar' : ', ' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + ' que o a pagar'),
-        (l.pix_itens || []).map((p) => brl(p.valor) + ' em ' + dm2(p.data) + ' · ' + p.conta + ' · ' + p.nome).join(' + ') || 'extrato Itaú');
-    } else if (pixEsperando()) add('esp', 'Pix: <b>esperando o banco</b> (extrato até ' + esc(dm2(CONF.extrato_ate)) + ')');
-    else if (CONF) add('alerta', 'Pix: <b>não achado</b> no extrato do dia seguinte com o nome dele', 'se caiu na conta de um parente, falta ligar o nome do Pix a ele');
+      add(Math.abs(df) < 1 ? 'ok' : 'alerta', 'Pix: <b>saiu ' + brl(l.pix_pago) + '</b>' + (Math.abs(df) < 0.01 ? ', igual ao a pagar' : ', ' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + ' que o a pagar'), 'extrato Itaú de ' + dm2(DADOS.conf && DADOS.conf.pix_cai_em));
+    } else if (l.pix_segunda_somado != null) add('esp', 'Pix: de sexta a domingo cai <b>somado na segunda</b> (' + brl(l.pix_segunda_somado) + ' nos 3 dias)', 'extrato Itaú');
+    else if (l.pix_sem_mapa) add('alerta', 'Pix: <b>falta ligar o nome do Pix</b> a este motoboy', 'mapa de nomes do Pix');
+    else if (pixEsperando()) add('esp', 'Pix: <b>esperando o banco</b> (cai em ' + esc(dm2(DADOS.conf.pix_cai_em)) + ')');
     return '<ul class="pm-vr">' + it.join('') + '</ul>';
   }
   function etiquetas(l) {
@@ -285,12 +273,26 @@ function exigirLogin(recado) {
     const f = ORD_VAL[ORD.k];
     return g.slice().sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * ORD.dir; });
   }
-  // DIFERENÇA = a pagar × planilha (Organizador 26/11 12:07); sem planilha, a pagar × Pix feito
+  // DIFERENÇA = a pagar × planilha (Organizador 26/11 12:07)
   function difDe(l) {
     if (l.diferenca != null) return Number(l.diferenca);
     if (l.planilha != null) return Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100;
-    if (l.pix_pago != null) return Math.round((Number(l.pagar || 0) - Number(l.pix_pago)) * 100) / 100;
     return null;
+  }
+  // 26/11 [dono] Planilha da Hellen, Pix feito e diferença: função à parte do Financeiro (c2c1378), sem mexer na conta do Fabio.
+  // Cruza pelo loja + id_entregador. Se falhar, as colunas ficam "—" e a conta segue igual.
+  async function juntarConferencia(dia, seq) {
+    let c = null;
+    try { const r = await trRpc('pagar_motoboys_conferencia', { p_dia: dia }); if (r.ok) c = await r.json(); } catch (e) {}
+    if (seq !== SEQ || !c || !DADOS) return;
+    DADOS.conf = c;
+    const m = {};
+    (c.linhas || []).forEach((x) => { m[x.loja + '|' + x.id_entregador] = x; });
+    (DADOS.linhas || []).forEach((l) => {
+      const x = m[l.loja + '|' + l.id_entregador]; if (!x) return;
+      l.planilha = x.planilha; l.pix_pago = x.pix_pago; l.diferenca = x.diferenca;
+      l.pix_segunda_somado = x.pix_segunda_somado; l.pix_sem_mapa = x.pix_sem_mapa;
+    });
   }
   // Chegada no pátio: a MESMA fonte da tela Chegada (fila do TrackEat, GPS do pátio, anotado no balcão e a decisão à mão
   // de garantido/refeição). Só leitura (GET). Se falhar, a conta sai sem hora do pátio e não corta ninguém.
@@ -446,7 +448,9 @@ function exigirLogin(recado) {
       '<td data-rot="Refeição">' + refeicaoTxt(l) + (Number(l.cobrar_refeicao) > 0 ? '<br><small class="pm-nao">cobra ' + brl(l.cobrar_refeicao) + '</small>' : '') + '</td>' +
       '<td data-rot="A pagar" class="pm-pagar">' + brl(l.pagar) + '</td>' +
       '<td data-rot="Planilha">' + din(l.planilha) + '</td>' +
-      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) : pixEsperando() ? '<span class="pm-tarde">esperando</span>' : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) :
+        l.pix_segunda_somado != null ? '<span class="pm-fraco" title="Pix de sexta a domingo cai somado na segunda: ' + esc(brl(l.pix_segunda_somado)) + ' nos 3 dias">somado na seg</span>' :
+        l.pix_sem_mapa ? '<span class="pm-nao" title="Pix sem nome ligado a este motoboy">sem mapa</span>' : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
       '<td data-rot="Diferença">' + (difv == null ? din(null) : Math.abs(difv) < 0.005 ? '<span class="pm-sim">bateu</span>' : '<span class="pm-nao">' + (difv < 0 ? '− ' : '+ ') + brl(Math.abs(difv)) + '</span>') + '</td>' +
       '<td class="pm-fraco">' + (ABERTO[k] ? '▾' : '▸') + '</td></tr>';
     if (ABERTO[k]) {
@@ -495,12 +499,9 @@ function exigirLogin(recado) {
     const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
     if (sd.length) h += '<div class="pm-aviso" style="margin-top:12px">🍔 <b>' + sd.length + ' lanche(s) sem dono</b> na comanda Z Motoboys — ninguém está sendo cobrado: ' +
       sd.map((x) => esc(x.loja) + ' venda ' + esc(x.numero_venda) + ' (' + esc(x.produto) + ')').join(' · ') + '. Falta o nome do motoboy na observação do lanche.</div>';
-    const CONTA_LOJA = { 'ITAU AV': 'Água Verde', 'ITAU SB': 'São Braz', 'ITAU AHU': 'Ahú' };
-    const psd = ((CONF && CONF.pix_sem_dono) || []).filter((x) => LOJA === 'todas' || CONTA_LOJA[x.conta] === LOJA);
-    if (psd.length) h += '<details class="pm-aviso" style="margin-top:12px"><summary style="cursor:pointer">💸 <b>' + psd.length + ' Pix de até R$ 600 sem dono</b> no extrato de ' + esc(dm2(somaDias(d.dia, 1))) + ' (pode ser motoboy com Pix em nome de outra pessoa, ou não ser motoboy)</summary><ul>' +
-      psd.map((x) => '<li>' + esc(x.conta) + ' · ' + brl(x.valor) + ' · ' + esc(x.nome) + '</li>').join('') + '</ul></details>';
-    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. Clique no título de uma coluna para ordenar. Pix feito: extrato Itaú do dia seguinte, casado pelo nome' +
-      (CONF ? ' (extrato até ' + esc(dm2(CONF.extrato_ate)) + ')' : '') + '. Planilha: planilha de fechamento da loja' + (CONF && !CONF.planilhas ? ' — <b>ainda não chega ao portal novo</b>' : '') + '.</p>';
+    const cf = d.conf || {};
+    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. A escala combinada aparece no clique. ' +
+      (d.conf ? 'Planilha = "Fechamento Motoboys" da Hellen, lida ' + esc(cf.planilha_lida_em || '—') + ', vai até ' + esc(cf.planilha_ate || '—') + '. Diferença = a pagar − planilha. Pix em branco: o dia do Pix ainda não acabou' + (cf.pix_somado_fds ? '; de sexta a domingo o Pix cai somado na segunda' : '') + '.' : 'Planilha, Pix feito e diferença não chegaram agora.') + '</p>';
     $('conteudo').innerHTML = h;
   }
 
@@ -656,8 +657,8 @@ function exigirLogin(recado) {
   $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); desenharAba(); });
   $('conteudo').addEventListener('click', (ev) => {
     const th = ev.target.closest('th[data-ord]'); if (th) { const k = th.dataset.ord; ORD = ORD.k === k ? { k, dir: -ORD.dir } : { k, dir: k === 'nome' || k === 'chegada' || k === 'saida' ? 1 : -1 }; desenhar(); return; }
-    const pb = ev.target.closest('button[data-pix]'); if (pb) { ev.stopPropagation(); const ok = () => { pb.textContent = 'Pix copiado ✓'; setTimeout(() => { pb.textContent = 'Copiar a chave Pix'; }, 1800); };
-      try { navigator.clipboard.writeText(pb.dataset.pix).then(ok, () => {}); } catch (e) {} return; }
+    const pb = ev.target.closest('button[data-pix]'); if (pb) { const ok = () => { pb.textContent = 'Pix copiado ✓'; setTimeout(() => { pb.textContent = 'Copiar a chave Pix'; }, 1800); };
+      try { navigator.clipboard.writeText(pb.dataset.pix).then(ok, () => {}); } catch (e) {} }
   });
   $('conteudo').addEventListener('click', (ev) => { const tv = ev.target.closest('button[data-tva]'); if (tv) { TURNO_VER[tv.dataset.tv] = tv.dataset.tva; desenhar(); return; } if (ev.target.closest('th[data-ord],button[data-pix],tr.pm-det')) return; const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
   $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };

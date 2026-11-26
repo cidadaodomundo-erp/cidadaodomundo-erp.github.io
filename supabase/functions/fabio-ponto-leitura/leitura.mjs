@@ -128,9 +128,9 @@ async function rpc(c, headers, fn) {
   if (!r.ok) throw new ErroLeitura('rpc_indisponivel', 502);
   try { return await r.json(); } catch (e) { throw new ErroLeitura('rpc_formato', 502); }
 }
-// exige pode_ver_pessoal === true E pode_cadastrar_pessoal === true; devolve o painel de lojas
+// exige pode_ver_ponto === true (RH inteiro OU só ponto, rmb_config emails_ponto) E pode_cadastrar_pessoal === true; devolve o painel de lojas
 export async function exigirPermissoes(c, headers) {
-  const [ver, cad, painel] = await Promise.all([rpc(c, headers, 'pode_ver_pessoal'), rpc(c, headers, 'pode_cadastrar_pessoal'), rpc(c, headers, 'painel_minhas_lojas')]);
+  const [ver, cad, painel] = await Promise.all([rpc(c, headers, 'pode_ver_ponto'), rpc(c, headers, 'pode_cadastrar_pessoal'), rpc(c, headers, 'painel_minhas_lojas')]);
   if (ver !== true || cad !== true) throw new ErroLeitura('sem_permissao', 403);
   // painel_minhas_lojas() RETURNS TABLE(lojas text[], loja_inicial text, travado boolean) => o PostgREST devolve ARRAY de 1 linha.
   // Aceita exatamente 1 elemento objeto válido (ou, por compatibilidade, o próprio objeto válido); 0, 2+ ou tipo errado = 403.

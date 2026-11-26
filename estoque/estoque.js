@@ -1708,7 +1708,7 @@ function sepSaldoTd(l) {
 // 17/11/2026 (dono 13:36, agenda #871: "rever as telas do estoque conferindo se os avisos pros usuários no passo a passo estão
 // claros pra eles saberem exatamente o que podem ou não fazer dentro do fluxo de produção"): uma linha por passo, do que o banco deixa
 const EST_PASSO = {
-  plano: ['Até fechar, pode pôr, mudar e tirar receitas (0 tira). Fechado, "Desfazer o plano" volta para edição e "Excluir" apaga — a separação e a ordem vão junto.', 'Depois que a ordem começou, o plano não se desfaz.'],
+  plano: ['Até fechar, pode pôr, mudar e tirar receitas (0 tira). Fechado, "Acrescentar receita" põe o que faltou. Para mudar quantidade, "Desfazer o plano" volta para edição e "Excluir" apaga — a separação e a ordem vão junto.', 'Depois que a ordem começou, o plano não se desfaz.'],
   separacao: ['Pode escrever quanto saiu de cada item (0 se não saiu) e conferir.', 'Não pode incluir item (isso é no plano). Conferida, a lista vira a ordem e não muda mais.'],
   ordem: ['Pode iniciar, anotar o que a cozinha produziu e encerrar. Cancelar, só antes de começar.', 'Começada a ordem, o plano dela não se desfaz nem se exclui.'],
 };
@@ -2428,7 +2428,7 @@ function plpBlocoPlano() {
   if (fech) {
     h += `<div class="contexto" style="border-color:var(--farol-ok);"><b>Plano de ${plpDm(fech.data_para || amanha)} fechado</b> com
       ${dec.length} ${dec.length === 1 ? 'receita' : 'receitas'}. Agora: separar e conferir cada lista; a ordem de produção nasce da lista conferida.
-      ${plpDesfBotoes(fech.id_plano)}
+      ${plpAcrescBotao(fech.id_plano)}${plpDesfBotoes(fech.id_plano)}
       <span id="plpMsg" style="font-size:12.5px;"></span></div>`;
     const f = EST_FILA || {};
     const nL = (Number(f.listas_a_separar) || 0) + (Number(f.listas_a_conferir) || 0) + (Number(f.listas_a_virar_ordem) || 0);
@@ -2678,6 +2678,64 @@ async function plpGerarOrdem(id) {
 // 17/11/2026 (dono 13:36, agenda #871: "essa exclusão vai estar amarrada ao ciclo todo?"): Desfazer e Excluir amarram o
 // ciclo inteiro — est_plano_desfazer cancela juntas as ordens abertas e as separações e reabre o plano; est_plano_excluir faz
 // o mesmo e apaga (cópia guardada), liberando o dia. O banco recusa se alguma ordem já começou. Motivo escrito na tela.
+// 26/11/2026 [dono] (pedido da Rita pelo Organizador; proposta 2026-11-26-acrescentar-receita-plano-fechado, chat Estoque):
+// no plano FECHADO, "Acrescentar receita" põe o que faltou sem desfazer nada (rpc est_plano_acrescentar; o banco diz para onde foi)
+const PLP_AC = {};
+function plpAcrescBotao(id) {
+  if (!id) return '';
+  return `<div style="margin:8px 0 4px;"><button class="preset-btn active" onclick="plpAcrescAbrir(${Number(id)})">+ Acrescentar receita</button>
+      <span class="caption-label" style="text-align:left;"> Esqueceu uma receita? Acrescente aqui. Ela vai para a separação da família, ou para uma separação nova se a família já foi separada.</span>
+      <div id="plpAcForm_${Number(id)}"></div></div>`;
+}
+async function plpAcrescAbrir(id) {
+  const el = document.getElementById('plpAcForm_' + id); if (!el) return;
+  if (PLP_AC[id] && PLP_AC[id].aberto) { PLP_AC[id].aberto = false; el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="caption-label" style="text-align:left;">carregando as receitas…</div>';
+  let cat = PLP && PLP.man && PLP.man.cat;
+  if (!cat || !cat.length) { try { cat = await consultarTudo('vw_est_plano_receitas?select=nome_base,grupo_receita,familia,un&order=nome_base'); } catch (e) { cat = []; } }
+  PLP_AC[id] = { aberto: true, cat: cat || [], linhas: [{ nome: '', qtd: '' }] };
+  plpAcrescPintar(id);
+}
+function plpAcrescPintar(id) {
+  const A = PLP_AC[id], el = document.getElementById('plpAcForm_' + id); if (!A || !el) return;
+  const unDe = (n) => ((A.cat.find((r) => r.nome_base === n) || {}).un || '');
+  el.innerHTML = `<div style="margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; text-align:left;">
+    <datalist id="plpAcLista_${id}">${A.cat.map((r) => `<option value="${trEscH(r.nome_base)}">`).join('')}</datalist>
+    ${A.linhas.map((l, i) => `<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0;">
+      <input list="plpAcLista_${id}" placeholder="receita (da base)" value="${trEscH(l.nome)}" oninput="PLP_AC[${id}].linhas[${i}].nome=this.value" onchange="plpAcrescPintar(${id})" style="flex:1 1 240px;">
+      <input type="number" step="0.001" min="0" inputmode="decimal" placeholder="quantidade" value="${trEscH(l.qtd)}" oninput="PLP_AC[${id}].linhas[${i}].qtd=this.value" style="width:110px;">
+      <span style="color:var(--tx-4); font-size:12px; min-width:30px;">${trEscH(unDe(l.nome))}</span>
+      ${A.linhas.length > 1 ? `<button class="preset-btn" onclick="PLP_AC[${id}].linhas.splice(${i},1); plpAcrescPintar(${id});" title="tirar esta linha">×</button>` : ''}</div>`).join('')}
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+      <button class="preset-btn" onclick="PLP_AC[${id}].linhas.push({ nome: '', qtd: '' }); plpAcrescPintar(${id});">+ outra receita</button>
+      <button class="preset-btn active" onclick="plpAcrescGravar(${id}, this)">Acrescentar ao plano</button>
+      <button class="preset-btn" onclick="plpAcrescAbrir(${id})">Voltar</button></div>
+    <div id="plpAcRes_${id}" style="margin-top:6px; font-size:13px;"></div></div>`;
+}
+async function plpAcrescGravar(id, bt) {
+  const A = PLP_AC[id]; if (!A) return;
+  const unDe = (n) => ((A.cat.find((r) => r.nome_base === n) || {}).un || null);
+  const itens = A.linhas.map((l) => ({ nome_base: String(l.nome || '').trim(), qtd: Number(String(l.qtd || '').replace(',', '.')) }))
+    .filter((l) => l.nome_base || l.qtd);
+  if (!itens.length) return avisoAcao('atencao', '! Escolha a receita e a quantidade.');
+  const fora = itens.find((l) => !A.cat.some((r) => r.nome_base === l.nome_base));
+  if (fora) return avisoAcao('atencao', `! "${fora.nome_base || '(vazio)'}" não está na lista de receitas da base: escolha da lista.`);
+  if (itens.some((l) => !(l.qtd > 0))) return avisoAcao('atencao', '! A quantidade tem de ser maior que 0.');
+  bt.disabled = true; bt.textContent = 'acrescentando…';
+  avisoAcao('enviando', 'Acrescentando ao plano…');
+  const quem = ((typeof rmbSessao === 'function' ? rmbSessao() : null) || {}).email || null;
+  const r = await trRpcSeguro('est_plano_acrescentar', { p_id: id, p_itens: itens.map((l) => ({ nome_base: l.nome_base, qtd: l.qtd, un: unDe(l.nome_base) })), p_quem: quem });
+  if (!r.ok) { bt.disabled = false; bt.textContent = 'Acrescentar ao plano'; return avisoAcao('erro', '✗ Não acrescentou: ' + (await trErroDe(r)), () => plpAcrescGravar(id, bt)); }
+  let j = []; try { j = await r.json(); } catch (e) {}
+  if (!Array.isArray(j)) j = [j];
+  const txt = j.map((x) => `✓ <b>${trEscH(x.nome_base || '')}</b>: ${trEscH(x.como || 'entrou no plano')}`).join('<br>');
+  avisoAcao('ok', `✓ ${j.length === 1 ? 'Receita acrescentada' : j.length + ' receitas acrescentadas'} ao plano às ${avisoHora()}.`);
+  PLP_AC[id] = null;
+  try { await estFilaCarregar(PLP.unidade); } catch (e) {}
+  await (PLP && PLP.manual ? plpManCarregar() : plpCarregar());
+  const res = document.getElementById('plpMsg') || document.querySelector('[id^="plpAcForm_"]');
+  if (res) res.innerHTML = `<div style="margin-top:6px; text-align:left;">${txt}</div>`;
+}
 function plpDesfBotoes(id) {
   return `<button class="preset-btn" onclick="plpDesfAbrir(${Number(id)}, 'desfazer')" title="Cancela junto a separação e a ordem ainda não começada e volta o plano para edição">Desfazer o plano (separação e ordem juntas)</button>
       <button class="preset-btn" style="color:var(--farol-fora);" onclick="plpDesfAbrir(${Number(id)}, 'excluir')" title="Apaga o plano, a separação e a ordem ainda não começada; o dia fica livre para um plano novo">Excluir o plano</button>
@@ -2796,7 +2854,7 @@ function plpManRender() {
     h += `<div class="contexto" style="border-color:var(--farol-ok); text-align:left;"><b>Plano de ${plpDm(M.data)} fechado.</b>
       ${nL ? `${nL} ${nL === 1 ? 'lista espera' : 'listas esperam'} na Separação.` : 'As listas dele estão na Separação e nas Ordens.'}
       <button class="preset-btn active" onclick="mostrarModulo('separacao')">Abrir a Separação ›</button>
-      ${plpDesfBotoes(M.idPlano)}</div>`;
+      ${plpAcrescBotao(M.idPlano)}${plpDesfBotoes(M.idPlano)}</div>`;
   } else {
     h += `<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px;">
       <button id="plpManFecharBtn" class="preset-btn active est-ciclo" onclick="plpManFechar()" ${plpManNoPlano().length || Object.keys(M.dig).length ? '' : 'disabled title="Digite a quantidade de ao menos uma receita antes"'}>Fechar o plano e gerar as listas de separação</button>
