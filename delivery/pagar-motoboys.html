@@ -91,6 +91,20 @@
   .pm-tv .av { margin-top:8px; padding:7px 10px; border-left:4px solid var(--farol-atencao, #d29922); background:var(--surface-2); border-radius:8px; font-size:12.5px; line-height:1.45; }
   .pm-tv .av.ok { border-left-color:var(--farol-ok, #2ea043); }
   .pm-tv .fo { display:block; margin-top:6px; font-size:11px; color:var(--tx-3); line-height:1.4; }
+  .pm-vr { list-style:none; margin:6px 0 8px; padding:0; max-width:760px; }
+  .pm-vr li { position:relative; padding:3px 0 3px 18px; font-size:13px; line-height:1.45; }
+  .pm-vr li::before { content:''; position:absolute; left:2px; top:9px; width:9px; height:9px; border-radius:50%; background:var(--tx-3); }
+  .pm-vr li.ok::before { background:var(--farol-ok, #2ea043); }
+  .pm-vr li.alerta::before { background:var(--farol-fora, #e5534b); }
+  .pm-vr li.esp::before { background:var(--farol-atencao, #d29922); }
+  .pm-vr li .fo { display:block; font-size:11px; color:var(--tx-3); }
+  .pm-tags { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .pm-tag { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; border:1px solid var(--line-2); background:var(--surface); }
+  .pm-tag.aviso { border-color:var(--farol-atencao, #d29922); color:var(--farol-atencao, #d29922); }
+  .pm-pixbox { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; font-size:12.5px; }
+  .pm-pixbox code { font-size:12px; word-break:break-all; }
+  .pm-tab th[data-ord] { cursor:pointer; user-select:none; }
+  .pm-tab th[data-ord]:hover { color:var(--tx-1); }
   .pm-nota { font-size:12px; color:var(--tx-3); margin:10px 0 0; line-height:1.5; }
   .pm-vazio { padding:18px; color:var(--tx-3); }
   .pm-ok { color:var(--farol-ok, #2ea043); font-weight:700; }
@@ -166,6 +180,7 @@ function exigirLogin(recado) {
   const brl = (v) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const LOJAS = ['Água Verde', 'São Braz', 'Ahú'];
   let DADOS = null, LOJA = 'todas', ABERTO = {}, SEQ = 0;
+  let CONF = null, DOBRO = {}, ORD = { k: null, dir: 1 };
 
   function hojeSP() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); }
   function somaDias(d, n) { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
@@ -186,6 +201,96 @@ function exigirLogin(recado) {
     DADOS = await r.json(); ABERTO = {};
     if (seq === SEQ) desenhar();
     if (seq === SEQ && !$('painelObra').hidden) carregarAbas();
+    if (seq === SEQ) carregarConferir(dia, seq);
+  }
+  // 26/11/2026 [dono]: planilha da loja e Pix feito (pagar_motoboys_conferir, extrato Itaú do dia seguinte) e o selo de
+  // corrida em dobro (pagar_motoboys_abas). Só leitura. Se falhar, a tela continua com "—".
+  async function carregarConferir(dia, seq) {
+    CONF = null; DOBRO = {};
+    let rc = null, ra = null;
+    try { [rc, ra] = await Promise.all([trRpc('pagar_motoboys_conferir', { p_dia: dia }), trRpc('pagar_motoboys_abas', { p_dia: dia })]); } catch (e) { return; }
+    if (seq !== SEQ || !DADOS) return;
+    if (rc && rc.ok) {
+      CONF = await rc.json(); const mp = {};
+      (CONF.linhas || []).forEach((x) => { mp[x.loja + '|' + x.id_entregador] = x; });
+      (DADOS.linhas || []).forEach((l) => {
+        const x = mp[l.loja + '|' + l.id_entregador]; if (!x) return;
+        if (l.pix_pago == null && x.pix_pago != null) l.pix_pago = Number(x.pix_pago);
+        if (l.planilha == null && x.planilha != null) l.planilha = Number(x.planilha);
+        l.pix_itens = x.pix || [];
+      });
+    }
+    if (ra && ra.ok) {
+      const a = await ra.json();
+      (a.corridas || []).forEach((c) => { const k = c.loja + '|' + c.id_entregador; const d = DOBRO[k] || (DOBRO[k] = { rep: 0, pen: 0 }); if (c.status_financeiro === 'Reprovado') d.rep++; else d.pen++; });
+    }
+    if (seq === SEQ) desenhar();
+  }
+  function pixEsperando() { return !!(CONF && DADOS && CONF.extrato_ate && CONF.extrato_ate < somaDias(DADOS.dia, 1)); }
+  function dm2(d) { const p = String(d || '').slice(0, 10).split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
+  // O clique no motoboy: o resumo em bolinhas (verde = certo, vermelho = problema, laranja = esperando), como no portal antigo
+  function veredito(l, k) {
+    const it = []; const add = (c, t, f) => it.push('<li class="' + c + '">' + t + (f ? '<span class="fo">' + esc(f) + '</span>' : '') + '</li>');
+    const tol = DADOS.tolerancia_min, te = turnosEsc(l);
+    if (!te.length) add('alerta', 'Sem escala do Jaison com este nome neste dia: <b>confira na Chegada</b> antes de pagar', 'escala do Jaison');
+    te.forEach((t) => {
+      const nome = t.r === 'alm' ? 'almoço' : 'jantar', patio = l['patio_' + t.r], corta = !!l['corta_' + t.r];
+      if (corta) add('alerta', 'Turno do ' + nome + ' (escala ' + esc(t.ini) + '): chegou ' + esc(patio || '—') + ', <b>passou da tolerância de ' + esc(tol) + ' min</b>', 'chegada no pátio · escala do Jaison');
+      else if (patio) add('ok', 'Turno do ' + nome + ' (escala ' + esc(t.ini) + '): chegou ' + esc(patio) + ', dentro da tolerância', 'chegada no pátio · escala do Jaison');
+      else add('esp', 'Turno do ' + nome + ' (escala ' + esc(t.ini) + '): sem hora do pátio, não corta', 'vale a 1ª coleta só como aviso');
+    });
+    if (l.garantido_manual === true) add('ok', 'Garantido <b>mantido por decisão do dono</b> na Chegada', 'botão da tela Chegada');
+    else if (l.garantido_manual === false) add('alerta', 'Garantido <b>tirado por decisão do dono</b> na Chegada', 'botão da tela Chegada');
+    if (Number(l.garantido) > 0) add('ok', 'Garantido: <b>tem direito</b> (' + brl(l.garantido) + ')' + (Number(l.taxas) >= Number(l.garantido) ? ', mas as entregas deram mais: vale ' + brl(l.taxas) : ''), 'R$/hora × horas da escala');
+    else add('alerta', 'Garantido: <b>sem direito</b>' + (l.corta_dia ? ' · atrasou além da tolerância' : '') + '. Paga só as entregas (' + brl(l.taxas) + ')', 'TrackEat');
+    if (l.rango_manual === true) add('ok', 'Refeição <b>liberada pelo dono</b> na Chegada');
+    else if (l.rango_manual === false) add('alerta', 'Refeição <b>tirada pelo dono</b> na Chegada');
+    if (Number(l.cobrar_refeicao) > 0) add('alerta', 'Lanche além do direito: <b>desconta ' + brl(l.cobrar_refeicao) + '</b> (' + l.lanches + ' lanche(s), direito a ' + l.direito_refeicoes + ')', 'Saipos, comanda Z Motoboys');
+    else if (Number(l.lanches) > 0) add('ok', 'Refeição: ' + l.lanches + ' lanche(s), dentro do direito', 'Saipos, comanda Z Motoboys');
+    if (Array.isArray(l.lanches_precos) && l.lanches_precos.some((x) => x == null)) add('alerta', 'Falta o preço de um lanche: <b>não foi cobrado</b>');
+    if (Number(l.ajustes)) add(l.ajustes < 0 ? 'alerta' : 'ok', 'Acerto: ' + (l.ajustes > 0 ? '+ ' : '− ') + brl(Math.abs(l.ajustes)) + (l.ajuste_motivos ? ' · ' + esc(l.ajuste_motivos) : ''), 'aba Acerto e conferência do caixa');
+    if (l.conferir) add('alerta', '<b>Conferir a regra antes de pagar</b>: o valor é uma prévia');
+    const d = DOBRO[k];
+    if (d && d.pen) add('alerta', d.pen + ' corrida(s) <b>pendente(s)</b> no TrackEat ainda contam: confira na aba 🔎 Corrida em dobro');
+    if (d && d.rep) add('ok', d.rep + ' corrida(s) reprovada(s) no TrackEat ficaram fora da conta');
+    if (l.planilha == null) add('esp', 'Planilha da loja: <b>ainda não chegou</b> ao portal novo');
+    else { const df = Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100; add(Math.abs(df) < 0.01 ? 'ok' : 'alerta', 'Planilha da loja: ' + brl(l.planilha) + (Math.abs(df) < 0.01 ? ', <b>igual</b>' : ', sistema paga <b>' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + '</b>'), 'planilha de fechamento da loja'); }
+    if (l.pix_pago != null) {
+      const df = Math.round((Number(l.pix_pago) - Number(l.pagar || 0)) * 100) / 100;
+      add(Math.abs(df) < 1 ? 'ok' : 'alerta', 'Pix: <b>saiu ' + brl(l.pix_pago) + '</b>' + (Math.abs(df) < 0.01 ? ', igual ao a pagar' : ', ' + brl(Math.abs(df)) + (df > 0 ? ' a mais' : ' a menos') + ' que o a pagar'),
+        (l.pix_itens || []).map((p) => brl(p.valor) + ' em ' + dm2(p.data) + ' · ' + p.conta + ' · ' + p.nome).join(' + ') || 'extrato Itaú');
+    } else if (pixEsperando()) add('esp', 'Pix: <b>esperando o banco</b> (extrato até ' + esc(dm2(CONF.extrato_ate)) + ')');
+    else if (CONF) add('alerta', 'Pix: <b>não achado</b> no extrato do dia seguinte com o nome dele', 'se caiu na conta de um parente, falta ligar o nome do Pix a ele');
+    return '<ul class="pm-vr">' + it.join('') + '</ul>';
+  }
+  function etiquetas(l) {
+    const tg = [];
+    if (!turnosEsc(l).length) tg.push('<span class="pm-tag aviso" title="O Jaison não mandou escala com o nome dele neste dia">sem escala do Jaison</span>');
+    if (turnosEsc(l).length === 2 && !(l.alm_conta && l.jan_conta)) tg.push('<span class="pm-tag aviso">faltou a um turno da escala</span>');
+    if (l.garantido_manual === true && (l.corta_dia || l.corta_alm || l.corta_jan)) tg.push('<span class="pm-tag" title="Passou da tolerância; o garantido foi mantido pelo dono na Chegada">garantido mantido pelo dono</span>');
+    if (Array.isArray(l.lanches_precos) && l.lanches_precos.some((x) => x == null)) tg.push('<span class="pm-tag aviso">falta o preço de um lanche</span>');
+    if (Number(l.cobrar_refeicao) > 0) tg.push('<span class="pm-tag aviso">lanche a mais: − ' + brl(l.cobrar_refeicao) + '</span>');
+    return tg.length ? '<div class="pm-tags">' + tg.join('') + '</div>' : '';
+  }
+  function pixBox(l) {
+    if (!l.chave_pix) return '<div class="pm-pixbox"><span class="pm-nao">Sem chave Pix — peça antes de pagar</span></div>';
+    return '<div class="pm-pixbox"><button type="button" class="pm-btn" data-pix="' + esc(l.chave_pix) + '">Copiar a chave Pix</button><code>' + esc(l.chave_pix) + '</code></div>';
+  }
+  const ORD_VAL = { nome: (l) => String(l.nome || '').toLowerCase(), chegada: (l) => String(l.patio_alm || l.patio_jan || l.chegada || '99'), saida: (l) => String(l.saida || ''),
+    horas: (l) => Number(l.horas || 0), entregas: (l) => Number(l.entregas || 0), vh: (l) => Number(l.valor_hora || 0), gar: (l) => Number(l.garantido || 0),
+    ref: (l) => Number(l.direito_refeicoes || 0), pagar: (l) => Number(l.pagar || 0), plan: (l) => (l.planilha == null ? -1e9 : Number(l.planilha)),
+    pix: (l) => (l.pix_pago == null ? -1e9 : Number(l.pix_pago)), dif: (l) => { const v = difDe(l); return v == null ? -1e9 : Math.abs(v); } };
+  function ordenar(g) {
+    if (!ORD.k || !ORD_VAL[ORD.k]) return g;
+    const f = ORD_VAL[ORD.k];
+    return g.slice().sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * ORD.dir; });
+  }
+  // DIFERENÇA = a pagar × planilha (Organizador 26/11 12:07); sem planilha, a pagar × Pix feito
+  function difDe(l) {
+    if (l.diferenca != null) return Number(l.diferenca);
+    if (l.planilha != null) return Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100;
+    if (l.pix_pago != null) return Math.round((Number(l.pagar || 0) - Number(l.pix_pago)) * 100) / 100;
+    return null;
   }
   // Chegada no pátio: a MESMA fonte da tela Chegada (fila do TrackEat, GPS do pátio, anotado no balcão e a decisão à mão
   // de garantido/refeição). Só leitura (GET). Se falhar, a conta sai sem hora do pátio e não corta ninguém.
@@ -327,9 +432,10 @@ function exigirLogin(recado) {
     // Planilha, Pix feito e Diferença aparecem quando o banco mandar (planilha, pix_pago, diferenca); até lá, "—".
     const din = (v) => (v == null || v === '' ? '<span class="pm-fraco" title="ainda não chega a esta tela">—</span>' : brl(v));
     // DIFERENÇA = a pagar × planilha (Organizador 26/11 12:07): usa a do banco; sem ela, calcula quando a planilha existir
-    const difv = l.diferenca != null ? Number(l.diferenca) : l.planilha != null ? Math.round((Number(l.pagar || 0) - Number(l.planilha)) * 100) / 100 : null;
+    const difv = difDe(l);
+    const dob = DOBRO[k];
     let h = '<tr class="lin" data-k="' + esc(k) + '">' +
-      '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') +
+      '<td data-rot="Motoboy"><span class="pm-nome">' + esc(l.nome) + (l.conferir ? '<span class="pm-conf">⚠ conferir</span>' : '') + (dob && dob.pen ? '<span class="pm-conf" title="Corrida pendente no TrackEat: veja a aba Corrida em dobro">🔎 ' + dob.pen + ' em dobro?</span>' : '') +
         (l.turnos > 1 ? '<small>2 turnos</small>' : '') + (l.corta_dia ? '<small class="pm-nao">✂ atrasou: sem garantido e refeição</small>' : '') + '</span></td>' +
       '<td data-rot="Chegada" class="' + (tarde ? 'pm-tarde' : '') + '" title="Entrada no pátio (ou 1ª coleta no TrackEat)">' + celReal(l, 'ch') + '</td>' +
       '<td data-rot="Saída" title="Última entrega no TrackEat">' + celReal(l, 'sai') + '</td>' +
@@ -340,7 +446,7 @@ function exigirLogin(recado) {
       '<td data-rot="Refeição">' + refeicaoTxt(l) + (Number(l.cobrar_refeicao) > 0 ? '<br><small class="pm-nao">cobra ' + brl(l.cobrar_refeicao) + '</small>' : '') + '</td>' +
       '<td data-rot="A pagar" class="pm-pagar">' + brl(l.pagar) + '</td>' +
       '<td data-rot="Planilha">' + din(l.planilha) + '</td>' +
-      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
+      '<td data-rot="Pix">' + (l.pix_pago != null ? brl(l.pix_pago) : pixEsperando() ? '<span class="pm-tarde">esperando</span>' : l.chave_pix ? '<span class="pm-fraco" title="tem chave Pix; o Pix feito ainda não chega a esta tela">—</span>' : '<span class="pm-nao">sem chave</span>') + '</td>' +
       '<td data-rot="Diferença">' + (difv == null ? din(null) : Math.abs(difv) < 0.005 ? '<span class="pm-sim">bateu</span>' : '<span class="pm-nao">' + (difv < 0 ? '− ' : '+ ') + brl(Math.abs(difv)) + '</span>') + '</td>' +
       '<td class="pm-fraco">' + (ABERTO[k] ? '▾' : '▸') + '</td></tr>';
     if (ABERTO[k]) {
@@ -353,7 +459,8 @@ function exigirLogin(recado) {
       else itens.splice(1, 0, 'Fora da escala do Jaison neste dia.');
       itens.push('Lanches na comanda Z Motoboys: ' + l.lanches + ' (direito: ' + l.direito_refeicoes + ')');
       if (l.reprovadas) itens.push(l.reprovadas + ' corrida(s) reprovada(s) no TrackEat ficaram fora');
-      h += '<tr class="pm-det"><td colspan="13">' + turnosBox(l, k) + '<ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></td></tr>';
+      h += '<tr class="pm-det"><td colspan="13">' + etiquetas(l) + veredito(l, k) + pixBox(l) + turnosBox(l, k) +
+        '<details><summary class="pm-fraco" style="cursor:pointer">ver a conta completa</summary><ul>' + itens.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul></details></td></tr>';
     }
     return h;
   }
@@ -381,13 +488,19 @@ function exigirLogin(recado) {
       const g = ls.filter((l) => l.loja === lj); if (!g.length) return;
       h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' +
         '<div class="pm-tab-wrap"><table class="pm-tab"><thead>' +
-        '<tr><th style="text-align:left">Motoboy</th><th>Chegada</th><th>Saída</th><th>Horas</th><th>Entregas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Planilha</th><th>Pix</th><th>Diferença</th><th></th></tr></thead><tbody>' +
-        g.map(linhaHtml).join('') + '</tbody></table></div>';
+        '<tr>' + [['nome', 'Motoboy'], ['chegada', 'Chegada'], ['saida', 'Saída'], ['horas', 'Horas'], ['entregas', 'Entregas'], ['vh', 'R$/hora'], ['gar', 'Garantido'], ['ref', 'Refeição'], ['pagar', 'A pagar'], ['plan', 'Planilha'], ['pix', 'Pix'], ['dif', 'Diferença']]
+          .map((c, i) => '<th data-ord="' + c[0] + '" title="Clique para ordenar"' + (i ? '' : ' style="text-align:left"') + '>' + c[1] + (ORD.k === c[0] ? (ORD.dir > 0 ? ' ▲' : ' ▼') : '') + '</th>').join('') + '<th></th></tr></thead><tbody>' +
+        ordenar(g).map(linhaHtml).join('') + '</tbody></table></div>';
     });
     const sd = (d.lanches_sem_dono || []).filter((x) => LOJA === 'todas' || x.loja === LOJA);
     if (sd.length) h += '<div class="pm-aviso" style="margin-top:12px">🍔 <b>' + sd.length + ' lanche(s) sem dono</b> na comanda Z Motoboys — ninguém está sendo cobrado: ' +
       sd.map((x) => esc(x.loja) + ' venda ' + esc(x.numero_venda) + ' (' + esc(x.produto) + ')').join(' · ') + '. Falta o nome do motoboy na observação do lanche.</div>';
-    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. A escala combinada aparece no clique. Planilha, Pix feito e diferença aparecem aqui quando chegarem ao banco.</p>';
+    const CONTA_LOJA = { 'ITAU AV': 'Água Verde', 'ITAU SB': 'São Braz', 'ITAU AHU': 'Ahú' };
+    const psd = ((CONF && CONF.pix_sem_dono) || []).filter((x) => LOJA === 'todas' || CONTA_LOJA[x.conta] === LOJA);
+    if (psd.length) h += '<details class="pm-aviso" style="margin-top:12px"><summary style="cursor:pointer">💸 <b>' + psd.length + ' Pix de até R$ 600 sem dono</b> no extrato de ' + esc(dm2(somaDias(d.dia, 1))) + ' (pode ser motoboy com Pix em nome de outra pessoa, ou não ser motoboy)</summary><ul>' +
+      psd.map((x) => '<li>' + esc(x.conta) + ' · ' + brl(x.valor) + ' · ' + esc(x.nome) + '</li>').join('') + '</ul></details>';
+    h += '<p class="pm-nota">Clique na linha para ver a conta daquele motoboy. Clique no título de uma coluna para ordenar. Pix feito: extrato Itaú do dia seguinte, casado pelo nome' +
+      (CONF ? ' (extrato até ' + esc(dm2(CONF.extrato_ate)) + ')' : '') + '. Planilha: planilha de fechamento da loja' + (CONF && !CONF.planilhas ? ' — <b>ainda não chega ao portal novo</b>' : '') + '.</p>';
     $('conteudo').innerHTML = h;
   }
 
@@ -541,7 +654,12 @@ function exigirLogin(recado) {
     if (!$('painelObra').hidden) carregarAbas();
   });
   $('lojas').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-loja]'); if (!b || !DADOS) return; LOJA = b.dataset.loja; desenhar(); desenharAba(); });
-  $('conteudo').addEventListener('click', (ev) => { const tv = ev.target.closest('button[data-tva]'); if (tv) { TURNO_VER[tv.dataset.tv] = tv.dataset.tva; desenhar(); return; } const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
+  $('conteudo').addEventListener('click', (ev) => {
+    const th = ev.target.closest('th[data-ord]'); if (th) { const k = th.dataset.ord; ORD = ORD.k === k ? { k, dir: -ORD.dir } : { k, dir: k === 'nome' || k === 'chegada' || k === 'saida' ? 1 : -1 }; desenhar(); return; }
+    const pb = ev.target.closest('button[data-pix]'); if (pb) { ev.stopPropagation(); const ok = () => { pb.textContent = 'Pix copiado ✓'; setTimeout(() => { pb.textContent = 'Copiar a chave Pix'; }, 1800); };
+      try { navigator.clipboard.writeText(pb.dataset.pix).then(ok, () => {}); } catch (e) {} return; }
+  });
+  $('conteudo').addEventListener('click', (ev) => { const tv = ev.target.closest('button[data-tva]'); if (tv) { TURNO_VER[tv.dataset.tv] = tv.dataset.tva; desenhar(); return; } if (ev.target.closest('th[data-ord],button[data-pix],tr.pm-det')) return; const tr = ev.target.closest('tr.lin'); if (!tr) return; ABERTO[tr.dataset.k] = !ABERTO[tr.dataset.k]; desenhar(); });
   $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };
   $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
   $('dia').onchange = carregar;
