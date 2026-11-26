@@ -398,7 +398,7 @@ function exigirLogin(recado) {
       '<div><div class="k">Entregas</div><div class="v">' + ls.reduce((a, l) => a + Number(l.entregas || 0), 0) + '</div></div></div>';
     (LOJA === 'todas' ? LOJAS : [LOJA]).forEach((lj) => {
       const g = ls.filter((l) => l.loja === lj); if (!g.length) return;
-      h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' +
+      h += '<div class="pm-loja"><h2>' + esc(lj) + '</h2><span class="meta">' + g.length + ' motoboy(s) · <b>' + brl(g.reduce((a, l) => a + Number(l.pagar || 0), 0)) + '</b></span></div>' + escDoDia(lj, $('dia').value) +
         '<div class="pm-tab-wrap"><table class="pm-tab"><thead>' +
         '<tr><th style="text-align:left">Motoboy</th><th>Chegada</th><th>Saída</th><th>Horas</th><th>Entregas</th><th>R$/hora</th><th>Garantido</th><th>Refeição</th><th>A pagar</th><th>Planilha</th><th>Pix</th><th>Diferença</th><th></th></tr></thead><tbody>' +
         g.map(linhaHtml).join('') + '</tbody></table></div>';
@@ -499,6 +499,26 @@ function exigirLogin(recado) {
     $('painelObra').innerHTML = h;
   }
   $('painelObra').addEventListener('click', (ev) => { const b = ev.target.closest('button[data-escpula]'); if (b) abaEscalas(Number(b.dataset.escpula)); });
+
+  // 26/11/2026 (pedido da Hellen): horários da escala do dia acima da lista de cada loja. Só mostra.
+  const ESCDIA = {};
+  function escDoDia(loja, dia) {
+    if (!dia) return '';
+    const ini = segDe(dia), w = ESCDIA[ini];
+    if (!w) {
+      ESCDIA[ini] = 'carregando';
+      trRpc('pagar_motoboys_escala_semana', { p_ini: ini }).then((r) => r.ok ? r.json() : Promise.reject())
+        .then((j) => { ESCDIA[ini] = j; if (DADOS) desenhar(); }).catch(() => { ESCDIA[ini] = 'erro'; });
+      return '';
+    }
+    if (typeof w === 'string') return '';
+    const ls = (w.linhas || []).filter((r) => r.unidade === loja && r.data === dia);
+    if (!ls.length) return '<div class="pm-aviso">📅 <b>Escala do dia:</b> nenhuma escala do Jaison para esta loja neste dia.</div>';
+    const g = [];
+    ls.forEach((r) => { const k = (r.entrada || '?') + '–' + (r.saida || 'fechar'); let x = g.find((y) => y.k === k); if (!x) { x = { k, t: r.turno, n: [] }; g.push(x); } x.n.push(r.nome); });
+    return '<div class="pm-caixa" style="display:block">📅 <b>Escala do dia</b> <small>(do Jaison)</small><div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:4px">' +
+      g.map((x) => '<div><b>' + esc(x.k) + '</b> <small>' + esc(x.t || '') + '</small> · ' + x.n.map(esc).join(', ') + '</div>').join('') + '</div></div>';
+  }
 
   function desenharAba() {
     if (!ABAS) return;
@@ -619,7 +639,7 @@ function exigirLogin(recado) {
   $('btnAntes').onclick = () => { $('dia').value = somaDias($('dia').value, -1); carregar(); };
   $('btnDepois').onclick = () => { $('dia').value = somaDias($('dia').value, 1); carregar(); };
   $('dia').onchange = carregar;
-  $('btnAtualizar').onclick = carregar;
+  $('btnAtualizar').onclick = () => { for (const k in ESCDIA) delete ESCDIA[k]; carregar(); };
   // 26/11/2026 [dono] (Organizador 11:59): a loja escolhida no topo do painel vale aqui também
   const LOJA_NOME = { 'AGUA VERDE': 'Água Verde', 'SÃO BRAZ': 'São Braz', 'SAO BRAZ': 'São Braz', 'AHU': 'Ahú' };
   const lojaDaCasca = () => { const l = typeof lojaAtual === 'function' ? lojaAtual() : null; return !l || l === 'REDE' ? 'todas' : (LOJA_NOME[l] || l); };
