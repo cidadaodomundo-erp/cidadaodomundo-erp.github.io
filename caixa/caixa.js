@@ -110,7 +110,10 @@ function caixaDiaDaVez(u) {
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
 const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {};
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {};
+// id_sale da chave da pendência (dif:/pdv:/pix:/quase:/troca:/divid: o 1º) e a linha de detalhe da venda
+const caixaIdDaChave = (c) => (String(c || '').match(/^(?:dif|pdv|pix|quase|troca|divid):(\d+)/) || [])[1] || null;
+function caixaRefTxt(id) { const v = id && CAIXA_VREF[String(id)]; if (!v) return ''; return [v.ref_venda, String(v.hora || '').slice(0, 5), v.caixa ? 'setor ' + (v.caixa === 'SALÃO' ? 'salão' : 'delivery') : ''].filter(Boolean).join(' · '); }
 const cgNum = v => Number(v) || 0;
 function caixaFrenteNome(u, cx) {   // 'Caixa 14808' → 'CaixaSalao' (caixa_frente_nome); desconhecido fica "caixa <id>"
   const id = String(cx || '').replace(/\D/g, '');
@@ -698,8 +701,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // 06/11/2026 (dono, via Financeiro: "bandeira trocada que já passou fica como registro"): troca com baixa em
   // caixa_pendencia_validada (chave 'troca:<id_sale>') não é mais pendência — fica só o registro na forma
   const trocaBaixa = t => !!valDe['troca:' + t.ref];
-  const bateuItens = (A, P) => A.map(x => ({ hora: hhmm(x.hora), venda: rotVenda(x), saipos: limpa(x.detalhe), outro: x.par ? limpa(x.par.detalhe) + ' às ' + hhmm(x.par.hora) : '', valor: +x.valor || 0 }))
-    .concat(P.map(x => ({ hora: hhmm(x.hora), venda: 'PIX', saipos: String(x.tipo || 'PIX'), outro: 'entrou no banco', valor: +x.valor || 0 })))
+  const vr = (id) => (id && CAIXA_VREF[String(id)]) || {};
+  const setorTx = (c) => c === 'SALÃO' ? 'salão' : c === 'DELIVERY' ? 'delivery' : '';
+  const bateuItens = (A, P) => A.map(x => { const r = vr(x.id_sale || x.referencia); return { hora: hhmm(x.hora) || String(r.hora || '').slice(0, 5), venda: r.ref_venda || rotVenda(x), setor: setorTx(r.caixa || x.caixa), saipos: limpa(x.detalhe), outro: x.par ? limpa(x.par.detalhe) + ' às ' + hhmm(x.par.hora) : '', valor: +x.valor || 0 }; })
+    .concat(P.map(x => { const r = vr(x.id_sale); return { hora: String(r.hora || x.entrega || '').slice(0, 5) || hhmm(x.hora), venda: r.ref_venda || 'PIX', setor: setorTx(r.caixa || x.caixa), saipos: String(x.tipo || 'PIX'), outro: 'PIX entrou no banco', valor: +x.valor || 0 }; }))
     .sort((a, b) => String(a.hora).localeCompare(String(b.hora)));
   if (calc) return { abertas: abertas.filter(x => grupoDe(x) !== 'auto'), trocas: trocas.filter(t => !trocaBaixa(t)), turnos,
     // 25/11/2026: o "Bateu (N · R$)" da conferência do cartão da loja
@@ -1809,7 +1814,7 @@ async function caixaHellenCarregar() {
     // filtra por quem confere a loja — a fin_lancamentos fica fechada para quem não está em tr_usuarios e voltava vazia
     const [frentes, difsai] = await Promise.all([
       consultarTudo('caixa_frente_nome?select=unidade,caixa_usuario,nome&order=unidade,caixa_usuario').catch(() => []),
-      consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito,frente,tipo,tratamento&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
+      consultarTudo('vw_caixa_diferenca_saipos?select=id,data,unidade,descricao,credito,debito,frente,tipo,tratamento,caixa,id_titulo,hora_fechamento,operador&data=gte.' + des + '&' + un + '&order=data,id').catch(() => [])]);
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     const [trs, pix, cobr, forma, onl, robo, quebras] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
@@ -1820,6 +1825,10 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_caixa_troca_bandeira_robo?select=dia,unidade,id_sale,valor,caixa,numero,mesa,forma_no_saipos,forma_nova,acao,feito_em' + faixa(des, hoje) + '&acao=in.(TROCAR,FEITO_AGUARDA_CARGA,DIVERGENTE)').catch(() => []),
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
     ]);
+    // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento com o número da venda"; Financeiro c770577):
+    // por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor — salão não tem número no Saipos
+    CAIXA_VREF = {};
+    (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
     const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,canal,frente,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
     // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
@@ -1890,7 +1899,9 @@ function caixaHellenItens() {
       if (valDS[l.data + '|' + chave]) return;
       // 26/11: a frente do Saipos diz o caixa (Salão/Balcão = SALÃO; Delivery/Atendimento = DELIVERY); outra frente fica nos dois filtros
       const cxF = l.caixa || (/SAL|BALC/i.test(nome) ? 'SALÃO' : /DELIV|ATEND/i.test(nome) ? 'DELIVERY' : null);
-      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: cxF, valor: Math.abs(v), hora: '', forma: 'Dinheiro', frente: nome,
+      // 26/11/2026 [dono] ("todos os lançamentos devem trazer os detalhes do fechamento"): lançamento, hora do fechamento e operador
+      const detF = [l.id_titulo ? 'lançamento ' + l.id_titulo : '', l.hora_fechamento ? 'fechado ' + l.hora_fechamento : '', l.operador ? 'operador ' + l.operador : '', cxF ? 'setor ' + (cxF === 'SALÃO' ? 'salão' : 'delivery') : ''].filter(Boolean).join(' · ');
+      const pend = { chave, bloco: 'dinheiro', efeito: -v, caixa: cxF, valor: Math.abs(v), hora: String(l.hora_fechamento || '').slice(-5), forma: 'Dinheiro', frente: nome, detalheFech: detF,
         saipos: 'fechamento da frente ' + nome + ' no Saipos', real: v < 0 ? 'faltou ' + reais(v) + ' na gaveta' : 'sobrou ' + reais(v) + ' na gaveta',
         leitura: 'diferença no fechamento do Saipos (' + nome + '): ' + (v < 0 ? 'faltou ' : 'sobrou ') + reais(v), acao: 'explicar como quebra ou sobra' };
       add({ u, dia: l.data, caixa: cxF || '', ordem: 3, valor: v, oque: pend.leitura, acao: 'explicar', pend, bloco: 'difsaipos', venda: nome + (v < 0 ? ' · faltou' : ' · sobrou'), forma: 'Dinheiro', frente: nome });
@@ -2197,7 +2208,7 @@ function caixaPendRow(p, idx, lote) {
   setTimeout(() => caixaOpcMudou(idx), 0);
   return `<div class="cx-pend" data-idx="${idx}" style="padding:8px 0;border-top:1px dashed var(--line);">
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span><b>${trEscH(p.hora || '')}</b> · ${trEscH(p.venda || 'venda')} · ${trEscH(p.forma || '')} · <b>${R(p.valor)}</b>
-      <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span></span>
+      <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span>${p.detalhe ? `<br><span style="font-size:12px;color:var(--tx-4);">${trEscH(p.detalhe)}</span>` : ''}</span>
       ${p.bloco === 'difsaipos' && !lote ? `<button class="preset-btn" onclick="caixaHellenExplicar(${idx})">Explicar</button>` : `<button class="preset-btn" onclick="const d=this.closest('.cx-pend').querySelector('.cx-exp'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button>`}</div>
     <div id="cxExp_${idx}" class="cx-exp" style="display:none;margin-top:6px;">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
@@ -2210,8 +2221,8 @@ function caixaPendRow(p, idx, lote) {
 function caixaBateuTabela(it) {
   if (!it || !it.length) return '';
   const td = 'padding:3px 6px;border-top:1px solid var(--line);text-align:left;';
-  return `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;color:var(--tx-3);"><tr><th style="${td}">Hora</th><th style="${td}">Venda</th><th style="${td}">No Saipos</th><th style="${td}">Na maquininha / banco</th><th style="${td}text-align:right;">Valor</th></tr>`
-    + it.map(x => `<tr><td style="${td}white-space:nowrap;">${trEscH(x.hora)}</td><td style="${td}white-space:nowrap;">${trEscH(x.venda)}</td><td style="${td}">${trEscH(x.saipos)}</td><td style="${td}">${trEscH(x.outro)}</td><td style="${td}text-align:right;white-space:nowrap;">R$ ${fmt(x.valor)}</td></tr>`).join('') + '</table></div>';
+  return `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;color:var(--tx-3);"><tr><th style="${td}">Hora</th><th style="${td}">Venda</th><th style="${td}">Setor</th><th style="${td}">No Saipos</th><th style="${td}">Na maquininha / banco</th><th style="${td}text-align:right;">Valor</th></tr>`
+    + it.map(x => `<tr><td style="${td}white-space:nowrap;">${trEscH(x.hora)}</td><td style="${td}white-space:nowrap;">${trEscH(x.venda)}</td><td style="${td}">${trEscH(x.setor || '')}</td><td style="${td}">${trEscH(x.saipos)}</td><td style="${td}">${trEscH(x.outro)}</td><td style="${td}text-align:right;white-space:nowrap;">R$ ${fmt(x.valor)}</td></tr>`).join('') + '</table></div>';
 }
 function caixaResPendHtml(res, pend, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
@@ -2284,7 +2295,7 @@ function caixaConfHtml(u, dia) {
   }).join('');
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
-    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i, bloco: x.bloco }));
+    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i, bloco: x.bloco, detalhe: x.pend.detalheFech || caixaRefTxt(caixaIdDaChave(x.pend.chave)) }));
   const abertosD = caixaDescAbertos(u, dia);
   const pendF = pend.filter(p => caixaNaFrente(p.caixa));
   const ok = !pendF.length && !abertosD.length && envGrav;
