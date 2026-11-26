@@ -395,7 +395,10 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
   // 06/11/2026 (dono, via Financeiro: "diferença de até R$ 1 deixa de virar pendência"): o quase-par de até R$ 1 vai para
   // "Absorvido"; a exceção é delivery cobrado a menos com motoboy, que segue quebra do motoboy (regra de 11/09)
   [...conferir].forEach(q => { if (Math.abs(q.dv) <= 1.0001 && !(q.dv < 0 && moto[q.s.referencia])) { conferir.splice(conferir.indexOf(q), 1); arredond.push(q); } });
-  const eVale = t => /^vr\b|ticket|alelo|pluxee|sodexo|^vale/i.test(t.detalhe || '');
+  const eVale = t => /^vr\b|ticket|alelo|pluxee|sodexo|^vale|\bben\b|voucher/i.test(t.detalhe || '');
+  // 25/11/2026 [regra] (Financeiro 21:30, agenda #2406 do dono): vale sem passada na Rede, de 25/11 em diante, espera a confirmação do
+  // equipamento (cinza, não vira pendência da Hellen) — até o dono dizer se o vale passa em máquina própria
+  const valeEspera = t => eVale(t) && dia >= CAIXA_NOVO_FLUXO;
   const turnos = (CAIXA_TURNOS || []).filter(t => t.unidade === unidade && t.dia === dia).sort((a, b) => +b.total - +a.total);
   const hhmmTs = ts => ts ? String(ts).slice(11, 16) + (String(ts).slice(0, 10) !== dia ? ' (' + String(ts).slice(8, 10) + '/' + String(ts).slice(5, 7) + ')' : '') : '';
   const rotuloCaixa = t => t.caixa === 'SALÃO' ? 'Caixa Salão' : t.caixa === 'DELIVERY' ? 'Caixa Delivery' : t.caixa + (t.canal_dominante ? ' (' + (['SALÃO', 'BALCÃO'].includes(t.canal_dominante) ? 'salão' : 'delivery') + ')' : '');
@@ -484,9 +487,9 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
       acao: dv > 0 ? 'faltam ' + reaisCc(dv) + ': o resto foi pago de outro jeito (dinheiro, PIX, outro cartão)? ou o valor registrado está errado?' : 'passou ' + reaisCc(-dv) + ' a mais na máquina: valor digitado errado na maquininha? gorjeta?' });
   });
   semParS.filter(s => !s._explicado).forEach(s => pend.push({ forma: formaPadrao(s.detalhe), caixa: s.caixa || null, chave: 'pdv:' + s.referencia + ':' + (+s.valor).toFixed(2), bloco: semForma(s) ? 'dinheiro' : 'maquininha', efeito: semForma(s) ? 0 : +s.valor,
-    p: madrugadaSemRede(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) ? '#9aa4af' : eVale(s) ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(s.hora),
+    p: madrugadaSemRede(s) || valeEspera(s) ? 3 : eVale(s) ? 2 : 1, cor: madrugadaSemRede(s) || valeEspera(s) ? '#9aa4af' : eVale(s) ? 'var(--farol-perto)' : 'var(--farol-fora)', hora: hhmm(s.hora),
     saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou este dia inteiro' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
-    leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'não passou na maquininha: a Hellen autoriza o desconto',   // 25/11/2026 [conserto] (dono #108 12:53: "itens não recebidos devem ser enviados para a Hellen autorizar o desconto")
+    leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : valeEspera(s) ? 'vale: aguardando confirmação do equipamento' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'não passou na maquininha: a Hellen autoriza o desconto',   // 25/11/2026 [conserto] (dono #108 12:53: "itens não recebidos devem ser enviados para a Hellen autorizar o desconto")
     acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou; se não cobrou, a Hellen autoriza o desconto' : 'a Hellen autoriza o desconto (ou acha a venda paga em outra forma)' }));
   restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || null, chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
     p: 2, cor: 'var(--farol-perto)', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
@@ -2122,17 +2125,49 @@ const CX_DECISOES = [['SOBRA_RECEITA', 'Sobra → receita'], ['FALTA_DELIVERY', 
 // o detalhe é sempre o mesmo — Resolvidos (N · R$) recolhido, Pendentes (N) aberto, e em cada pendente o botão "Explicar", que abre a
 // explicação, a decisão e Gravar. Nos dias em lote (até 24/11) o detalhe aparece só para leitura, com a marca "fechado em lote".
 let CAIXA_LOTE = {};
+// 25/11/2026 [dono] (Organizador 21:04; Financeiro 21:50, livro venda-sem-lancamento-aviso-pontual-e-explicacao-opcoes): a explicação
+// é por OPÇÕES PRONTAS + "Outro"; cada opção já leva a decisão. "Outro" e toda FALTA pedem texto (mínimo 3 letras).
+const CX_OPC = {
+  maq: [['Refrigerante ou item vendido na entrega sem lançar', 'SOBRA_RECEITA'], ['Gorjeta na maquininha', 'SOBRA_RECEITA'],
+    ['Conta junta ou dividida (está em outra venda)', 'SEM_EFEITO'], ['Venda lançada em outra loja ou em outro dia', 'SEM_EFEITO'], ['Outro', '*']],
+  venda: [['Forma errada no Saipos (foi Pix, dinheiro ou outro cartão)', 'SEM_EFEITO'], ['Venda duplicada no Saipos', 'SEM_EFEITO'],
+    ['Conta junta ou dividida', 'SEM_EFEITO'], ['Cortesia (não era para cobrar)', 'FALTA_SALAO_NAO_DESCONTA'], ['Não foi pago', '#PAGO'], ['Outro', '*']] };
+const CX_DEC_TODAS = [...CX_DECISOES, ['SEM_EFEITO', 'Sem efeito (não mexe no caixa)']];
+function caixaOpcoes(p) { return String(p.chave || '').startsWith('rede:') ? CX_OPC.maq : CX_OPC.venda; }
+// a decisão de uma opção: '*' = a Hellen escolhe entre todas; '#PAGO' = delivery pede confirmação, salão a Hellen escolhe se desconta
+function caixaDecDaOpcao(p, dec) {
+  if (dec === '#PAGO') return p.caixa === 'DELIVERY' || p.quem ? 'FALTA_DELIVERY' : '#SALAO';
+  return dec;
+}
+function caixaOpcMudou(idx) {
+  const P = (CAIXA_PEND_IDX || {})[idx]; if (!P) return;
+  const op = document.getElementById('cxOp_' + idx), de = document.getElementById('cxDe_' + idx), tx = document.getElementById('cxEx_' + idx);
+  const [rot, d0] = caixaOpcoes(P)[Number(op.value)] || [];
+  const dec = caixaDecDaOpcao(P, d0);
+  const lista = dec === '*' ? CX_DEC_TODAS : dec === '#SALAO' ? CX_DECISOES.filter(([v]) => /FALTA_SALAO/.test(v)) : null;
+  de.innerHTML = lista ? lista.map(([v, t]) => `<option value="${v}">${t}</option>`).join('') : '';
+  de.style.display = lista ? '' : 'none';
+  const precisa = dec === '*' || dec === '#SALAO' || /^FALTA/.test(dec || '');
+  tx.placeholder = precisa ? 'o que aconteceu (obrigatório)' : 'detalhe (opcional)';
+  const info = document.getElementById('cxDi_' + idx);
+  if (info) info.textContent = lista ? '' : (CX_DEC_TODAS.find(([v]) => v === dec) || [, ''])[1];
+}
+let CAIXA_PEND_IDX = {};
 function caixaPendRow(p, idx, lote) {
   const R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
-  const e = Number(p.efeito || 0), sug = e < 0 ? 'SOBRA_RECEITA' : (p.caixa === 'DELIVERY' || p.quem) ? 'FALTA_DELIVERY' : 'FALTA_SALAO_DESCONTA';
+  CAIXA_PEND_IDX[idx] = p;
+  const ops = caixaOpcoes(p);
+  setTimeout(() => { if (document.getElementById('cxOp_' + idx)) caixaOpcMudou(idx); }, 0);
   return `<div style="padding:8px 0;border-top:1px dashed var(--line);">
     <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span><b>${trEscH(p.hora || '')}</b> · ${trEscH(p.venda || 'venda')} · ${trEscH(p.forma || '')} · <b>${R(p.valor)}</b>
       <span style="font-size:12.5px;color:var(--tx-3);"> — ${trEscH(p.leitura || '')}</span></span>
       <button class="preset-btn" onclick="const d=document.getElementById('cxExp_${idx}'); d.style.display = d.style.display === 'none' ? '' : 'none';">Explicar</button></div>
     <div id="cxExp_${idx}" style="display:none;margin-top:6px;">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-        <input id="cxEx_${idx}" placeholder="explicação (obrigatória)" ${lote ? 'disabled' : ''} style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
-        <select id="cxDe_${idx}" ${lote ? 'disabled' : ''} style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DECISOES.map(([v, t]) => `<option value="${v}"${v === sug ? ' selected' : ''}>${t}</option>`).join('')}</select>
+        <select id="cxOp_${idx}" ${lote ? 'disabled' : ''} onchange="caixaOpcMudou('${idx}')" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${ops.map(([t], j) => `<option value="${j}">${t}</option>`).join('')}</select>
+        <select id="cxDe_${idx}" ${lote ? 'disabled' : ''} style="display:none;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;"></select>
+        <span id="cxDi_${idx}" style="font-size:12px;color:var(--tx-4);"></span>
+        <input id="cxEx_${idx}" placeholder="detalhe (opcional)" ${lote ? 'disabled' : ''} style="flex:1 1 200px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
         ${lote ? '<span style="color:var(--tx-4);font-size:12.5px;">fechado em lote pelo dono — só leitura</span>' : `<button class="preset-btn active" onclick="caixaDecidir(${idx}, this)">Gravar</button>`}</div></div></div>`;
 }
 function caixaResPendHtml(res, pend, lote) {
@@ -2196,7 +2231,7 @@ function caixaConfHtml(u, dia) {
     + ln('Diferença', df == null ? tr : Math.abs(df) < 0.005 ? '<b style="color:var(--farol-ok);">bateu</b>' : `<b style="color:var(--farol-fora);">${df < 0 ? 'faltou' : 'sobrou'} ${R(df)}</b>`);
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
-    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, idx: x.i }));
+    .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i }));
   const abertosD = caixaDescAbertos(u, dia);
   const ok = !pend.length && !abertosD.length && envGrav;
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">${pend.length + abertosD.length + (envGrav ? 0 : 1)} a fazer</span>`}`,
@@ -2209,12 +2244,17 @@ const caixaMesmoNome = (a, b) => { const n = (t) => String(t || '').normalize('N
 const caixaBlocoBanco = (b) => ({ cofre: 'dinheiro', difsaipos: 'dinheiro', semcobr: 'maquininha', troca: 'maquininha', pix: 'maquininha' }[b] || b);
 async function caixaDecidir(i, bt) {
   const x = CAIXA_HELLEN_CALC && CAIXA_HELLEN_CALC.itens[i]; if (!x || !x.pend) return;
-  const ex = (document.getElementById('cxEx_' + i) || {}).value || '', de = (document.getElementById('cxDe_' + i) || {}).value, mo = (document.getElementById('cxMo_' + i) || {}).value || '';
-  if (ex.trim().length < 3) return avisoAcao('atencao', '! Escreva a explicação (é obrigatória).');
-
+  const P = (CAIXA_PEND_IDX || {})[i] || {};
+  const opI = Number((document.getElementById('cxOp_' + i) || {}).value || 0), [rot, d0] = caixaOpcoes(P)[opI] || ['Outro', '*'];
+  const d1 = caixaDecDaOpcao(P, d0);
+  const de = d1 === '*' || d1 === '#SALAO' ? (document.getElementById('cxDe_' + i) || {}).value : d1;
+  const tx = ((document.getElementById('cxEx_' + i) || {}).value || '').trim();
+  const precisa = d1 === '*' || d1 === '#SALAO' || /^FALTA/.test(de || '');
+  if (precisa && tx.length < 3) return avisoAcao('atencao', '! Escreva o que aconteceu (obrigatório nesta opção).');
+  const ex = tx ? rot + ' — ' + tx : rot;
   bt.disabled = true; bt.textContent = 'gravando…';
   const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.u, p_dia: x.dia, p_chave: x.pend.chave, p_bloco: caixaBlocoBanco(x.pend.bloco), p_valor: Number(x.valor) || 0,
-    p_explicacao: ex.trim(), p_decisao: de, p_caixa: x.caixa || null, p_responsavel: null, p_descricao: [x.hora, x.venda, x.forma].filter(Boolean).join(' · ') });
+    p_explicacao: ex, p_decisao: de, p_caixa: x.caixa || null, p_responsavel: null, p_descricao: [x.hora, x.venda, x.forma].filter(Boolean).join(' · ') });
   if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaDecidir(i, bt)); }
   avisoAcao('ok', `✓ Gravado às ${avisoHora()}.`);
   await caixaRecarregarValidadas(); CAIXA_HELLEN_CALC = null; renderModuloCaixa();
