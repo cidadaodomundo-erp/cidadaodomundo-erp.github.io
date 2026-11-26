@@ -1034,3 +1034,15 @@
     .card-val { font-size:18px; }
     .card-pct { font-size:13px; }
   }
+
+  /* 22-23/11/2026 (Fábio, portal no celular): campo sem estilo próprio deixava de vir branco do navegador no fundo escuro
+     e ficava baixo demais para o dedo. :where() não pesa nada: qualquer estilo da própria tela continua mandando. */
+  :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select, textarea) {
+    background:var(--surface-2); color:var(--tx-1); border:1px solid var(--line-2, var(--line)); border-radius:8px; padding:6px 10px; font:inherit;
+  }
+  :where(input, select, textarea)::placeholder { color:var(--tx-3, var(--tx-2)); }
+  @media (max-width:700px) {
+    :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]), select) { min-height:40px; }
+  }
+  :where(button:not([class*="sidebar"])) { color:var(--tx-1); }
+  :where(button:not([class])), :where(.pao-btn) { background:var(--surface-2); border:1px solid var(--line-2, var(--line)); border-radius:8px; padding:6px 12px; font:inherit; cursor:pointer; }
