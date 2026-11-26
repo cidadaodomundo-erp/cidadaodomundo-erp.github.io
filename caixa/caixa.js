@@ -1813,7 +1813,7 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
     ]);
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
-    const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
+    const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
     // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
     const motos = await consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []);
     // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
@@ -2123,7 +2123,7 @@ function caixaDescontosHtml() {
     const D = (H.desc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia);
     const semMot = D.filter(x => x.alerta_sem_motivo).length, semAut = D.filter(x => x.alerta_sem_autorizacao).length, ab = caixaDescAbertos(u, dia);
     return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${D.length} ${D.length === 1 ? 'desconto' : 'descontos'} · sem senha: ${semAut} · sem motivo: ${semMot}${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
-      + ab.map(x => `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);"><div>${trEscH(String(x.hora || '').slice(0, 5))} · ${x.numero ? 'nº ' + trEscH(x.numero) : x.mesa ? 'mesa ' + trEscH(x.mesa) : 'venda'} · desconto <b>${R(x.desconto)}</b> · ${x.alerta_sem_motivo ? 'sem motivo' : trEscH(x.motivo || '')}${x.alerta_sem_autorizacao ? ' · sem senha' : ''}</div>
+      + ab.map(x => `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);"><div>${trEscH(String(x.hora || '').slice(0, 5))} · ${x.numero ? 'nº ' + trEscH(x.numero) : x.mesa ? 'mesa ' + trEscH(x.mesa) : 'venda'} · desconto <b>${R(x.desconto)}</b> · ${x.alerta_sem_motivo ? 'sem motivo' : trEscH(x.motivo || '')}${x.alerta_sem_autorizacao ? ' · sem senha · lançou: <b>' + trEscH(x.lancado_por || x.quem || 'não registrado') + '</b>' : ''}</div>
         <div style="display:flex;gap:6px;margin-top:4px;"><input id="cxDx_${trEscH(x.id_sale)}" placeholder="explicação (obrigatória)" style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
         <button class="preset-btn active" onclick="caixaDescExplicar('${u.replace(/'/g, "\\'")}', '${dia}', '${trEscH(x.id_sale)}', ${Number(x.desconto) || 0}, this)">Gravar</button></div></div>`).join('');
   }).join('') + `</div>`;
