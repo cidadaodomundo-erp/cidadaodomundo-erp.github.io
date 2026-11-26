@@ -110,7 +110,7 @@ function caixaDiaDaVez(u) {
 const caixaFechouSozinho = c => /^regra do dono/i.test(String((c && c.quem) || ''));
 const caixaFechouLote = c => /lote/i.test(String((c && c.quem) || ''));   // 'dono 25/11 lote' = passado fechado em lote
 const caixaDdm = d => String(d || '').slice(8, 10) + '/' + String(d || '').slice(5, 7);
-let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [], CAIXA_FECHDIF = [];
+let CAIXA_FRENTE = null, CAIXA_DIFSAI = null, CAIXA_SOBRAFALTA = {}, CAIXA_VREF = {}, CAIXA_TRANSITO = [], CAIXA_FECHDIF = [], CAIXA_FIADO = [];
 // 26/11/2026 [dono] (Boletim 16:09: "o que são essa diferenças? porque elas não apareceram pra Hellen justificar no painel";
 // Financeiro 3627b3c): toda forma do fechamento do Saipos com saldo ≠ 0 (vw_caixa_fechamento_diferenca), por setor
 function caixaFechSaiposHtml(u, dia, cx) {
@@ -123,16 +123,20 @@ function caixaFechSaiposHtml(u, dia, cx) {
   const cab = `<div style="font-size:12.5px;color:var(--tx-3);margin-top:6px;">Saipos: saldo do fechamento <b>${R(tot)}</b> = maquininha ${R(maq)} + dinheiro ${R(din)} + aguardando ${R(agu)} + a justificar ${R(jus)}</div>`;
   const lin = x => {
     const k = 'fd' + String(x.chave || '').replace(/[^A-Za-z0-9]/g, '');
+    // 26/11 16:17 (dono: "não estamos mais aceitando fiado, com exceção de compras do Fabio, Hellen e Jane"): as vendas do Fiado abertas
+    const fiado = /fiado/i.test(x.forma || '') ? (CAIXA_FIADO || []).filter(f => f.unidade === u && String(f.dia).slice(0, 10) === dia && f.caixa === cx) : [];
+    const fiadoTx = fiado.map(f => `<div style="font-size:12px;color:${f.situacao === 'ALERTA' ? 'var(--farol-fora)' : 'var(--tx-4)'};padding-left:10px;">${trEscH(f.ref_venda || 'venda')} · ${caixaDdm(String(f.dia).slice(0, 10))} ${trEscH(String(f.hora || '').slice(0, 5))} · ${trEscH(f.cliente || 'sem cliente')} · ${R(f.valor)}${f.situacao === 'ALERTA' ? ' · ⚠ fiado não autorizado' : f.situacao === 'AUTORIZADO' ? ' · autorizado' : f.situacao === 'SEM VALOR' ? ' · refeição sem valor' : ''}</div>`).join('');
     const base = `<b>${trEscH(x.forma)}</b> · ${R(x.saldo)}`;
     if (x.situacao === 'PENDENTE') return `<div class="cx-fd" style="padding:6px 0;border-top:1px dashed var(--line);">
       <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;"><span>${base} <span style="font-size:12px;color:var(--farol-perto);">a justificar</span></span>
-      <button class="preset-btn" onclick="const d=this.closest('.cx-fd').querySelector('.cx-fd-f'); d.style.display = d.style.display === 'none' ? '' : 'none';">Justificar</button></div>
+      <button class="preset-btn" onclick="const d=this.closest('.cx-fd').querySelector('.cx-fd-f'); d.style.display = d.style.display === 'none' ? '' : 'none';">Justificar</button></div>${fiadoTx}
       <div class="cx-fd-f" style="display:none;margin-top:6px;"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
         <select class="cx-fd-d" style="background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">${CX_DEC_TODAS.slice().reverse().map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>
         <input class="cx-fd-t" placeholder="o que aconteceu (obrigatório)" style="flex:1 1 200px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px;">
         <button class="preset-btn active" onclick="caixaFechJustificar(this, '${trEscH(String(x.chave)).replace(/'/g, '')}')">Gravar</button></div></div></div>`;
-    if (x.situacao === 'DECIDIDA') return `<div style="padding:4px 0;border-top:1px dashed var(--line);color:var(--farol-ok);">✓ ${base} <span style="font-size:12px;color:var(--tx-3);">— ${trEscH(x.explicacao || '')}${x.decidida_por ? ' (' + trEscH(String(x.decidida_por).split('@')[0]) + ')' : ''}</span></div>`;
-    const cinza = x.situacao === 'MAQUININHA' ? 'conferido na maquininha' : x.situacao === 'DINHEIRO' ? 'conferido no envelope' : x.situacao === 'AGUARDANDO' ? 'aguardando a Rede pagar o vale' : trEscH(x.situacao || '');
+    if (x.situacao === 'DECIDIDA') return `<div style="padding:4px 0;border-top:1px dashed var(--line);color:var(--farol-ok);">✓ ${base} <span style="font-size:12px;color:var(--tx-3);">— ${trEscH(x.explicacao || '')}${x.decidida_por ? ' (' + trEscH(String(x.decidida_por).split('@')[0]) + ')' : ''}</span>${fiadoTx}</div>`;
+    // 26/11 16:17 (dono): o vale espera a Rede até 5 dias; no 6º vira pendência
+    const cinza = x.situacao === 'MAQUININHA' ? 'conferido na maquininha' : x.situacao === 'DINHEIRO' ? 'conferido no envelope' : x.situacao === 'AGUARDANDO' ? 'vale aguardando a Rede · vira pendência em ' + caixaDdm(caixaHellenMais(String(x.dia).slice(0, 10), 6)) : trEscH(x.situacao || '');
     return `<div style="padding:4px 0;border-top:1px dashed var(--line);color:var(--tx-4);">${base} · ${cinza}</div>`;
   };
   const ordem = { PENDENTE: 0, DECIDIDA: 1, AGUARDANDO: 2, MAQUININHA: 3, DINHEIRO: 4 };
@@ -1900,6 +1904,7 @@ async function caixaHellenCarregar() {
     // por id_sale, a referência pronta (venda nº / mesa / comanda), hora e setor — salão não tem número no Saipos
     CAIXA_TRANSITO = await consultarTudo('vw_caixa_envelope_transito?select=*&order=lancado_no_saipos_em').catch(() => []);
     CAIXA_FECHDIF = await consultarTudo('vw_caixa_fechamento_diferenca?select=*&dia=gte.' + des + '&' + un + '&order=dia,caixa,forma').catch(() => []);
+    CAIXA_FIADO = await consultarTudo('vw_caixa_fiado?select=*&dia=gte.' + des + '&' + un + '&order=dia,hora').catch(() => []);
     CAIXA_VREF = {};
     (await consultarTudo('vw_caixa_venda_ref?select=id_sale,hora,ref_venda,caixa' + faixa(mais(des, -1), hoje)).catch(() => [])).forEach(x => { CAIXA_VREF[String(x.id_sale)] = x; });
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
