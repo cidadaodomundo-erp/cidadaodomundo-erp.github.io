@@ -362,6 +362,7 @@ let ATUAL = null;                       // chave aberta (null = Início)
 let PAINEL_PRONTO = false;              // o painel antigo terminou de carregar os dados
 let PAINEL_ALVO = null;                 // tela que o painel deve mostrar quando ficar pronto
 const MOLDURAS = {};                    // url -> iframe
+const CASCA_CB = Date.now().toString(36); // 26/11: renova a página do módulo a cada abertura da casca
 
 // ------------------------------------------------------------- sessão
 function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
@@ -719,7 +720,10 @@ function moldura(chave) {
     f.title = url === 'painel' ? 'Painel' : (ITENS[chave] || {}).rotulo || url;
     f.setAttribute('allow', 'fullscreen; screen-wake-lock; clipboard-write');
     if (url === 'painel') { PAINEL_PRONTO = false; PAINEL_ALVO = chave; f.src = urlDoPainel(chave); }
-    else f.src = ABA_PEDIDA ? (url.includes('#') ? url.replace('#', '?aba=' + encodeURIComponent(ABA_PEDIDA) + '#') : url + '?aba=' + encodeURIComponent(ABA_PEDIDA)) : url;
+    // 26/11/2026 [conserto] (dono 15:14: "o botão atualizar ainda não aparece"): a página do módulo ficava até 10 min no cache do
+    // navegador e o Ctrl+F5 da casca não a renova; cada abertura da casca pede a página nova (os .js seguem no cache pelo ?v=)
+    else { const q = (ABA_PEDIDA ? 'aba=' + encodeURIComponent(ABA_PEDIDA) + '&' : '') + 'cb=' + CASCA_CB;
+      f.src = url.includes('#') ? url.replace('#', (url.split('#')[0].includes('?') ? '&' : '?') + q + '#') : url + (url.includes('?') ? '&' : '?') + q; }
     f.hidden = true;
     $('vista').appendChild(f);
     MOLDURAS[url] = f;
