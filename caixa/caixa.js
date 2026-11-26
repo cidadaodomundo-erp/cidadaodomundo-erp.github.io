@@ -491,7 +491,8 @@ function renderDiaConcartao(unidade, dia, trs, pix, cobr, forma, descs, onl, cal
     saipos: limpa(s.detalhe) + ' · ' + rotVenda(s) + quem(s), real: madrugadaSemRede(s) ? 'a Rede ainda não entregou este dia inteiro' : semForma(s) ? 'nada desse valor na maquininha nem no banco' : 'nada desse valor na maquininha', valor: +s.valor,
     leitura: madrugadaSemRede(s) ? 'a maquininha ainda não mandou todas as vendas deste dia: aguardando' : semForma(s) ? 'o Saipos não diz como foi pago (venda ficou "Pendente")' : valeEspera(s) ? 'vale: aguardando confirmação do equipamento' : eVale(s) ? 'vale pode levar até uma semana para aparecer na Rede' : 'não passou na maquininha: a Hellen autoriza o desconto',   // 25/11/2026 [conserto] (dono #108 12:53: "itens não recebidos devem ser enviados para a Hellen autorizar o desconto")
     acao: madrugadaSemRede(s) ? 'esperar' : semForma(s) ? 'fechar a venda no Saipos com a forma certa, ou confirmar se foi paga' : moto[s.referencia] ? 'confirmar com o motoboy se cobrou; se não cobrou, a Hellen autoriza o desconto' : 'a Hellen autoriza o desconto (ou acha a venda paga em outra forma)' }));
-  restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || null, chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
+  // 26/11/2026 (Financeiro 12:20, caixa_terminal_rede): a maquininha sem venda leva a frente do terminal; terminal MISTA fica sem frente (aparece nos dois filtros)
+  restoR.forEach(r => pend.push({ forma: formaPadrao(r.detalhe), caixa: r.caixa || (['SALÃO', 'DELIVERY'].includes(r.frente_terminal) ? r.frente_terminal : null), chave: 'rede:' + r.referencia, bloco: 'maquininha', efeito: -(+r.valor),
     p: 2, cor: 'var(--farol-perto)', hora: hhmm(r.hora), saipos: 'nada desse valor no Saipos', real: limpa(r.detalhe), valor: +r.valor,
     leitura: 'passou na maquininha, mas não está registrado no Saipos', acao: 'achar a venda no Saipos (lançada em outra forma ou não lançada)' }));
   conferir.forEach(q => pend.push({ forma: formaPadrao(q.s.detalhe), caixa: q.s.caixa || null, chave: 'quase:' + q.s.referencia + ':' + q.r.referencia, bloco: 'maquininha', efeito: +q.s.valor - +q.r.valor,
@@ -1815,7 +1816,7 @@ async function caixaHellenCarregar() {
       consultarTudo('vw_caixa_quebras?select=*&reposta_em=is.null&' + un).catch(() => []),
     ]);
     // 25/11/2026: os descontos do salão e do balcão sem motivo ou sem autorização viram item da conferência (Financeiro 20:05)
-    const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,canal,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
+    const desc = await consultarTudo('vw_descontos_venda?select=unidade,dia,id_sale,numero,mesa,hora,desconto,motivo,lancado_por,quem,canal,frente,alerta_sem_motivo,alerta_sem_autorizacao&refeicao_equipe=is.false&desconto=gt.0&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []);
     // FALTA_DELIVERY exige o nome do cadastro (Financeiro 20:15): a lista vem de vw_motoboy_nomes
     const motos = await consultarTudo('vw_motoboy_nomes?select=nome').then((L) => (L || []).map((x) => x.nome)).catch(() => []);
     // 25/11/2026 (Organizador 20:52; §C3): Ahú e SB folgam às terças — dia de loja fechada aparece "loja fechada", sem pendência
@@ -2125,7 +2126,7 @@ const CAIXA_DESC_DESDE = '2026-11-26';
 function caixaDescAbertos(u, dia) {
   if (dia < CAIXA_DESC_DESDE) return [];
   const exp = new Set((CAIXA_VALID || []).map(v => v.chave));
-  return ((CAIXA_HELLEN && CAIXA_HELLEN.desc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(caixaFrenteDoCanal(x.canal)) && (x.alerta_sem_motivo || x.alerta_sem_autorizacao) && !exp.has('desc:' + x.id_sale));
+  return ((CAIXA_HELLEN && CAIXA_HELLEN.desc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)) && (x.alerta_sem_motivo || x.alerta_sem_autorizacao) && !exp.has('desc:' + x.id_sale));
 }
 function caixaDescontosHtml() {
   const H = CAIXA_HELLEN; if (!H || H.erro || !H.lojas || !H.lojas.length) return '';
@@ -2134,7 +2135,7 @@ function caixaDescontosHtml() {
   const titulo = `<div class="section-label" style="text-align:left;margin-top:16px;">Descontos do dia anterior (${caixaDdm(dia)})</div>`;
   if (dia < CAIXA_DESC_DESDE) return titulo + `<div class="contexto" style="text-align:left;"><span style="color:var(--tx-4);">a conferência dos descontos começa com os de ${caixaDdm(CAIXA_DESC_DESDE)}</span></div>`;
   return titulo + `<div class="contexto" style="text-align:left;">` + caixaLojasVis().map(u => {
-    const D = (H.desc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(caixaFrenteDoCanal(x.canal)));
+    const D = (H.desc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)));
     const semMot = D.filter(x => x.alerta_sem_motivo).length, semAut = D.filter(x => x.alerta_sem_autorizacao).length, ab = caixaDescAbertos(u, dia);
     return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${D.length} ${D.length === 1 ? 'desconto' : 'descontos'} · sem senha: ${semAut} · sem motivo: ${semMot}${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
       + ab.map(x => `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);"><div>${trEscH(String(x.hora || '').slice(0, 5))} · ${x.numero ? 'nº ' + trEscH(x.numero) : x.mesa ? 'mesa ' + trEscH(x.mesa) : 'venda'} · desconto <b>${R(x.desconto)}</b> · ${x.alerta_sem_motivo ? 'sem motivo' : trEscH(x.motivo || '')}${x.alerta_sem_autorizacao ? ' · sem senha · lançou: <b>' + trEscH(x.lancado_por || x.quem || 'não registrado') + '</b>' : ''}</div>
