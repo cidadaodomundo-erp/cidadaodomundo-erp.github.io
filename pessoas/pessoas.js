@@ -2311,6 +2311,30 @@ function cgFolhaConferidoHtml(comp) {
       ? `<span><b>Conferido, pode enviar para a contabilidade</b> · ${cgEsc(cgEnvQuem(x.quem))} em ${cgEnvQuando(x.criado_em)} · ${x.status === 'FEITO' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ enviado em ${cgEnvQuando(x.atendido_em)}</span>${x.resposta ? ' — ' + cgEsc(x.resposta) : ''}` : cgPedSt(x)}</span>`
       : `${cgBotaoPasso('Conferido, pode enviar para a contabilidade', `cgPedido('CONFERIDO','${comp}')`)}${abertas ? ` <span style="font-size:12.5px;color:var(--farol-perto);">${abertas} ${abertas === 1 ? 'correção ainda aberta' : 'correções ainda abertas'}</span>` : ''}${x ? ' · último: ' + cgPedSt(x) : ''}`}</div>`;
 }
+// 27/11 19:3x (dono: "faltou o botão pra Hellen informar as correções na tela"): "Pedir correção" e "Conferido…" no topo do mês,
+// lado a lado; o formulário escolhe a pessoa e a linha; "Correções pedidas" logo abaixo, à vista
+function cgFolhaTopoHtml(comp, PT) {
+  const inp = 'padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;font:inherit;';
+  const pes = (PT || []).filter((p) => p.pid).sort((a, b) => cgNome(a.nome).localeCompare(cgNome(b.nome), 'pt-BR'));
+  const aberto = CARGOS_F.envioCorr === 'topo', pid = Number(CARGOS_F.corrPid) || null, pp = pes.find((p) => p.pid === pid);
+  const form = !aberto ? '' : `<div style="flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:8px;">
+    <select style="${inp}" onchange="CARGOS_F.corrPid=this.value;renderModuloCargos()"><option value="">pessoa…</option>${pes.map((p) => `<option value="${p.pid}"${p.pid === pid ? ' selected' : ''}>${cgEsc(cgNome(p.nome))}</option>`).join('')}</select>
+    <select id="cgCorrTopo_l" style="${inp}max-width:260px;"><option value="">linha (opcional)</option>${pp ? pp.lin.map((x) => { const l = `${x.rubrica} · ${x.descricao}`; return `<option value="${cgEsc(l)}">${cgEsc(l)}</option>`; }).join('') : ''}</select>
+    <input id="cgCorrTopo_t" placeholder="o que está errado" style="flex:1 1 220px;${inp}"><input id="cgCorrTopo_m" placeholder="motivo (opcional)" style="flex:1 1 160px;${inp}">
+    <button type="button" class="preset-btn active" onclick="cgPedidoTopo('${comp}')">Enviar a correção</button>
+    <button type="button" class="preset-btn" onclick="CARGOS_F.envioCorr=null;renderModuloCargos()">Cancelar</button></div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0;">
+      ${aberto ? '' : cgBotaoPasso('Pedir correção', "CARGOS_F.envioCorr='topo';renderModuloCargos()")}
+      ${cgFolhaConferidoHtml(comp).replace(/^<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 12px;">/, '<span style="display:inline-flex;flex-wrap:wrap;gap:8px;align-items:center;">').replace(/<\/div>$/, '</span>')}
+      ${form}</div>
+    ${cgFolhaCorrecoesHtml(comp)}`;
+}
+function cgPedidoTopo(comp) {
+  const pid = Number(CARGOS_F.corrPid) || null;
+  if (!pid) return avisoAcao('atencao', '! Escolha a pessoa.');
+  const l = (document.getElementById('cgCorrTopo_l') || {}).value || null;
+  return cgPedido('CORRECAO', comp, pid, l, 'cgCorrTopo');
+}
 async function cgPedido(tipo, comp, pid, linha, idCampo) {
   let texto = null, motivo = null;
   if (tipo === 'CORRECAO') {
@@ -2322,7 +2346,7 @@ async function cgPedido(tipo, comp, pid, linha, idCampo) {
   avisoAcao('enviando', '… enviando');
   const r = await trRpcSeguro('rh_folha_pedido_gravar', { p_tipo: tipo, p_competencia: comp, p_pessoa_id: pid || null, p_linha: linha || null, p_texto: texto || null, p_motivo: motivo || null });
   if (!r.ok) { const e = await trErroDe(r); return avisoAcao('erro', `✗ Não foi: ${/permiss|denied/i.test(e) ? 'este login não pode fazer este pedido — fale com o Neto' : e}`, () => cgPedido(tipo, comp, pid, linha, idCampo)); }
-  CARGOS_F.envioCorr = null;
+  CARGOS_F.envioCorr = null; CARGOS_F.corrPid = null;
   avisoAcao('ok', tipo === 'FOLHA_FECHADA' ? `✓ Pedido feito às ${avisoHora()}: o robô baixa a Flash em até 5 min.` : tipo === 'CONFERIDO' ? `✓ Conferido às ${avisoHora()}: o robô envia à contabilidade.` : `✓ Correção pedida às ${avisoHora()}: a resposta aparece em "Correções pedidas".`);
   await cgPedidosCarregar(comp);
 }
@@ -2353,6 +2377,7 @@ function cgAbaEnvioCorpo() {
       "(v) => { CARGOS_F.envioComp = v; CARGOS_F.envioEmp = null; CARGOS_F.envioAberta = null; renderModuloCargos(); }")}
     <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
     ${cgFolhaFechadaHtml(comp)}
+    ${cgFolhaTopoHtml(comp, PT)}
     ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
                 ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')],
                 [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, !fPend && (fComF > 0 || empsFlash.size > 0)], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}`;
@@ -2415,9 +2440,7 @@ function cgAbaEnvioCorpo() {
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px;">
       ${cgBotaoPasso('Gerar arquivo para a contabilidade (.xlsx)', 'cgEnvioXlsx()')}
       <span class="caption-label" style="margin:0;">uma aba por empresa, com o total por rubrica</span></div>
-    ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}
-    ${cgFolhaCorrecoesHtml(comp)}
-    ${cgFolhaConferidoHtml(comp)}`;
+    ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}`;
   CARGOS.envComp = comp;   // a linha de cada pessoa usa no "Pedir correção"
   void botaoConferido;   // 27/11: o "Marcar como conferido" antigo deu lugar ao pedido CONFERIDO
   return h;
