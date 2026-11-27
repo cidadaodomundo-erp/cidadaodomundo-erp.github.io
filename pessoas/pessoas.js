@@ -3790,7 +3790,7 @@ function rhPorFolhaHtml(P) {
     <div class="cards"><div class="card blue"><div class="card-lbl">Total de descontos desta folha</div><div class="card-val">${R(total)}</div>
       <div class="card-pct">${rot(f)} · ${new Set(L.filter((x) => chave(x) === k).map((x) => x.colaborador)).size} pessoas${Math.abs(soma - total) > 0.005 ? ` · <span style="color:var(--farol-fora);font-weight:700;">✗ a soma das linhas dá ${R(soma)}</span>` : ''}</div></div></div>
     <div id="tabelaRhPorFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Parcelas</th><th>Valor</th><th>Situação</th><th>O quê</th></tr></thead><tbody>
-      ${sel.map((x) => `<tr><td>${nome(x)}</td><td>${cgEsc(String(x.parcelas == null ? '' : x.parcelas))}</td><td>${R(x.valor)}</td><td>${cgEsc(String(x.situacao || '').toLowerCase())}</td><td style="white-space:normal;">${cgEsc(x.descricoes || '')}</td></tr>`).join('') || '<tr><td colspan="5">Nada nesta folha.</td></tr>'}
+      ${sel.map((x) => `<tr><td>${nome(x)}</td><td>${x.parcela_n_total ? `<b>${cgEsc(x.parcela_n_total)}</b>` : cgEsc(String(x.parcelas == null ? '' : x.parcelas))}${x.faltam_depois != null ? ` <span style="font-size:12px;color:var(--tx-4);">${Number(x.faltam_depois) ? `faltam ${Number(x.faltam_depois)} (${R(x.saldo_depois)})` : 'última'}</span>` : ''}</td><td>${R(x.valor)}</td><td>${cgEsc(String(x.situacao || '').toLowerCase())}</td><td style="white-space:normal;">${cgEsc(x.descricoes || '')}</td></tr>`).join('') || '<tr><td colspan="5">Nada nesta folha.</td></tr>'}
     </tbody><tfoot><tr class="liq"><td>Total${P ? ' desta pessoa' : ''}</td><td></td><td>${R(sel.reduce((a, x) => a + n(x.valor), 0))}</td><td></td><td></td></tr></tfoot></table></div>`;
 }
 // SAÍDA DO DINHEIRO (dono 12/11/2026 10:25): procura no extrato um débito do mesmo valor até 5 dias da concessão. É busca, não prova:
@@ -3949,9 +3949,10 @@ function renderModuloRh() {
   const quem = ativos.filter((c) => n(c.a_descontar) > 0);
   // 27/11 [dono]: o total parcelado de cada um (vw_rh_desconto_total_pessoa): total · já descontado · saldo · parcelas · próximo desconto
   const TP = new Map((RH.totPes || []).map((x) => [x.colaborador, x]));
-  h += `<div class="section-label">Quem deve: o total parcelado de cada um</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Valor total</th><th>Já descontado</th><th>Saldo devedor</th><th>Parcelas pagas</th><th>Próximo desconto</th><th>Última</th></tr></thead><tbody>
+  h += `<div class="section-label">Quem deve: o total parcelado de cada um</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Valor total</th><th>Já descontado</th><th>Saldo devedor</th><th>Parcelas</th><th>Próximo desconto</th><th>Última</th></tr></thead><tbody>
     ${quem.map((c) => { const ab = P === c.colaborador, t0 = TP.get(c.colaborador) || {};
-      const parc = t0.parcelas_pagas != null ? `${n(t0.parcelas_pagas)} de ${n(t0.parcelas_pagas) + n(t0.parcelas_a_pagar)}` : n(c.parcelas_abertas) + ' a pagar';
+      // 27/11 20:00 (dono: "coloca em parcelas qual é e quantas falta, tipo 3/4... 2/5"): a próxima / o total, e quantas faltam
+      const parc = t0.parcelas_pagas != null ? (n(t0.parcelas_a_pagar) ? `<b>${n(t0.parcelas_pagas) + 1}/${n(t0.parcelas_pagas) + n(t0.parcelas_a_pagar)}</b> <span style="font-size:12px;color:var(--tx-4);">faltam ${n(t0.parcelas_a_pagar)}</span>` : `${n(t0.parcelas_pagas)}/${n(t0.parcelas_pagas)} quitado`) : n(c.parcelas_abertas) + ' a pagar';
       let t = `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})' title="${ab ? 'clique para soltar' : 'clique para a tela falar só desta pessoa'}">
         <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${t0.valor_total != null ? R(t0.valor_total) : '—'}</td><td>${t0.ja_descontado != null ? R(t0.ja_descontado) : '—'}</td>
         <td><b>${R(t0.saldo_devedor != null ? t0.saldo_devedor : c.a_descontar)}</b></td><td>${parc}</td><td>${cgData(t0.proximo_desconto || c.proximo_desconto)}${t0.proxima_parcela != null ? ' · ' + R(t0.proxima_parcela) : ''}</td><td>${mesTxt(c.quitacao_prevista)}</td></tr>`;
