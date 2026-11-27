@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Central das TVs</title>
+<style>
+  :root { --bg:#111110; --surface:#1e1e1c; --linha:#34332f; --tx:#e8e6dc; --tx2:#9aa0a6; --amarelo:#f6c63e; --brand:#c8102e; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx); font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding:24px 16px; }
+  h1 { margin:0 0 4px; font-size:26px; }
+  .sub { color:var(--tx2); margin:0 0 24px; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; }
+  .card { background:var(--surface); border:1px solid var(--linha); border-radius:12px; overflow:hidden; }
+  .prev { position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#000; }
+  .prev iframe { position:absolute; top:0; left:0; width:1280px; height:720px; border:0; transform-origin:0 0; pointer-events:none; }
+  .info { padding:12px 14px; }
+  .info b { font-size:17px; }
+  .loja { color:var(--tx2); font-size:14px; }
+  .end { margin-top:8px; font-size:14px; color:var(--amarelo); word-break:break-all; }
+  .telas { margin-top:6px; font-size:13px; color:var(--tx2); }
+</style>
+</head>
+<body>
+<h1>Central das TVs</h1>
+<p class="sub">O que cada caixinha está mostrando agora. Para mudar, é só pedir no chat.</p>
+<div class="grade" id="grade"></div>
+<script>
+const BASE = location.href.replace(/[^/]*(\?.*)?$/, '');
+fetch('programacao.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(p => {
+  const g = document.getElementById('grade');
+  p.tvs.forEach(t => {
+    const url = BASE + 'tela.html?tv=' + t.codigo;
+    const c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = '<div class="prev"><iframe loading="lazy" title=""></iframe></div><div class="info"><b></b><div class="loja"></div><div class="telas"></div><div class="end"></div></div>';
+    c.querySelector('iframe').src = url;
+    c.querySelector('b').textContent = t.nome;
+    c.querySelector('.loja').textContent = 'Loja: ' + t.loja;
+    c.querySelector('.telas').textContent = 'Telas: ' + t.telas.join(', ');
+    c.querySelector('.end').textContent = url.replace(/^https?:\/\//, '');
+    g.appendChild(c);
+  });
+  const ajustar = () => document.querySelectorAll('.prev').forEach(d => d.querySelector('iframe').style.transform = 'scale(' + d.clientWidth / 1280 + ')');
+  ajustar(); addEventListener('resize', ajustar);
+});
+</script>
+</body>
+</html>
