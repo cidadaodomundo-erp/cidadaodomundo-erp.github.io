@@ -13,37 +13,47 @@
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="../operacao-construcao/construcao.css?v=20261111a">
+<style>
+  .tvs-grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; margin-top:16px; }
+  .tvs-card { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .tvs-prev { position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#000; }
+  .tvs-prev iframe { position:absolute; top:0; left:0; width:1280px; height:720px; border:0; transform-origin:0 0; pointer-events:none; }
+  .tvs-info { padding:12px 14px; }
+  .tvs-info b { font-size:17px; }
+  .tvs-loja, .tvs-telas { color:var(--tx-3); font-size:14px; margin-top:4px; }
+  .tvs-end { margin-top:8px; font-size:14px; color:var(--amber-2); word-break:break-all; }
+  .tvs-sub { color:var(--tx-3); margin:4px 0 0; }
+</style>
 </head>
 <body>
 <div class="main-content">
-  <div class="wrap oc">
-    <h1>TVs <span class="oc-obras">Em construção</span></h1>
-    <div id="bloqueio" hidden role="alert"></div>
-    <div id="statusGeral" role="status" aria-live="polite"></div>
-    <div id="app" hidden></div>
+  <div class="wrap">
+    <h1>Central das TVs</h1>
+    <p class="tvs-sub">O que cada caixinha está mostrando agora. Para mudar, é só pedir no chat. Cada TV abre o endereço amarelo no app Fully Kiosk.</p>
+    <div class="tvs-grade" id="tvsGrade"></div>
   </div>
 </div>
 <script src="../nucleo/nucleo.js?v=20261122d"></script>
-<script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="../operacao-construcao/construcao.js?v=20261111a"></script>
 <script>
-OperacaoConstrucao.iniciar({
-  titulo: 'TVs',
-  aviso: 'O vínculo com aparelhos e fontes ainda está em construção. Nenhuma TV será ativada por esta tela.',
-  legenda: 'TV (preparado)',
-  campos: [
-    { r: 'Loja', t: 'loja' },
-    { r: 'Aparelho/local', t: 'select', o: ['Cozinha', 'Expedição', 'Salão'] },
-    { r: 'Conteúdo', t: 'select' },
-    { r: 'Orientação', t: 'select', o: ['Horizontal', 'Vertical'] }
-  ],
-  atalhos: [
-    { r: 'Ver Delivery', chave: 'delivery' },
-    { r: 'Ver Reservas', chave: 'reservas' },
-    { r: 'Ver Qualidade', chave: 'qualidade' }
-  ]
-});
+(function(){
+  const BASE = new URL('../tv/', location.href).href;
+  fetch(BASE + 'programacao.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(p => {
+    const g = document.getElementById('tvsGrade');
+    p.tvs.forEach(t => {
+      const url = BASE + 'tela.html?tv=' + t.codigo;
+      const c = document.createElement('div'); c.className = 'tvs-card';
+      c.innerHTML = '<div class="tvs-prev"><iframe loading="lazy" title=""></iframe></div><div class="tvs-info"><b></b><div class="tvs-loja"></div><div class="tvs-telas"></div><div class="tvs-end"></div></div>';
+      c.querySelector('iframe').src = url;
+      c.querySelector('b').textContent = t.nome;
+      c.querySelector('.tvs-loja').textContent = 'Loja: ' + t.loja;
+      c.querySelector('.tvs-telas').textContent = 'Telas: ' + t.telas.join(', ');
+      c.querySelector('.tvs-end').textContent = url.replace(/^https?:\/\//, '');
+      g.appendChild(c);
+    });
+    const ajustar = () => document.querySelectorAll('.tvs-prev').forEach(d => d.querySelector('iframe').style.transform = 'scale(' + d.clientWidth / 1280 + ')');
+    ajustar(); addEventListener('resize', ajustar);
+  });
+})();
 </script>
 </body>
 </html>
