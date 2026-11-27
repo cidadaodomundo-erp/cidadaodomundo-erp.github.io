@@ -53,7 +53,9 @@ async function entrarNotas() {
   try { const r = await trRpcSeguro('notas_faltam_pode_ler', {}); NF.semAcesso = r.ok ? ((await r.json()) === false) : false; } catch (e) { NF.semAcesso = false; }
   // 25/11/2026 [regra] (Estoque; âncora do selo de Compras; proposta 2026-11-25-notas-recebidas-sem-lancamento.md): a 3ª lista,
   // "Chegou e não foi lançada" — vw_compra_nf_sem_lancamento (a filial vê a própria loja; não lê o financeiro, a Rita vê)
-  NF.semLanc = await consultarTudo('vw_compra_nf_sem_lancamento?select=chave,unidade,numero,data_emissao,dias,fornecedor,total,recebimento&order=dias.desc').catch(() => null);
+  // 27/11 (Estoque): `aviso` nas notas do Mercado Livre com título do robô ("lance a nota SEM clicar no $"); sem a coluna, lê como antes
+  NF.semLanc = await consultarTudo('vw_compra_nf_sem_lancamento?select=chave,unidade,numero,data_emissao,dias,fornecedor,total,recebimento,aviso&order=dias.desc')
+    .catch(() => consultarTudo('vw_compra_nf_sem_lancamento?select=chave,unidade,numero,data_emissao,dias,fornecedor,total,recebimento&order=dias.desc')).catch(() => null);
   if (NF.semAcesso) { alvo.innerHTML = '<h2>Notas sem conta / sem entrada</h2>' + nfSemLancHtml() + '<div class="contexto" style="text-align:left;border-color:var(--farol-perto);margin-top:14px;"><b style="color:var(--farol-perto);">As listas de conta a pagar não abrem para este login.</b> São de Compras (Rita). Peça ao Neto para liberar.</div>'; return; }
   try {
     const [ra, rb] = await Promise.all([trRpcSeguro('notas_sem_conta_tela', {}), trRpcSeguro('notas_sem_entrada_tela', {})]);
@@ -103,7 +105,7 @@ function nfSemLancHtml() {
   if (!L.length) return h + '<div class="contexto" style="text-align:left;border-color:var(--farol-ok);"><b style="color:var(--farol-ok);">✓ Toda nota que chegou há 7 dias ou mais foi lançada ou respondida.</b></div>';
   return h + `<div id="tabelaNfSemLancamento" style="overflow-x:auto;"><table><thead><tr><th>Nota</th><th>Fornecedor</th><th>Loja</th><th>Valor</th><th>Chegou</th><th>Não é de estoque?</th></tr></thead><tbody>
     ${L.map((x) => { const k = nfE(JSON.stringify(x.chave)); return `<tr><td>NF ${nfE(x.numero)}<div style="font-size:11px;color:var(--tx-4);">emitida ${nfD(x.data_emissao)}</div></td>
-      <td style="white-space:normal;">${nfE(nfNome(x.fornecedor))}</td><td>${nfE(nfLoja(x.unidade))}</td><td>${nfR(x.total)}</td>
+      <td style="white-space:normal;">${nfE(nfNome(x.fornecedor))}${x.aviso ? `<div style="margin-top:4px;padding:4px 8px;border:1px solid var(--farol-perto);border-radius:6px;color:var(--farol-perto);font-weight:700;font-size:12.5px;">⚠ ${nfE(x.aviso)}</div>` : ''}</td><td>${nfE(nfLoja(x.unidade))}</td><td>${nfR(x.total)}</td>
       <td>${x.recebimento ? nfD(x.recebimento) + '<div style="font-size:11px;color:var(--tx-4);">' : '<div style="font-size:11px;color:var(--tx-4);">'}há ${Number(x.dias || 0)} dias</div></td>
       <td style="white-space:nowrap;"><button type="button" class="preset-btn" onclick='nfResponder(${k}, "NAO_E_ESTOQUE", this)'>Não é de estoque</button>
         <button type="button" class="preset-btn" onclick='nfResponder(${k}, "ANTIGA", this)'>Antiga, o Saipos não aceita mais</button></td></tr>`; }).join('')}</tbody></table></div>`;
