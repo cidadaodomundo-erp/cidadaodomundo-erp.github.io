@@ -64,7 +64,9 @@ async function entrarCartao() {
   const alvo = document.getElementById('view-cartao');
   alvo.innerHTML = '<h2>Compra no cartão</h2><div class="contexto">Carregando…</div>';
   try {
-    const [cartoes, compras] = await Promise.all([ccRpcJson('fin_cartao_meus_cartoes'), ccRpcJson('fin_cartao_minhas_compras')]);
+    // 27/11/2026 [conserto] (Organizador 17:42): o dono e o gestor veem TODAS as compras, com quem registrou (pessoa ou robô);
+    // cada funcionário segue vendo só as dele e filial só a sua (fin_cartao_compras_tela; se faltar, a de antes)
+    const [cartoes, compras] = await Promise.all([ccRpcJson('fin_cartao_meus_cartoes'), ccRpcJson('fin_cartao_compras_tela').catch(() => ccRpcJson('fin_cartao_minhas_compras'))]);
     CC.cartoes = cartoes || []; CC.compras = compras || []; CC.erro = null;
   } catch (e) { CC.erro = e.message; }
   // as faturas já anexadas: só quem vê o financeiro lê; os outros não veem a lista (o anexar continua valendo)
@@ -120,14 +122,19 @@ function ccDesenhar() {
   // 3) COBRANÇAS SEM REGISTRO (a grade, com Classificar / Ensinar regra)
   h += ccPendHtml();
   // 3) MINHAS COMPRAS, por fatura
-  const L = CC.compras.slice().sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
-  h += `<div class="section-label" style="text-align:left;margin-top:18px;">Compras registradas</div>`;
-  h += L.length ? `<div id="tabelaCcCompras"><table><thead><tr><th>Fatura</th><th>Cartão</th><th>Compra</th><th>O que</th><th>Parcela</th><th>Valor</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+  const todas = CC.compras.some((x) => x.vejo_todas);
+  const quemL = [...new Set(CC.compras.map((x) => x.registrado_por).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const L = CC.compras.filter((x) => !CC.quem || x.registrado_por === CC.quem).sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
+  h += `<div class="section-label" style="text-align:left;margin-top:18px;">${todas ? 'Compras registradas (todas)' : 'Minhas compras'}</div>`;
+  if (todas && quemL.length > 1) h += `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;"><span style="font-size:12.5px;color:var(--tx-3);">Quem registrou:</span>
+    <button type="button" class="preset-btn${!CC.quem ? ' active' : ''}" onclick="CC.quem=null;ccDesenhar()">Todos</button>
+    ${quemL.map((q) => `<button type="button" class="preset-btn${CC.quem === q ? ' active' : ''}" onclick='CC.quem=${ccE(JSON.stringify(q))};ccDesenhar()'>${ccE(q)}</button>`).join('')}</div>`;
+  h += L.length ? `<div id="tabelaCcCompras"><table><thead><tr><th>Fatura</th><th>Cartão</th><th>Compra</th><th>O que</th>${todas ? '<th>Quem registrou</th>' : ''}<th>Parcela</th><th>Valor</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
     ${L.map((x) => { const [st, cor] = ccSit[x.situacao] || [String(x.situacao || '').toLowerCase(), 'var(--tx-3)'];
-      const acao = x.situacao !== 'REGISTRADA' ? '' : CC.cancelando === x.compra_id
+      const acao = x.situacao !== 'REGISTRADA' || (todas && x.minha === false) ? '' : CC.cancelando === x.compra_id
         ? `<span style="color:var(--farol-fora);font-size:12.5px;">Cancelar a compra toda?</span> <button type="button" class="preset-btn" style="color:var(--farol-fora);" onclick="ccCancelar(${Number(x.compra_id)})">Sim, cancelar</button> <button type="button" class="preset-btn" onclick="CC.cancelando=null;ccDesenhar()">Não</button>`
         : `<button type="button" class="preset-btn" onclick="CC.cancelando=${Number(x.compra_id)};ccDesenhar()">Cancelar</button>`;
-      return `<tr><td>${ccD(x.fatura_vencimento)}</td><td>${ccE(nomeCartao(x.conta_cartao))}</td><td>${ccD(x.data_compra)}</td><td style="white-space:normal;">${ccE(x.descricao)}${x.origem === 'ASSINATURA' ? ' <span style="font-size:11px;color:var(--tx-4);">· assinatura</span>' : ''}</td>
+      return `<tr><td>${ccD(x.fatura_vencimento)}</td><td>${ccE(nomeCartao(x.conta_cartao))}</td><td>${ccD(x.data_compra)}</td><td style="white-space:normal;">${ccE(x.descricao)}${x.origem === 'ASSINATURA' ? ' <span style="font-size:11px;color:var(--tx-4);">· assinatura</span>' : ''}</td>${todas ? `<td>${ccE(x.registrado_por || '')}</td>` : ''}
         <td>${Number(x.parcela) || 1}/${Number(x.parcelas) || 1}</td><td>${ccR(x.valor_parcela)}</td><td style="color:${cor};font-weight:700;">${st}</td><td style="white-space:nowrap;">${acao}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="caption-label" style="text-align:left;">Nenhuma compra registrada ainda.</div>';
   // 4) REGRAS ENSINADAS (recolhido)
