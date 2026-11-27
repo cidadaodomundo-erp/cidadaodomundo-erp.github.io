@@ -1912,7 +1912,7 @@ async function caixaHellenCarregar() {
     CAIXA_FRENTE = frentes || []; CAIXA_DIFSAI = difsai || [];
     // 26/11/2026 [conserto] (dono 18:32: "a tela dos caixas de Ahu e SB estão demorando"): tudo numa leva só — antes eram
     // 8 leituras uma depois da outra depois desta leva (~4 s a mais)
-    const [trs, pix, cobr, forma, onl, robo, quebras, transito, fechdif, fiado, valeD, valeS, vref, desc, motos, aberto, atual, roboCx] = await Promise.all([
+    const [trs, pix, cobr, forma, onl, robo, quebras, transito, fechdif, fiado, valeD, valeS, vref, desc, motos, aberto, atual, roboCx, canc, descDet] = await Promise.all([
       consultarTudo('vw_cartao_transacoes?select=*' + faixa(mais(des, -1), hoje) + '&order=dia,hora'),
       consultarTudo('vw_pix_conciliacao?select=dia,dia_turno,unidade,id_sale,numero,numero_pedido,mesa,data_venda,caixa,tipo,valor,entrega,entregador,subgrupo,recebido,aguardando,memo_banco,data_banco,conta_banco,fitid_banco' + faixa(des, ate) + '&order=entrega'),
       consultarTudo('vw_cartao_entrega_cobranca?select=dia,unidade,id_sale,entregador' + faixa(des, ate)),
@@ -1937,7 +1937,12 @@ async function caixaHellenCarregar() {
       // 26/11 18:35 (dono: "tem como a tela informar que já foi atualizado?"): o pedido de reler e o que o robô lançou depois
       consultarTudo('caixa_atualizacao_pedido?select=id,unidade,dia,quem,pedido_em,status,terminado_em,resumo&dia=gte.' + des + '&' + un + '&order=id').catch(() => []),
       consultarTudo('fin_robo_em_caixa?select=unidade,dia,caixa,forma_saipos,pedido_em,feito_em,resultado,cancelado&dia=gte.' + des + '&' + un).catch(() => []),
+      // 27/11/2026 [dono] (13:10: "um quadro igual abaixo dos descontos, com os cancelamentos do dia"; Financeiro 226844d)
+      consultarTudo('vw_caixa_cancelamentos_dia?select=*&dia=gte.' + CAIXA_DESC_DESDE + '&' + un + '&order=data_hora').catch(() => []),
+      // 27/11 (dono: os descontos com mais detalhes da venda, igual ao primeiro quadro; Financeiro 226844d)
+      consultarTudo('vw_descontos_venda_detalhe?select=id_sale,data_hora,ref_venda,canal,bruto,total,itens,forma_pagamento,lancado_por_nome,para_quem&dia=gte.' + CAIXA_DESC_DESDE + '&' + un).catch(() => []),
     ]);
+    CAIXA_DESCDET = {}; (descDet || []).forEach(x => { CAIXA_DESCDET[String(x.id_sale)] = x; });
     CAIXA_ATUAL = atual || []; CAIXA_ROBO = roboCx || [];
     CAIXA_TRANSITO = transito; CAIXA_FECHDIF = fechdif; CAIXA_FIADO = fiado;
     CAIXA_VALE = (valeD || []).map(x => ({ dia: x.dia, unidade: x.unidade, caixa: x.frente || 'DELIVERY', valor: x.valor, id: x.id_sale }))
@@ -1947,7 +1952,7 @@ async function caixaHellenCarregar() {
     CAIXA_ABERTO = {};
     (aberto || []).forEach((x) => {
       const kk = x.unidade + '|' + String(x.dia).slice(0, 10); CAIXA_ABERTO[kk] = !!(CAIXA_ABERTO[kk] || x.aberto); });
-    CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc, motos };
+    CAIXA_HELLEN = { lojas, des, ate, hoje, trs, pix, cobr, forma, onl, robo, quebras, desc, motos, canc: canc || [] };
   } catch (e) { CAIXA_HELLEN = { lojas, erro: e.message }; }
   CAIXA_HELLEN_CALC = null;
   renderModuloCaixa();
@@ -2145,6 +2150,7 @@ function caixaHellenHtml() {
     <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">${hoje}</div>
     ${caixaHellenLojas().includes('AGUA VERDE') ? caixaTransitoHtml() : ''}
     ${caixaDescontosHtml()}
+    ${caixaCancelamentosHtml()}
     <div class="section-label" style="text-align:left;margin-top:16px;">Para a Hellen${deHellen.length ? ' · ' + deHellen.length : ''}</div>
     ${deHellen.length || semMot ? `<div class="contexto" style="text-align:left;">${lista}</div>` : `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);">${ok('nada para resolver')}</div>`}`;
 }
@@ -2302,7 +2308,45 @@ const CAIXA_DESC_DESDE = '2026-11-26';
 function caixaDescAbertos(u, dia) {
   if (dia < CAIXA_DESC_DESDE) return [];
   const exp = new Set((CAIXA_VALID || []).map(v => v.chave));
-  return ((CAIXA_HELLEN && CAIXA_HELLEN.desc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)) && (x.alerta_sem_motivo || x.alerta_sem_autorizacao) && !exp.has('desc:' + x.id_sale));
+  // 27/11 (Financeiro): a API do Saipos não manda quem autorizou o desconto; só "sem motivo" pede explicação
+  return ((CAIXA_HELLEN && CAIXA_HELLEN.desc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)) && x.alerta_sem_motivo && !exp.has('desc:' + x.id_sale));
+}
+let CAIXA_DESCDET = {};
+// 27/11/2026 [dono] (13:10): CANCELAMENTOS DO DIA ANTERIOR, igual aos descontos: cada um com data e hora, venda, canal, itens, valor
+// (TOTAL = total da venda, PARCIAL = itens cancelados, §A17), motivo, quem cancelou e quem autorizou; explicação obrigatória
+function caixaCancAbertos(u, dia) {
+  if (dia < CAIXA_DESC_DESDE) return [];
+  const exp = new Set((CAIXA_VALID || []).map(v => v.chave));
+  return ((CAIXA_HELLEN && CAIXA_HELLEN.canc) || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)) && !exp.has(x.chave));
+}
+function caixaCancelamentosHtml() {
+  const H = CAIXA_HELLEN; if (!H || H.erro || !H.lojas || !H.lojas.length) return '';
+  const hojeSP = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }), dia = caixaHellenMais(hojeSP, -1);
+  const nomeLoja = u => typeof lojaNome === 'function' ? lojaNome(u) : u, R = v => 'R$ ' + fmt(Math.abs(Number(v || 0)));
+  const titulo = `<div class="section-label" style="text-align:left;margin-top:16px;">Cancelamentos do dia anterior (${caixaDdm(dia)})</div>`;
+  if (dia < CAIXA_DESC_DESDE) return '';
+  return titulo + `<div class="contexto" style="text-align:left;">` + caixaLojasVis().map(u => {
+    const C = (H.canc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)));
+    const tot = C.reduce((a, x) => a + Number(x.valor || 0), 0), ab = caixaCancAbertos(u, dia);
+    return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${C.length} ${C.length === 1 ? 'cancelamento' : 'cancelamentos'}${C.length ? ' · ' + R(tot) : ''}${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
+      + ab.map(x => `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);">
+        <div>${trEscH(x.data_hora || '')} · <b>${trEscH(x.ref_venda || 'venda')}</b> · ${trEscH(x.canal || '')} · ${x.tipo_cancelamento === 'PARCIAL' ? 'parcial' : 'total'} <b>${R(x.valor)}</b></div>
+        <div style="font-size:12.5px;color:var(--tx-3);">${x.itens ? trEscH(x.itens) + ' · ' : ''}motivo: ${trEscH(x.motivo || 'não informado')} · cancelou: <b>${trEscH(x.quem_cancelou || 'não informado')}</b>${x.autorizou ? ' · autorizou: ' + trEscH(x.autorizou) : ''}</div>
+        <div style="display:flex;gap:6px;margin-top:4px;"><input id="cxCx_${trEscH(x.id_sale)}" placeholder="explicação (obrigatória)" style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
+        <button class="preset-btn active" onclick="caixaCancExplicar('${trEscH(x.id_sale)}', this)">Gravar</button></div></div>`).join('');
+  }).join('') + `</div>`;
+}
+async function caixaCancExplicar(idSale, bt) {
+  const x = ((CAIXA_HELLEN && CAIXA_HELLEN.canc) || []).find(y => String(y.id_sale) === String(idSale)); if (!x) return;
+  const ex = (document.getElementById('cxCx_' + idSale) || {}).value || '';
+  if (ex.trim().length < 3) return avisoAcao('atencao', '! Escreva a explicação do cancelamento (é obrigatória).');
+  bt.disabled = true; bt.textContent = 'gravando…';
+  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.unidade, p_dia: String(x.dia).slice(0, 10), p_chave: x.chave, p_bloco: 'cancelamento',
+    p_valor: Number(x.valor) || 0, p_explicacao: ex.trim(), p_decisao: 'SEM_EFEITO', p_caixa: x.frente || null, p_responsavel: null,
+    p_descricao: 'cancelamento · ' + (x.ref_venda || idSale) });
+  if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaCancExplicar(idSale, bt)); }
+  avisoAcao('ok', `✓ Cancelamento explicado às ${avisoHora()}.`);
+  await caixaRecarregarValidadas(); renderModuloCaixa();
 }
 function caixaDescontosHtml() {
   const H = CAIXA_HELLEN; if (!H || H.erro || !H.lojas || !H.lojas.length) return '';
@@ -2312,11 +2356,13 @@ function caixaDescontosHtml() {
   if (dia < CAIXA_DESC_DESDE) return titulo + `<div class="contexto" style="text-align:left;"><span style="color:var(--tx-4);">a conferência dos descontos começa com os de ${caixaDdm(CAIXA_DESC_DESDE)}</span></div>`;
   return titulo + `<div class="contexto" style="text-align:left;">` + caixaLojasVis().map(u => {
     const D = (H.desc || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && caixaNaFrente(x.frente || caixaFrenteDoCanal(x.canal)));
-    const semMot = D.filter(x => x.alerta_sem_motivo).length, semAut = D.filter(x => x.alerta_sem_autorizacao).length, ab = caixaDescAbertos(u, dia);
-    return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${D.length} ${D.length === 1 ? 'desconto' : 'descontos'} · sem senha: ${semAut} · sem motivo: ${semMot}${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
-      + ab.map(x => `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);"><div>${trEscH(String(x.hora || '').slice(0, 5))} · ${x.numero ? 'nº ' + trEscH(x.numero) : x.mesa ? 'mesa ' + trEscH(x.mesa) : 'venda'} · desconto <b>${R(x.desconto)}</b> · ${x.alerta_sem_motivo ? 'sem motivo' : trEscH(x.motivo || '')}${x.alerta_sem_autorizacao ? ' · sem senha · lançou: <b>' + trEscH(x.lancado_por || x.quem || 'não registrado') + '</b>' : ''}</div>
+    const semMot = D.filter(x => x.alerta_sem_motivo).length, ab = caixaDescAbertos(u, dia);
+    return `<div style="padding:6px 0;border-top:1px solid var(--line);"><b>${nomeLoja(u)}</b> · ${D.length} ${D.length === 1 ? 'desconto' : 'descontos'} · sem motivo: ${semMot} · senha: o Saipos não informa${ab.length ? '' : ' · <span style="color:var(--farol-ok);">✓ nada a explicar</span>'}</div>`
+      + ab.map(x => { const d = CAIXA_DESCDET[String(x.id_sale)] || {};
+        return `<div style="padding:6px 0 6px 12px;border-top:1px dashed var(--line);"><div>${trEscH(d.data_hora || String(x.hora || '').slice(0, 5))} · <b>${trEscH(d.ref_venda || (x.numero ? 'nº ' + x.numero : x.mesa ? 'mesa ' + x.mesa : 'venda'))}</b>${d.canal ? ' · ' + trEscH(d.canal) : ''} · desconto <b>${R(x.desconto)}</b>${d.bruto != null ? ' de ' + R(d.bruto) + ' (pago ' + R(d.total) + ')' : ''} · ${x.alerta_sem_motivo ? 'sem motivo' : trEscH(x.motivo || '')}</div>
+        <div style="font-size:12.5px;color:var(--tx-3);">${d.itens ? trEscH(d.itens) + ' · ' : ''}${d.forma_pagamento ? trEscH(d.forma_pagamento) + ' · ' : ''}lançou: <b>${trEscH(d.lancado_por_nome || x.lancado_por || x.quem || 'não registrado')}</b>${d.para_quem ? ' · para: ' + trEscH(d.para_quem) : ''}</div>
         <div style="display:flex;gap:6px;margin-top:4px;"><input id="cxDx_${trEscH(x.id_sale)}" placeholder="explicação (obrigatória)" style="flex:1 1 220px;background:var(--surface-2);border:1px solid var(--farol-perto);border-radius:8px;color:var(--tx-1);padding:6px;">
-        <button class="preset-btn active" onclick="caixaDescExplicar('${u.replace(/'/g, "\\'")}', '${dia}', '${trEscH(x.id_sale)}', ${Number(x.desconto) || 0}, this)">Gravar</button></div></div>`).join('');
+        <button class="preset-btn active" onclick="caixaDescExplicar('${u.replace(/'/g, "\\'")}', '${dia}', '${trEscH(x.id_sale)}', ${Number(x.desconto) || 0}, this)">Gravar</button></div></div>`; }).join('');
   }).join('') + `</div>`;
 }
 const CX_DECISOES = [['SOBRA_RECEITA', 'Sobra → receita'], ['FALTA_DELIVERY', 'Falta Delivery - descontar motoboy'],
@@ -2463,16 +2509,16 @@ function caixaConfHtml(u, dia) {
   // 2) venda a venda
   const pend = (H && !H.erro && H.trs ? caixaHellenItens().filter(x => x.u === u && x.dia === dia && x.pend) : [])
     .map(x => ({ hora: x.hora, venda: x.venda, forma: x.forma, valor: x.valor, leitura: x.pend.leitura, efeito: x.pend.efeito, caixa: x.caixa, quem: x.quem, chave: x.pend.chave, idx: x.i, bloco: x.bloco, detalhe: x.pend.detalheFech || caixaRefTxt(caixaIdDaChave(x.pend.chave)) }));
-  const abertosD = caixaDescAbertos(u, dia);
+  const abertosD = caixaDescAbertos(u, dia), abertosC = caixaCancAbertos(u, dia);
   const eu = String((rmbSessao() || {}).email || '').toLowerCase();
   const podeConf = (typeof souODono === 'function' && souODono()) || (CAIXA_RESP || []).some(r => r.unidade === u && String(r.email).toLowerCase() === eu);
   const pendF = doisCx ? pend.filter(p => caixaNaFrente(p.caixa)) : pend;
-  const ok = !pendF.length && !abertosD.length && envGrav;
+  const ok = !pendF.length && !abertosD.length && !abertosC.length && envGrav;
   // 26/11 (dono: SB "1 a fazer" com "nenhuma pendente"): diz QUAL é a coisa a fazer
   const faltaEnv = setores.filter(cd => cd.contado == null).map(cd => 'contar o envelope do ' + (cd.caixa === 'SALÃO' ? 'Salão' : 'Delivery'));
   const fechPend = setores.reduce((a, cd) => a + (CAIXA_FECHDIF || []).filter(x => x.unidade === u && String(x.dia).slice(0, 10) === dia && x.caixa === cd.caixa && x.situacao === 'PENDENTE').length, 0);
   if (fechPend) faltaEnv.push(fechPend + (fechPend === 1 ? ' forma do fechamento a justificar' : ' formas do fechamento a justificar'));
-  const fazer = faltaEnv.concat(pendF.length ? [pendF.length + (pendF.length === 1 ? ' pendente' : ' pendentes')] : [], abertosD.length ? [abertosD.length + ' desconto(s) sem explicação'] : []);
+  const fazer = faltaEnv.concat(pendF.length ? [pendF.length + (pendF.length === 1 ? ' pendente' : ' pendentes')] : [], abertosD.length ? [abertosD.length + ' desconto(s) sem explicação'] : [], abertosC.length ? [abertosC.length + ' cancelamento(s) sem explicação'] : []);
   return sec(`Conferência do caixa de ${caixaDdm(dia)} · ${ok && !fechPend ? '<span style="color:var(--farol-ok);">✓ fechada</span>' : `<span style="color:var(--farol-perto);">a fazer: ${fazer.join(' · ') || 'contar o envelope'}</span>`}`,
     `<div style="margin-bottom:8px;">${din}</div>` + caixaResPendHtml(CAIXA_BATEU[u + '|' + dia], pend, false, !doisCx)
     + (podeConf ? `<div style="margin-top:8px;">${caixaAtualBotao(u, dia)}</div>` : ''));
