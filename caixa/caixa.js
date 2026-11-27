@@ -163,7 +163,7 @@ async function caixaFechJustificar(bt, chave) {
   const box = bt.closest('.cx-fd'), dec = box.querySelector('.cx-fd-d').value, tx = (box.querySelector('.cx-fd-t').value || '').trim();
   if (tx.length < 3) return avisoAcao('atencao', '! Escreva o que aconteceu.');
   bt.disabled = true; bt.textContent = 'gravando…';
-  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.unidade, p_dia: String(x.dia).slice(0, 10), p_chave: x.chave, p_bloco: 'FECHAMENTO_SAIPOS',
+  const r = await trRpcSeguro('caixa_pendencia_decidir', { p_unidade: x.unidade, p_dia: String(x.dia).slice(0, 10), p_chave: x.chave, p_bloco: 'fechamento',
     p_valor: Number(x.saldo) || 0, p_explicacao: tx, p_decisao: dec, p_caixa: x.caixa, p_responsavel: null, p_descricao: 'fechamento do Saipos · ' + x.forma });
   if (!r.ok) { bt.disabled = false; bt.textContent = 'Gravar'; return avisoAcao('erro', '✗ Não gravou: ' + (await trErroDe(r)), () => caixaFechJustificar(bt, chave)); }
   avisoAcao('ok', `✓ Gravado às ${avisoHora()}.`);
