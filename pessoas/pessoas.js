@@ -2293,8 +2293,8 @@ const cgPedSt = (x) => { const [t, c] = RH_PED_ST[x.status] || [String(x.status 
 function cgFolhaFechadaHtml(comp) {
   const x = cgPedidos(comp).find((y) => y.tipo === 'FOLHA_FECHADA');
   return `<div class="contexto" style="text-align:left;margin:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-    ${x && x.status !== 'RECUSADO' ? `<span><b>Folha fechada</b> · pedido por ${cgEsc(cgEnvQuem(x.quem))} em ${cgEnvQuando(x.criado_em)} · ${x.status === 'ABERTO' || x.status === 'FAZENDO' ? '<span style="color:var(--farol-perto);font-weight:700;">⏳ o robô está baixando a Flash…</span>' : cgPedSt(x)}</span>`
-      : `${cgBotaoPasso('Folha fechada', `cgPedido('FOLHA_FECHADA','${comp}')`)} <span class="caption-label" style="margin:0;">clique quando a folha do mês fechar: o robô baixa a Flash e monta a conferência</span>${x ? ' · último: ' + cgPedSt(x) : ''}`}</div>`;
+    ${x && x.status !== 'RECUSADO' ? `<span><b>Folha ponto fechada</b> · pedido por ${cgEsc(cgEnvQuem(x.quem))} em ${cgEnvQuando(x.criado_em)} · ${x.status === 'ABERTO' || x.status === 'FAZENDO' ? '<span style="color:var(--farol-perto);font-weight:700;">⏳ o robô está baixando a Flash…</span>' : cgPedSt(x)}</span>`
+      : `${cgBotaoPasso('Folha ponto fechada', `cgPedido('FOLHA_FECHADA','${comp}')`)} <span class="caption-label" style="margin:0;">clique quando a folha de ponto do mês fechar: o robô baixa a Flash e monta a conferência</span>${x ? ' · último: ' + cgPedSt(x) : ''}`}</div>`;
 }
 function cgFolhaCorrecoesHtml(comp) {
   const L = cgPedidos(comp).filter((x) => x.tipo !== 'FOLHA_FECHADA' && x.tipo !== 'CONFERIDO');
