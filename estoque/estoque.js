@@ -5121,7 +5121,7 @@ async function cfEnviar(id, iid, naofaz) {
 // 05/11/2026 ~02:30: banco aplicado (requisicao_pede_tudo_sai_por_ficha). A lista vem de vw_est_requisicao_catalogo (cada login
 // vê a própria loja), e "sai pela ficha" vem do banco em cada linha (catálogo, item, lista do dia). A praça vem do login
 // (est_requisicao_quem_pede ou o setor do líder); só quem separa escolhe a praça.
-const REQ = { itens: null, sai: {}, carrinho: {}, carrinhos: {}, grade: [], busca: '', manda: false, lider: null, praca: '', minhas: [], unidade: null };
+const REQ = { itens: null, sai: {}, carrinho: {}, carrinhos: {}, grade: [], busca: '', manda: false, lider: null, praca: '', minhas: [], unidade: null, conf: [], confItens: [], rec: {}, mot: {} };
 // 17/11/2026 (dono 15:02: "Faz o mesmo esquema do pedido das listas, a grade mostrando todos os itens de cada praça, pra que o
 // usuário não esqueça de nada"; proposta 2026-11-17-pedir-material-grade-por-praca): a grade da praça vem de
 // vw_est_requisicao_grade, por grupo; em branco = não pede. A busca fica embaixo, para item fora da grade.
@@ -5135,7 +5135,83 @@ const REQ_PRACAS = ['COZINHA', 'DELIVERY', 'SALÃO', 'PRODUÇÃO'];
 const reqSaiPelaFicha = (nb) => !!REQ.sai[nb];
 const reqFmt = (v) => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 function reqQuando(ts) { if (!ts) return ''; const d = new Date(ts); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }); }
+// 27/11/2026 [dono] (16:46: "justificativa para o Habraham quando separar menos que o solicitado; setor pede, Habraham separa, setor
+// que pediu confere"; Estoque 17:20, banco no ar, vale de seg 30/11): motivo obrigatório no a menos e na diferença da conferência
+const REQ_CONF_DESDE = '2026-11-30';
+const REQ_MOT_SEP = [['FALTA_NO_ESTOQUE', 'Falta no estoque'], ['VENCIDO', 'Vencido'], ['AVARIADO', 'Avariado'], ['TROCADO_POR_OUTRO', 'Trocado por outro'], ['OUTRO', 'Outro (escreva)']];
+const REQ_MOT_CONF = [['NAO_RECEBEU', 'Não recebi'], ['RECEBEU_A_MAIS', 'Recebi a mais'], ['AVARIADO', 'Avariado'], ['TROCADO_POR_OUTRO', 'Trocado por outro'], ['OUTRO', 'Outro (escreva)']];
+const reqMotNome = (m) => ([...REQ_MOT_SEP, ...REQ_MOT_CONF].find((x) => x[0] === m) || [m, m || ''])[1];
+const reqNum = (v) => { const t = String(v == null ? '' : v).trim(); return t === '' ? NaN : Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); };
+const reqDiaSP = (ts) => ts ? new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : '';
+// as separadas antes de 30/11 nunca tiveram conferência: não "falta conferir"
+const reqAntesConf = (r) => r.situacao === 'SEPARADA' && !r.conferida_em && reqDiaSP(r.separada_em || r.criado_em) < REQ_CONF_DESDE;
+// o seletor do motivo (pre = 'S' separar, 'C' conferir), escondido até a quantidade mudar
+function reqMotivoHtml(pre, id, lista, mostra, M) {
+  const campo = 'background:var(--surface-2); border:1px solid var(--farol-perto); border-radius:8px; color:var(--tx-1); padding:5px 8px; font:inherit;';
+  const m = M[id] || {};
+  return `<div id="reqMot${pre}_${id}" style="display:${mostra ? 'flex' : 'none'}; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-top:4px;">
+    <select onchange="(${pre === 'S' ? 'REQS.mot' : 'REQ.mot'}[${id}]=${pre === 'S' ? 'REQS.mot' : 'REQ.mot'}[${id}]||{}).motivo=this.value; document.getElementById('reqMotT${pre}_${id}').style.display = this.value==='OUTRO' ? '' : 'none';" style="${campo}">
+      <option value="">motivo (obrigatório)…</option>${lista.map(([v, t]) => `<option value="${v}"${m.motivo === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <input id="reqMotT${pre}_${id}" placeholder="escreva (10 letras ou mais)" value="${trEscH(m.just || '')}" oninput="(${pre === 'S' ? 'REQS.mot' : 'REQ.mot'}[${id}]=${pre === 'S' ? 'REQS.mot' : 'REQ.mot'}[${id}]||{}).just=this.value" style="display:${m.motivo === 'OUTRO' ? '' : 'none'}; width:200px; ${campo}"></div>`;
+}
+// valida e monta [{id_item, qtd, motivo, justificativa}]; base = a quantidade contra a qual o motivo é exigido
+function reqMontar(L, valores, M, base, rotulo) {
+  const out = [];
+  for (const i of L) {
+    const v = valores[i.id], n = v == null ? Number(base(i)) : reqNum(v);
+    if (!(n >= 0)) return { erro: `! A quantidade de ${i.nome_base || i.nome_pedido} não é um número.` };
+    const m = M[i.id] || {}, muda = Math.abs(n - Number(base(i) || 0)) > 0.0005;
+    if (muda && rotulo === 'separar' && n > Number(base(i) || 0)) { out.push({ id_item: i.id, qtd: n }); continue; }
+    if (muda && !m.motivo) return { erro: `! ${i.nome_base || i.nome_pedido}: escolha o motivo (${rotulo === 'separar' ? 'saiu menos que o pedido' : 'recebeu diferente do separado'}).` };
+    if (muda && m.motivo === 'OUTRO' && String(m.just || '').trim().replace(/\s+/g, ' ').length < 10) return { erro: `! ${i.nome_base || i.nome_pedido}: escreva o motivo (10 letras ou mais).` };
+    out.push(muda ? { id_item: i.id, qtd: n, motivo: m.motivo, justificativa: m.motivo === 'OUTRO' ? String(m.just).trim() : (String(m.just || '').trim() || null) } : { id_item: i.id, qtd: n });
+  }
+  return { itens: out };
+}
+// HISTÓRICO (dono 17:07): as requisições finalizadas, pedido × separado × conferido por item, com as justificativas
+const REQH = { aberto: false, de: '', ate: '', praca: '', item: '', cab: [], itens: [], tela: '' };
+function reqHistBotao(tela) {
+  return `<div class="section-label" style="margin-top:18px;">Histórico</div>` + (REQH.aberto && REQH.tela === tela ? reqHistHtml() : `<button class="preset-btn" onclick="reqHistAbrir('${tela}')">Ver o histórico das requisições finalizadas</button>`);
+}
+async function reqHistAbrir(tela) {
+  REQH.tela = tela; REQH.aberto = true;
+  if (!REQH.de) { const d = new Date(); d.setDate(d.getDate() - 14); REQH.de = d.toLocaleDateString('en-CA'); REQH.ate = new Date().toLocaleDateString('en-CA'); }
+  const u = tela === 'reqseparar' ? REQS.unidade : REQ.unidade;
+  avisoAcao('enviando', 'Lendo o histórico…');
+  try {
+    REQH.cab = await consultarTudo(`vw_est_requisicao?select=id,numero,data,praca,pedido_por,separado_por,separada_em,conferido_por,conferida_em,leitura,situacao,criado_em&unidade=eq.${encodeURIComponent(u)}&situacao=in.(CONFERIDA,SEPARADA)&data=gte.${REQH.de}&data=lte.${REQH.ate}&order=criado_em.desc&limit=300`);
+    REQH.itens = REQH.cab.length ? await consultarTudo(`vw_est_requisicao_item?select=id,id_requisicao,nome_base,nome_pedido,qtd_pedida,qtd_separada,qtd_conferida,un,motivo_separacao,justificativa_separacao,motivo_conferencia,justificativa_conferencia&id_requisicao=in.(${REQH.cab.map((x) => x.id).join(',')})&order=id`) : [];
+    avisoAcao('ok', `✓ Histórico lido às ${avisoHora()}.`);
+  } catch (e) { return avisoAcao('erro', '✗ Não consegui ler o histórico: ' + e.message, () => reqHistAbrir(tela)); }
+  reqRedesenhar();
+}
+function reqHistHtml() {
+  const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
+  const it = REQH.item.trim().toLowerCase();
+  const cab = REQH.cab.filter((c) => !REQH.praca || c.praca === REQH.praca).filter((c) => !it || REQH.itens.some((i) => i.id_requisicao === c.id && String(i.nome_base || i.nome_pedido || '').toLowerCase().includes(it)));
+  const sit = (c) => c.situacao === 'CONFERIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">conferida${c.conferido_por ? ' por ' + trEscH(estNome(c.conferido_por) || String(c.conferido_por).split('@')[0]) : ''} ${trEscH(reqQuando(c.conferida_em))}</span>`
+    : reqAntesConf(c) ? '<span style="color:var(--tx-4);">separada (antes da conferência)</span>' : `<span style="color:var(--farol-perto);font-weight:700;">${trEscH(String(c.leitura || 'falta conferir').toLowerCase())}</span>`;
+  const q = (v, un) => v == null ? '–' : reqFmt(v) + ' ' + trEscH(String(un || '').toLowerCase());
+  return `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:6px 0;">
+      de <input type="date" value="${REQH.de}" onchange="REQH.de=this.value" style="${campo}"> até <input type="date" value="${REQH.ate}" onchange="REQH.ate=this.value" style="${campo}">
+      <button class="preset-btn" onclick="reqHistAbrir(REQH.tela)">Ler o período</button>
+      <select onchange="REQH.praca=this.value; reqRedesenhar();" style="${campo}"><option value="">todas as praças</option>${REQ_PRACAS.map((p) => `<option value="${p}"${REQH.praca === p ? ' selected' : ''}>${p.toLowerCase()}</option>`).join('')}</select>
+      <input placeholder="item" value="${trEscH(REQH.item)}" onchange="REQH.item=this.value; reqRedesenhar();" style="width:160px; ${campo}">
+      <button class="preset-btn" onclick="REQH.aberto=false; reqRedesenhar();">Fechar</button></div>
+    <div class="caption-label" style="text-align:left;">${cab.length} ${cab.length === 1 ? 'requisição' : 'requisições'}</div>
+    ${cab.map((c) => { const L = REQH.itens.filter((i) => i.id_requisicao === c.id).filter((i) => !it || String(i.nome_base || i.nome_pedido || '').toLowerCase().includes(it));
+      return `<div class="contexto" style="text-align:left; margin:8px 0;"><div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><b>${trEscH(c.numero)} · ${trEscH(String(c.praca || '').toLowerCase())} · ${trEscH(plpDm(c.data))}</b><span style="font-size:12.5px;">${sit(c)}</span></div>
+        <div style="font-size:12px; color:var(--tx-4);">pediu ${trEscH(estNome(c.pedido_por) || String(c.pedido_por || '').split('@')[0])}${c.separado_por ? ' · separou ' + trEscH(estNome(c.separado_por) || String(c.separado_por).split('@')[0]) + ' ' + trEscH(reqQuando(c.separada_em)) : ''}</div>
+        <div style="overflow-x:auto; margin-top:4px;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Separado</th><th style="text-align:right;">Conferido</th><th>Justificativas</th></tr></thead><tbody>
+        ${L.map((i) => `<tr><td style="white-space:normal;">${trEscH(i.nome_base || i.nome_pedido)}</td><td style="text-align:right;">${q(i.qtd_pedida, i.un)}</td>
+          <td style="text-align:right;${i.qtd_separada != null && Number(i.qtd_separada) < Number(i.qtd_pedida) ? ' color:var(--farol-perto); font-weight:700;' : ''}">${q(i.qtd_separada, i.un)}</td>
+          <td style="text-align:right;${i.qtd_conferida != null && Number(i.qtd_conferida) !== Number(i.qtd_separada) ? ' color:var(--farol-fora); font-weight:700;' : ''}">${q(i.qtd_conferida, i.un)}</td>
+          <td style="white-space:normal; font-size:12.5px;">${[i.motivo_separacao ? 'separação: ' + trEscH(reqMotNome(i.motivo_separacao)) + (i.justificativa_separacao ? ' — ' + trEscH(i.justificativa_separacao) : '') : '',
+            i.motivo_conferencia ? 'conferência: ' + trEscH(reqMotNome(i.motivo_conferencia)) + (i.justificativa_conferencia ? ' — ' + trEscH(i.justificativa_conferencia) : '') : ''].filter(Boolean).join('<br>')}</td></tr>`).join('')}
+        </tbody></table></div></div>`; }).join('')}`;
+}
 function reqSituacao(r) {
+  if (reqAntesConf(r)) return '<span style="color:var(--tx-4);">separada (antes da conferência)</span>';
   const s = String(r.leitura || r.situacao || '');
   const cor = /CANCEL/.test(s) ? 'var(--tx-4)' : /SEPARADA|ENTREGUE/.test(s) ? 'var(--farol-ok)' : 'var(--farol-perto)';
   return `<span style="color:${cor}; font-weight:700;">${trEscH(s.toLowerCase())}</span>`;
@@ -5178,6 +5254,36 @@ async function entrarReqPedir() {
 async function reqMinhasCarregar() {
   // o banco mostra a cada login as requisições da praça dele (quem separa vê todas)
   REQ.minhas = await consultarTudo(`vw_est_requisicao?select=*&unidade=eq.${encodeURIComponent(REQ.unidade)}&order=criado_em.desc&limit=20`).catch(() => []);
+  // a conferir: separadas da praça (a de quem pede; quem separa vê todas), de 30/11 em diante, ainda sem conferência
+  REQ.conf = (await consultarTudo(`vw_est_requisicao?select=*&unidade=eq.${encodeURIComponent(REQ.unidade)}&situacao=eq.SEPARADA&conferida_em=is.null&order=separada_em`).catch(() => []))
+    .filter((r) => !reqAntesConf(r) && (!REQ.praca || !REQ.manda || r.praca === REQ.praca));
+  REQ.confItens = REQ.conf.length ? await consultarTudo(`vw_est_requisicao_item?select=*&id_requisicao=in.(${REQ.conf.map((r) => r.id).join(',')})&fora_da_base=is.false&order=id`).catch(() => []) : [];
+}
+function reqConferirHtml() {
+  if (!REQ.conf.length) return '';
+  const campo = 'background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--tx-1); padding:6px 8px; font:inherit;';
+  return `<div class="section-label" style="margin-top:6px;">Conferir o que recebi · ${REQ.conf.length}</div>
+    <div class="caption-label" style="text-align:left;">Confira o que chegou. Se recebeu diferente do separado, mude o número e escolha o motivo. O estoque baixa pelo que você conferir.</div>
+    ${REQ.conf.map((r) => { const L = REQ.confItens.filter((i) => i.id_requisicao === r.id);
+      return `<div class="contexto" style="text-align:left; margin:8px 0; border-color:var(--farol-perto);"><div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><b>${trEscH(r.numero)} · ${trEscH(String(r.praca || '').toLowerCase())}</b>
+        <span style="font-size:12px; color:var(--tx-4);">separou ${trEscH(estNome(r.separado_por) || String(r.separado_por || '').split('@')[0])} · ${trEscH(reqQuando(r.separada_em))}</span></div>
+        ${L.map((i) => { const sep = Number(i.qtd_separada || 0), v = REQ.rec[i.id], muda = v != null && Math.abs(reqNum(v) - sep) > 0.0005;
+          return `<div style="padding:6px 0; border-top:1px dashed var(--line);"><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between;">
+            <span style="flex:1 1 180px;">${trEscH(i.nome_base || i.nome_pedido)} <span style="font-size:12px; color:var(--tx-3);">· separado: <b>${reqFmt(sep)} ${trEscH(String(i.un || '').toLowerCase())}</b>${Number(i.qtd_pedida) > sep ? ` (pedido ${reqFmt(i.qtd_pedida)}${i.motivo_separacao ? ': ' + trEscH(reqMotNome(i.motivo_separacao)) : ''})` : ''}</span></span>
+            <span>recebi <input inputmode="decimal" value="${trEscH(v != null ? v : reqFmt(sep))}" oninput="REQ.rec[${i.id}]=this.value; const d=document.getElementById('reqMotC_${i.id}'); if(d) d.style.display = Math.abs(reqNum(this.value)-${sep})>0.0005 ? 'flex' : 'none';" style="width:76px; text-align:right; ${campo}"></span></div>
+            ${reqMotivoHtml('C', i.id, REQ_MOT_CONF, muda, REQ.mot)}</div>`; }).join('')}
+        <div style="margin-top:8px;"><button class="preset-btn active" onclick="reqConferir(${r.id})">Conferir</button></div></div>`; }).join('')}`;
+}
+async function reqConferir(id) {
+  const r0 = REQ.conf.find((r) => r.id === id) || {}, L = REQ.confItens.filter((i) => i.id_requisicao === id);
+  const m = reqMontar(L, REQ.rec, REQ.mot, (i) => i.qtd_separada || 0, 'conferir');
+  if (m.erro) return avisoAcao('atencao', m.erro);
+  avisoAcao('enviando', `Conferindo ${r0.numero || ''}…`);
+  const r = await trRpcSeguro('est_requisicao_conferir', { p_id: id, p_conferido: m.itens });
+  if (!r.ok) return avisoAcao('erro', `✗ ${r0.numero || ''} NÃO foi conferida: ${await trErroDe(r)}.`, () => reqConferir(id));
+  L.forEach((i) => { delete REQ.rec[i.id]; delete REQ.mot[i.id]; });
+  avisoAcao('ok', `✓ ${r0.numero || ''} conferida às ${avisoHora()}. O estoque baixa pelo que você conferiu.`);
+  await reqMinhasCarregar(); reqPedirDesenhar();
 }
 function reqPedirDesenhar() {
   const alvo = document.getElementById('view-reqpedir');
@@ -5203,7 +5309,8 @@ function reqPedirDesenhar() {
   }
   const fora = noCarrinho.filter(([nb]) => !naGrade.has(nb));
   alvo.innerHTML = `<h2>Pedir material ${'<a href="../guia-pedir-material.html" target="_blank" rel="noopener" class="preset-btn" style="text-decoration:none;font-size:12px;" title="o passo a passo de quem pede e de quem separa">Como funciona (guia)</a>'}</h2>
-    <div class="caption-label">${trEscH(estNomeLoja(REQ.unidade))}${REQ.praca ? ' · praça <b>' + trEscH(REQ.praca) + '</b>' : ''}. Peça tudo o que a praça precisa; quem separa entrega e dá a baixa no estoque.</div>
+    <div class="caption-label">${trEscH(estNomeLoja(REQ.unidade))}${REQ.praca ? ' · praça <b>' + trEscH(REQ.praca) + '</b>' : ''}. Peça tudo o que a praça precisa; quem separa entrega, e a praça confere o que recebeu.</div>
+    ${reqConferirHtml()}
     ${REQ.manda ? `<div style="margin:8px 0;">Praça: ${REQ_PRACAS.map((p) => `<button class="preset-btn${REQ.praca === p ? ' active' : ''}" onclick='reqTrocarPraca(${JSON.stringify(p)})'>${trEscH(p.toLowerCase())}</button>`).join(' ')}</div>` : ''}
     ${grade.length ? `<div class="caption-label" style="text-align:left;">Todos os itens da praça (${grade.length}): digite a quantidade do que precisa; em branco não pede.</div><div id="reqGrade">${gradeHtml}</div>
       <div class="section-label" style="margin-top:16px;">Outro item (fora da lista da praça)</div>` : ''}
@@ -5216,7 +5323,8 @@ function reqPedirDesenhar() {
     <div class="section-label" style="margin-top:18px;">${REQ.manda ? 'Requisições desta loja' : 'Requisições da sua praça'}</div>
     ${REQ.minhas.length ? `<div id="tabelaReqMinhas" style="overflow-x:auto;"><table><thead><tr><th>Número</th><th>Quando</th><th>Praça</th><th style="text-align:right;">Itens</th><th>Situação</th></tr></thead><tbody>
       ${REQ.minhas.map((r) => `<tr><td>${trEscH(r.numero)}</td><td>${trEscH(reqQuando(r.criado_em))}</td><td>${trEscH(String(r.praca || '').toLowerCase())}</td><td style="text-align:right;">${r.itens}${r.itens_a_menos ? ` <span style="color:var(--farol-perto);">(${r.itens_a_menos} a menos)</span>` : ''}</td><td>${reqSituacao(r)}${r.situacao === 'ABERTA' ? ' ' + reqCancelarHtml(r) : ''}</td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="caption-label">Nenhuma requisição ainda.</div>'}`;
+    </tbody></table></div>` : '<div class="caption-label">Nenhuma requisição ainda.</div>'}
+    ${reqHistBotao('reqpedir')}`;
 }
 function reqBuscar(v) {
   REQ.busca = v; clearTimeout(window._reqB);
@@ -5296,7 +5404,7 @@ function reqOleoHtml() {
 }
 
 // ---- Separar: quem entrega (Habrahan, Rita, dono) ----
-const REQS = { abertas: [], itens: [], dia: [], fora: [], separado: {}, unidade: null };
+const REQS = { abertas: [], itens: [], dia: [], fora: [], separado: {}, mot: {}, unidade: null };
 async function entrarReqSeparar() {
   const alvo = document.getElementById('view-reqseparar');
   if (!alvo) return;
@@ -5341,7 +5449,8 @@ function reqSepararDesenhar() {
         <div id="tabelaReq${r.id}" style="overflow-x:auto; margin-top:6px;"><table><thead><tr><th>Item</th><th style="text-align:right;">Pedido</th><th style="text-align:right;">Saiu</th></tr></thead><tbody>
           ${L.map((i) => `<tr><td style="white-space:normal;">${trEscH(i.nome_base || i.nome_pedido)}${i.fora_da_base ? ' <span style="font-size:11px; color:var(--farol-perto);">· fora da base: não sai, o Neto valida</span>' : i.sai_por_ficha ? ' <span style="font-size:11px; color:var(--tx-4);">· sai pela ficha (não baixa aqui)</span>' : ''}</td>
             <td style="text-align:right;">${reqFmt(i.qtd_pedida)} ${trEscH(String(i.un || '').toLowerCase())}</td>
-            <td style="text-align:right;">${i.fora_da_base ? '–' : `<input inputmode="decimal" value="${trEscH(REQS.separado[i.id] != null ? REQS.separado[i.id] : reqFmt(i.qtd_pedida))}" oninput="REQS.separado[${i.id}]=this.value" style="width:76px; text-align:right; ${campo}">`}</td></tr>`).join('')}
+            <td style="text-align:right;">${i.fora_da_base ? '–' : `<input inputmode="decimal" value="${trEscH(REQS.separado[i.id] != null ? REQS.separado[i.id] : reqFmt(i.qtd_pedida))}" oninput="REQS.separado[${i.id}]=this.value; const d=document.getElementById('reqMotS_${i.id}'); if(d) d.style.display = reqNum(this.value) < ${Number(i.qtd_pedida) || 0} ? 'flex' : 'none';" style="width:76px; text-align:right; ${campo}">`
+              + reqMotivoHtml('S', i.id, REQ_MOT_SEP, REQS.separado[i.id] != null && reqNum(REQS.separado[i.id]) < Number(i.qtd_pedida || 0), REQS.mot)}</td></tr>`).join('')}
         </tbody></table></div>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;"><button class="preset-btn" style="border-color:var(--marca-amarelo);" onclick="reqEntregar(${r.id})">Entreguei</button>
           <button class="preset-btn" onclick="reqImprimir(${r.id})">🖨️ Imprimir</button>
@@ -5351,6 +5460,7 @@ function reqSepararDesenhar() {
       ${REQS.fora.map((x) => `<tr><td style="white-space:normal;">${trEscH(x.nome_pedido)}</td><td style="text-align:right;">${x.vezes_pedido}</td><td>${trEscH(reqQuando(x.primeira_vez))}</td><td style="white-space:normal;">${trEscH(String(x.quem_pediu || '').replace(/@[^,\s]+/g, ''))}</td></tr>`).join('')}
     </tbody></table></div>` : ''}`;
   alvo.insertAdjacentHTML('beforeend', reqOleoHtml());
+  alvo.insertAdjacentHTML('beforeend', reqHistBotao('reqseparar'));
 }
 // 13/11/2026 (dono 00:59, teste ponta a ponta das requisições; pedido do Estoque): a folha que o Habrahan leva para separar,
 // no molde da separação da ordem (prdOrdemImprimir). Só imprime: a baixa continua pelo "Entreguei".
@@ -5435,19 +5545,15 @@ function reqImprimirPracas() {
 async function reqEntregar(id) {
   const r0 = REQS.abertas.find((r) => r.id === id) || {};
   const L = REQS.itens.filter((i) => i.id_requisicao === id && !i.fora_da_base);
-  const sep = [];
-  for (const i of L) {
-    const s = REQS.separado[i.id];
-    if (s == null) continue;
-    const t = String(s).trim(), n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t);
-    if (String(s).trim() === '' || !(n >= 0)) return avisoAcao('atencao', `! A quantidade que saiu de ${i.nome_base} não é um número.`);
-    sep.push({ id_item: i.id, qtd: n });
-  }
+  // 27/11 [dono]: saiu menos que o pedido → motivo obrigatório (o banco recusa sem ele e diz qual item)
+  const m = reqMontar(L, REQS.separado, REQS.mot, (i) => i.qtd_pedida || 0, 'separar');
+  if (m.erro) return avisoAcao('atencao', m.erro);
+  const sep = m.itens;
   avisoAcao('enviando', `Gravando a entrega de ${r0.numero || ''}…`);
   const r = await trRpcSeguro('est_requisicao_separar', { p_id: id, p_separado: sep, p_quem: null });
   if (!r.ok) return avisoAcao('erro', `✗ A entrega de ${r0.numero || ''} NÃO foi gravada: ${await trErroDe(r)}.`, () => reqEntregar(id));
   const x = ((await r.json()) || [])[0] || {};
-  L.forEach((i) => delete REQS.separado[i.id]);
+  L.forEach((i) => { delete REQS.separado[i.id]; delete REQS.mot[i.id]; });
   avisoAcao('ok', `✓ ${x.numero || r0.numero} entregue às ${avisoHora()}: ${x.itens} ${x.itens === 1 ? 'item' : 'itens'}${x.nao_atendidos ? `, ${x.nao_atendidos} sem sair` : ''}. A baixa no estoque já conta.`);
   entrarReqSeparar();
 }
