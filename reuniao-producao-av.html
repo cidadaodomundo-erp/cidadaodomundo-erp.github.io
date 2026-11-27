@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Produção da Água Verde</title>
+<!-- Material da reunião da Rita com a cozinha e a produção da Água Verde (sex 27/11/2026, chat Telas; texto do Estoque em
+     contexto/propostas-telas/2026-11-27-reuniao-producao-rita.md; dono via Organizador 15:03). Imprimível em A4.
+     Nomes dos botões conferidos em docs/estoque/estoque.js (27/11). As telas aparecem desenhadas com os botões reais;
+     a foto das telas entra quando houver login no Chrome (a sessão do painel tinha caído às 15:10). -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67; --linha:#E4DBD8;
+          --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; --anda:#8A5A00; --anda-fundo:#FBF0DC; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9;
+          --suave:#D6CBC8; --mudo:#A29793; --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20; --ok:#7BC4A0; --ok-fundo:#1C2E25; --anda:#E8B55A; --anda-fundo:#2E2415; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793; --linha:#332A29;
+          --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20; --ok:#7BC4A0; --ok-fundo:#1C2E25; --anda:#E8B55A; --anda-fundo:#2E2415; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; font-size:16px; }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:700; margin:0; }
+  h1 { font-size:2rem; line-height:1.1; margin:.3rem 0 .4rem; }
+  h2 { font-size:1.35rem; margin:2.2rem 0 .6rem; padding-top:.6rem; border-top:2px solid var(--linha); }
+  .lede { color:var(--suave); font-size:1.05rem; }
+  .grande { font-size:1.2rem; font-weight:700; background:var(--acento-fundo); color:var(--acento); padding:10px 14px; border-radius:6px; }
+  ol li, ul li { margin:.3rem 0; }
+  b.bt, span.bt { display:inline-block; border:1px solid var(--forte); background:var(--papel); border-radius:6px; padding:1px 8px; font-weight:700; white-space:nowrap; }
+  .tela { border:2px solid var(--forte); border-radius:10px; background:var(--papel); margin:12px 0 4px; overflow:hidden; break-inside:avoid; }
+  .tela .barra { background:var(--alt); padding:6px 12px; font-size:.8rem; color:var(--mudo); font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .tela .corpo { padding:12px 14px; font-size:.92rem; }
+  .tela .lin { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:6px 0; border-top:1px dashed var(--linha); flex-wrap:wrap; }
+  .tela .bot { border:1px solid var(--forte); border-radius:8px; padding:4px 12px; font-weight:600; background:var(--papel); }
+  .tela .bot.on { background:var(--tinta); color:var(--fundo); border-color:var(--tinta); }
+  .tela .campo { border:1px solid var(--forte); border-radius:6px; padding:3px 10px; min-width:90px; color:var(--mudo); background:var(--fundo); }
+  .seta { color:var(--acento); font-weight:700; }
+  .leg { font-size:.82rem; color:var(--mudo); margin:0 0 10px; }
+  .num { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:8px; margin:10px 0; }
+  .num div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px; }
+  .num b { display:block; font-size:1.5rem; color:var(--acento); }
+  .erro { background:var(--papel); border-left:4px solid var(--acento); border-radius:4px; padding:8px 12px; margin:8px 0; }
+  .bolso { border:3px solid var(--tinta); border-radius:12px; padding:18px 20px; background:var(--papel); break-before:page; }
+  .bolso h2 { border:0; margin-top:0; font-size:1.6rem; text-align:center; }
+  .bolso li { font-size:1.12rem; margin:.5rem 0; }
+  .imprimir { background:var(--acento); color:#fff; border:0; border-radius:6px; padding:8px 14px; font:inherit; cursor:pointer; }
+  @media print { body { background:#fff; font-size:12.5px; } .wrap { padding:0; max-width:none; } .noprint { display:none; }
+    h2 { break-after:avoid; } @page { size:A4; margin:14mm; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="eyebrow">Cidadão do Mundo · Água Verde · reunião da Rita com a cozinha e a produção</p>
+<h1>Produziu? Aponte na hora.</h1>
+<p class="lede">Ordens de produção, apontamento e requisição de material: como fazer no painel, passo a passo.</p>
+<p class="noprint"><button class="imprimir" onclick="window.print()">Imprimir (A4)</button></p>
+
+<h2>1. Por que isso importa</h2>
+<p>Na conferência do estoque de 11/11 a 25/11, <b>8 dos 15 itens não fecharam</b> porque a produção ou a requisição não foi apontada:</p>
+<div class="num"><div><b>188 kg</b>peito de frango</div><div><b>112 kg</b>bacon</div><div><b>68 kg</b>costelinha</div><div><b>114 litros</b>óleo</div></div>
+<p>Quando não se aponta, o sistema acha que o produto ainda está na câmara. Daí vem a compra errada, o custo errado e a contagem que nunca bate.</p>
+<p class="grande">O que não foi apontado, para o sistema, não aconteceu.</p>
+
+<h2>2. Ordem de produção: do plano ao fim</h2>
+<p>Menu <b>Produção</b>, nesta ordem: <b>Planejar produção → Separação → Ordens de produção</b>.</p>
+<ol>
+  <li><b>Planejar produção:</b> a Rita escolhe as receitas do dia e toca em <span class="bt">Fechar o plano e gerar as listas de separação</span>. Faltou uma receita depois de fechar? Use <span class="bt">+ Acrescentar receita</span>; não precisa desfazer.</li>
+  <li><b>Separação:</b> quem separa escreve quanto saiu de cada item (0 se não saiu), toca em <span class="bt">Marcar como separada</span> e depois em <span class="bt">Conferir</span>. Conferida, a separação vira a ordem.</li>
+  <li><b>Ordens de produção:</b> <span class="bt">Iniciar</span> quando começar a fazer → no fim, <span class="bt">Registrar o que saiu</span> com o <b>peso ou a quantidade real</b> → <span class="bt">Encerrar</span>.</li>
+  <li>Cancelar a ordem só antes de iniciar. Depois de iniciada, ela não se desfaz.</li>
+  <li><b>Fechar o turno:</b> só fecha com as ordens encerradas e a produção apontada. A própria tela diz o que falta.</li>
+</ol>
+<div class="tela"><div class="barra">Produção › Ordens de produção</div><div class="corpo">
+  <div class="lin"><span><b>Ordem do dia</b> · bacon frito · frango grelhado</span><span class="bot">Iniciar</span></div>
+  <div class="lin"><span>Bacon frito · previsto 10 kg</span><span>saiu <span class="campo">kg real</span> <span class="seta">←</span> pese</span></div>
+  <div class="lin"><span></span><span><span class="bot on">Registrar o que saiu</span> <span class="bot">Encerrar</span></span></div>
+</div></div>
+<p class="leg">Como aparece na tela (desenho com os botões reais).</p>
+
+<h2>3. Apontamento: o que, quando, quanto e onde</h2>
+<p>Tela <b>Apontar produção</b>. Cada cozinheiro vê só as receitas da sua cozinha (a linha "Cozinha: …" no alto mostra qual).</p>
+<ul>
+  <li><b>O que</b> apontar: tudo o que foi preparado. Os que mais faltam hoje: <b>bacon frito, frango grelhado, costelinha defumada, bifes e desossa</b>.</li>
+  <li><b>Quando:</b> na hora em que terminou, não no fim do dia.</li>
+  <li><b>Quanto:</b> <b>pesar</b> e apontar o peso real, em kg. Se a receita é em unidade, apontar unidades.</li>
+  <li><b>Onde:</b> com ordem, em Ordens de produção → <span class="bt">Registrar o que saiu</span>. Sem ordem, em Apontar produção → "O que a cozinha produziu — sem precisar de ordem" → procurar a receita → digitar a quantidade → <span class="bt">Apontar</span>.</li>
+  <li><b>Perdeu parte do lote?</b> Anote na coluna <b>Perdeu</b>, no mesmo apontamento.</li>
+</ul>
+<div class="tela"><div class="barra">Produção › Apontar produção</div><div class="corpo">
+  <div style="color:var(--mudo);font-size:.85rem;">Cozinha: <b>Produção</b> — aparecem só as ordens e receitas desta cozinha</div>
+  <div style="font-weight:700;margin-top:8px;">O que a cozinha produziu — sem precisar de ordem</div>
+  <div class="lin"><span class="campo" style="flex:1 1 200px;">procurar a receita…</span><span>quantidade <span class="campo">kg</span> perdeu <span class="campo">kg</span></span><span class="bot on">Apontar</span></div>
+  <div style="font-weight:700;margin-top:10px;">Perda fora da produção</div>
+  <div class="lin"><span>item · quanto · motivo (estragou, venceu, caiu, voltou do salão)</span><span class="bot on">Registrar perda</span></div>
+</div></div>
+<p class="leg">Como aparece na tela (desenho com os botões reais).</p>
+
+<h2>4. Requisição de material: nada sai da câmara sem pedido</h2>
+<p>Telas <b>Pedir material</b> (quem usa) e <b>Separar requisições</b> (quem entrega). As duas têm o botão do guia, com o passo a passo.</p>
+<ol>
+  <li>A praça (cozinha, delivery, salão, produção) pede em <b>Pedir material</b>: item e quantidade, depois <span class="bt">Pedir</span>.</li>
+  <li>Quem cuida do estoque abre <b>Separar requisições</b>, separa, entrega e toca em <span class="bt">Entreguei</span>.</li>
+  <li><b>Óleo: desde 18/11 só sai por requisição.</b> A troca de óleo fica registrada.</li>
+  <li>Pegou sem pedir? Peça na hora, mesmo depois. Sem pedido, o estoque não baixa.</li>
+</ol>
+<div class="tela"><div class="barra">Estoque › Pedir material · Separar requisições</div><div class="corpo">
+  <div class="lin"><span><b>Pedir material</b> · item <span class="campo">óleo</span> quantidade <span class="campo">1 galão</span></span><span class="bot on">Pedir</span></div>
+  <div class="lin"><span><b>Separar requisições</b> · Cozinha pediu 1 galão de óleo</span><span class="bot on">Entreguei</span></div>
+</div></div>
+<p class="leg">Como aparece na tela (desenho com os botões reais).</p>
+
+<h2>5. Os 5 erros mais comuns (conferência de 27/11)</h2>
+<div class="erro"><b>1. Unidade trocada:</b> 429 bolinhos apontados como <b>429 kg</b>. Confira a unidade antes de gravar.</div>
+<div class="erro"><b>2. Produção feita e não apontada:</b> bacon frito, frango grelhado, costelinha. Feito tem que ser apontado.</div>
+<div class="erro"><b>3. Separação deixada aberta:</b> quatro separações ficaram abertas por dias e bagunçaram a contagem. Conferiu, fechou.</div>
+<div class="erro"><b>4. Perda não registrada:</b> em novembro, nenhuma perda foi registrada na Água Verde. Estragou, venceu ou caiu: <b>Apontar produção → Perda fora da produção → <span class="bt">Registrar perda</span></b>.</div>
+<div class="erro"><b>5. Tirar da câmara sem requisição:</b> principalmente o óleo.</div>
+
+<div class="bolso">
+  <h2>PRODUZIU? APONTE NA HORA.</h2>
+  <ul>
+    <li><b>Pese</b> e aponte o <b>peso real</b>. Confira a <b>unidade</b> (kg ou un).</li>
+    <li>Com ordem: <b>Iniciar → Registrar o que saiu → Encerrar</b>.</li>
+    <li>Sem ordem: <b>Apontar produção → O que a cozinha produziu → Apontar</b>.</li>
+    <li><b>Perdeu?</b> Coluna <b>Perdeu</b> (do lote) ou <b>Registrar perda</b> (fora do lote).</li>
+    <li><b>Precisa de material?</b> <b>Pedir material</b>. Nada sai da câmara sem pedido. <b>Óleo também.</b></li>
+    <li><b>Fim do turno:</b> <b>Fechar o turno</b>. A tela diz o que falta.</li>
+    <li>Dúvida: botão <b>Ajuda</b> no painel ou a Rita.</li>
+  </ul>
+</div>
+</div>
+</body>
+</html>
