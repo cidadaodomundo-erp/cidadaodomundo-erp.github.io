@@ -32,9 +32,9 @@ test('URLs: só GET, só as duas tabelas, só as colunas permitidas, contato com
   assert.equal(t.est.urls.length, 2);
   assert.ok(t.est.metodos.every((m) => m === 'GET'));
   const [c, v] = t.est.urls;
-  assert.ok(c.startsWith('freela_contato?select=id,nome,setor,telefone,tipo,ativo,loja&ativo=eq.true&loja=in.'));
+  assert.ok(c.startsWith('freela_contato?select=id,nome,setor,telefone,tipo,ativo,loja,chamado&ativo=eq.true&loja=in.'));
   assert.ok(v.startsWith('freela_valor_hora?select=loja,valor_hora,atualizado_em&loja=in.'));
-  assert.equal(params(c).get('select'), 'id,nome,setor,telefone,tipo,ativo,loja');
+  assert.equal(params(c).get('select'), 'id,nome,setor,telefone,tipo,ativo,loja,chamado');
   assert.equal(params(v).get('select'), 'loja,valor_hora,atualizado_em');
   assert.equal(params(c).get('limit'), '200'); assert.equal(params(c).get('offset'), '0');
   assert.ok(!params(v).has('ativo'));      // valor-hora não tem coluna ativo: não se inventa filtro

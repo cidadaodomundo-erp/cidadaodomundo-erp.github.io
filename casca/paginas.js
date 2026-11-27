@@ -115,7 +115,7 @@ window.CASCA_PAGINAS = {
   // 12/11/2026: telas do agrupamento "Operação das lojas" que passam a abrir a
   // página delas. As outras telas desse agrupamento ainda não têm linha aqui e aparecem sem botão ativo (docs/delivery-migracao.md).
   delivery: 'delivery/index.html',   // Delivery do dia: placar, tempo, cancelamentos e avaliações (delivery_dia)
-  freelas: 'freelas/index.html?v=20261116a',        // 16/11/2026: Taxas e Freelas (consulta + loja de cada freela)
+  freelas: 'freelas/index.html?v=20261127a',        // 27/11/2026: Taxas e Freelas por setor (Produção, Salão, Cozinha)
   reuniao: 'reuniao/index.html?v=20261115a',        // Reunião semanal (pauta temporária, separada por loja)
   temperaturas: 'temperaturas/index.html',   // 19/11/2026 (Organizador 00:03): tela do Fabio, em Produção, para quem vê a Produção
   manutencao: 'manutencao/index.html?v=20261124a#chamados',      // Pedidos de manutenção (abrir, acompanhar, marcar arrumado)

@@ -68,7 +68,7 @@ test('contatos na REDE: cada linha cai na loja concreta dela (aliases), nunca em
 
 test('contatos: só os campos permitidos saem; campos intrusos (observação, 2º telefone, destaque) são descartados', () => {
   const r = M.normalizarContatos([ct(1, 'Ana', { o_que_quer: 'SEGREDO', telefone2: '999', destaque: true, primeiro_contato: '2026-01-01', criado_em: 'x', senha: 'y' })], rec('AHU'));
-  assert.deepEqual(Object.keys(r.linhas[0]).sort(), ['id', 'loja', 'nome', 'setor', 'telefone', 'tipo']);
+  assert.deepEqual(Object.keys(r.linhas[0]).sort(), ['chamado', 'id', 'loja', 'nome', 'setor', 'telefone', 'tipo']);
   assert.ok(!JSON.stringify(r).match(/SEGREDO|999|destaque/));
 });
 
@@ -195,4 +195,14 @@ test('valores na REDE: cada linha na loja concreta; ordem por loja', () => {
     { loja: 'SAO BRAZ', valor_hora: 3, atualizado_em: null }, { loja: 'Agua Verde', valor_hora: 1, atualizado_em: null }, { loja: 'AHU', valor_hora: 2, atualizado_em: null }
   ], rec('REDE'));
   assert.deepEqual(r.linhas.map((l) => l.loja), ['AGUA VERDE', 'AHU', 'SÃO BRAZ']);
+});
+
+test('quadro por setor: Produção, Salão, Cozinha sempre; Sem setor só se tiver; já chamados primeiro', () => {
+  const r = M.normalizarContatos([
+    ct(1, 'Zé', { setor: 'Cozinha' }), ct(2, 'Ana', { setor: 'cozinha', chamado: true }), ct(3, 'Bia', { setor: 'Atendimento e salão' }), ct(4, 'Caio', { setor: 'Salão' })
+  ], rec('AHU'));
+  const g = M.agruparPorSetor(r.linhas);
+  assert.deepEqual(g.map((x) => x.rotulo + ':' + x.linhas.map((l) => l.nome).join(',')), ['Produção:', 'Salão:Caio', 'Cozinha:Ana,Zé', 'Sem setor:Bia']);
+  assert.equal(r.linhas.find((l) => l.nome === 'Ana').chamado, true);
+  assert.equal(r.linhas.find((l) => l.nome === 'Zé').chamado, false);
 });

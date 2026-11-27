@@ -312,19 +312,26 @@
     var vis = M.filtrarContatos(linhas, FILTRO);
     lista.appendChild(el('p', 'fl-contagem', vis.length === linhas.length ? linhas.length + ' contato(s)' : vis.length + ' de ' + linhas.length + ' contato(s)'));
     if (!vis.length) { lista.appendChild(el('p', 'fl-estado', 'Nenhum contato bate com a busca.')); return; }
-    vis.forEach(function (c) {
-      var card = el('article', 'fl-card');
-      card.appendChild(el('h3', 'fl-nome', c.nome));
-      var dl = el('dl', 'fl-dados');
-      [['Setor', c.setor], ['Tipo', c.tipo], ['Loja', rotuloLoja(c.loja)], ['Telefone', c.telefone]].forEach(function (par) {
-        var grupo = el('div', 'fl-par');
-        grupo.appendChild(el('dt', null, par[0]));
-        grupo.appendChild(el('dd', null, par[1] || '—'));
-        dl.appendChild(grupo);
+    // 27/11/2026: quadro por setor (Produção, Salão, Cozinha); quem já chamamos direto vem primeiro
+    M.agruparPorSetor(vis).forEach(function (g) {
+      var cab = el('h2', 'fl-setor', g.rotulo + ' (' + g.linhas.length + ')');
+      lista.appendChild(cab);
+      if (!g.linhas.length) { lista.appendChild(el('p', 'fl-estado', 'Ninguém neste setor ainda. Use “Nova pessoa” para colocar.')); return; }
+      g.linhas.forEach(function (c) {
+        var card = el('article', 'fl-card' + (c.chamado ? ' fl-chamado' : ''));
+        card.appendChild(el('h3', 'fl-nome', c.nome));
+        if (c.chamado) card.appendChild(el('p', 'fl-selo', '⭐ Já chamamos direto'));
+        var dl = el('dl', 'fl-dados');
+        [['Tipo', c.tipo], ['Loja', rotuloLoja(c.loja)], ['Telefone', c.telefone]].forEach(function (par) {
+          var grupo = el('div', 'fl-par');
+          grupo.appendChild(el('dt', null, par[0]));
+          grupo.appendChild(el('dd', null, par[1] || '—'));
+          dl.appendChild(grupo);
+        });
+        card.appendChild(dl);
+        if (window.FreelasLoja) FreelasLoja.enfeitarContato(card, c);
+        lista.appendChild(card);
       });
-      card.appendChild(dl);
-      if (window.FreelasLoja) FreelasLoja.enfeitarContato(card, c);
-      lista.appendChild(card);
     });
   }
 

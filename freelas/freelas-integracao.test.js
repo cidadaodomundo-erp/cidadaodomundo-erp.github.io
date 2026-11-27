@@ -99,7 +99,7 @@ test('index.html: exige sessão existente, sem chave/JWT/endereço, scripts do n
   assert.ok(!/<a\s|href="(tel|https?|whatsapp|mailto)/i.test(html.replace(/<link[^>]*>/g, '')), 'nenhum link de contato/ação');
   assert.match(html, /<div id="app" hidden>/, 'formulário nasce oculto');
   assert.match(html, /Em construção/);
-  assert.match(html, /Só consulta/);
+  assert.match(html, /Quadro por setor/);
   ['abaContatos', 'abaValores', 'btnAtualizar', 'buscaTexto', 'filtroSetor'].forEach((id) => assert.match(html, new RegExp('id="' + id + '"')));
   // todo caminho referenciado existe
   const refs = [...html.matchAll(/(?:src|href)="([^"?#]+)(?:\?[^"]*)?"/g)].map((m) => m[1]).filter((r) => !/^https?:/.test(r));
@@ -137,7 +137,7 @@ test('freelas-dados.js: só as duas tabelas de freela, nenhuma outra fonte; só 
   const tabelas = new Set(src.match(/\bfreela_[a-z_]+/g));
   assert.deepEqual([...tabelas].sort(), ['freela_contato', 'freela_valor_hora']);
   const M = require('./freelas-modelo.js');
-  assert.deepEqual(M.CAMPOS_CONTATO, ['id', 'nome', 'setor', 'telefone', 'tipo', 'ativo', 'loja']);
+  assert.deepEqual(M.CAMPOS_CONTATO, ['id', 'nome', 'setor', 'telefone', 'tipo', 'ativo', 'loja', 'chamado']);
   assert.deepEqual(M.CAMPOS_VALOR, ['loja', 'valor_hora', 'atualizado_em']);
   assert.ok(!/\b(folha|pagamento|ponto|escala_freela|qr_)\w*\?/.test(ler('freelas', 'freelas-dados.js')));
 });

@@ -9,7 +9,9 @@
 
   var LIMITE_PAGINA = 200;
   var MAX_PAGINAS = 10;                       // teto seguro: 2.000 linhas por consulta
-  var SELECT_CONTATO = 'id,nome,setor,telefone,tipo,ativo,loja';
+  var SELECT_CONTATO = 'id,nome,setor,telefone,tipo,ativo,loja,chamado';
+  // 27/11/2026: quadro por setor. Ordem fixa; o que vier fora disso cai em "Sem setor".
+  var SETORES = ['Produção', 'Salão', 'Cozinha'];
   var SELECT_VALOR = 'loja,valor_hora,atualizado_em';
   var CAMPOS_CONTATO = SELECT_CONTATO.split(',');
   var CAMPOS_VALOR = SELECT_VALOR.split(',');
@@ -130,12 +132,37 @@
       var id = String(x.id);
       if (ids[id]) { r.duplicadas++; return; }
       ids[id] = true;
-      r.linhas.push({ id: id, nome: nome, setor: textoCurto(x.setor), tipo: textoCurto(x.tipo), telefone: textoCurto(x.telefone), loja: c.loja });
+      r.linhas.push({ id: id, nome: nome, setor: textoCurto(x.setor), tipo: textoCurto(x.tipo), telefone: textoCurto(x.telefone), loja: c.loja, chamado: x.chamado === true });
     });
     r.linhas.sort(function (a, b) {
       return colador().compare(a.nome, b.nome) || colador().compare(a.loja, b.loja) || cmpId(a.id, b.id);
     });
     return r;
+  }
+
+  /* Setor oficial do quadro (Produção, Salão, Cozinha) ou null = sem setor. */
+  function setorOficial(s) {
+    var k = chaveTexto(s);
+    for (var i = 0; i < SETORES.length; i++) if (chaveTexto(SETORES[i]) === k) return SETORES[i];
+    return null;
+  }
+  /* Grupos na ordem Produção, Salão, Cozinha, Sem setor. Dentro: quem já chamamos direto primeiro, depois nome.
+   * Grupo vazio dos três setores aparece (para mostrar que ninguém está lá); "Sem setor" só se tiver gente. */
+  function agruparPorSetor(linhas) {
+    var grupos = SETORES.map(function (s) { return { setor: s, rotulo: s, linhas: [] }; });
+    var sem = { setor: null, rotulo: 'Sem setor', linhas: [] };
+    (linhas || []).forEach(function (l) {
+      var s = setorOficial(l.setor);
+      var g = s ? grupos[SETORES.indexOf(s)] : sem;
+      g.linhas.push(l);
+    });
+    grupos.concat([sem]).forEach(function (g) {
+      g.linhas.sort(function (a, b) {
+        return ((b.chamado ? 1 : 0) - (a.chamado ? 1 : 0)) || colador().compare(a.nome, b.nome) || cmpId(a.id, b.id);
+      });
+    });
+    if (sem.linhas.length) grupos.push(sem);
+    return grupos;
   }
 
   function listarSetores(linhas) {
@@ -264,6 +291,7 @@
     CAMPOS_CONTATO: CAMPOS_CONTATO, CAMPOS_VALOR: CAMPOS_VALOR, SEM_SETOR: SEM_SETOR, ALIASES: ALIASES,
     chaveLoja: chaveLoja, chaveTexto: chaveTexto, resolverRecorte: resolverRecorte, variantesServidor: variantesServidor,
     classificarLoja: classificarLoja, normalizarContatos: normalizarContatos, listarSetores: listarSetores,
+    SETORES: SETORES, setorOficial: setorOficial, agruparPorSetor: agruparPorSetor,
     filtrarContatos: filtrarContatos, lerValorHora: lerValorHora, lerCarimbo: lerCarimbo, normalizarValores: normalizarValores,
     formatarMoeda: formatarMoeda, formatarDataHora: formatarDataHora
   };
