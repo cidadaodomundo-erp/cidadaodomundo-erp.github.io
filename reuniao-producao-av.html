@@ -97,14 +97,16 @@
 <h2>4. Requisição de material: nada sai da câmara sem pedido</h2>
 <p>Telas <b>Pedir material</b> (quem usa) e <b>Separar requisições</b> (quem entrega). As duas têm o botão do guia, com o passo a passo.</p>
 <ol>
-  <li>A praça (cozinha, delivery, salão, produção) pede em <b>Pedir material</b>: item e quantidade, depois <span class="bt">Pedir</span>.</li>
-  <li>Quem cuida do estoque abre <b>Separar requisições</b>, separa, entrega e toca em <span class="bt">Entreguei</span>.</li>
-  <li><b>Óleo: desde 18/11 só sai por requisição.</b> A troca de óleo fica registrada.</li>
-  <li>Pegou sem pedir? Peça na hora, mesmo depois. Sem pedido, o estoque não baixa.</li>
+  <li><b>O setor pede</b> em <b>Pedir material</b>: item e quantidade, depois <span class="bt">Pedir</span>.</li>
+  <li><b>O Habrahan separa</b> em <b>Separar requisições</b> e toca em <span class="bt">Entreguei</span>. Se mandar menos que o pedido, escolhe o motivo (falta no estoque, vencido, avariado, trocado por outro ou outro).</li>
+  <li><b>O setor que pediu confere</b> o que recebeu em <b>Pedir material → Conferir o que recebi</b> e toca em <span class="bt">Conferir</span>. Veio diferente? Muda o número e escolhe o motivo.</li>
+  <li><b>O estoque baixa pelo que foi conferido.</b></li>
 </ol>
+<p><b>Óleo: desde 18/11 só sai por requisição.</b> Pegou sem pedir? Peça na hora, mesmo depois. Sem pedido, o estoque não baixa. Vale a partir de segunda, 30/11.</p>
 <div class="tela"><div class="barra">Estoque › Pedir material · Separar requisições</div><div class="corpo">
   <div class="lin"><span><b>Pedir material</b> · item <span class="campo">óleo</span> quantidade <span class="campo">1 galão</span></span><span class="bot on">Pedir</span></div>
   <div class="lin"><span><b>Separar requisições</b> · Cozinha pediu 1 galão de óleo</span><span class="bot on">Entreguei</span></div>
+  <div class="lin"><span><b>Conferir o que recebi</b> · separado: 1 galão · recebi <span class="campo">1</span></span><span class="bot on">Conferir</span></div>
 </div></div>
 <p class="leg">Como aparece na tela (desenho com os botões reais).</p>
 
@@ -112,7 +114,7 @@
 <p>Quando alguém vai embora e deixa uma tarefa aberta, ela fica aberta para todo mundo. O que mais fica para trás:</p>
 <div class="num">
   <div><b>Ordem</b>iniciada e não encerrada</div><div><b>Produção</b>feita e não apontada</div><div><b>Separação</b>deixada aberta</div>
-  <div><b>Requisição</b>pedida e não entregue</div><div><b>Perda</b>que ninguém registrou</div>
+  <div><b>Requisição</b>pedida e não entregue</div><div><b>Requisição</b>recebida e não conferida</div><div><b>Perda</b>que ninguém registrou</div>
 </div>
 <p>O custo disso, só de 11/11 a 25/11: <b>peito −188 kg, bacon −112 kg, costelinha −68 kg, óleo −114 litros</b> que o sistema não sabe para onde foram. Resultado: <b>compra errada, custo errado e contagem que não bate</b>.</p>
 <div class="tela"><div class="barra">Exemplo · antes e depois de apontar</div><div class="corpo">
@@ -150,7 +152,7 @@
     <li>Com ordem: <b>Iniciar → Registrar o que saiu → Encerrar</b>.</li>
     <li>Sem ordem: <b>Apontar produção → O que a cozinha produziu → Apontar</b>.</li>
     <li><b>Perdeu?</b> Coluna <b>Perdeu</b> (do lote) ou <b>Registrar perda</b> (fora do lote).</li>
-    <li><b>Precisa de material?</b> <b>Pedir material</b>. Nada sai da câmara sem pedido. <b>Óleo também.</b></li>
+    <li><b>Precisa de material?</b> <b>Pedir material</b>. Nada sai da câmara sem pedido. <b>Óleo também.</b> Chegou? <b>Conferir o que recebi</b>.</li>
     <li><b>Não saia sem finalizar.</b> Fim do turno: <b>Fechar o turno</b>. Ficou aberto? Escreva o porquê e <b>Fechar com justificativa</b>.</li>
     <li>Dúvida: botão <b>Ajuda</b> no painel ou a Rita.</li>
   </ul>
