@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Junção das telas · nova ordem</title>
+<!-- Junção das telas v2 (sex 27/11/2026, chat Telas). Ver o comentário no script. -->
+<style>
+  :root { --fundo:#FAF8F7; --papel:#FFFFFF; --alt:#F3EEEC; --tinta:#241C1B; --suave:#4E4442; --mudo:#756A67;
+          --linha:#E4DBD8; --forte:#CFC2BE; --acento:#C8102E; --acento-fundo:#FBE9EC;
+          --anda:#8A5A00; --anda-fundo:#FBF0DC; --ok:#2F6B4F; --ok-fundo:#E6F1EB; --azul:#2F5F8A; --azul-fundo:#E5EEF6; --marca-fabio:#2E8BA6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+          --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; --azul:#8DB8E0; --azul-fundo:#1A2632; --marca-fabio:#5fb3c9; } }
+  :root[data-theme="dark"] { --fundo:#161211; --papel:#1E1817; --alt:#262020; --tinta:#F2EBE9; --suave:#D6CBC8; --mudo:#A29793;
+          --linha:#332A29; --forte:#453A38; --acento:#FF5A70; --acento-fundo:#3A1B20;
+          --anda:#E8B55A; --anda-fundo:#2E2415; --ok:#7BC4A0; --ok-fundo:#1C2E25; --azul:#8DB8E0; --azul-fundo:#1A2632; --marca-fabio:#5fb3c9; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--tinta); font-family:"Segoe UI",system-ui,sans-serif; line-height:1.5; }
+  .wrap { max-width:1000px; margin:0 auto; padding:24px 16px 64px; }
+  .eyebrow { font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--acento); font-weight:600; margin:0; }
+  h1 { font-size:1.8rem; line-height:1.1; margin:.35rem 0 .3rem; }
+  h2 { font-size:1.15rem; margin:2rem 0 .5rem; }
+  h3 { font-size:.8rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mudo); margin:1.4rem 0 .5rem; }
+  .lede { color:var(--suave); margin:0 0 1rem; }
+  .placar { display:flex; gap:10px; flex-wrap:wrap; margin:.6rem 0 .8rem; }
+  .placar div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; min-width:120px; }
+  .placar b { display:block; font-size:1.45rem; line-height:1.1; }
+  .placar span { font-size:.8rem; color:var(--mudo); }
+  .filtros { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 .6rem; position:sticky; top:0; background:var(--fundo); padding:8px 0; z-index:2; }
+  .bt { background:var(--papel); color:var(--tinta); border:1px solid var(--forte); border-radius:4px; padding:5px 12px; font:inherit; font-size:.85rem; cursor:pointer; }
+  .bt.on { background:var(--tinta); color:var(--fundo); border-color:var(--tinta); }
+  .bt.sim { border-color:var(--ok); color:var(--ok); font-weight:600; } .bt.nao { border-color:var(--acento); color:var(--acento); font-weight:600; }
+  .bt.cheio { background:var(--acento); color:#fff; border-color:var(--acento); }
+  .item { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 14px; margin-bottom:8px; }
+  .item.JUNTAR { border-left:4px solid var(--azul); }
+  .item.pausada { border-left:4px solid var(--forte); opacity:.75; } .tag.pausada { background:var(--alt); color:var(--mudo); } .item.TIRAR { border-left:4px solid var(--acento); } .item.MANTER { border-left:4px solid var(--ok); }
+  .topo { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
+  .tit { font-weight:600; }
+  .tag { font-size:.7rem; font-weight:700; padding:1px 8px; border-radius:999px; background:var(--alt); color:var(--mudo); }
+  .tag.JUNTAR { background:var(--azul-fundo); color:var(--azul); } .tag.TIRAR { background:var(--acento-fundo); color:var(--acento); } .tag.MANTER { background:var(--ok-fundo); color:var(--ok); }
+  .tag.fabio { background:var(--anda-fundo); color:var(--anda); }
+  .fab-marca { color:var(--marca-fabio); font-size:.8rem; }
+  .par { display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:start; margin-bottom:12px; padding:8px; border:1px dashed var(--forte); border-radius:8px; }
+  .par > .item { margin:0; }
+  .par .nums { grid-column:1 / -1; font-size:.86rem; background:var(--alt); border-radius:4px; padding:6px 10px; }
+  @media (max-width:640px) { .par { grid-template-columns:1fr; } }
+  .grade { display:grid; grid-template-columns:150px 1fr; gap:1px 12px; font-size:.85rem; margin-top:.35rem; }
+  .grade dt { color:var(--mudo); } .grade dd { margin:0; color:var(--suave); }
+  .prop { margin-top:.4rem; padding:6px 10px; background:var(--alt); border-radius:4px; font-size:.88rem; }
+  .decide { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:.5rem; }
+  .decide > div { border:1px solid var(--linha); border-radius:4px; padding:6px 8px; font-size:.84rem; }
+  .decide .rot { font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--mudo); font-weight:700; }
+  .resp { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:.3rem; }
+  .resp input { flex:1 1 180px; padding:5px 8px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; font-size:.85rem; }
+  .dito b.sim { color:var(--ok); } .dito b.nao { color:var(--acento); } .dito b.outro { color:var(--anda); }
+  .aviso { font-size:.82rem; } .aviso.erro { color:var(--acento); } .aviso.certo { color:var(--ok); }
+  .nota { font-size:.82rem; color:var(--mudo); }
+  table { border-collapse:collapse; width:100%; font-size:.86rem; background:var(--papel); }
+  th, td { border:1px solid var(--linha); padding:5px 8px; text-align:left; vertical-align:top; }
+  th { background:var(--alt); font-weight:600; }
+  .menu { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+  .menu > div { background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:10px 12px; font-size:.85rem; }
+  .menu b { display:block; margin-bottom:4px; }
+  .menu .prov { color:var(--mudo); } .menu .dec { font-weight:600; } .menu .sai { color:var(--acento); text-decoration:line-through; }
+  .vazio { color:var(--mudo); font-size:.9rem; }
+  .login { max-width:360px; margin:12vh auto; background:var(--papel); border:1px solid var(--forte); border-radius:8px; padding:20px; }
+  .login input { width:100%; padding:10px; margin:6px 0 10px; border:1px solid var(--forte); border-radius:4px; background:var(--fundo); color:var(--tinta); font:inherit; }
+  .login button, .sair { background:var(--acento); color:#fff; border:0; border-radius:4px; padding:10px 14px; font:inherit; cursor:pointer; }
+  .sair { background:transparent; color:var(--mudo); border:1px solid var(--forte); padding:4px 10px; font-size:.8rem; }
+  .erro { color:var(--acento); font-size:.85rem; }
+  footer { margin-top:2rem; color:var(--mudo); font-size:.8rem; }
+  @media (max-width:640px) { .grade { grid-template-columns:1fr; } .decide { grid-template-columns:1fr; } }
+  .lin { display:grid; grid-template-columns: 1.4fr .9fr 1.2fr 1fr; gap:6px 12px; background:var(--papel); border:1px solid var(--linha); border-radius:6px; padding:9px 12px; margin-bottom:6px; font-size:.88rem; }
+  .lin.ok { border-left:4px solid var(--ok); } .lin.nao { border-left:4px solid var(--acento); }
+  .lin .k { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--mudo); font-weight:700; }
+  .lin .prop { margin:0; padding:3px 8px; display:inline-block; font-weight:700; }
+  .prop.FICA_A_DO_FABIO { background:var(--anda-fundo); color:var(--anda); } .prop.FICA_A_NOSSA { background:var(--azul-fundo); color:var(--azul); }
+  .prop.ELIMINAR, .prop.SAI { background:var(--acento-fundo); color:var(--acento); } .prop.FICA { background:var(--ok-fundo); color:var(--ok); }
+  .lin .acoes { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  @media (max-width:700px) { .lin { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="vazio">Carregando…</p></div>
+<script>
+// JUNÇÃO DAS TELAS v2 (sex 27/11/2026, chat Telas; dono 13:45 pelo Organizador: "juntar as telas em comum, dando preferência em
+// deixar a dele [...] eliminar as telas que não usamos e reorganizar a ordem dos módulos"). Quem marca é o DONO, linha a linha:
+// De acordo / Não (com o que fazer). Os dados NÃO ficam neste arquivo (repositório público): juncao_dados chave 'estudo-v2'
+// (RLS pode_ver_plano = Neto e Fabio). Respostas: juncao_telas_resposta pela juncao_telas_responder, tela 'v2:<chave>'.
+// Depois do OK: o Telas aplica no menu e pede ao Fabio, pela Issue, o que é do lado dele.
+const SUPABASE_URL = "https://rtmgzsikwglsvpopbfbw.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0bWd6c2lrd2dsc3Zwb3BiZmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgwMjcsImV4cCI6MjEwMTQyNDAyN30.-vwbQkcuAbbonmBVCeUWXjTg54uB5MNN94QmMlBxTA4";
+const app = document.getElementById('app');
+const D = { dados: null, resp: [], filtro: 'todas', aberto: null };
+function sessao() { try { return JSON.parse(localStorage.getItem('rmbSessao') || 'null'); } catch (e) { return null; } }
+function sessaoValida() { const s = sessao(); return s && s.access_token && (!s.expira_em || s.expira_em > Date.now() + 60000) ? s : null; }
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const H = () => { const s = sessaoValida(); return { apikey:SUPABASE_ANON_KEY, Authorization:`Bearer ${s.access_token}`, 'Content-Type':'application/json' }; };
+const usuario = e => String(e || '').replace('@cidadaodomundo.com.br', '');
+const quandoBR = ts => ts ? new Date(ts).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' }) : '';
+function telaLogin(msg) {
+  app.innerHTML = `<div class="login"><p class="eyebrow">Cidadão do Mundo</p><h1 style="font-size:1.3rem">Junção das telas</h1>
+    <p class="lede">Entre com o mesmo nome e senha do painel.</p>
+    <label>Nome<input id="e" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu nome (ex.: neto)"></label>
+    <label>Senha<input id="s" type="password" autocomplete="current-password"></label>
+    <button id="b">Entrar</button><p class="erro" id="m">${esc(msg || '')}</p></div>`;
+  const ir = async () => {
+    const t = String(document.getElementById('e').value || '').trim();
+    const email = !t || t.includes('@') ? t : t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase() + '@cidadaodomundo.com.br';
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method:'POST', headers:{ apikey:SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password:document.getElementById('s').value }) });
+    const s = await r.json();
+    if (!r.ok || !s.access_token) { document.getElementById('m').textContent = 'Nome ou senha não conferem.'; return; }
+    localStorage.setItem('rmbSessao', JSON.stringify({ access_token:s.access_token, refresh_token:s.refresh_token, email:(s.user && s.user.email) || '', expira_em: Date.now() + (s.expires_in || 3600) * 1000 }));
+    carregar();
+  };
+  document.getElementById('b').onclick = ir;
+  document.getElementById('s').onkeydown = e => { if (e.key === 'Enter') ir(); };
+}
+async function carregar() {
+  if (!sessaoValida()) return telaLogin();
+  const [rd, rr] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/juncao_dados?select=dados&chave=eq.estudo-v2`, { headers:H() }),
+    fetch(`${SUPABASE_URL}/rest/v1/juncao_telas_resposta?select=*&tela=like.v2:*&order=criado_em.desc`, { headers:H() })]);
+  if (rd.status === 401) return telaLogin('Sessão vencida, entre de novo.');
+  const dd = rd.ok ? await rd.json() : [];
+  if (!dd.length) { app.innerHTML = `<p class="vazio">Este login não tem acesso (a página é só do Neto e do Fabio).</p><button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">entrar com outro login</button>`; return; }
+  D.dados = dd[0].dados; D.resp = rr.ok ? await rr.json() : [];
+  desenhar();
+}
+const resp = k => D.resp.find(x => x.tela === 'v2:' + k);
+const propCls = p => String(p || '').startsWith('SAI') ? 'SAI' : p === 'JUNTA NA NOSSA' ? 'FICA_A_NOSSA' : String(p).replace(/ /g, '_');
+function linha(x) {
+  const r = resp(x.k), id = x.k.replace(/[^a-z0-9]/gi, '_');
+  const uso = x.a == null ? '<span class="nota">no portal: não medido daqui</span>' : x.a === 0 ? 'nenhum acesso' : `${x.a} acessos · ${x.p} ${x.p === 1 ? 'pessoa' : 'pessoas'}<div class="nota">${esc(x.quem)}</div>`;
+  const marcado = r ? `<span class="dito"><b class="${r.resposta}">${r.resposta === 'sim' ? 'De acordo' : 'Não'}</b>${r.texto ? ' — ' + esc(r.texto) : ''} <span class="nota">· ${esc(usuario(r.quem))} ${esc(quandoBR(r.criado_em))}</span></span>` : '';
+  const acoes = D.aberto === x.k
+    ? `<input id="tx_${id}" placeholder="o que fazer com esta tela?" maxlength="1000" style="flex:1 1 220px;padding:5px 8px;border:1px solid var(--forte);border-radius:4px;background:var(--fundo);color:var(--tinta);font:inherit;"><button class="bt cheio" onclick="responder('${esc(x.k)}','nao')">Gravar</button><button class="bt" onclick="D.aberto=null;desenhar()">Cancelar</button>`
+    : `${marcado}<button class="bt sim" onclick="responder('${esc(x.k)}','sim')">De acordo</button><button class="bt nao" onclick="D.aberto='${esc(x.k)}';desenhar();document.getElementById('tx_${id}').focus()">Não…</button>`;
+  return `<div class="lin ${r ? (r.resposta === 'sim' ? 'ok' : 'nao') : ''}">
+    <div><div class="k">Tela · ${esc(x.de)}</div><b>${esc(x.t)}</b><div class="nota">hoje em: ${esc(x.hoje)}</div></div>
+    <div><div class="k">Uso em 30 dias</div>${uso}</div>
+    <div><div class="k">Par do outro lado</div>${esc(x.par)}</div>
+    <div><div class="k">Proposta</div><span class="prop ${propCls(x.prop)}">${esc(x.prop)}</span><div class="nota">${esc(x.nota)}</div></div>
+    <div class="acoes">${acoes}<span class="aviso" id="av_${id}"></span></div></div>`;
+}
+function desenhar() {
+  const L = D.dados.linhas, M = D.dados.mods, feitas = L.filter(x => resp(x.k)).length;
+  const F = [['todas', `Todas (${L.length})`], ['abertas', `Sem marca (${L.length - feitas})`], ['fabio', `Fica a do Fabio (${L.filter(x => x.prop === 'FICA A DO FABIO').length})`],
+             ['nossa', `Fica a nossa (${L.filter(x => x.prop === 'FICA A NOSSA' || x.prop === 'JUNTA NA NOSSA').length})`], ['sai', `Sai ou eliminar (${L.filter(x => /^SAI|ELIMINAR/.test(x.prop)).length})`],
+             ['portal', `Só no portal (${L.filter(x => x.hoje === 'só no portal').length})`], ['fora', `Fora do menu (${L.filter(x => x.hoje === 'fora do menu').length})`]];
+  const passa = x => D.filtro === 'todas' || (D.filtro === 'abertas' && !resp(x.k)) || (D.filtro === 'fabio' && x.prop === 'FICA A DO FABIO')
+    || (D.filtro === 'nossa' && (x.prop === 'FICA A NOSSA' || x.prop === 'JUNTA NA NOSSA')) || (D.filtro === 'sai' && /^SAI|ELIMINAR/.test(x.prop))
+    || (D.filtro === 'portal' && x.hoje === 'só no portal') || (D.filtro === 'fora' && x.hoje === 'fora do menu');
+  const grupos = [...M, '—'];
+  const s = sessao() || {};
+  app.innerHTML = `<p class="eyebrow">Cidadão do Mundo · só Neto e Fabio · medido em ${esc(D.dados.medido)}</p>
+    <h1>Junção das telas · nova ordem</h1>
+    <p class="lede">Todas as telas do nosso menu e as do portal do Fabio, já na ordem nova dos módulos: operação do dia → compras e estoque → vendas e iFood → financeiro → equipe → gestão. Em cada linha: o uso de 30 dias no painel, o par do outro lado e a proposta (a do Fabio fica quando faz a mesma coisa; a nossa fica só quando a dele não tem a função, e a linha diz qual). <b>Marque De acordo ou Não, linha a linha</b>; no Não, escreva o que fazer. Nada muda no menu antes disso.</p>
+    <div class="placar"><div><b>${feitas} de ${L.length}</b><span>marcadas</span></div><div><b>${L.filter(x => x.prop === 'FICA A DO FABIO').length}</b><span>fica a do Fabio</span></div><div><b>${L.filter(x => x.prop === 'FICA A NOSSA' || x.prop === 'JUNTA NA NOSSA').length}</b><span>fica a nossa</span></div><div><b>${L.filter(x => /^SAI|ELIMINAR/.test(x.prop)).length}</b><span>sai ou eliminar</span></div></div>
+    <p class="nota">O uso das telas do portal não é medido daqui (o monitor de uso é só do painel). As telas do Fabio que já abrem dentro do painel têm o uso daqui.</p>
+    <div class="filtros">${F.map(([k, t]) => `<button class="bt${D.filtro === k ? ' on' : ''}" onclick="D.filtro='${k}';desenhar()">${t}</button>`).join('')}
+      ${feitas ? '' : `<button class="bt sim" onclick="tudoDeAcordo()">De acordo com todas as que estão na tela</button>`}</div>
+    ${grupos.map(g => { const l = L.filter(x => (x.novo || '—') === g && passa(x)); return l.length ? `<h3>${esc(g === '—' ? 'Fora do menu (continua fora)' : g)} · ${l.length}</h3>` + l.map(linha).join('') : ''; }).join('') || '<p class="vazio">Nenhuma tela neste filtro.</p>'}
+    <footer>Entrou como ${esc(usuario(s.email))} · <button class="sair" onclick="localStorage.removeItem('rmbSessao');carregar()">sair</button></footer>`;
+}
+async function responder(k, resposta) {
+  const id = k.replace(/[^a-z0-9]/gi, '_'), x = D.dados.linhas.find(y => y.k === k);
+  const campo = document.getElementById('tx_' + id), texto = campo ? campo.value.trim() : '';
+  if (resposta === 'nao' && texto.length < 3) { const a = document.getElementById('av_' + id); if (a) { a.className = 'aviso erro'; a.textContent = 'Escreva o que fazer com esta tela.'; } return; }
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/juncao_telas_responder`, { method:'POST', headers:H(),
+    body: JSON.stringify({ p_tela:'v2:' + k, p_proposta:(x ? x.prop + ' · ' + x.novo : '').slice(0, 200), p_resposta: resposta === 'nao' ? 'outro' : 'sim', p_texto: texto || null }) });
+  if (!r.ok) { const a = document.getElementById('av_' + id); if (a) { a.className = 'aviso erro'; a.textContent = '✗ Não gravou: ' + ((await r.json().catch(() => ({}))).message || r.status); } return; }
+  D.aberto = null;
+  const rr = await fetch(`${SUPABASE_URL}/rest/v1/juncao_telas_resposta?select=*&tela=like.v2:*&order=criado_em.desc`, { headers:H() });
+  D.resp = rr.ok ? await rr.json() : D.resp; desenhar();
+}
+async function tudoDeAcordo() {
+  const L = D.dados.linhas.filter(x => !resp(x.k));
+  if (!confirm(`Marcar De acordo nas ${L.length} linhas sem marca?`)) return;
+  for (const x of L) await fetch(`${SUPABASE_URL}/rest/v1/rpc/juncao_telas_responder`, { method:'POST', headers:H(),
+    body: JSON.stringify({ p_tela:'v2:' + x.k, p_proposta:(x.prop + ' · ' + x.novo).slice(0, 200), p_resposta:'sim', p_texto:null }) });
+  carregar();
+}
+carregar();
+</script>
+</body>
+</html>
