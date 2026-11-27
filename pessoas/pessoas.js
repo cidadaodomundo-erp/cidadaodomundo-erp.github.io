@@ -2270,7 +2270,61 @@ function cgEnvVal(k, v, pct) {
   return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
 }
 function cgAbaEnvio() {
-  return cgFlashTxtHtml() + cgAbaEnvioCorpo();
+  return cgAbaEnvioCorpo() + `<details style="margin-top:18px;"><summary style="cursor:pointer;font-size:12.5px;color:var(--tx-3);">reserva: subir o arquivo da Flash à mão</summary>${cgFlashTxtHtml()}</details>`;
+}
+// 27/11/2026 [dono] (18:53: "um botão na conferência com o dizer, folha fechada, a Hellen clica nele... se tiver erros, tem que ter um
+// lugar pra ela te passar as correções, quando estiver ok, um botão que diz, conferido, pode enviar pra contabilidade"; RH, banco pronto):
+// rh_folha_pedido_gravar(p_tipo, p_competencia, p_pessoa_id, p_linha, p_texto, p_motivo) e vw_rh_folha_pedido (o robô do RH atende)
+const RH_PED_ST = { ABERTO: ['⏳ pedido feito, o robô pega em até 5 min', 'var(--farol-perto)'], FAZENDO: ['⏳ o robô está fazendo', 'var(--farol-perto)'],
+  FEITO: ['✓ feito', 'var(--farol-ok)'], FOI_AO_DONO: ['→ foi ao Neto decidir', 'var(--info)'], RECUSADO: ['✗ recusado', 'var(--farol-fora)'] };
+function cgPedidos(comp) {
+  if (!CARGOS.ped || CARGOS.ped.comp !== comp) { CARGOS.ped = { comp, L: null }; cgPedidosCarregar(comp); }
+  return CARGOS.ped.L || [];
+}
+async function cgPedidosCarregar(comp) {
+  try { const r = await trFetch(`vw_rh_folha_pedido?select=*&competencia=eq.${comp}&order=criado_em.desc,id.desc`); CARGOS.ped = { comp, L: r.ok ? await r.json() : [] }; }
+  catch (e) { CARGOS.ped = { comp, L: [] }; }
+  if (CARGOS_F.aba === 'envio') renderModuloCargos();
+  clearTimeout(CARGOS.pedT);
+  if (CARGOS.ped.L.some((x) => x.status === 'ABERTO' || x.status === 'FAZENDO')) CARGOS.pedT = setTimeout(() => cgPedidosCarregar(comp), 20000);
+}
+const cgPedSt = (x) => { const [t, c] = RH_PED_ST[x.status] || [String(x.status || '').toLowerCase(), 'var(--tx-3)'];
+  return `<span style="color:${c};font-weight:700;">${t}</span>${x.resposta ? ` — ${cgEsc(x.resposta)}` : ''}${x.atendido_em && x.status === 'FEITO' ? ` <span style="color:var(--tx-4);">(${cgEnvQuando(x.atendido_em)})</span>` : ''}`; };
+function cgFolhaFechadaHtml(comp) {
+  const x = cgPedidos(comp).find((y) => y.tipo === 'FOLHA_FECHADA');
+  return `<div class="contexto" style="text-align:left;margin:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+    ${x && x.status !== 'RECUSADO' ? `<span><b>Folha fechada</b> · pedido por ${cgEsc(cgEnvQuem(x.quem))} em ${cgEnvQuando(x.criado_em)} · ${x.status === 'ABERTO' || x.status === 'FAZENDO' ? '<span style="color:var(--farol-perto);font-weight:700;">⏳ o robô está baixando a Flash…</span>' : cgPedSt(x)}</span>`
+      : `${cgBotaoPasso('Folha fechada', `cgPedido('FOLHA_FECHADA','${comp}')`)} <span class="caption-label" style="margin:0;">clique quando a folha do mês fechar: o robô baixa a Flash e monta a conferência</span>${x ? ' · último: ' + cgPedSt(x) : ''}`}</div>`;
+}
+function cgFolhaCorrecoesHtml(comp) {
+  const L = cgPedidos(comp).filter((x) => x.tipo !== 'FOLHA_FECHADA' && x.tipo !== 'CONFERIDO');
+  if (!L.length) return '';
+  return `<div class="section-label" style="margin-top:16px;">Correções pedidas · ${L.length}</div>
+    <div id="tabelaCgCorrecoes" style="overflow-x:auto;"><table><thead><tr><th>Quando</th><th>Pessoa</th><th>Linha</th><th>O que está errado</th><th>Situação</th></tr></thead><tbody>
+    ${L.map((x) => `<tr><td>${cgEnvQuando(x.criado_em)}</td><td>${cgEsc(cgNome(x.nome || ''))}</td><td>${cgEsc(x.linha || '')}</td><td style="white-space:normal;">${cgEsc(x.texto || '')}${x.motivo ? `<div style="font-size:11.5px;color:var(--tx-4);">motivo: ${cgEsc(x.motivo)}</div>` : ''}</td><td style="white-space:normal;">${cgPedSt(x)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function cgFolhaConferidoHtml(comp) {
+  const P = cgPedidos(comp), x = P.find((y) => y.tipo === 'CONFERIDO');
+  const abertas = P.filter((y) => y.tipo !== 'FOLHA_FECHADA' && y.tipo !== 'CONFERIDO' && (y.status === 'ABERTO' || y.status === 'FAZENDO')).length;
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 12px;">${x && x.status !== 'RECUSADO'
+      ? `<span><b>Conferido, pode enviar para a contabilidade</b> · ${cgEsc(cgEnvQuem(x.quem))} em ${cgEnvQuando(x.criado_em)} · ${x.status === 'FEITO' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ enviado em ${cgEnvQuando(x.atendido_em)}</span>${x.resposta ? ' — ' + cgEsc(x.resposta) : ''}` : cgPedSt(x)}</span>`
+      : `${cgBotaoPasso('Conferido, pode enviar para a contabilidade', `cgPedido('CONFERIDO','${comp}')`)}${abertas ? ` <span style="font-size:12.5px;color:var(--farol-perto);">${abertas} ${abertas === 1 ? 'correção ainda aberta' : 'correções ainda abertas'}</span>` : ''}${x ? ' · último: ' + cgPedSt(x) : ''}`}</div>`;
+}
+async function cgPedido(tipo, comp, pid, linha, idCampo) {
+  let texto = null, motivo = null;
+  if (tipo === 'CORRECAO') {
+    texto = ((document.getElementById(idCampo + '_t') || {}).value || '').trim(); motivo = ((document.getElementById(idCampo + '_m') || {}).value || '').trim();
+    if (texto.length < 3) return avisoAcao('atencao', '! Escreva o que está errado nesta linha.');
+  }
+  if (tipo === 'CONFERIDO') { const ab = cgPedidos(comp).filter((y) => y.tipo === 'CORRECAO' && (y.status === 'ABERTO' || y.status === 'FAZENDO')).length;
+    if (ab && !confirm(`Ainda há ${ab} ${ab === 1 ? 'correção aberta' : 'correções abertas'}. Marcar como conferido mesmo assim?`)) return; }
+  avisoAcao('enviando', '… enviando');
+  const r = await trRpcSeguro('rh_folha_pedido_gravar', { p_tipo: tipo, p_competencia: comp, p_pessoa_id: pid || null, p_linha: linha || null, p_texto: texto || null, p_motivo: motivo || null });
+  if (!r.ok) { const e = await trErroDe(r); return avisoAcao('erro', `✗ Não foi: ${/permiss|denied/i.test(e) ? 'este login não pode fazer este pedido — fale com o Neto' : e}`, () => cgPedido(tipo, comp, pid, linha, idCampo)); }
+  CARGOS_F.envioCorr = null;
+  avisoAcao('ok', tipo === 'FOLHA_FECHADA' ? `✓ Pedido feito às ${avisoHora()}: o robô baixa a Flash em até 5 min.` : tipo === 'CONFERIDO' ? `✓ Conferido às ${avisoHora()}: o robô envia à contabilidade.` : `✓ Correção pedida às ${avisoHora()}: a resposta aparece em "Correções pedidas".`);
+  await cgPedidosCarregar(comp);
 }
 function cgAbaEnvioCorpo() {
   const F = CARGOS_F;
@@ -2298,6 +2352,7 @@ function cgAbaEnvioCorpo() {
   let h = `${cgSelPeriodo('Mês', [...comps].sort().map((c) => [c, cgMesRot(c)]), comp,
       "(v) => { CARGOS_F.envioComp = v; CARGOS_F.envioEmp = null; CARGOS_F.envioAberta = null; renderModuloCargos(); }")}
     <div class="caption-label" style="text-align:left;">Período ${de.toLocaleDateString('pt-BR')} a ${ate.toLocaleDateString('pt-BR')}.</div>
+    ${cgFolhaFechadaHtml(comp)}
     ${cgPassos([[`Horas da Flash${empsFlash.size ? ` (${empsFlash.size} ${empsFlash.size === 1 ? 'empresa' : 'empresas'})` : ''}`, empsFlash.size > 0],
                 ['Gratificações salão', tem((x) => CG_ENV_COLS[5][2](x))], ['VT', tem((x) => x.rubrica === '0048')], ['Adiantamento', tem((x) => x.rubrica === '0981')],
                 [`Dias das faltas${fPend ? ` (faltam ${fPend})` : ''}`, !fPend && (fComF > 0 || empsFlash.size > 0)], [conf ? `Conferido por ${cgEnvQuem(conf.conferido_por)}` : 'Conferido', !!conf, conf ? cgEnvQuando(conf.conferido_em) : '']])}`;
@@ -2361,15 +2416,25 @@ function cgAbaEnvioCorpo() {
       ${cgBotaoPasso('Gerar arquivo para a contabilidade (.xlsx)', 'cgEnvioXlsx()')}
       <span class="caption-label" style="margin:0;">uma aba por empresa, com o total por rubrica</span></div>
     ${tabela('tabelaCgEnvioPainel', CG_ENV_PAINEL)}
-    ${botaoConferido}`;
+    ${cgFolhaCorrecoesHtml(comp)}
+    ${cgFolhaConferidoHtml(comp)}`;
+  CARGOS.envComp = comp;   // a linha de cada pessoa usa no "Pedir correção"
+  void botaoConferido;   // 27/11: o "Marcar como conferido" antigo deu lugar ao pedido CONFERIDO
   return h;
 }
 function cgEnvioLinhasHtml(p) {
-  return `<div id="tabelaCgEnvioLin" style="overflow-x:auto;max-width:760px;"><table><thead><tr><th>Rubrica</th><th>Valor</th><th>Na Flash</th><th>De onde vem</th></tr></thead><tbody>
-    ${p.lin.map((x) => `<tr><td>${cgEsc(x.rubrica)} · ${cgEsc(x.descricao)}</td>
+  const comp = CARGOS.envComp, inp = 'padding:5px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:6px;font:inherit;';
+  return `<div id="tabelaCgEnvioLin" onclick="event.stopPropagation()" style="overflow-x:auto;max-width:860px;"><table><thead><tr><th>Rubrica</th><th>Valor</th><th>Na Flash</th><th>De onde vem</th><th></th></tr></thead><tbody>
+    ${p.lin.map((x, i) => { const lin = `${x.rubrica} · ${x.descricao}`, id = `cgCorr_${p.pid || 0}_${i}`, ab = CARGOS_F.envioCorr === id;
+      return `<tr><td>${cgEsc(x.rubrica)} · ${cgEsc(x.descricao)}</td>
       <td>${x.medida === 'horas' ? cgEnvHM(cgEnvMin(x.valor)) : cgR(x.valor)}</td>
       <td style="color:var(--tx-4);">${x.medida === 'horas' ? cgEsc(cgN(x.valor).toFixed(2)) : ''}</td>
-      <td style="color:var(--tx-4);">${cgEsc(x.origem)}</td></tr>`).join('')}</tbody></table></div>`;
+      <td style="color:var(--tx-4);">${cgEsc(x.origem)}</td>
+      <td>${comp && p.pid && !ab ? `<button type="button" class="preset-btn" onclick="CARGOS_F.envioCorr='${id}';renderModuloCargos()">Pedir correção</button>` : ''}</td></tr>
+      ${ab ? `<tr><td colspan="5"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <input id="${id}_t" placeholder="o que está errado" style="flex:1 1 220px;${inp}"><input id="${id}_m" placeholder="motivo (opcional)" style="flex:1 1 160px;${inp}">
+        <button type="button" class="preset-btn active" onclick='cgPedido("CORRECAO","${comp}",${Number(p.pid)},${cgEsc(JSON.stringify(lin))},"${id}")'>Enviar a correção</button>
+        <button type="button" class="preset-btn" onclick="CARGOS_F.envioCorr=null;renderModuloCargos()">Cancelar</button></div></td></tr>` : ''}`; }).join('')}</tbody></table></div>`;
 }
 // ---- dia de cada falta (rh_falta_data) e "conferido" (rh_fechamento_conferido), do RH em 05/11/2026 ----
 function cgEnvDias(comp, pid) { return (CARGOS.envio.fdias || []).filter((x) => String(x.competencia).slice(0, 10) === comp && x.pessoa_id === pid).map((x) => String(x.data).slice(0, 10)).sort(); }
