@@ -12,7 +12,7 @@
   h1 { margin:0 0 4px; font-size:26px; }
   .sub { color:var(--tx2); margin:0 0 24px; }
   .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; }
-  .card { background:var(--surface); border:1px solid var(--linha); border-radius:12px; overflow:hidden; }
+  .card { display:block; color:inherit; text-decoration:none; cursor:pointer; transition:border-color .15s;  background:var(--surface); border:1px solid var(--linha); border-radius:12px; overflow:hidden; }
   .prev { position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:#000; }
   .prev iframe { position:absolute; top:0; left:0; width:1280px; height:720px; border:0; transform-origin:0 0; pointer-events:none; }
   .info { padding:12px 14px; }
@@ -20,6 +20,8 @@
   .loja { color:var(--tx2); font-size:14px; }
   .end { margin-top:8px; font-size:14px; color:var(--amarelo); word-break:break-all; }
   .telas { margin-top:6px; font-size:13px; color:var(--tx2); }
+  .card:hover, .card:focus-visible { border-color:var(--amarelo); }
+  .card .vivo { display:inline-block; margin-top:8px; font-size:13px; font-weight:700; color:#3fb950; }
 </style>
 </head>
 <body>
@@ -32,8 +34,8 @@ fetch('programacao.json?t=' + Date.now(), {cache:'no-store'}).then(r => r.json()
   const g = document.getElementById('grade');
   p.tvs.forEach(t => {
     const url = BASE + 'tela.html?tv=' + t.codigo;
-    const c = document.createElement('div'); c.className = 'card';
-    c.innerHTML = '<div class="prev"><iframe loading="lazy" title=""></iframe></div><div class="info"><b></b><div class="loja"></div><div class="telas"></div><div class="end"></div></div>';
+    const c = document.createElement('a'); c.className = 'card'; c.href = url; c.target = '_blank'; c.rel = 'noopener'; c.title = 'Abrir esta TV ao vivo';
+    c.innerHTML = '<div class="prev"><iframe loading="lazy" title=""></iframe></div><div class="info"><b></b><div class="loja"></div><div class="telas"></div><div class="end"></div><span class="vivo">● Clique para ver ao vivo</span></div>';
     c.querySelector('iframe').src = url;
     c.querySelector('b').textContent = t.nome;
     c.querySelector('.loja').textContent = 'Loja: ' + t.loja;
