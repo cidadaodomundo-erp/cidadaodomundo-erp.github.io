@@ -3609,12 +3609,17 @@ async function entrarRh() {
     const lida = await consultarTudo('rh_descontos?select=atualizado_em&order=atualizado_em.desc.nullslast&limit=1').catch(() => []);
     // 12/11/2026 (dono 10:25, agenda #14): o detalhe do Quem deve mostra o emprestado, as parcelas já pagas e a saída do dinheiro;
     // (dono 10:27, proposta 2026-11-12-rh-quem-deve-vales-novos.md): vale novo do Saipos que a Hellen parcela aqui
+    // 27/11/2026 [dono] (17:16, repetido: "aparecer o total parcelado de cada um, a Hellen tem que enxergar o total de descontos em cada
+    // folha de pagamento"; RH, proposta 2026-11-27-descontos-folha-total-e-por-folha): total por pessoa e visão por folha
+    const [totPes, porFolha] = await Promise.all([
+      consultarTudo('vw_rh_desconto_total_pessoa?select=*').catch(() => []),
+      consultarTudo('vw_rh_desconto_por_folha?select=*&order=data_desconto,nome_completo').catch(() => [])]);
     const [emp, pagos, novos, pesAtivas] = await Promise.all([
       consultarTudo('vw_rh_emprestimos?select=chave,valor_total,descontado,data_concessao,credor').catch(() => []),
       consultarTudo('rh_descontos?select=emprestimo,parcela,parcelas_no_plano,valor,data_desconto&status=eq.PAGO&order=data_desconto').catch(() => []),
       consultarTudo('vw_rh_emprestimo_novo?select=*&situacao=eq.A_PARCELAR&order=data').catch((e) => ({ erro: e.message })),
       consultarTudo('rh_pessoa?select=id,nome&ativo=is.true&order=nome').catch(() => [])]);
-    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null,
+    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null, totPes, porFolha,
       emp: new Map(emp.map((e) => [e.chave, e])), pagos, novos, pesAtivas };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${cgEsc(e.message)}</div>`;
@@ -3622,7 +3627,32 @@ async function entrarRh() {
   }
   renderModuloRh();
 }
-let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null;
+let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null, RH_FOLHA = null;
+// POR FOLHA DE PAGAMENTO (dono 27/11 17:16): seletor da folha (padrão: a próxima a pagar), o total da folha e a lista por pessoa.
+// Prova na própria tela: o card é a soma das linhas daquela folha; se não bater, avisa.
+function rhPorFolhaHtml(P) {
+  const L = RH.porFolha || [];
+  if (!L.length) return '';
+  const n = (v) => Number(v) || 0, R = (v) => 'R$ ' + fmt(n(v)), hoje = cgHojeIso();
+  const chave = (x) => String(x.data_desconto).slice(0, 10) + '|' + x.folha;
+  const folhas = [...new Map(L.map((x) => [chave(x), x])).values()].sort((a, b) => chave(a).localeCompare(chave(b)));
+  const prox = folhas.find((x) => String(x.data_desconto).slice(0, 10) >= hoje) || folhas[folhas.length - 1];
+  const k = RH_FOLHA && folhas.some((x) => chave(x) === RH_FOLHA) ? RH_FOLHA : chave(prox);
+  const sel = L.filter((x) => chave(x) === k && (!P || x.colaborador === P));
+  const f = folhas.find((x) => chave(x) === k) || {};
+  const soma = L.filter((x) => chave(x) === k).reduce((a, x) => a + n(x.valor), 0), total = n(f.total_da_folha);
+  const nome = (x) => cgEsc(cgNome(x.nome_completo || x.colaborador || ''));
+  const rot = (x) => `${cgData(x.data_desconto)} · ${String(x.folha || '').toLowerCase()}`;
+  return `<div class="section-label">Por folha de pagamento</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 8px;">
+      <select onchange="RH_FOLHA=this.value;renderModuloRh()" style="padding:6px 8px;background:var(--surface-2);color:var(--tx-1);border:1px solid var(--line);border-radius:8px;font:inherit;">
+        ${folhas.map((x) => `<option value="${cgEsc(chave(x))}"${chave(x) === k ? ' selected' : ''}>${rot(x)}${chave(x) === chave(prox) ? ' (a próxima)' : ''}</option>`).join('')}</select></div>
+    <div class="cards"><div class="card blue"><div class="card-lbl">Total de descontos desta folha</div><div class="card-val">${R(total)}</div>
+      <div class="card-pct">${rot(f)} · ${new Set(L.filter((x) => chave(x) === k).map((x) => x.colaborador)).size} pessoas${Math.abs(soma - total) > 0.005 ? ` · <span style="color:var(--farol-fora);font-weight:700;">✗ a soma das linhas dá ${R(soma)}</span>` : ''}</div></div></div>
+    <div id="tabelaRhPorFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Parcelas</th><th>Valor</th><th>Situação</th><th>O quê</th></tr></thead><tbody>
+      ${sel.map((x) => `<tr><td>${nome(x)}</td><td>${cgEsc(String(x.parcelas == null ? '' : x.parcelas))}</td><td>${R(x.valor)}</td><td>${cgEsc(String(x.situacao || '').toLowerCase())}</td><td style="white-space:normal;">${cgEsc(x.descricoes || '')}</td></tr>`).join('') || '<tr><td colspan="5">Nada nesta folha.</td></tr>'}
+    </tbody><tfoot><tr class="liq"><td>Total${P ? ' desta pessoa' : ''}</td><td></td><td>${R(sel.reduce((a, x) => a + n(x.valor), 0))}</td><td></td><td></td></tr></tfoot></table></div>`;
+}
 // SAÍDA DO DINHEIRO (dono 12/11/2026 10:25): procura no extrato um débito do mesmo valor até 5 dias da concessão. É busca, não prova:
 // a tela diz o que achou e diz quando não achou. Dinheiro de terceiro (credor ≠ EMPRESA) não passa pelas contas da empresa.
 const RH_SAIDA = {};
@@ -3774,6 +3804,7 @@ function renderModuloRh() {
   </div>`;
 
   if (!P) h += rhValesNovosHtml();
+  h += rhPorFolhaHtml(P);
   // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
   const confDe = (r) => confDia.find((x) => x.pessoa_id === r.pessoa_id);
   const visto = new Set();
@@ -3805,20 +3836,24 @@ function renderModuloRh() {
     const fp = D.filter((d) => d.tipo === 'FALTA PARCELA').reduce((a, d) => a + n(d.diferenca), 0), pm = D.filter((d) => d.tipo !== 'FALTA PARCELA').reduce((a, d) => a + Math.abs(n(d.diferenca)), 0);
     return [fp ? `<span style="color:var(--farol-perto);" title="sobrou valor sem parcela lançada: ninguém está cobrando">falta parcela ${R(fp)}</span>` : '', pm ? `<span style="color:var(--farol-perto);" title="quase sempre vale replanejado com a parcela antiga ainda na planilha">parcela a mais ${R(pm)}</span>` : ''].filter(Boolean).join('<br>'); };
   const quem = ativos.filter((c) => n(c.a_descontar) > 0);
-  h += `<div class="section-label">Quem deve</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Falta</th><th>Parcelas que faltam</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
-    ${quem.map((c) => { const ab = P === c.colaborador;
+  // 27/11 [dono]: o total parcelado de cada um (vw_rh_desconto_total_pessoa): total · já descontado · saldo · parcelas · próximo desconto
+  const TP = new Map((RH.totPes || []).map((x) => [x.colaborador, x]));
+  h += `<div class="section-label">Quem deve: o total parcelado de cada um</div><div id="tabelaRhColab" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Valor total</th><th>Já descontado</th><th>Saldo devedor</th><th>Parcelas pagas</th><th>Próximo desconto</th><th>Última</th></tr></thead><tbody>
+    ${quem.map((c) => { const ab = P === c.colaborador, t0 = TP.get(c.colaborador) || {};
+      const parc = t0.parcelas_pagas != null ? `${n(t0.parcelas_pagas)} de ${n(t0.parcelas_pagas) + n(t0.parcelas_a_pagar)}` : n(c.parcelas_abertas) + ' a pagar';
       let t = `<tr style="cursor:pointer;${ab ? 'background:var(--surface-2);' : ''}" onclick='rhIr("pessoa",${js(c.colaborador)})' title="${ab ? 'clique para soltar' : 'clique para a tela falar só desta pessoa'}">
-        <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${R(c.a_descontar)}</td><td>${n(c.parcelas_abertas)}</td><td>${cgData(c.proximo_desconto)}</td><td>${mesTxt(c.quitacao_prevista)}</td></tr>`;
+        <td>${ab ? '▾ ' : '▸ '}${NC(c)}${c.onde === 'POR FORA' ? ' <span style="font-size:11px;color:var(--tx-4);">por fora</span>' : ''}</td><td>${t0.valor_total != null ? R(t0.valor_total) : '—'}</td><td>${t0.ja_descontado != null ? R(t0.ja_descontado) : '—'}</td>
+        <td><b>${R(t0.saldo_devedor != null ? t0.saldo_devedor : c.a_descontar)}</b></td><td>${parc}</td><td>${cgData(t0.proximo_desconto || c.proximo_desconto)}${t0.proxima_parcela != null ? ' · ' + R(t0.proxima_parcela) : ''}</td><td>${mesTxt(c.quitacao_prevista)}</td></tr>`;
       if (ab) { const E = [...new Set(RH.aberto.filter((r) => r.colaborador === c.colaborador).map((r) => r.chave))].map((k) => RH.aberto.filter((r) => r.chave === k && r.colaborador === c.colaborador));
-        t += `<tr><td colspan="5"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Emprestado</th><th>Já descontado</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
-          ${E.map((L) => { const k = L[0].chave, e = (RH.emp && RH.emp.get(k)) || {}, pg = (RH.pagos || []).filter((x) => x.emprestimo === k);
+        t += `<tr><td colspan="7"><div class="caption-label" style="text-align:left;margin:2px 0;">Empréstimos de ${NC(c)}</div><table style="font-size:12.5px;"><thead><tr><th>Empréstimo</th><th>Emprestado</th><th>Já descontado</th><th>Parcelas que faltam</th><th>Falta</th><th>Próxima</th><th>Última</th></tr></thead><tbody>
+          ${E.map((L) => { const k = L[0].chave, e = (RH.emp && RH.emp.get(k)) || {}, pg = (RH.pagos || []).filter((x) => x.emprestimo === k);   // (colspan 7)
             return `<tr><td>${cgEsc(L[0].descricao || '')}${L[0].credor && L[0].credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(L[0].credor))}</span>` : ''}</td>
             <td>${e.valor_total != null ? R(e.valor_total) : '—'}${e.data_concessao ? `<div style="font-size:11px;color:var(--tx-4);">em ${cgData(e.data_concessao)}</div>` : ''}</td>
             <td>${R(pg.reduce((a, x) => a + n(x.valor), 0))}<div style="font-size:11px;color:var(--tx-4);">${pg.length} ${pg.length === 1 ? 'parcela' : 'parcelas'}</div></td>
             <td>${L.length}${L[0].parcelas_total ? ` (de ${L[0].parcelas_total})` : ''}</td><td>${R(L.reduce((a, r) => a + n(r.valor), 0))}</td><td>${cgData(L[0].data_desconto)}</td><td>${cgData(L[L.length - 1].data_desconto)}</td></tr>
             <tr><td colspan="7" style="white-space:normal;font-size:12px;padding-top:0;">${rhSaidaHtml(k, e, L[0])}${pg.length ? `<details style="margin-top:2px;"><summary style="cursor:pointer;color:var(--tx-3);">parcelas já pagas (${pg.length})</summary>${pg.map((x) => `${x.parcela ? x.parcela + (x.parcelas_no_plano ? '/' + x.parcelas_no_plano : '') + ' · ' : ''}${cgData(x.data_desconto)} · ${R(x.valor)}`).join('<br>')}</details>` : ''}</td></tr>`; }).join('')}</tbody></table></td></tr>`; }
       return t; }).join('')}
-    </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n(c.a_descontar), 0))}</td><td>${quem.reduce((a, c) => a + n(c.parcelas_abertas), 0)}</td><td></td><td></td></tr></tfoot></table></div>`;
+    </tbody><tfoot><tr class="liq"><td>Total · ${quem.length} ${quem.length === 1 ? 'pessoa' : 'pessoas'}</td><td>${R(quem.reduce((a, c) => a + n((TP.get(c.colaborador) || {}).valor_total), 0))}</td><td>${R(quem.reduce((a, c) => a + n((TP.get(c.colaborador) || {}).ja_descontado), 0))}</td><td>${R(quem.reduce((a, c) => a + n((TP.get(c.colaborador) || {}).saldo_devedor != null ? TP.get(c.colaborador).saldo_devedor : c.a_descontar), 0))}</td><td></td><td></td><td></td></tr></tfoot></table></div>`;
 
   // Bloco 4: depósitos da Rita (Vales Cidadão) — ela deposita na conta, não sai da folha
   // 12/11/2026 (usabilidade): sem deposito em aberto, o bloco fica recolhido
