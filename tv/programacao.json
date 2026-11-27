@@ -1,0 +1,55 @@
+{
+  "_leia": "Central das TVs. Cada caixinha abre tv/tela.html?tv=CODIGO e lê este arquivo a cada 2 minutos. Mudou aqui = muda na TV sozinha.",
+  "segundos_por_tela": 15,
+  "recado_do_dia": "Capricho em cada lanche: o cliente come com os olhos primeiro.",
+  "tvs": [
+    {
+      "codigo": "totem",
+      "nome": "Totem do autoatendimento",
+      "loja": "a definir",
+      "telas": [
+        "boas-vindas",
+        "como-pedir",
+        "marca"
+      ]
+    },
+    {
+      "codigo": "sb",
+      "nome": "Cozinha São Braz",
+      "loja": "São Braz",
+      "telas": [
+        "relogio",
+        "sacola",
+        "recado"
+      ]
+    },
+    {
+      "codigo": "av",
+      "nome": "Cozinha Água Verde",
+      "loja": "Água Verde",
+      "telas": [
+        "relogio",
+        "sacola",
+        "recado"
+      ]
+    },
+    {
+      "codigo": "r4",
+      "nome": "Caixinha reserva 4",
+      "loja": "sem lugar ainda",
+      "telas": [
+        "marca",
+        "relogio"
+      ]
+    },
+    {
+      "codigo": "r5",
+      "nome": "Caixinha reserva 5",
+      "loja": "sem lugar ainda",
+      "telas": [
+        "marca",
+        "relogio"
+      ]
+    }
+  ]
+}
