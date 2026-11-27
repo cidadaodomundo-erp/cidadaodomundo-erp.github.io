@@ -1990,6 +1990,11 @@ function turnoDesenhar(alvo) {
         : `<div style="display:flex; align-items:center; gap:10px; min-height:36px;"><b style="width:22px; flex:none; text-align:center; color:${t.feita ? 'var(--farol-ok)' : 'var(--farol-fora)'};">${t.feita ? '✓' : '✗'}</b><span>${trEscH(t.descricao)}</span></div>`).join('')}
       ${c.turno_fechado
         ? `<div style="margin-top:8px; font-weight:700; color:var(--farol-ok);">✓ Turno fechado às ${turnoHora(c.fechado_em)} por ${trEscH(estNome(c.fechado_por) || c.fechado_por || '')}</div>`
+        : turnoPend(ls).length
+        // 27/11/2026 [dono] (Estoque 15:35, "a cerca", vale de seg 30/11): com pendência, a lista em vermelho e o porquê (mínimo 20 letras)
+        ? `<div style="margin-top:8px; padding:8px 10px; border:1px solid var(--farol-fora); border-radius:8px; color:var(--farol-fora);"><b>Ficou aberto:</b> ${turnoPend(ls).map((t) => trEscH(t.descricao)).join(' · ')}</div>
+           <input id="tnoO_${g}" placeholder="Por que ficou aberto? (mínimo 20 letras)" maxlength="300" style="display:block; width:100%; margin:8px 0; min-height:42px; padding:8px; font:inherit; border-radius:8px; border:1px solid var(--farol-fora); background:var(--surface-2); color:var(--tx-1);">
+           <button class="preset-btn active est-ciclo" style="min-height:46px; padding:0 22px; font-size:15px;" onclick="turnoFechar(${g})">Fechar com justificativa</button>`
         : `<input id="tnoO_${g}" placeholder="Observação (opcional)" maxlength="300" style="display:block; width:100%; margin:8px 0; min-height:42px; padding:8px; font:inherit; border-radius:8px; border:1px solid var(--line); background:var(--surface-2); color:var(--tx-1);">
            <button class="preset-btn active est-ciclo" style="min-height:46px; padding:0 22px; font-size:15px;" onclick="turnoFechar(${g})">Fechar o turno</button>`}
     </div>`;
@@ -2002,10 +2007,13 @@ function turnoDesenhar(alvo) {
   }
   alvo.innerHTML = h;
 }
+// o que o sistema confere sozinho (ordem encerrada, produção apontada, separação fechada, requisição entregue…) e ainda não está feito
+function turnoPend(ls) { return ls.filter((t) => t.como_confere !== 'CONFIRMA' && !t.feita); }
 async function turnoFechar(g) {
   const ls = TURNO.grupos[g], c = ls[0];
   const confirmou = ls.filter((t, k) => { const e = document.getElementById(`tnoC_${g}_${k}`); return e && e.checked; }).map((t) => t.codigo);
   const obs = ((document.getElementById(`tnoO_${g}`) || {}).value || '').trim();
+  if (turnoPend(ls).length && obs.replace(/\s+/g, ' ').length < 20) return avisoAcao('atencao', '! Ficou coisa aberta: escreva por que (mínimo 20 letras) para fechar com justificativa.');
   if (!estTravar(true)) return;
   avisoAcao('enviando', 'Fechando o turno…');
   let r;
@@ -2013,7 +2021,8 @@ async function turnoFechar(g) {
   catch (e) { estTravar(false); return avisoAcao('erro', `✗ NÃO fechou: ${e.message}.`, () => turnoFechar(g)); }
   estTravar(false);
   if (!r.ok) return avisoAcao('erro', `✗ NÃO fechou: ${await trErroDe(r)}.`, () => turnoFechar(g));
-  avisoAcao('ok', `✓ Turno fechado: ${c.setor} ${c.turno} — às ${avisoHora()}.`);
+  const volta = await r.json().catch(() => null), pend = volta && (Array.isArray(volta) ? (volta[0] || {}).pendentes : volta.pendentes);
+  avisoAcao('ok', pend ? `✓ Turno fechado com justificativa: ${c.setor} ${c.turno} — às ${avisoHora()}. Ficou aberto: ${pend}. Vai para a agenda da Rita amanhã.` : `✓ Turno fechado: ${c.setor} ${c.turno} — às ${avisoHora()}.`);
   await entrarFechaTurno();
 }
 
