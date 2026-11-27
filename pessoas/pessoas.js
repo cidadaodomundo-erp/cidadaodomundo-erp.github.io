@@ -3611,17 +3611,16 @@ async function entrarRh() {
     // (dono 10:27, proposta 2026-11-12-rh-quem-deve-vales-novos.md): vale novo do Saipos que a Hellen parcela aqui
     // 27/11/2026 [dono] (17:16, repetido: "aparecer o total parcelado de cada um, a Hellen tem que enxergar o total de descontos em cada
     // folha de pagamento"; RH, proposta 2026-11-27-descontos-folha-total-e-por-folha): total por pessoa e visão por folha
-    const [totPes, porFolha, semPlano] = await Promise.all([
+    const [totPes, porFolha] = await Promise.all([
       consultarTudo('vw_rh_desconto_total_pessoa?select=*').catch(() => []),
       consultarTudo('vw_rh_desconto_por_folha?select=*&order=data_desconto,nome_completo').catch(() => []),
-      // 27/11 (RH/dono): vales antigos sem plano saem da folha e aparecem à parte
-      consultarTudo('vw_rh_desconto_sem_plano?select=*&order=saldo_sem_plano.desc').catch(() => [])]);
+    ]);
     const [emp, pagos, novos, pesAtivas] = await Promise.all([
       consultarTudo('vw_rh_emprestimos?select=chave,valor_total,descontado,data_concessao,credor').catch(() => []),
       consultarTudo('rh_descontos?select=emprestimo,parcela,parcelas_no_plano,valor,data_desconto&status=eq.PAGO&order=data_desconto').catch(() => []),
       consultarTudo('vw_rh_emprestimo_novo?select=*&situacao=eq.A_PARCELAR&order=data').catch((e) => ({ erro: e.message })),
       consultarTudo('rh_pessoa?select=id,nome&ativo=is.true&order=nome').catch(() => [])]);
-    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null, totPes, porFolha, semPlano,
+    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null, totPes, porFolha,
       emp: new Map(emp.map((e) => [e.chave, e])), pagos, novos, pesAtivas };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${cgEsc(e.message)}</div>`;
@@ -3632,20 +3631,6 @@ async function entrarRh() {
 let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null, RH_FOLHA = null;
 // POR FOLHA DE PAGAMENTO (dono 27/11 17:16): seletor da folha (padrão: a próxima a pagar), o total da folha e a lista por pessoa.
 // Prova na própria tela: o card é a soma das linhas daquela folha; se não bater, avisa.
-// SALDO EM ABERTO SEM PLANO (RH 27/11, Organizador/dono): vale antigo que a planilha "estacionava" numa folha e não desconta de
-// verdade — fica à parte, fora do total da folha
-function rhSemPlanoHtml(P) {
-  const L = (RH.semPlano || []).filter((x) => !P || x.colaborador === P);
-  if (!L.length) return '';
-  const R = (v) => 'R$ ' + fmt(Number(v) || 0), tot = L.reduce((a, x) => a + (Number(x.saldo_sem_plano) || 0), 0);
-  const idade = (m) => { m = Number(m) || 0; return m >= 12 ? Math.floor(m / 12) + (Math.floor(m / 12) === 1 ? ' ano' : ' anos') + (m % 12 ? ' e ' + (m % 12) + (m % 12 === 1 ? ' mês' : ' meses') : '') : m + (m === 1 ? ' mês' : ' meses'); };
-  return `<details style="margin-top:10px;"><summary class="section-label" style="cursor:pointer;">Saldo em aberto sem plano (não desconta em folha) · ${L.length} ${L.length === 1 ? 'pessoa' : 'pessoas'} · ${R(tot)}</summary>
-    <div class="caption-label" style="text-align:left;">Vales antigos sem parcela planejada: não entram no total da folha.</div>
-    <div id="tabelaRhSemPlano" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Saldo sem plano</th><th>Desde</th><th>Idade</th><th>Na folha hoje</th><th>O quê</th></tr></thead><tbody>
-    ${L.map((x) => `<tr><td>${cgEsc(cgNome(x.nome_completo || x.colaborador || ''))}</td><td>${R(x.saldo_sem_plano)}</td><td>${cgData(x.desde)}</td><td>${idade(x.idade_meses)}</td>
-      <td>${x.na_folha_hoje ? 'Sim' : '<span style="color:var(--farol-perto);font-weight:700;">Não</span>'}</td><td style="white-space:normal;font-size:12.5px;">${cgEsc(x.descricoes || '')}</td></tr>`).join('')}
-    </tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td><td></td><td></td></tr></tfoot></table></div></details>`;
-}
 function rhPorFolhaHtml(P) {
   const L = RH.porFolha || [];
   if (!L.length) return '';
@@ -3765,18 +3750,18 @@ function renderModuloRh() {
   const P = RH_PESSOA && RH.colab.some((c) => c.colaborador === RH_PESSOA) ? RH_PESSOA : null;
   const cP = P ? RH.colab.find((c) => c.colaborador === P) : null;
   const soP = (arr) => P ? arr.filter((r) => r.colaborador === P) : arr;
-  const abas = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;">
-    <button type="button" class="preset-btn ${RH_ABA === 'ativos' ? 'active' : ''}" onclick="rhIr('aba','ativos')">Em dia (ativos)</button>
-    <button type="button" class="preset-btn ${RH_ABA === 'hist' ? 'active' : ''}" onclick="rhIr('aba','hist')">Histórico (saíram) · ${histC.length}</button>
-    <span style="margin-left:auto;font-size:12px;">${lida}</span></div>
+  // 27/11/2026 [dono] (17:44: "já tínhamos definido que os antigos ficariam apenas para consulta"): a tela mostra só 3 coisas —
+  // o desconto de cada folha, o parcelado por pessoa (ativos) e o Histórico (só consulta), recolhido no fim. Sem abas.
+  RH_ABA = 'ativos';
+  const abas = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;"><span style="margin-left:auto;font-size:12px;">${lida}</span></div>
     ${P ? `<div style="margin:0 0 10px;"><button type="button" class="preset-btn active" onclick="rhIr('pessoa',null)">${cgEsc(cgNome(cP.nome_completo || P))} ✕</button></div>` : ''}`;
   const titulo = '<h2 style="margin-top:0;">Descontos em folha</h2>';
 
-  if (RH_ABA === 'hist') {
+  const histHtml = () => {
+    if (!histC.length) return '';
     const H = RH.hist, tot = histC.reduce((a, c) => a + n(c.a_descontar_historico), 0);
     const pessoa = (c) => H.filter((h) => h.colaborador === c.colaborador);
-    let h = `${titulo}${abas}<div class="cards"><div class="card neutral"><div class="card-lbl">Ficou em aberto</div><div class="card-val">${R(tot)}</div>
-      <div class="card-pct">${histC.length} ${histC.length === 1 ? 'pessoa que saiu' : 'pessoas que saíram'} · só consulta</div></div></div>
+    let h = `<details style="margin-top:18px;"${P && histC.some((c) => c.colaborador === P) ? ' open' : ''}><summary class="section-label" style="cursor:pointer;">Histórico (só consulta) · ${histC.length} ${histC.length === 1 ? 'pessoa que saiu' : 'pessoas que saíram'}</summary>
       <div id="tabelaRhHist" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Ficou devendo</th><th>Último desconto pago</th><th>Quem emprestou</th></tr></thead><tbody>`;
     histC.forEach((c) => {
       const L = pessoa(c), ult = L.map((x) => x.ultimo_pago).filter(Boolean).sort().pop();
@@ -3787,11 +3772,10 @@ function renderModuloRh() {
         ${L.sort((a, b) => n(b.a_descontar) - n(a.a_descontar)).map((x) => `<tr style="${n(x.a_descontar) > 0 ? '' : 'color:var(--tx-4);'}"><td>${cgEsc(x.descricao || '')}${x.credor && x.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(x.credor))}</span>` : ''}</td>
           <td>${cgData(x.data_concessao)}</td><td>${R(x.valor_total)}</td><td>${R(x.descontado)}</td><td>${n(x.a_descontar) ? R(x.a_descontar) : 'quitado'}</td><td>${x.ultimo_pago ? cgData(x.ultimo_pago) : '—'}</td></tr>`).join('')}</tbody></table></td></tr>`;
     });
-    h += `</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td></tr></tfoot></table></div>`;
+    h += `</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td></tr></tfoot></table></div></details>`;
     // 06/11/2026 (dono): "pode tirar esses avisos de falta parcela" — o histórico é só consulta, sem conferência de parcelas
-    alvo.innerHTML = h;
-    return;
-  }
+    return h;
+  };
 
   // ---------------- aba Em dia (ativos) ----------------
   const aberto = soP(RH.aberto);
@@ -3812,38 +3796,9 @@ function renderModuloRh() {
   const situacaoConf = !confDia.length ? (dia && dia <= hoje ? '' : 'a conferir quando o pagamento entrar')
     : naoBate.length ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${naoBate.length} não ${naoBate.length === 1 ? 'bate' : 'batem'}</span>`
     : confDia.every((x) => x.situacao === 'CONFERE') ? '<span style="color:var(--farol-ok);font-weight:700;">✓ bate com o pagamento</span>' : 'previsto';
-  let h = `${titulo}${abas}<div class="cards">
-    <div class="card blue"><div class="card-lbl">Sai na folha de ${ddmm(dia)}</div><div class="card-val">${R(totDia)}</div><div class="card-pct">${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}${situacaoConf ? ' · ' + situacaoConf : ''}</div></div>
-    <div class="card neutral"><div class="card-lbl">Falta descontar</div><div class="card-val">${R(falta)}</div><div class="card-pct">${ativosP.length} ${ativosP.length === 1 ? 'pessoa' : 'pessoas'}${ultima ? ` · última parcela em ${mesTxt(ultima)}` : ''}</div></div>
-    ${depAb.length ? `<div class="card neutral"><div class="card-lbl">Rita deposita</div><div class="card-val">${R(depAb.reduce((a, d) => a + n(d.valor), 0))}</div><div class="card-pct">em ${depAb.map((d) => ddmm(d.data_deposito)).join(' e ')}</div></div>` : ''}
-    ${devolver > 0 && !P ? `<div class="card neutral"><div class="card-lbl">A repassar à ${credor.map((c) => cgNome(c.credor)).join(' e ao ')}</div><div class="card-val">${R(devolver)}</div><div class="card-pct">conforme desconta</div></div>` : ''}
-  </div>`;
-
+  let h = `${titulo}${abas}`;
   if (!P) h += rhValesNovosHtml();
   h += rhPorFolhaHtml(P);
-  h += rhSemPlanoHtml(P);
-  // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
-  const confDe = (r) => confDia.find((x) => x.pessoa_id === r.pessoa_id);
-  const visto = new Set();
-  h += `<div class="section-label">Folha de ${ddmm(dia)}${dia ? '/' + dia.slice(2, 4) : ''}: quanto sai de cada um${RH_DIA && RH_DIA !== prox ? ` <button type="button" class="preset-btn active" style="margin-left:8px;" onclick="rhIr('dia',null)">${ddmm(RH_DIA)} ✕</button>` : ''}</div>
-    <div id="tabelaRhFolha" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>O quê</th><th>Parcela</th><th>Valor</th><th>Sai de</th><th>No pagamento</th><th>Confere</th></tr></thead><tbody>
-    ${doDia.map((r) => { const c = confDe(r), pri = !visto.has(r.colaborador); visto.add(r.colaborador);
-      const okTxt = !c ? '<span style="color:var(--tx-5);">–</span>' : c.situacao === 'CONFERE' ? '<span style="color:var(--farol-ok);">✓</span>' : c.situacao === 'DIFERENTE' ? `<span style="color:var(--farol-fora);font-weight:700;">✗ ${R(c.diferenca)}</span>` : '<span style="color:var(--tx-4);">previsto</span>';
-      return `<tr><td${pri ? '' : ' style="color:var(--tx-4);"'}>${NC(r)}</td><td>${cgEsc(r.descricao || '')}${r.credor && r.credor !== 'EMPRESA' ? ` <span style="font-size:11px;color:var(--tx-4);">de ${cgEsc(cgNome(r.credor))}</span>` : ''}</td>
-        <td>${r.parcela_n ? `${r.parcela_n} de ${r.parcelas_total}` : '—'}</td><td>${R(r.valor)}</td><td>${r.onde === 'POR FORA' ? 'por fora' : cgEsc(r.onde || '—')}</td>
-        <td>${pri && c && c.situacao !== 'PREVISTO' ? R(c.no_pagamento) : ''}</td><td>${pri ? okTxt : ''}</td></tr>`; }).join('') || '<tr><td colspan="7">Nada nesta folha.</td></tr>'}
-    </tbody><tfoot><tr class="liq"><td>Total · ${pesDia} ${pesDia === 1 ? 'pessoa' : 'pessoas'}</td><td></td><td></td><td>${R(totDia)}</td><td></td><td>${confDia.some((x) => x.situacao !== 'PREVISTO') ? R(confDia.reduce((a, x) => a + n(x.no_pagamento), 0)) : ''}</td><td></td></tr></tfoot></table></div>`;
-
-  // Bloco 2: próximas folhas, uma barra por dia de desconto (o clique troca o bloco 1)
-  const futuros = dias.filter((d) => d >= (prox || hoje));
-  const porDia = futuros.map((d) => [d, aberto.filter((r) => String(r.data_desconto).slice(0, 10) === d).reduce((a, r) => a + n(r.valor), 0)]).filter(([, v]) => v > 0);
-  const maxV = Math.max(1, ...porDia.map(([, v]) => v));
-  if (porDia.length > 1) h += `<div class="section-label">Próximas folhas</div><div style="display:flex;flex-direction:column;gap:4px;max-width:640px;">
-    ${porDia.map(([d, v]) => `<div onclick="rhIr('dia','${d}')" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;" title="ver quem sai na folha de ${ddmm(d)}">
-      <span style="width:62px;color:${d === dia ? 'var(--tx-1)' : 'var(--tx-3)'};font-weight:${d === dia ? 700 : 400};">${mesTxt(d)}</span>
-      <span style="flex:1;background:var(--surface-2);border-radius:3px;height:14px;"><span style="display:block;height:14px;border-radius:3px;width:${Math.max(2, v / maxV * 100)}%;background:${d === dia ? 'var(--brand)' : 'var(--info)'};"></span></span>
-      <span style="width:96px;">${R(v)}</span></div>`).join('')}</div>`;
-
   // Bloco 3: quem deve (o seletor da tela)
   // o depósito da Rita não é parcela de folha; e só o empréstimo com parcela aberta (dono 06/11 12:54: o passado é só consulta)
   const chavesAbertas = new Set(RH.aberto.map((r) => r.chave));
@@ -3885,6 +3840,7 @@ function renderModuloRh() {
         ${RH.credorDet.filter((d) => d.credor === c.credor && n(d.a_reembolsar) > 0).map((d) => { const pc = RH.colab.find((x) => x.colaborador === d.colaborador) || d;
           return `<tr><td>${NC(pc)}</td><td>${cgEsc(d.descricao || '')} <span style="font-size:11px;color:var(--tx-4);">${cgData(d.data_concessao)}</span></td><td>${R(d.a_reembolsar)}</td></tr>`; }).join('')}</tbody></table></td></tr>`;
       return t; }).join('')}</tbody><tfoot><tr class="liq"><td>Total</td><td>${R(credor.reduce((a, c) => a + n(c.emprestado), 0))}</td><td>${R(devolver)}</td></tr></tfoot></table></div>`;
+  h += histHtml();
   alvo.innerHTML = h;
 }
 
