@@ -1809,6 +1809,54 @@ async function cgFolhaImportar(inp) {
     await cgFolhaImpCarregar();
   } catch (e) { avisoAcao('erro', '✗ Não consegui enviar a folha: ' + e.message + '. Tente de novo.'); }
 }
+// 27/11/2026 [dono] (17:52/17:59: "só precisamos do botão lá pra ela subir os arquivos"; RH): o txt da Flash (Domínio), um por empresa,
+// vai pelo MESMO caminho do Importar folha (rh_folha_arquivo, base64); o robô do RH (5 em 5 min) responde em vw_rh_folha_importacao
+function cgFlashTxtHtml() {
+  if (CARGOS.flashImp === undefined) { CARGOS.flashImp = null; cgFlashTxtCarregar(); }
+  const L = (CARGOS.flashImp || []).slice(0, 6);
+  const em = (x) => x.enviado_em ? new Date(x.enviado_em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') : '';
+  const st = (x) => x.situacao === 'LENDO' ? `<span style="color:var(--farol-perto);font-weight:700;">⏳ ${x.resultado ? cgEsc(x.resultado) : 'lendo (até 5 min)'}</span>`
+    : x.situacao === 'LIDA' ? `<span style="color:var(--farol-ok);font-weight:700;">✓ ${cgEsc(x.resultado || 'recebido e gravado')}</span>`
+    : `<span style="color:var(--farol-fora);font-weight:700;">✗ ${cgEsc(x.resultado || 'não lido')}</span>`;
+  return `<div class="contexto" style="text-align:left;margin-bottom:10px;">
+    <div style="font-size:12.5px;color:var(--tx-3);margin-bottom:6px;">Na Flash: <b>Controle de jornada › Integrações › Domínio › Exportar arquivo</b> (uma vez por empresa: 413 Ahú, 944 FF São Braz, 945 FF Água Verde; Período fechado = o mês; verbas "Exportação para contabilidade"). Depois de "Arquivos para baixar", suba os 3 aqui.</div>
+    <label class="preset-btn active" style="cursor:pointer;display:inline-block;" title="o robô lê em até 5 min">📄 Enviar o arquivo da Flash (.txt)
+      <input type="file" accept=".txt,text/plain" multiple style="display:none;" onchange="cgFlashTxtEnviar(this)"></label>
+    ${L.map((x) => `<div style="font-size:12.5px;margin-top:4px;">${cgEsc(x.nome || '')} <span style="color:var(--tx-4);">· ${cgEsc(String(x.quem || '').split('@')[0])} ${em(x)}</span> — ${st(x)}</div>`).join('')}</div>`;
+}
+async function cgFlashTxtCarregar() {
+  try { const r = await trFetch('vw_rh_folha_importacao?select=id,nome,quem,enviado_em,atendido_em,ok,resultado,situacao&nome=ilike.*.txt&order=enviado_em.desc,id.desc&limit=6');
+    CARGOS.flashImp = r.ok ? await r.json() : []; }
+  catch (e) { CARGOS.flashImp = []; }
+  const lendo = CARGOS.flashImp.some((x) => x.situacao === 'LENDO');
+  if (CARGOS.flashLendo && !lendo) { CARGOS.flashLendo = false; CARGOS.envio = undefined; }   // leu: relê o fechamento do mês
+  CARGOS.flashLendo = lendo;
+  if (CARGOS_F.aba === 'envio') renderModuloCargos();
+  clearTimeout(CARGOS.flashT);
+  if (lendo) CARGOS.flashT = setTimeout(cgFlashTxtCarregar, 20000);
+}
+async function cgFlashTxtEnviar(inp) {
+  const arqs = [...inp.files]; inp.value = '';
+  if (!arqs.length) return;
+  const b64 = (f) => new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => erro(new Error('não consegui ler ' + f.name)); r.readAsDataURL(f); });
+  try {
+    await rmbGarantirTokenValido();
+    for (let i = 0; i < arqs.length; i++) {
+      if (!/\.txt$/i.test(arqs[i].name)) throw new Error(arqs[i].name + ' não é o .txt da Flash');
+      if (arqs[i].size > 15000000) throw new Error(arqs[i].name + ' é grande demais para ser o arquivo da Flash');
+      avisoAcao('enviando', `Enviando ${arqs.length > 1 ? (i + 1) + ' de ' + arqs.length + ' ' : ''}(${arqs[i].name})…`);
+      const conteudo = await b64(arqs[i]);
+      const envia = () => fetch(`${SUPABASE_URL}/rest/v1/rh_folha_arquivo`, { method: 'POST', headers: rmbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+        body: JSON.stringify({ nome: arqs[i].name, conteudo }) });
+      let r = await envia();
+      if (r.status === 401) { await rmbRenovarSeExpirado(r); r = await envia(); }
+      if (!r.ok) throw new Error((await r.text()).slice(0, 160));
+    }
+    avisoAcao('ok', `✓ ${arqs.length === 1 ? 'Arquivo enviado' : arqs.length + ' arquivos enviados'} às ${avisoHora()} — o robô lê em até 5 min; a resposta aparece embaixo do botão.`);
+    CARGOS.flashLendo = true;
+    await cgFlashTxtCarregar();
+  } catch (e) { avisoAcao('erro', '✗ Não consegui enviar: ' + e.message + '. Tente de novo.'); }
+}
 function cgFolhaValidacaoHtml(comp) {
   const v = (CARGOS.folha.valid || []).find((x) => String(x.competencia).slice(0, 10) === comp);
   if (v) return `<div class="contexto" style="text-align:left;border-color:var(--farol-ok);margin-top:14px;"><b style="color:var(--farol-ok);">✓ Conferência validada por ${cgEsc(cgNome(String(v.validado_por || '').split('@')[0]))} em ${cgEsc(cgEnvQuando(v.validado_em))}.</b>
@@ -2222,6 +2270,9 @@ function cgEnvVal(k, v, pct) {
   return ['grat', 'vt', 'adt'].includes(k) ? cgR(v) : cgEnvHM(v);
 }
 function cgAbaEnvio() {
+  return cgFlashTxtHtml() + cgAbaEnvioCorpo();
+}
+function cgAbaEnvioCorpo() {
   const F = CARGOS_F;
   if (CARGOS.envio === undefined) { cgEnvioCarregar(); return '<div class="contexto">Lendo o fechamento da folha…</div>'; }
   if (CARGOS.envio === null) return '<div class="contexto">Lendo o fechamento da folha…</div>';
