@@ -3611,15 +3611,17 @@ async function entrarRh() {
     // (dono 10:27, proposta 2026-11-12-rh-quem-deve-vales-novos.md): vale novo do Saipos que a Hellen parcela aqui
     // 27/11/2026 [dono] (17:16, repetido: "aparecer o total parcelado de cada um, a Hellen tem que enxergar o total de descontos em cada
     // folha de pagamento"; RH, proposta 2026-11-27-descontos-folha-total-e-por-folha): total por pessoa e visão por folha
-    const [totPes, porFolha] = await Promise.all([
+    const [totPes, porFolha, semPlano] = await Promise.all([
       consultarTudo('vw_rh_desconto_total_pessoa?select=*').catch(() => []),
-      consultarTudo('vw_rh_desconto_por_folha?select=*&order=data_desconto,nome_completo').catch(() => [])]);
+      consultarTudo('vw_rh_desconto_por_folha?select=*&order=data_desconto,nome_completo').catch(() => []),
+      // 27/11 (RH/dono): vales antigos sem plano saem da folha e aparecem à parte
+      consultarTudo('vw_rh_desconto_sem_plano?select=*&order=saldo_sem_plano.desc').catch(() => [])]);
     const [emp, pagos, novos, pesAtivas] = await Promise.all([
       consultarTudo('vw_rh_emprestimos?select=chave,valor_total,descontado,data_concessao,credor').catch(() => []),
       consultarTudo('rh_descontos?select=emprestimo,parcela,parcelas_no_plano,valor,data_desconto&status=eq.PAGO&order=data_desconto').catch(() => []),
       consultarTudo('vw_rh_emprestimo_novo?select=*&situacao=eq.A_PARCELAR&order=data').catch((e) => ({ erro: e.message })),
       consultarTudo('rh_pessoa?select=id,nome&ativo=is.true&order=nome').catch(() => [])]);
-    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null, totPes, porFolha,
+    RH = { colab, aberto, credor, credorDet, diverg, conf, hist, dep, lidaEm: (lida[0] || {}).atualizado_em || null, totPes, porFolha, semPlano,
       emp: new Map(emp.map((e) => [e.chave, e])), pagos, novos, pesAtivas };
   } catch (e) {
     alvo.innerHTML = `<div class="contexto">Não consegui carregar os descontos em folha: ${cgEsc(e.message)}</div>`;
@@ -3630,6 +3632,20 @@ async function entrarRh() {
 let RH_ABA = 'ativos', RH_DIA = null, RH_CREDOR = null, RH_FOLHA = null;
 // POR FOLHA DE PAGAMENTO (dono 27/11 17:16): seletor da folha (padrão: a próxima a pagar), o total da folha e a lista por pessoa.
 // Prova na própria tela: o card é a soma das linhas daquela folha; se não bater, avisa.
+// SALDO EM ABERTO SEM PLANO (RH 27/11, Organizador/dono): vale antigo que a planilha "estacionava" numa folha e não desconta de
+// verdade — fica à parte, fora do total da folha
+function rhSemPlanoHtml(P) {
+  const L = (RH.semPlano || []).filter((x) => !P || x.colaborador === P);
+  if (!L.length) return '';
+  const R = (v) => 'R$ ' + fmt(Number(v) || 0), tot = L.reduce((a, x) => a + (Number(x.saldo_sem_plano) || 0), 0);
+  const idade = (m) => { m = Number(m) || 0; return m >= 12 ? Math.floor(m / 12) + (Math.floor(m / 12) === 1 ? ' ano' : ' anos') + (m % 12 ? ' e ' + (m % 12) + (m % 12 === 1 ? ' mês' : ' meses') : '') : m + (m === 1 ? ' mês' : ' meses'); };
+  return `<details style="margin-top:10px;"><summary class="section-label" style="cursor:pointer;">Saldo em aberto sem plano (não desconta em folha) · ${L.length} ${L.length === 1 ? 'pessoa' : 'pessoas'} · ${R(tot)}</summary>
+    <div class="caption-label" style="text-align:left;">Vales antigos sem parcela planejada: não entram no total da folha.</div>
+    <div id="tabelaRhSemPlano" style="overflow-x:auto;"><table><thead><tr><th>Nome completo</th><th>Saldo sem plano</th><th>Desde</th><th>Idade</th><th>Na folha hoje</th><th>O quê</th></tr></thead><tbody>
+    ${L.map((x) => `<tr><td>${cgEsc(cgNome(x.nome_completo || x.colaborador || ''))}</td><td>${R(x.saldo_sem_plano)}</td><td>${cgData(x.desde)}</td><td>${idade(x.idade_meses)}</td>
+      <td>${x.na_folha_hoje ? 'Sim' : '<span style="color:var(--farol-perto);font-weight:700;">Não</span>'}</td><td style="white-space:normal;font-size:12.5px;">${cgEsc(x.descricoes || '')}</td></tr>`).join('')}
+    </tbody><tfoot><tr class="liq"><td>Total</td><td>${R(tot)}</td><td></td><td></td><td></td><td></td></tr></tfoot></table></div></details>`;
+}
 function rhPorFolhaHtml(P) {
   const L = RH.porFolha || [];
   if (!L.length) return '';
@@ -3805,6 +3821,7 @@ function renderModuloRh() {
 
   if (!P) h += rhValesNovosHtml();
   h += rhPorFolhaHtml(P);
+  h += rhSemPlanoHtml(P);
   // Bloco 1: a folha do dia escolhido, parcela a parcela, com a conferência por pessoa
   const confDe = (r) => confDia.find((x) => x.pessoa_id === r.pessoa_id);
   const visto = new Set();
