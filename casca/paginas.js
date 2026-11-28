@@ -50,6 +50,7 @@ window.CASCA_PAGINAS = {
   biblioteca: 'biblioteca/index.html',
   estudos: 'estudos.html',   // 19/11/2026: Estudos do Neto (cópia dos artefatos; só Neto e Fabio, artefato_copia)
   usuarios: 'usuarios/index.html',   // 18/11/2026: Usuários do painel (só o dono; criar, editar, senha, telas)   // 18/11/2026: Biblioteca — guias, estudos e dossiês de um clique (painel_biblioteca)
+  desperdicio: 'desperdicio/index.html',   // 18/11/2026: Desperdício — perdas dos últimos 30 dias (vw_est_perda, só leitura)
   regras: 'regras/index.html',   // 16/11/2026: Regras em vigor (só o dono; vw_regras_em_vigor)
   notasfaltam: 'notas/index.html',
   cartao: 'cartao/index.html',

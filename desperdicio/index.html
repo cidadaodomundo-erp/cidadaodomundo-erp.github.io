@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Desperdício · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- DESPERDÍCIO (18/11/2026, dono: "precisa ser as coisas do desperdício" dentro do portal novo).
+     Só leitura: vw_est_perda dos últimos 30 dias (sobras, queimados e pedidos jogados fora), por dia, com custo e valor do pedido.
+     Quem lança: a tela de Produção (Perda fora da produção) e os lançamentos vindos do WhatsApp. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ln-dia { color:var(--tx-1); font-size:15px; font-weight:800; margin:18px 2px 6px; }
+  .ln-nota { margin:10px 2px; font-size:13px; color:var(--tx-3); }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-desperdicio" class="modulo" style="display:none;">
+      <div id="view-desperdicio"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261109a"></script>
+<script>
+const LN_DIAS = 30;
+const LN_MOTIVO = { SOBROU: 'Sobrou', QUEIMOU: 'Queimou', DEVOLUCAO: 'Pedido jogado fora', OUTRO: 'Outro', CAIU: 'Caiu', VALIDADE: 'Validade', 'ERRO DE RECEITA': 'Erro de receita' };
+const LN = { perdas: null };
+const lnDdmm = (d) => (d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '–');
+const lnNum = (n) => Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+const lnReais = (n) => 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// valor do pedido vem escrito na observação ("R$ 40,08 (Saipos...)"); linhas "Ver linha..." são do mesmo pedido e não somam
+function lnValor(p) {
+  const o = p.observacao || '';
+  if (/Ver linha/i.test(o)) return 0;
+  const m = o.match(/R\$\s*([\d.]+,\d{2})/);
+  return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) : 0;
+}
+async function entrarDesperdicio() {
+  const alvo = document.getElementById('view-desperdicio');
+  alvo.innerHTML = '<div class="contexto">Carregando…</div>';
+  try {
+    const desde = new Date(Date.now() - LN_DIAS * 86400000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    LN.perdas = await consultarTudo(`vw_est_perda?select=*&data=gte.${desde}&order=data.desc,id.asc`);
+    dpDesenhar();
+  } catch (e) {
+    alvo.innerHTML = `<h2>Desperdício</h2><div class="contexto" style="text-align:left;border-color:var(--farol-fora);">✗ Não consegui ler: ${trEscH(e.message)} <button type="button" class="preset-btn" onclick="entrarDesperdicio()">Tentar de novo</button></div>`;
+  }
+}
+function dpDesenhar() {
+  const alvo = document.getElementById('view-desperdicio');
+  const P = (LN.perdas || []).filter((p) => !p.foi_corrigida);
+  let h = `<h2>Desperdício</h2><div class="ln-nota">Últimos ${LN_DIAS} dias: sobras, queimados e pedidos jogados fora. Custo vem da ficha quando o item está ligado ao estoque; valor do pedido é o do cupom ou do Saipos, escrito na observação.</div>`;
+  const kg = P.filter((p) => p.un === 'kg').reduce((s, p) => s + Number(p.qtd || 0), 0);
+  const pedidos = P.filter((p) => p.motivo === 'DEVOLUCAO' && lnValor(p) > 0);
+  const reais = P.reduce((s, p) => s + lnValor(p), 0);
+  const custo = P.reduce((s, p) => s + Number(p.custo || 0), 0);
+  h += `<div class="cards">
+    <div class="card neutral"><div class="card-lbl">Sobras pesadas</div><div class="card-val">${lnNum(kg)} kg</div></div>
+    <div class="card neutral"><div class="card-lbl">Pedidos jogados fora</div><div class="card-val">${pedidos.length}</div></div>
+    <div class="card ${reais ? 'highlight' : 'neutral'}"><div class="card-lbl">Valor desses pedidos</div><div class="card-val">${lnReais(reais)}</div></div>
+    <div class="card neutral"><div class="card-lbl">Custo pela ficha</div><div class="card-val">${lnReais(custo)}</div></div></div>`;
+  if (!P.length) { alvo.innerHTML = h + '<div class="contexto" style="text-align:left;">Nenhum desperdício lançado nos últimos dias.</div>'; return; }
+  const dias = [...new Set(P.map((p) => p.data))];
+  dias.forEach((d, i) => {
+    const L = P.filter((p) => p.data === d);
+    const v = L.reduce((s, p) => s + lnValor(p), 0);
+    h += `<div class="ln-dia">${lnDdmm(d)} · ${L.length} ${L.length === 1 ? 'linha' : 'linhas'}${v ? ' · ' + lnReais(v) : ''}</div>
+      <div id="tabelaDp${i}" style="overflow-x:auto;"><table><thead><tr><th>Loja</th><th>Item</th><th>Quanto</th><th>Motivo</th><th>Custo</th><th>Quem</th><th>Observação</th></tr></thead><tbody>
+      ${L.map((p) => `<tr><td>${trEscH(p.unidade || '')}</td><td>${trEscH(p.item || '')}</td><td>${lnNum(p.qtd)} ${trEscH(p.un || '')}</td>
+        <td>${trEscH(LN_MOTIVO[p.motivo] || p.motivo || '')}</td><td>${p.custo ? lnReais(p.custo) : '–'}</td><td>${trEscH(p.quem || '')}</td>
+        <td style="white-space:normal;">${trEscH(p.observacao || '')}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  });
+  alvo.innerHTML = h;
+  if (typeof barrasTopoTabelas === 'function') { try { barrasTopoTabelas(); } catch (e) {} }
+}
+
+const TELA = 'desperdicio';
+let MODULO_ATUAL = 'desperdicio';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+document.getElementById('modulo-desperdicio').style.display = '';
+registrarUso(TELA);
+avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+window.reentrarTela = () => { entrarDesperdicio(); };
+entrarDesperdicio();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('../sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

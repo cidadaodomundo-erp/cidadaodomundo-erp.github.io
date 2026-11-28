@@ -26,6 +26,7 @@ window.CASCA_MODULOS_CFG = {
     cartao: { rotulo: 'Compra no cartão', icone: '💳' },
     compliance: { rotulo: 'Documentos e renovações', icone: '📑' },   // 13/11: alvarás, licenças, limpezas, extintores (Compliance)   // 13/11: compra no cartão + anexar a fatura (Hellen)   // 12/11: onde a Rita resolve as tarefas 30 e 82
     saiposcod: { rotulo: 'Código que falhou no Saipos', icone: '⚠️' },   // 16/11: item que cai no Diversos (Cardápio)
+    desperdicio: { rotulo: 'Desperdício', icone: '🗑️' },   // 18/11: sobras, queimados e pedidos jogados fora (vw_est_perda)
     regras: { rotulo: 'Regras em vigor', icone: '✅' },
     biblioteca: { rotulo: 'Biblioteca', icone: '📚' },
     estudos: { rotulo: 'Estudos', icone: '🗂️' },   // 19/11: cópia dos artefatos do Neto, só Neto e Fabio (pode_ver_plano)
@@ -60,7 +61,7 @@ window.CASCA_MODULOS = [
   { id: 'salao', nome: 'Salão', icone: '🍽️',
     lancar: [], acompanhar: ['reservas', 'pausados', 'avalsalao', 'salao'] },   // 12/11: Contestações é aba de Cancelamentos; Motoboys junta logfin + macertos (juncoes)
   { id: 'estoque', nome: 'Estoque', icone: '📦',
-    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao'] },
+    lancar: ['contagem', 'conferencias', 'reqpedir', 'reqseparar'], acompanhar: ['controle', 'posicao', 'desperdicio'] },
   { id: 'compras', nome: 'Compras', icone: '🛒', lancar: ['notaschegou', 'notasfaltam'], acompanhar: ['comprateto', 'mercadolivre'] },
   { id: 'producao', nome: 'Produção', icone: '🍳',
     lancar: ['processos', 'plprod', 'separacao', 'ordens', 'producao', 'fechaturno'], acompanhar: ['prodhist'] },   // o ciclo, na ordem (dono, 27/10)
