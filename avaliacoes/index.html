@@ -16,6 +16,7 @@
        ?modo=salao    -> Google (API oficial do Perfil da Empresa: google_avaliacao_recente / google_avaliacao_loja)
      22/11/2026: botão "Robô de respostas" (pedido do Fábio). Mostra o que o robô respondeu ou vai responder,
      pela RPC erp_robo_respostas (supabase/robo-respostas.sql). Daqui ninguém publica: só mostra.
+     28/11/2026: Google passa a responder sozinho (supabase/google-robo-automatico.sql); esta tela continua só mostrando.
      Google: o robô fica no banco pessoal (chaves do Google não vêm para o ERP). iFood: só rascunhos até o OK do Fábio. -->
 <script>
   const NA_CASCA = window.parent !== window;
@@ -279,7 +280,7 @@ const ROBO_CANAL = MODO === 'salao' ? 'google' : 'ifood';
 const ROBO_STATUS = { rascunho: ['rasc', 'rascunho, esperando OK'], publicada: ['pub', 'publicada'], falhou: ['fal', 'falhou'], descartada: ['', 'descartada'] };
 function roboExplica() {
   return MODO === 'salao'
-    ? 'O robô responde as avaliações do Google em nome da loja, pela API oficial do Perfil da Empresa. Ele só publica quando o Fábio manda; não tem horário automático.'
+    ? 'O robô responde sozinho as avaliações do Google em nome da loja, pela API oficial do Perfil da Empresa. A cada 5 minutos ele escreve a resposta por modelo fixo e publica.'
     : 'O robô prepara as respostas das avaliações do iFood. Por enquanto são só rascunhos: nada é publicado até o OK do Fábio e a conferência com o robô de contestações.';
 }
 async function carregarRobo() {
