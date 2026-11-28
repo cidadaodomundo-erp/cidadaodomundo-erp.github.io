@@ -53,6 +53,14 @@
   .ps-comp-card span { font-size:12px; opacity:.8; }
   .ps-bate { color:var(--farol-ok, #3fb950); }
   .ps-difere { color:var(--farol-fora, #ff6b6b); }
+  .ps-sinc { border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; background:var(--surface); margin:0 0 14px; }
+  .ps-sinc h2 { font-size:15px; margin:0 0 4px; }
+  .ps-sinc-sub { font-size:12px; opacity:.75; margin:0 0 8px; line-height:1.45; }
+  .ps-sinc-linha { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:6px 0; border-top:1px solid var(--line-2); font-size:13px; }
+  .ps-sinc-linha b { min-width:90px; }
+  .ps-sinc-linha button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--brand); background:var(--brand); color:#fff; cursor:pointer; font-weight:700; }
+  .ps-sinc-linha button:disabled { opacity:.55; cursor:default; }
+  .ps-sinc-info { opacity:.8; font-size:12px; }
   .ps-titulo-lista { font-size:15px; margin:14px 0 6px; }
 </style>
 </head>
@@ -84,6 +92,7 @@
     <div class="ps-fonte" id="fonte"></div>
     <div class="ps-consultado" id="consultado"></div>
     <div id="erroMsg" style="display:none;"></div>
+    <div id="sincronia"></div>
     <div id="comparativo"></div>
     <div id="conteudo"><div class="ps-vazio">Carregando…</div></div>
   </div>
@@ -298,6 +307,49 @@ function desenharComparativo(dados) {
   '</div>';
 }
 
+// 16/11/2026 tarde (pedido do Fábio): sincronia iFood -> site. O robô do Escritório 2 confere de 5 em 5 min e,
+// se o site estiver diferente do iFood, aperta "Sincronizar cardápio" sozinho (desconto 0). O botão aqui só
+// pede a sincronia: o robô atende na rodada seguinte. Leitura/pedido pelas RPCs accon_sinc_situacao / accon_sinc_pedir.
+const SINC_LOJAS = [['AGUA VERDE', 'Água Verde'], ['SÃO BRAZ', 'São Braz'], ['AHU', 'Ahú']];
+async function carregarSincronia() {
+  const el = document.getElementById('sincronia');
+  const canal = document.getElementById('fCanal').value;
+  if (MODO === 'salao' || (canal && canal !== 'Accon' && canal !== 'iFood')) { el.innerHTML = ''; return; }
+  let lista = [];
+  try {
+    const r = await trRpcSeguro('accon_sinc_situacao', {});
+    if (!r.ok) { el.innerHTML = ''; return; }
+    lista = (await r.json()) || [];
+  } catch (e) { el.innerHTML = ''; return; }
+  const filtro = document.getElementById('fUnidade').value;
+  const porUn = {}; lista.forEach((x) => { porUn[x.unidade] = x; });
+  const linhas = SINC_LOJAS.filter(([u]) => !filtro || filtro === u).map(([u, nome]) => {
+    const x = porUn[u] || {};
+    let info = 'nenhuma sincronia registrada ainda';
+    if (x.ultima && x.ultima.em) {
+      info = 'última: ' + horaCurta(x.ultima.em) + ' · ' + (x.ultima.origem === 'botao' ? 'pelo botão' : 'automática') + ' · ' +
+        (x.ultima.status === 'feito' ? 'ok' : 'falhou') ;
+    }
+    const pend = x.pendente ? ' · <span class="ps-difere">pedido aguardando o robô (desde ' + esc(horaCurta(x.pendente)) + ')</span>' : '';
+    return '<div class="ps-sinc-linha"><b>' + esc(nome) + '</b>' +
+      '<button type="button" data-sinc="' + esc(u) + '"' + (x.pendente ? ' disabled' : '') + '>Sincronizar com o iFood</button>' +
+      '<span class="ps-sinc-info">' + esc(info) + '</span>' + pend + '</div>';
+  }).join('');
+  el.innerHTML = '<div class="ps-sinc"><h2>Sincronia do site com o iFood</h2>' +
+    '<p class="ps-sinc-sub">O site copia o iFood sozinho: a cada 5 minutos o robô confere e, se estiver diferente, sincroniza (itens, preços e pausas; desconto 0). Para não esperar, aperte o botão: o robô atende em até uns 5 minutos. Não edite o cardápio direto no site: a sincronia apaga essas mudanças.</p>' +
+    linhas + '</div>';
+  el.querySelectorAll('button[data-sinc]').forEach((b) => b.addEventListener('click', () => pedirSincronia(b)));
+}
+async function pedirSincronia(b) {
+  b.disabled = true; b.textContent = 'Pedindo…';
+  try {
+    const r = await trRpcSeguro('accon_sinc_pedir', { p_unidade: b.dataset.sinc });
+    if (!r.ok) throw new Error();
+    b.textContent = 'Pedido feito';
+  } catch (e) { b.disabled = false; b.textContent = 'Sincronizar com o iFood'; mostrarErro('não foi possível pedir a sincronia agora.'); return; }
+  setTimeout(carregarSincronia, 800);
+}
+
 function desenhar(dados) {
   if (CANAIS_DO_MODO) {
     dados.itens = (dados.itens || []).filter((x) => CANAIS_DO_MODO.includes(x.canal));
@@ -306,6 +358,7 @@ function desenhar(dados) {
   if (MODO === 'salao') dados.comparativo = [];
   montarFontes(dados.fonte && dados.fonte.fontes);
   desenharComparativo(dados);
+  carregarSincronia();
   document.getElementById('consultado').textContent = dados.consultado_em ? 'Consultado em ' + horaCurta(dados.consultado_em) : '';
 
   const linhas = Array.isArray(dados.itens) ? dados.itens : [];
@@ -335,7 +388,7 @@ function desenhar(dados) {
   }
   const nota = document.createElement('p');
   nota.className = 'ps-nota';
-  nota.textContent = 'Fontes: iFood pela API oficial (uma leitura por dia, só itens principais, Boqueirão fora); Tablet (Goomer) e Site (Accon) pelos leitores próprios. Só consulta: pausar e despausar continuam nos próprios sistemas. Goomer cobre Água Verde e São Braz.';
+  nota.textContent = 'Fontes: iFood pela API oficial (a cada 5 min das 10h às 23h55, só itens principais, Boqueirão fora); Site (Accon) pelo robô do Escritório 2 (a cada 5 min) e Tablet (Goomer) pelo leitor próprio. Pausar e despausar se faz no iFood: o site copia o iFood pela sincronia. Goomer cobre Água Verde e São Braz.';
   c.appendChild(nota);
 }
 
