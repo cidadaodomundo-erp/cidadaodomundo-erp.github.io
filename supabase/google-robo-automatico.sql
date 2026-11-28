@@ -1,0 +1,6 @@
+-- Robô automático de respostas do Google (28/11/2026).
+-- google_robo_rascunhar(): escreve por modelo fixo (sem IA) a resposta das avaliações novas sem resposta.
+-- google_fila_publicar(p_chave): devolve a fila para a ponte da API oficial (mesma chave da porta google_avaliacao_receber).
+-- google_fila_confirmar(p_chave, p_itens): marca cada resposta como publicada ou falhou.
+-- Aplicado no banco como migração "google_robo_respostas_automatico". A chave nunca fica aqui: no banco só o hash dela.
+-- Modelos por estrelas: 5 (com e sem texto), 4, 3, 1-2 (com e sem texto). Ver a migração para os textos.
