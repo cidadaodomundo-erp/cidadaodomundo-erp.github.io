@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+<title>Mapa de acessos · Cidadão do Mundo</title>
+<meta name="theme-color" content="#111110">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<!-- MAPA DE ACESSOS (28/11/2026). Inventário por unidade: sistemas, integrações, contas, e-mails, internet, modems, câmeras,
+     computadores, robôs e backups, com responsável, situação, se depende do ERP e a referência ao cofre.
+     Lê e grava public.mapa_acesso (supabase/mapa-acessos.sql). Só os donos: a RLS confere eh_dono() no servidor, para ler e
+     para gravar; o menu esconde para os demais (sistema.html, SO_DONO). Senha, token e chave NUNCA entram aqui: só o nome do
+     item no cofre (o banco recusa o que parece segredo). Sem timer: lê ao abrir e depois de cada gravação. -->
+<script>
+  const NA_CASCA = window.parent !== window;
+  if (NA_CASCA) document.documentElement.classList.add('na-casca');
+  function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
+</script>
+<link rel="stylesheet" href="../nucleo/nucleo.css?v=20261107t">
+<style>
+  .na-casca body::before { display:none !important; }
+  .ma-aviso { border:1px solid var(--farol-perto); border-radius:8px; padding:8px 12px; font-size:13px; margin:6px 0 12px; text-align:left; }
+  .ma-filtros { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 8px; }
+  .ma-grp { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--tx-4); margin:16px 0 4px; }
+  .ma-sit { display:inline-block; font-size:11px; font-weight:700; border-radius:10px; padding:1px 8px; border:1px solid currentColor; white-space:nowrap; }
+  .ma-sit.OK { color:var(--farol-ok); } .ma-sit.A_TROCAR { color:var(--farol-fora); } .ma-sit.PARADO { color:var(--farol-fora); }
+  .ma-sit.A_CONFERIR { color:var(--farol-perto); }
+  .ma-form { border:1px solid var(--tx-4); border-radius:8px; padding:12px; margin:10px 0; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; }
+  .ma-form label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--tx-4); }
+  .ma-form input, .ma-form select, .ma-form textarea { font:inherit; font-size:14px; padding:6px 8px; border-radius:6px; border:1px solid var(--tx-4); background:transparent; color:inherit; }
+  .ma-form select option { color:#111; }
+  .ma-form .ma-larga { grid-column:1 / -1; }
+  .ma-botoes { grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .ma-erro { color:var(--farol-fora); font-size:13px; }
+  .tabelaAcessos td { white-space:normal; vertical-align:top; }
+  .ma-sub { font-size:12px; color:var(--tx-4); }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <div class="wrap">
+    <div id="erroMsg" style="display:none;"></div>
+    <div id="modulo-acessos" class="modulo" style="display:none;"><div id="view-acessos"></div></div>
+  </div>
+</div>
+
+<script src="../nucleo/nucleo.js?v=20261122d"></script>
+<script>
+const MA_UNIDADES = [['REDE', 'Geral da rede'], ['AGUA VERDE', 'Água Verde'], ['SAO BRAZ', 'São Braz'], ['AHU', 'Ahú'], ['BOQUEIRAO', 'Boqueirão']];
+const MA_CATEGORIAS = [['sistema', 'Sistemas'], ['integracao', 'Integrações'], ['conta', 'Contas'], ['email', 'E-mails'], ['internet', 'Internet'],
+  ['modem', 'Modems'], ['camera', 'Câmeras'], ['computador', 'Computadores'], ['robo', 'Robôs'], ['backup', 'Backups']];
+const MA_SITUACOES = [['OK', 'Em ordem'], ['A_CONFERIR', 'A conferir'], ['A_TROCAR', 'A trocar'], ['PARADO', 'Parado']];
+const MA_DEPENDE = [['A_CONFERIR', 'A conferir'], ['SIM', 'Sim'], ['PARCIAL', 'Em parte'], ['NAO', 'Não']];
+const MA_COLS = 'id,unidade,categoria,nome,descricao,responsavel,situacao,depende_erp,ref_cofre,atualizado_em';
+const MA = { L: null, erro: null, unidade: 'REDE', categoria: null, situacao: null, busca: '', editando: null, msg: '', gravando: false };
+const maE = (s) => trEscH(String(s == null ? '' : s));
+const maRot = (lista, k) => (lista.find((x) => x[0] === k) || [k, k])[1];
+// Mesma barreira do banco (mapa_acesso_antes_gravar), para avisar antes de enviar. Quem decide de verdade é o servidor.
+function maPareceSegredo(t) {
+  t = String(t || '');
+  return /(senha|password|passwd|pwd|token|secret|api[_ -]?key|chave)\s*[:=]/i.test(t) || /eyJ[A-Za-z0-9_-]{10,}\./.test(t)
+    || /(sk-|ghp_|gho_|github_pat_|xox[bp]-|AKIA)[A-Za-z0-9_-]{8,}/.test(t) || /[A-Za-z0-9+/_=-]{40,}/.test(t);
+}
+
+async function entrarAcessos() {
+  const alvo = document.getElementById('view-acessos');
+  if (!MA.L) alvo.innerHTML = '<h2>Mapa de acessos</h2><div class="contexto">Carregando…</div>';
+  try {
+    // tabela de estado atual (inventário): lê UMA unidade por vez, filtrada pela chave unidade e com limit (poucas centenas de linhas)
+    MA.L = await consultarTudo(`mapa_acesso?select=${MA_COLS}&unidade=eq.${encodeURIComponent(MA.unidade)}&order=id&limit=500`);
+    MA.erro = null;
+  } catch (e) { MA.erro = e.message; }
+  maDesenhar();
+}
+function maFiltro(campo, v) { MA[campo] = MA[campo] === v ? null : v; maDesenhar(); }
+function maUnidade(u) { if (MA.unidade === u) return; MA.unidade = u; MA.L = null; MA.editando = null; MA.msg = ''; entrarAcessos(); }
+function maOpcoes(lista, atual) { return lista.map(([k, r]) => `<option value="${maE(k)}"${k === atual ? ' selected' : ''}>${maE(r)}</option>`).join(''); }
+function maFormulario(x) {
+  x = x || { unidade: MA.unidade || 'REDE', categoria: MA.categoria || 'sistema', situacao: 'A_CONFERIR', depende_erp: 'A_CONFERIR' };
+  return `<form class="ma-form" id="maForm" onsubmit="event.preventDefault();maGravar()">
+    <label class="ma-larga">Nome<input id="maNome" maxlength="120" required value="${maE(x.nome)}" placeholder="ex.: Wi-Fi do salão, Saipos, câmera da porta"></label>
+    <label>Unidade<select id="maUnidade">${maOpcoes(MA_UNIDADES, x.unidade)}</select></label>
+    <label>Tipo<select id="maCategoria">${maOpcoes(MA_CATEGORIAS, x.categoria)}</select></label>
+    <label>Situação<select id="maSituacao">${maOpcoes(MA_SITUACOES, x.situacao)}</select></label>
+    <label>Depende do ERP?<select id="maDepende">${maOpcoes(MA_DEPENDE, x.depende_erp)}</select></label>
+    <label>Responsável<input id="maResp" maxlength="80" value="${maE(x.responsavel)}" placeholder="quem cuida"></label>
+    <label>Onde está no cofre<input id="maCofre" maxlength="120" value="${maE(x.ref_cofre)}" placeholder="nome do item no cofre (nunca a senha)"></label>
+    <label class="ma-larga">O que é / observação<textarea id="maDesc" maxlength="500" rows="2">${maE(x.descricao)}</textarea></label>
+    <div class="ma-botoes">
+      <button type="submit" class="preset-btn active" id="maSalvar"${MA.gravando ? ' disabled' : ''}>${MA.gravando ? 'Gravando…' : (x.id ? 'Salvar alteração' : 'Cadastrar')}</button>
+      <button type="button" class="preset-btn" onclick="MA.editando=null;MA.msg='';maDesenhar()">Cancelar</button>
+      ${x.id ? `<button type="button" class="preset-btn" style="margin-left:auto;color:var(--farol-fora);" onclick="maApagar(${Number(x.id)},this)">Apagar este item</button>` : ''}
+      <span class="ma-erro" id="maMsg">${maE(MA.msg)}</span>
+    </div></form>`;
+}
+function maDesenhar() {
+  const alvo = document.getElementById('view-acessos');
+  if (MA.erro) { alvo.innerHTML = `<h2>Mapa de acessos</h2><div class="contexto" style="border-color:var(--farol-fora);">✗ Não consegui ler: ${maE(MA.erro)} <button type="button" class="preset-btn" onclick="entrarAcessos()">Tentar de novo</button></div>`; return; }
+  const L = MA.L || [];
+  let h = `<h2>Mapa de acessos</h2>
+    <div class="ma-aviso">🔒 Só o proprietário vê esta tela. <b>Senha, token e chave ficam no cofre</b>: aqui vai só o nome do item no cofre. O banco recusa o que parece senha.</div>`;
+  const unid = `<div class="ma-filtros">${MA_UNIDADES.map(([k, r]) => `<button type="button" class="preset-btn${MA.unidade === k ? ' active' : ''}" onclick="maUnidade('${k}')">${maE(r)}</button>`).join('')}</div>`;
+  h += unid;
+  if (!L.length && MA.editando === null) {
+    alvo.innerHTML = h + `<div class="contexto">Nada em ${maE(maRot(MA_UNIDADES, MA.unidade))}. Ou esta unidade ainda está vazia, ou este login não é do proprietário (o banco só entrega a ele).</div>
+      <button type="button" class="preset-btn" onclick="MA.editando=0;maDesenhar()">+ Cadastrar o primeiro item</button>`;
+    return;
+  }
+  const q = MA.busca.trim().toLowerCase();
+  const vis = L.filter((x) => (!MA.unidade || x.unidade === MA.unidade) && (!MA.categoria || x.categoria === MA.categoria)
+    && (!MA.situacao || x.situacao === MA.situacao)
+    && (!q || [x.nome, x.descricao, x.responsavel, x.ref_cofre].some((v) => String(v || '').toLowerCase().includes(q))));
+  const conta = (s) => L.filter((x) => (!MA.unidade || x.unidade === MA.unidade) && (!MA.categoria || x.categoria === MA.categoria) && x.situacao === s).length;
+  const card = (s, cls, sub) => `<div class="card ${cls}" style="cursor:pointer;${MA.situacao === s ? ' outline:2px solid var(--marca-amarelo);' : ''}" onclick="maFiltro('situacao','${s}')">
+      <div class="card-lbl">${maRot(MA_SITUACOES, s)}</div><div class="card-val">${conta(s)}</div><div class="card-pct">${sub}</div></div>`;
+  h += `<div class="cards">${card('OK', 'pos', 'itens em ordem')}${card('A_TROCAR', conta('A_TROCAR') ? 'neg' : 'pos', 'trocar dono, senha ou e-mail')}${card('A_CONFERIR', 'highlight', 'ainda não conferidos')}${card('PARADO', 'neutral', 'desligados ou sem uso')}</div>`;
+  const botoes = (campo, lista) => `<div class="ma-filtros"><button type="button" class="preset-btn${MA[campo] ? '' : ' active'}" onclick="MA.${campo}=null;maDesenhar()">Todos</button>
+    ${lista.map(([k, r]) => { const n = L.filter((x) => x[campo] === k).length; return n || MA[campo] === k ? `<button type="button" class="preset-btn${MA[campo] === k ? ' active' : ''}" onclick="maFiltro('${campo}','${k}')">${maE(r)} · ${n}</button>` : ''; }).join('')}</div>`;
+  h += botoes('categoria', MA_CATEGORIAS);
+  h += `<div class="ma-filtros"><input id="maBusca" type="search" placeholder="procurar nome, responsável, cofre…" value="${maE(MA.busca)}" oninput="MA.busca=this.value;maDesenharLista()" style="font:inherit;padding:6px 8px;border-radius:6px;border:1px solid var(--tx-4);background:transparent;color:inherit;min-width:220px;">
+    <button type="button" class="preset-btn" onclick="MA.editando=0;MA.msg='';maDesenhar()">+ Cadastrar item</button></div>`;
+  if (MA.editando === 0) h += maFormulario(null);
+  h += `<div id="maLista">${maLista(vis)}</div>`;
+  alvo.innerHTML = h;
+}
+function maDesenharLista() {
+  // a busca redesenha só a lista, para o campo não perder o foco
+  const L = MA.L || [], q = MA.busca.trim().toLowerCase();
+  const vis = L.filter((x) => (!MA.unidade || x.unidade === MA.unidade) && (!MA.categoria || x.categoria === MA.categoria)
+    && (!MA.situacao || x.situacao === MA.situacao)
+    && (!q || [x.nome, x.descricao, x.responsavel, x.ref_cofre].some((v) => String(v || '').toLowerCase().includes(q))));
+  document.getElementById('maLista').innerHTML = maLista(vis);
+}
+function maLista(vis) {
+  if (!vis.length) return '<div class="contexto">Nada neste filtro.</div>';
+  let h = '';
+  MA_UNIDADES.forEach(([u, ru]) => {
+    const daU = vis.filter((x) => x.unidade === u);
+    if (!daU.length) return;
+    h += `<p class="ma-grp">${maE(ru)} · ${daU.length}</p><div id="tabelaAcessos${u.replace(/\W/g, '')}" class="tabelaAcessos"><table><thead><tr><th>Item</th><th>Tipo</th><th>Responsável</th><th>Situação</th><th>Depende do ERP</th><th>Cofre</th><th></th></tr></thead><tbody>`;
+    const ord = (a, b) => MA_CATEGORIAS.findIndex((c) => c[0] === a.categoria) - MA_CATEGORIAS.findIndex((c) => c[0] === b.categoria)
+      || String(a.nome).localeCompare(String(b.nome), 'pt-BR');
+    daU.slice().sort(ord).forEach((x) => {
+      if (MA.editando === x.id) { h += `<tr><td colspan="7">${maFormulario(x)}</td></tr>`; return; }
+      h += `<tr><td><b>${maE(x.nome)}</b>${x.descricao ? `<div class="ma-sub">${maE(x.descricao)}</div>` : ''}</td>
+        <td>${maE(maRot(MA_CATEGORIAS, x.categoria))}</td><td>${maE(x.responsavel || '—')}</td>
+        <td><span class="ma-sit ${maE(x.situacao)}">${maE(maRot(MA_SITUACOES, x.situacao))}</span></td>
+        <td>${maE(maRot(MA_DEPENDE, x.depende_erp))}</td><td>${x.ref_cofre ? '🔐 ' + maE(x.ref_cofre) : '<span class="ma-sub">—</span>'}</td>
+        <td><button type="button" class="preset-btn" onclick="MA.editando=${Number(x.id)};MA.msg='';maDesenhar()">Editar</button></td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  });
+  return h;
+}
+async function maGravar() {
+  const v = (id) => document.getElementById(id).value;
+  const corpo = { nome: v('maNome').trim(), unidade: v('maUnidade'), categoria: v('maCategoria'), situacao: v('maSituacao'),
+    depende_erp: v('maDepende'), responsavel: v('maResp').trim() || null, ref_cofre: v('maCofre').trim() || null, descricao: v('maDesc').trim() || null };
+  const msg = (t) => { MA.msg = t; const m = document.getElementById('maMsg'); if (m) m.textContent = t; };
+  if (!corpo.nome) return msg('Escreva o nome do item.');
+  if ([corpo.nome, corpo.descricao, corpo.responsavel, corpo.ref_cofre].some(maPareceSegredo))
+    return msg('Isso parece senha, token ou chave. Guarde no cofre e escreva aqui só o nome do item no cofre.');
+  const id = MA.editando;
+  MA.gravando = true; const b = document.getElementById('maSalvar'); if (b) { b.disabled = true; b.textContent = 'Gravando…'; }
+  try {
+    const r = await trFetch(id ? `mapa_acesso?id=eq.${Number(id)}&select=${MA_COLS}` : `mapa_acesso?select=${MA_COLS}`,
+      { method: id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(corpo) });
+    if (!r.ok) { MA.gravando = false; if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } return msg('✗ Não gravou: ' + await trErroDe(r)); }
+    const volta = await r.json();
+    // RLS: login que não é do proprietário recebe 0 linhas no PATCH (nada muda) — não fingir que gravou
+    if (!Array.isArray(volta) || !volta.length) { MA.gravando = false; if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } return msg('✗ Não gravou: este login não tem permissão.'); }
+    MA.gravando = false; MA.editando = null; MA.msg = '';
+    if (volta[0].unidade !== MA.unidade) { MA.unidade = volta[0].unidade; MA.L = null; }
+    await entrarAcessos();
+  } catch (e) { MA.gravando = false; if (b) { b.disabled = false; b.textContent = 'Tentar de novo'; } msg('✗ Falhou a conexão: ' + e.message); }
+}
+async function maApagar(id, b) {
+  if (b && b.dataset.certeza !== '1') { b.dataset.certeza = '1'; b.textContent = 'Clique de novo para apagar'; return; }
+  try {
+    const r = await trFetch(`mapa_acesso?id=eq.${Number(id)}&select=id`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+    const volta = r.ok ? await r.json() : [];
+    if (!volta.length) { MA.msg = '✗ Não apagou' + (r.ok ? ': este login não tem permissão.' : ': ' + await trErroDe(r)); maDesenhar(); return; }
+    MA.editando = null; MA.msg = '';
+    await entrarAcessos();
+  } catch (e) { MA.msg = '✗ Falhou a conexão: ' + e.message; maDesenhar(); }
+}
+
+const TELA = 'acessos';
+let MODULO_ATUAL = 'acessos';
+function exigirLogin(recado) {
+  localStorage.removeItem('rmbSessao');
+  if (NA_CASCA) { avisarCasca({ tipo: 'casca-login', recado: recado || '' }); return; }
+  location.href = '../sistema.html#' + TELA;
+}
+if (!rmbSessao()) exigirLogin();
+else {
+  document.getElementById('modulo-acessos').style.display = '';
+  registrarUso(TELA);
+  avisarCasca({ tipo: 'casca-modulo', nome: TELA });
+  window.reentrarTela = () => { entrarAcessos(); };
+  entrarAcessos();
+}
+</script>
+</body>
+</html>
