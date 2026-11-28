@@ -84,6 +84,7 @@ window.CASCA_BUSCA = {
   usuarios: ['usuarios', 'usuario', 'login', 'senha', 'trocar senha', 'permissao', 'permissoes', 'acesso', 'criar usuario', 'bloquear'],
   biblioteca: ['biblioteca', 'guia', 'guias', 'passo a passo', 'como funciona', 'estudo', 'estudos', 'dossie', 'artefato', 'manual', 'tutorial'],
   estudos: ['estudos', 'estudos do neto', 'artefato', 'artefatos', 'claude'],
+  acessos: ['mapa de acessos', 'acessos', 'inventario', 'sistemas', 'integracoes', 'contas', 'emails', 'internet', 'modem', 'cameras', 'computadores', 'robos', 'backup', 'cofre'],
   regras: ['regras', 'regra', 'combinado', 'o que combinamos', 'esta valendo', 'aplicado', 'funcionando', 'decisoes', 'se perdeu', 'quebrou'],
   compliance: ['documentos', 'renovacoes', 'renovacao', 'alvara', 'licenca', 'vigilancia', 'bombeiros', 'extintor', 'dedetizacao', 'limpeza', 'caixa de gordura', 'certificado digital', 'vencimento'],
   cartao: ['cartao de credito', 'compra no cartao', 'fatura', 'anexar fatura', 'fatura do cartao', 'itau', 'assinatura', 'parcela'],

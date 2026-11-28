@@ -30,6 +30,7 @@ window.CASCA_MODULOS_CFG = {
     biblioteca: { rotulo: 'Biblioteca', icone: '📚' },
     estudos: { rotulo: 'Estudos', icone: '🗂️' },   // 19/11: cópia dos artefatos do Neto, só Neto e Fabio (pode_ver_plano)
     usuarios: { rotulo: 'Usuários do painel', icone: '🔑' },   // 18/11: criar login, senha e telas de cada um (só o dono, #1093)   // 18/11: guias e estudos de um clique (dono 01:40)   // 16/11: o que combinamos está valendo? (só o dono)
+    acessos: { rotulo: 'Mapa de acessos', icone: '🗺️' },   // 28/11: inventário por unidade (só o proprietário; RLS eh_dono em mapa_acesso)
     motoboys: { rotulo: 'Motoboys', icone: '🛵' } },   // 12/11: junção abaixo (Financeiro da logística + Acertos)
   // JUNÇÕES (dono 12/11/2026 00:32: "Pode juntar as duas sugestões"; livro chat-frente-telas/respostas/juncoes-contestacoes-motoboys):
   // um item só no menu; ao abrir, a casca mostra as abas logo abaixo do título. Cada aba é a tela que já existia (mesma
@@ -74,7 +75,7 @@ window.CASCA_MODULOS = [
     lancar: ['phoje', 'pcalc', 'rh', 'penvio', 'pconf', 'padm', 'pferias', 'presc', 'cargos', 'pseguro', 'pacertos'], acompanhar: ['pcartao', 'pao', 'freelas', 'taxaponto'] },   // ordem do dono (06/11)
   // 22/11/2026 (Fábio): saiu o cartão 'Portal da operação' que abria o portal antigo. Nenhum atalho para o portal antigo.
   { id: 'sistema', nome: 'Sistema', icone: '⚙️',
-    lancar: ['usuarios'], acompanhar: ['rotinas', 'conciliacao'] },
+    lancar: ['usuarios', 'acessos'], acompanhar: ['rotinas', 'conciliacao'] },
 ];
 
 
