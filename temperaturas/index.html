@@ -44,6 +44,26 @@
   .tc-b-velho { background:rgba(224,163,58,.18); border:2px solid #e0a33a; font-weight:800; }
   .tc-nota { font-size:12px; opacity:.7; margin:14px 0 0; line-height:1.45; }
   .tc-erro { border:1px solid #e5484d; border-radius:12px; padding:14px; }
+  /* ALERTAS (24/11/2026): vezes que cada câmara ficou 30 min ou mais fora da faixa. */
+  .tc-alertas { margin-top:20px; }
+  .tc-alertas h2 { font-size:17px; margin:0 0 10px; }
+  .tc-al { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:baseline; border-left:5px solid #e0a33a; background:rgba(127,127,127,.08); border-radius:10px; padding:10px 14px; margin:0 0 8px; font-size:14.5px; }
+  .tc-al b { font-size:15.5px; }
+  .tc-al .tc-al-q { opacity:.75; font-size:13px; }
+  .tc-al.tc-al-agora { border-left-color:#e5484d; background:rgba(229,72,77,.14); }
+  .tc-alarme { border-radius:14px; padding:14px 16px; margin:0 0 14px; background:#e5484d; color:#fff; font-weight:800; font-size:17px; line-height:1.35; animation:tcPisca 1.6s ease-in-out infinite; }
+  @keyframes tcPisca { 50% { opacity:.72; } }
+  @media (prefers-reduced-motion: reduce) { .tc-alarme { animation:none; } }
+  /* MODO TV (?tv=1): letras grandes para a TV da cozinha, sem botão. */
+  .modo-tv #btnAtualizar { display:none; }
+  .modo-tv .tc-topo h1 { font-size:32px; }
+  .modo-tv .tc-temp { font-size:72px; }
+  .modo-tv .tc-nome { font-size:26px; }
+  .modo-tv .tc-selo { font-size:18px; }
+  .modo-tv .tc-linha, .modo-tv .tc-al, .modo-tv .tc-banner { font-size:18px; }
+  .modo-tv .tc-al b { font-size:20px; }
+  .modo-tv .tc-alarme { font-size:26px; }
+  .modo-tv .tc-alertas h2 { font-size:24px; }
 </style>
 </head>
 <body>
@@ -53,7 +73,9 @@
       <h1>🌡️ Temperaturas das câmaras</h1>
       <button type="button" id="btnAtualizar">Atualizar</button>
     </div>
+    <div id="alarme"></div>
     <div id="conteudo"><div class="tc-nota">Carregando…</div></div>
+    <div id="alertas" class="tc-alertas"></div>
     <p class="tc-nota" id="rodape"></p>
   </div>
 </div>
@@ -62,6 +84,8 @@
 <script src="../nucleo/telas-extra.js?v=20261106a"></script>
 <script>
 const TELA = 'temperaturas';
+const MODO_TV = new URLSearchParams(location.search).get('tv') === '1';
+if (MODO_TV) document.documentElement.classList.add('modo-tv');
 const esc = trEscH;
 // ---- desenho dos cartões (igual nos dois portais) ----
 function tfmt(v) { return v == null ? '—' : Number(v).toFixed(1).replace('.', ',') + ' °C'; }
@@ -94,6 +118,46 @@ function estadoCamara(c, agoraMs, velhoMin) {
   if (t > Number(c.teto) || (c.faixa_min != null && t < Number(c.faixa_min))) return { cls: 'tc-fora', rotulo: 'Fora da faixa', aviso: '' };
   if (c.faixa_min != null && t > Number(c.faixa_max)) return { cls: 'tc-atencao', rotulo: 'Atenção', aviso: 'Acima do ideal, mas ainda abaixo do teto.' };
   return { cls: 'tc-ok', rotulo: 'Dentro da faixa', aviso: '' };
+}
+// ---- alertas: vezes que ficou 30 min ou mais fora da faixa ----
+function duracaoTexto(min) {
+  min = Math.round(Number(min) || 0);
+  if (min < 60) return min + ' min';
+  return Math.floor(min / 60) + 'h' + String(min % 60).padStart(2, '0');
+}
+function desenharAlertas(d) {
+  const lista = Array.isArray(d.alertas) ? d.alertas : [];
+  const agora = lista.filter((a) => a.em_andamento);
+  const alarme = agora.map((a) => '🚨 ' + esc(a.nome) + ' (' + esc(a.loja) + ') está FORA DA FAIXA há ' + esc(duracaoTexto((Date.now() - new Date(a.inicio).getTime()) / 60000)) + ' (desde ' + esc(horaCurtaT(a.inicio)) + '). Confiram a porta e o motor.').join('<br>');
+  const mostrar = MODO_TV ? lista.slice(0, 6) : lista;
+  const itens = mostrar.map((a) => '<div class="tc-al' + (a.em_andamento ? ' tc-al-agora' : '') + '">' +
+    '<b>' + esc(a.nome) + '</b><span>' + (a.em_andamento ? 'fora AGORA, desde ' + esc(horaCurtaT(a.inicio)) : esc(horaCurtaT(a.inicio)) + ' até ' + esc(horaCurtaT(a.fim)) + ' · ' + esc(duracaoTexto(a.minutos))) + '</span>' +
+    '<span class="tc-al-q">chegou a ' + esc(tfmt(a.tmax)) + (a.tmin != null && Number(a.tmin) !== Number(a.tmax) ? ' (mínima ' + esc(tfmt(a.tmin)) + ')' : '') + '</span></div>').join('');
+  return {
+    alarme: alarme ? '<div class="tc-alarme" role="alert">' + alarme + '</div>' : '',
+    lista: '<h2>⚠️ Alertas das últimas ' + esc(String(d.horas || 48)) + ' horas</h2>' + (itens || '<div class="tc-nota">Nenhuma câmara ficou 30 minutos seguidos fora da faixa neste período.</div>')
+  };
+}
+let ULTIMO_AL = null;
+async function carregarAlertas() {
+  let r;
+  try { r = await trRpcSeguro('erp_camaras_alertas_ler', { p_horas: MODO_TV ? 24 : 48 }); } catch (e) { r = null; }
+  let d = null;
+  if (r && r.ok) { try { d = await r.json(); } catch (e) { d = null; } }
+  if (!d || !Array.isArray(d.alertas)) {
+    ULTIMO_AL = null;
+    document.getElementById('alarme').innerHTML = '';
+    document.getElementById('alertas').innerHTML = '<div class="tc-erro">Não foi possível carregar os alertas agora.</div>';
+    return;
+  }
+  ULTIMO_AL = d;
+  pintarAlertas();
+}
+function pintarAlertas() {
+  if (!ULTIMO_AL) return;
+  const h = desenharAlertas(ULTIMO_AL);
+  document.getElementById('alarme').innerHTML = h.alarme;
+  document.getElementById('alertas').innerHTML = h.lista;
 }
 function desenharCamaras(dados, esc) {
   const agora = Date.now();
@@ -149,6 +213,7 @@ async function carregar() {
   if (!dados || !Array.isArray(dados.camaras)) { mostrarErro('Resposta inesperada do servidor.'); return; }
   ULTIMO = dados;
   pintar();
+  carregarAlertas();
 }
 function pintar() {
   if (!ULTIMO) return;
@@ -158,6 +223,7 @@ function pintar() {
   if (f.ultimo_status && f.ultimo_status !== 'OK' && f.ultima_tentativa) rod += ' ⚠️ A última tentativa do coletor falhou às ' + horaCurtaT(f.ultima_tentativa) + '.';
   rod += ' Avisa nos grupos só depois de ' + (ULTIMO.minutos_fora || 30) + ' minutos seguidos fora da faixa.';
   document.getElementById('rodape').textContent = rod;
+  pintarAlertas();
 }
 document.getElementById('btnAtualizar').addEventListener('click', carregar);
 if (!rmbSessao()) exigirLogin('Entre para ver as temperaturas.');
