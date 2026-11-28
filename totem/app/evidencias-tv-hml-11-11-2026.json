@@ -1,0 +1,16 @@
+{
+  "data": "2026-11-11",
+  "ambiente": "HML 93936",
+  "pedidoAnterior": "9201",
+  "origem": "Pedido ja aceito na etapa anterior; nenhum novo envio nesta etapa",
+  "verificado": {
+    "testes": 75,
+    "preparando": true,
+    "pronto": true,
+    "retirado": true,
+    "desconexaoLimpaSenhas": true
+  },
+  "preparo": "Controlado exclusivamente pelos botoes da NOSSA cozinha de teste; nao sincronizado com o status Saipos",
+  "cardapio": "PENDENTE: fonte Gama/VNDX confirmada; consulta oficial exige chave atual. Menu publico da loja localizado, ainda nao prova selecao exata do totem. HML continua somente Diversos.",
+  "limites": "Sem pagamento, impressao, TV fisica, portal, ERP ou operacao real. Servidor parado e aba de teste fechada. Painel VNDX aguardando login humano."
+}

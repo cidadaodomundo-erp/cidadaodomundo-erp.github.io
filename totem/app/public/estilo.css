@@ -1,0 +1,11 @@
+body{font-family:Arial,sans-serif;max-width:720px;margin:20px auto;padding:0 16px;color:#222}
+.banner{background:#b91c1c;color:#fff;text-align:center;padding:10px;font-weight:bold;border-radius:6px;margin-bottom:16px}
+.produto{border:1px solid #ddd;border-radius:6px;padding:10px;margin:8px 0}
+.preco{color:#555}
+button{background:#1a4d2e;color:#fff;border:none;padding:8px 14px;border-radius:5px;cursor:pointer}
+button:disabled{background:#999;cursor:not-allowed}
+.carrinho{border-top:2px solid #333;margin-top:16px;padding-top:10px}
+.pedido-card{border:1px solid #ccc;border-radius:6px;padding:10px;margin:8px 0}
+.senha{font-size:3em;text-align:center;margin:10px}
+label{display:block;margin:4px 0}
+.erro{color:#b91c1c;font-weight:bold}

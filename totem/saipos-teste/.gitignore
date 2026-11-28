@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+token-cache.json
+test-store.json
+catalogo-teste.json
+ledger/
+payloads/
+state/
+data/
+*.local

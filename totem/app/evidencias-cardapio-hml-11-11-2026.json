@@ -1,0 +1,119 @@
+{
+  "data": "2026-11-11T07:48:34.170Z",
+  "escopo": "TESTE_ISOLADO, sem publicacao ou ERP",
+  "fonteCardapio": {
+    "origem": "API Gama/VNDX Água Verde, cópia de 11/11/2026 às 01h42 de Curitiba",
+    "categorias": 20,
+    "produtos": 93,
+    "variacoes": 107,
+    "fotosLocais": 93,
+    "gruposNaFonte": 15,
+    "opcoesNaFonte": 60,
+    "gruposAtivosHml": 14,
+    "opcoesAtivasHml": 52,
+    "conferenciaApi": {
+      "consultadoEm": "2026-11-11T07:22:28.135Z",
+      "mapaVersion": 2,
+      "variacoesConfirmadas": 107,
+      "vinculosDeOpcoesConfirmados": 721,
+      "grupos": 14,
+      "problemas": 0,
+      "faltantes": 0,
+      "catalogoFinalLinhas": 829,
+      "auxiliarDeConferenciaInativado": true
+    }
+  },
+  "verificacoes": {
+    "app": 110,
+    "conector": 38,
+    "mapeador": 14,
+    "leitorGamaEtapaAnterior": 17,
+    "telaChaveEtapaAnterior": 3,
+    "todosPassaram": true,
+    "nota": "Contagens do Node incluem arquivos de apoio. Leitor e tela da chave foram conferidos na etapa anterior; não foram repetidos nesta etapa."
+  },
+  "pedido": {
+    "novosNestaEtapa": 1,
+    "senha": 9202,
+    "orderId": "HML-20261111072853-1da73159",
+    "fichaSaipos": 3,
+    "idSaipos": 936126987,
+    "recebidoEm": "2026-11-11T07:28:54.285Z",
+    "totalCentavos": 27692,
+    "itens": [
+      {
+        "nome": "Nelson Piquet",
+        "quantidade": 2,
+        "precoUnitarioBaseCentavos": 3399,
+        "adicionaisPorUnidade": [
+          {
+            "nome": "Anéis de cebola",
+            "quantidade": 2,
+            "precoCentavos": 1299
+          },
+          {
+            "nome": "Molho Barbecue",
+            "quantidade": 1,
+            "precoCentavos": 500
+          }
+        ],
+        "subtotalCentavos": 12994
+      },
+      {
+        "nome": "Churrasco + acompanhamentos.",
+        "tamanho": "T-bone (file De Igreja) 2 Pessoas",
+        "quantidade": 1,
+        "precoUnitarioBaseCentavos": 12799,
+        "adicionaisPorUnidade": [
+          {
+            "nome": "Ovo frito",
+            "quantidade": 1,
+            "precoCentavos": 400
+          },
+          {
+            "nome": "Ao Ponto",
+            "quantidade": 1,
+            "precoCentavos": 0
+          },
+          {
+            "nome": "Batata frita individual",
+            "quantidade": 1,
+            "precoCentavos": 1499
+          }
+        ],
+        "subtotalCentavos": 14698
+      }
+    ],
+    "cozinhaSaiposConferida": true,
+    "itensTamanhosAdicionaisQuantidadesTotalExatos": true,
+    "naoImprimirClicado": true,
+    "pagamento": "Dinheiro de teste, sem cobrança real",
+    "recarregarNaoDuplicou": true,
+    "proximaSenha": 9203,
+    "ledgersAntes": 2,
+    "ledgersDepois": 3,
+    "estadoFinalSaipos": "Cozinha"
+  },
+  "tvLocal": {
+    "senha": 9202,
+    "preparandoConferido": true,
+    "prontoConferido": true,
+    "retiradoConferido": true,
+    "estadoFinal": "RETIRADO",
+    "prontoEm": "2026-11-11T07:34:14.597Z",
+    "retiradoEm": "2026-11-11T07:35:03.209Z",
+    "fonte": "Comandos da nossa cozinha local de teste",
+    "consultaSegundos": 1.5,
+    "sincronizaStatusComSaipos": false,
+    "tvFisicaInstalada": false
+  },
+  "limites": "Somente loja HML e computador local. Sem impressão, cobrança real, alteração na operação real, publicação, portal ou ERP. Cardápio é cópia datada, sem atualizador automático. A nossa cozinha comanda a nossa TV; esses botões não alteram o Saipos. Ficha 3 permaneceu Cozinha no Saipos depois da retirada local.",
+  "proximoPassoForaDesteEnsaio": "Planejar o piloto em aparelho e pagamento real, além da ligação automática dos estados do Saipos à TV, se escolhida. Nada disso foi implantado nesta etapa.",
+  "encerramento": {
+    "abasPropriasFechadas": true,
+    "servidor4654EncerradoConferidoECONNREFUSED": true,
+    "processo10358InterrompidoIntencionalmenteExit1": true,
+    "executoresClaudeEncerrados": true,
+    "nenhumRoboOuAgendamentoNovo": true
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "data": "2026-11-11",
+  "ambiente": "Saipos HML 93936, teste isolado, dados artificiais",
+  "status": "Ensaio externo conferido em HML (15:52 Curitiba). Teste encerrado. Nao implantado, nao aprovado para producao.",
+  "testes": {
+    "aplicativo": "147/147",
+    "conector": "38/38",
+    "observacao": "as contagens incluem o receptor",
+    "fonte": "fixtures artificiais, logs de 11/11"
+  },
+  "ensaioExterno": {
+    "senha": 9206,
+    "conferidoEm": "15:52 Curitiba",
+    "orderId": "HML-20261111185147-90c7e772",
+    "loja": "Saipos HML 93936",
+    "pedidoNoSaipos": "Balcao3",
+    "idSaipos": 936502431,
+    "item": "1 Nelson 33,99 sem extras (cardapio snapshot 11/11 01:42)",
+    "naoImprimirClicado": true,
+    "confirmed": "15:51:48.709",
+    "clique": "Pedido Pronto no Saipos -> CONCLUDED 15:52:18.432, sem READY_TO_DELIVER",
+    "tv": "9206 apareceu pronto, sem rota local de pronto",
+    "retiradaManual": "15:52:58.025 no aplicativo, conferida na TV",
+    "marcadoOptinHml": true
+  },
+  "regra": {
+    "padrao": "prontoAoConcluirHml=false: CONCLUDED nao chama pronto; READY_TO_DELIVER chama.",
+    "optinHml": "true somente para novos TAKEOUT HML com flag persistida: CONFIRMED+CONCLUDED => PRONTO; qualquer encerramento desses HML tambem chama a senha. Nao produz conclusao real nem prontidao fisica universal.",
+    "terminais": "Cancelados terminais; avisos tardios nao reabrem. Concluidos sem pronto nao aparecem como retirados."
+  },
+  "pedidosDestaRetomada": {
+    "novos": "9203..9206 (3 aceitos, 1 recusado)",
+    "ledgersFinais": 7,
+    "proximaSenha": 9207,
+    "preservados": [
+      9201,
+      9202
+    ],
+    "p9203": "recusado: telefone obrigatorio (400), nao chegou a cozinha; corrigido com telefone ficticio so TAKEOUT HML, TICKET inalterado",
+    "p9204e9205": "concluidos sem Pronto, preservados sem reclassificacao"
+  },
+  "encerramento": "Campo do Saipos nao aceita apagar URL: URL temporaria protegida SUBSTITUIDA e SALVA por https://webhook-desativado.invalid/; editor fechado; URL trycloudflare ausente conferida. Tunel Cloudflare 4656 e app 4654 parados, sem servico, abas proprias fechadas; portas 4654, 4656 e 20241 ja conferidas pelo Codex: ECONNREFUSED.",
+  "autorizacoes": "Cloudflare e cadastro no Saipos autorizados explicitamente; nenhuma permissao pendente.",
+  "limites": "Painel de pedidos prontos do Saipos HML: valor original Nao; testado Sim no pedido 9205 sem mudar os eventos; restaurado Nao e conferido apos recarregar. Ultimo aviso indica passado; a TV consulta o estado local a cada 1,5 s e, em falha, limpa os numeros.",
+  "isolamento": "Sem portal, ERP, TV fisica, operacao real, pagamento, impressao, robo ou instalacao permanente.",
+  "proximoPasso": "Demonstrar o app completo no equipamento totem e na TV fisica, ainda em HML, antes de qualquer implantacao ou aprovacao real.",
+  "fonteOficial": "https://saipos-docs-order-api.readme.io/reference/eventos-pedido",
+  "fonteConsultadaEm": "2026-11-11"
+}
