@@ -72,6 +72,8 @@ async function entrarCartao() {
   // as faturas já anexadas: só quem vê o financeiro lê; os outros não veem a lista (o anexar continua valendo)
   // 18/11/2026 (Cartões; proposta 2026-11-18-fatura-cartao-conferir-no-anexo): o resultado da leitura de cada fatura
   // (estado, leitura_obs) e as cobranças da fatura fechada que ninguém registrou
+  // 27/11/2026 [dono] (17:44: "a tela está bem bagunçada"; Cartões, proposta 2026-11-27-compras-cartao): a fatura do mês, linha a linha
+  CC.linhas = await consultarTudo('vw_fin_cartao_fatura_linha_tela?select=*&order=vencimento.desc,data_compra').catch(() => null);
   [CC.faturas, CC.pend, CC.status, CC.regras, CC.cats] = await Promise.all([
     consultarTudo('fin_cartao_fatura?select=id,conta_cartao,vencimento,total,anexado_por,anexado_em,estado,leitura_obs,lido_em&order=vencimento.desc,conta_cartao&limit=24').catch(() => null),
     consultarTudo('vw_fin_cartao_fatura_pendente?select=fatura_id,conta_cartao,unidade,vencimento,linha_id,data_compra,descricao,final_cartao,parcela,parcelas,valor,grupo&order=grupo,data_compra').catch(() => null),
@@ -79,7 +81,7 @@ async function entrarCartao() {
     consultarTudo('fin_cartao_regra?ativo=is.true&select=padrao,conta_cartao,categoria,descricao,usos,ultimo_uso,ensinado_por&order=criado_em.desc').catch(() => null),
     consultarTudo('fin_de_para_categoria?usar=is.true&select=categoria_nossa').then((L) => [...new Set((L || []).map((x) => x.categoria_nossa).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))).catch(() => null)]);
   // linha marcada que já saiu da grade (foi para a fila) não fica presa na seleção
-  const vivas = new Set((CC.pend || []).map((x) => Number(x.linha_id)));
+  const vivas = new Set((CC.pend || []).map((x) => Number(x.linha_id)).concat((CC.linhas || []).filter((x) => x.estado === 'FALTA REGISTRAR').map((x) => Number(x.linha_id))));
   CC.sel = new Set([...CC.sel].filter((id) => vivas.has(id)));
   ccDesenhar();
 }
@@ -94,6 +96,9 @@ function ccDesenhar() {
   if (CC.cartoes.length > 1) h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;">
     <button type="button" class="preset-btn${CC.filtro ? '' : ' active'}" onclick="ccFiltrar(null)">Todos</button>
     ${CC.cartoes.map((c) => `<button type="button" class="preset-btn${CC.filtro === c.conta ? ' active' : ''}" onclick='ccFiltrar(${ccE(JSON.stringify(c.conta))})'>${ccE(ccRotulo(c))}</button>`).join('')}</div>`;
+  // 27/11: no topo, a fatura do mês (resumo + cada cobrança com o estado); depois as compras sem cobrança; Lançar e Faturas abaixo
+  h += ccFaturaMesHtml(nomeCartao);
+  const corte = h.length;
   // 1) LANÇAR COMPRA (no topo; dono 24/11 13:15)
   h += `<div class="section-label" style="text-align:left;border-top:none;margin-top:0;padding-top:0;">Lançar compra</div>
     <div class="caption-label" style="text-align:left;margin-bottom:6px;">Para compra que não vem do Mercado Livre nem da Amazon e não é conta fixa nem parcela já lançada.</div>
@@ -120,13 +125,16 @@ function ccDesenhar() {
     </div>
     <div class="caption-label" style="text-align:left;">A fatura anexada é lida às 06:40 e às 19:40.</div>`;
   // 3) COBRANÇAS SEM REGISTRO (a grade, com Classificar / Ensinar regra)
-  h += ccPendHtml();
+  if (!Array.isArray(CC.linhas)) h += ccPendHtml();
   // 3) MINHAS COMPRAS, por fatura
+  const antesCompras = h.length;
+  const naFatura = new Set((CC.linhas || []).map((x) => Number(x.compra_id)).filter(Boolean));
+  const comLinhas = Array.isArray(CC.linhas);
   const todas = CC.compras.some((x) => x.vejo_todas);
   const quemL = [...new Set(CC.compras.map((x) => x.registrado_por).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const L = CC.compras.filter((x) => !CC.quem || x.registrado_por === CC.quem).sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
-  h += `<div class="section-label" style="text-align:left;margin-top:18px;">${todas ? 'Compras registradas (todas)' : 'Minhas compras'}</div>`;
-  if (todas && quemL.length > 1) h += `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;"><span style="font-size:12.5px;color:var(--tx-3);">Quem registrou:</span>
+  const L = CC.compras.filter((x) => (!CC.quem || x.registrado_por === CC.quem) && (!CC.filtro || x.conta_cartao === CC.filtro) && (!comLinhas || !naFatura.has(Number(x.compra_id)))).sort((a, b) => String(b.fatura_vencimento || '').localeCompare(String(a.fatura_vencimento || '')) || String(b.data_compra).localeCompare(String(a.data_compra)));
+  h += `<div class="section-label" style="text-align:left;margin-top:18px;">${comLinhas ? 'Compras registradas que ainda não caíram numa fatura lida' : todas ? 'Compras registradas (todas)' : 'Minhas compras'}${L.length ? ' · ' + L.length : ''}</div>`;
+  if (todas && quemL.length > 1 && !comLinhas) h += `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;"><span style="font-size:12.5px;color:var(--tx-3);">Quem registrou:</span>
     <button type="button" class="preset-btn${!CC.quem ? ' active' : ''}" onclick="CC.quem=null;ccDesenhar()">Todos</button>
     ${quemL.map((q) => `<button type="button" class="preset-btn${CC.quem === q ? ' active' : ''}" onclick='CC.quem=${ccE(JSON.stringify(q))};ccDesenhar()'>${ccE(q)}</button>`).join('')}</div>`;
   h += L.length ? `<div id="tabelaCcCompras"><table><thead><tr><th>Fatura</th><th>Cartão</th><th>Compra</th><th>O que</th>${todas ? '<th>Quem registrou</th>' : ''}<th>Parcela</th><th>Valor</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
@@ -136,7 +144,9 @@ function ccDesenhar() {
         : `<button type="button" class="preset-btn" onclick="CC.cancelando=${Number(x.compra_id)};ccDesenhar()">Cancelar</button>`;
       return `<tr><td>${ccD(x.fatura_vencimento)}</td><td>${ccE(nomeCartao(x.conta_cartao))}</td><td>${ccD(x.data_compra)}</td><td style="white-space:normal;">${ccE(x.descricao)}${x.origem === 'ASSINATURA' ? ' <span style="font-size:11px;color:var(--tx-4);">· assinatura</span>' : ''}</td>${todas ? `<td>${ccE(x.registrado_por || '')}</td>` : ''}
         <td>${Number(x.parcela) || 1}/${Number(x.parcelas) || 1}</td><td>${ccR(x.valor_parcela)}</td><td style="color:${cor};font-weight:700;">${st}</td><td style="white-space:nowrap;">${acao}</td></tr>`; }).join('')}</tbody></table></div>`
-    : '<div class="caption-label" style="text-align:left;">Nenhuma compra registrada ainda.</div>';
+    : `<div class="caption-label" style="text-align:left;">${comLinhas ? 'Nenhuma: toda compra registrada já está numa fatura.' : 'Nenhuma compra registrada ainda.'}</div>`;
+  // as compras sobem para logo abaixo da fatura do mês
+  h = h.slice(0, corte) + h.slice(antesCompras) + h.slice(corte, antesCompras);
   // 4) REGRAS ENSINADAS (recolhido)
   if (Array.isArray(CC.regras) && CC.regras.length) h += `<details style="margin-top:18px;"><summary style="cursor:pointer;font-weight:600;">Regras ensinadas · ${CC.regras.length}</summary>
     <div class="caption-label" style="text-align:left;">Rodam sozinhas às 06:40 e 19:40: cobrança nova que tem o trecho vai direto à fila do robô.</div>
@@ -147,6 +157,59 @@ function ccDesenhar() {
   alvo.innerHTML = h;
 }
 function ccFiltrar(conta) { CC.filtro = conta; CC.fatFiltro = null; CC.sel = new Set(); ccDesenhar(); }
+const CC_EST = { 'FALTA REGISTRAR': [0, 'var(--farol-fora)', 'falta registrar'], 'NA FILA DO ROBÔ': [1, 'var(--farol-perto)', 'na fila do robô'],
+  'CASADA COM COMPRA': [2, 'var(--info)', 'casada com compra'], 'LANÇADA NO SAIPOS': [3, 'var(--farol-ok)', 'lançada no Saipos'], 'ACEITA': [4, 'var(--tx-4)', 'aceita'] };
+// as linhas do filtro: cartão (botões do topo), mês do vencimento e quem registrou; sem mês escolhido, a fatura FECHADA mais recente de cada cartão
+function ccLinhasDoFiltro() {
+  const L = (CC.linhas || []).filter((x) => !CC.filtro || x.conta_cartao === CC.filtro);
+  let F;
+  if (CC.mes) F = L.filter((x) => String(x.vencimento).slice(0, 7) === CC.mes);
+  else { const ult = {}; L.filter((x) => x.fatura_estado === 'FECHADA').forEach((x) => { const v = String(x.vencimento); if (!ult[x.conta_cartao] || v > ult[x.conta_cartao]) ult[x.conta_cartao] = v; });
+    F = L.filter((x) => String(x.vencimento) === ult[x.conta_cartao]); }
+  return F.filter((x) => !CC.quemLinha || (CC.quemLinha === '—' ? !x.registrado_por : x.registrado_por === CC.quemLinha));
+}
+function ccFaturaMesHtml(nomeCartao) {
+  if (!Array.isArray(CC.linhas)) return '';
+  const meses = [...new Set((CC.linhas || []).filter((x) => !CC.filtro || x.conta_cartao === CC.filtro).map((x) => String(x.vencimento).slice(0, 7)))].sort().reverse();
+  const mesRot = (m) => new Date(m + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const base = ccLinhasDoFiltro(), quemL = [...new Set((CC.linhas || []).map((x) => x.registrado_por).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const sel = 'background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--tx-1);padding:6px 8px;font:inherit;';
+  let h = `<div class="section-label" style="text-align:left;margin-top:6px;">Fatura do mês</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px;">
+      <select style="${sel}" onchange="CC.mes=this.value||null;CC.sel=new Set();ccDesenhar()"><option value="">a fatura fechada mais recente</option>${meses.map((m) => `<option value="${m}"${CC.mes === m ? ' selected' : ''}>vence em ${mesRot(m)}</option>`).join('')}</select>
+      <select style="${sel}" onchange="CC.quemLinha=this.value||null;ccDesenhar()"><option value="">quem registrou: todos</option>${quemL.map((q) => `<option value="${ccE(q)}"${CC.quemLinha === q ? ' selected' : ''}>${ccE(q)}</option>`).join('')}<option value="—"${CC.quemLinha === '—' ? ' selected' : ''}>ninguém (sem compra)</option></select></div>`;
+  if (!base.length) return h + '<div class="caption-label" style="text-align:left;">Nenhuma cobrança neste filtro.</div>';
+  // resumo: uma linha por fatura do filtro (total, situação no banco) + a contagem dos estados
+  const fats = [...new Map(base.map((x) => [x.fatura_id, x])).values()];
+  const cont = (e) => base.filter((x) => x.estado === e), soma = (L) => L.reduce((t, x) => t + Number(x.valor || 0), 0);
+  const falta = cont('FALTA REGISTRAR');
+  h += `<div class="cards">${fats.map((f) => { const st = (CC.status || []).find((s) => Number(s.fatura_id) === Number(f.fatura_id) || (s.conta_cartao === f.conta_cartao && String(s.vencimento) === String(f.vencimento)));
+      const L = base.filter((x) => x.fatura_id === f.fatura_id);
+      return `<div class="card neutral" style="text-align:left;"><div class="card-lbl">${ccE(f.cartao || nomeCartao(f.conta_cartao))} · vence ${ccD(f.vencimento)}${f.fatura_estado === 'ABERTA' ? ' · ainda aberta' : ''}</div>
+        <div class="card-val" style="font-size:20px;">${ccR(st && st.total_fatura != null ? st.total_fatura : soma(L))}</div>
+        <div class="card-pct" style="line-height:1.6;">${st ? (st.pago_banco != null ? `pago no banco ${ccR(st.pago_banco)}${st.data_pagamento ? ' em ' + ccD(st.data_pagamento) : ''}` : 'ainda não pago no banco') : ''}<br>${st ? ccStatusHtml(st) : ''}</div></div>`; }).join('')}
+    <div class="card ${falta.length ? 'highlight' : 'neutral'}" style="text-align:left;"><div class="card-lbl">Cobranças</div>
+      <div class="card-pct" style="line-height:1.8;">${Object.keys(CC_EST).map((e) => { const L = cont(e); return L.length ? `<span style="color:${CC_EST[e][1]};font-weight:700;">${L.length} ${CC_EST[e][2]}</span>${e === 'FALTA REGISTRAR' ? ' · ' + ccR(soma(L)) : ''}` : ''; }).filter(Boolean).join('<br>')}</div></div></div>`;
+  // a lista única: falta primeiro, depois a fila, depois o resto
+  const L = base.slice().sort((a, b) => (CC_EST[a.estado] || [9])[0] - (CC_EST[b.estado] || [9])[0] || String(a.data_compra).localeCompare(String(b.data_compra)));
+  const marc = L.filter((x) => x.estado === 'FALTA REGISTRAR' && CC.sel.has(Number(x.linha_id)));
+  h += `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 6px;">
+      <button type="button" class="preset-btn${marc.length ? ' active' : ''}" ${marc.length ? '' : 'disabled'} onclick="CC.classAberto=!CC.classAberto; ccPreencherPadrao(); ccDesenhar()">Classificar${marc.length ? ` ${marc.length} · ${ccR(soma(marc))}` : ''}</button>
+      ${marc.length ? '<button type="button" class="preset-btn" onclick="CC.sel=new Set(); CC.classAberto=false; ccDesenhar()">desmarcar</button>' : '<span class="caption-label" style="margin:0;">marque as que faltam registrar e clique Classificar (o robô lança no Saipos), ou "É minha: registrar"</span>'}</div>`;
+  if (CC.classAberto && marc.length) h += ccFormClassificarHtml(marc);
+  h += `<div id="tabelaCcFaturaLinhas" style="overflow-x:auto;"><table><thead><tr><th style="width:34px;">✓</th><th>Data</th><th>Na fatura</th><th>Cartão</th><th>Valor</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${L.map((x) => { const [, cor, rot] = CC_EST[x.estado] || [9, 'var(--tx-3)', String(x.estado || '').toLowerCase()], falta = x.estado === 'FALTA REGISTRAR';
+      const det = x.estado === 'CASADA COM COMPRA' ? `<div style="font-size:12px;color:var(--tx-3);">${ccE(x.compra_descricao || '')}${x.compra_categoria ? ' · ' + ccE(x.compra_categoria) : ''}${x.registrado_por ? ' · ' + ccE(x.registrado_por) : ''}${x.tem_titulo_saipos === false ? ' · <span style="color:var(--farol-perto);font-weight:700;">nota ainda não lançada no Saipos</span>' : ''}</div>` : '';
+      return `<tr><td>${falta ? `<input type="checkbox" ${CC.sel.has(Number(x.linha_id)) ? 'checked' : ''} style="width:18px;height:18px;" onchange="ccMarcar(${Number(x.linha_id)}, this.checked)" aria-label="marcar">` : ''}</td>
+        <td style="white-space:nowrap;">${ccD(x.data_compra).slice(0, 5)}</td>
+        <td style="white-space:normal;">${ccE(x.descricao)}${Number(x.parcelas) > 1 ? ` (${x.parcela}/${x.parcelas})` : ''}${det}</td>
+        <td style="font-size:12px;">${ccE(x.cartao || nomeCartao(x.conta_cartao))}</td>
+        <td style="white-space:nowrap;color:${Number(x.valor) < 0 ? 'var(--farol-ok)' : 'var(--tx-1)'};">${ccR(x.valor)}</td>
+        <td style="color:${cor};font-weight:700;">${rot}</td>
+        <td>${falta && Number(x.valor) > 0 ? `<button type="button" class="preset-btn" onclick='ccEhMinha(${ccE(JSON.stringify({ c: x.conta_cartao, d: x.data_compra, v: x.valor, t: x.descricao }))})'>É minha: registrar</button>` : ''}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
+  return h;
+}
 // a tabela das faturas: Cartão · Fechamento · Vencimento · Fatura · Saipos · Banco · Situação
 function ccFaturasHtml(nomeCartao) {
   const S = (CC.status || []).filter((f) => !CC.filtro || f.conta_cartao === CC.filtro);
@@ -230,7 +293,7 @@ function ccMarcar(id, on) { if (on) CC.sel.add(id); else CC.sel.delete(id); if (
 function ccMarcarGrupo(ids, on) { ids.forEach((id) => { if (on) CC.sel.add(id); else CC.sel.delete(id); }); if (!CC.sel.size) CC.classAberto = false; ccPreencherPadrao(); ccDesenhar(); }
 // o trecho que identifica: o começo da descrição da 1ª linha marcada, até o primeiro espaço (ex.: PADDLE.NET*)
 function ccPreencherPadrao() {
-  const x = (CC.pend || []).find((l) => CC.sel.has(Number(l.linha_id)));
+  const x = (CC.pend || []).concat(CC.linhas || []).find((l) => CC.sel.has(Number(l.linha_id)));
   if (x && !CC.form._padraoMexido) CC.form.padrao = String(x.descricao || '').trim().split(/\s+/)[0] || '';
 }
 function ccFormCampo(k, v) { CC.form[k] = v; if (k === 'padrao') CC.form._padraoMexido = true; }
@@ -261,7 +324,7 @@ async function ccClassificar() {
   if (!F.categoria) return avisoAcao('atencao', '! Escolha a categoria.');
   if (!String(F.descricao || '').trim()) return avisoAcao('atencao', '! Escreva a descrição do Saipos.');
   if (F.ensinar && String(F.padrao || '').trim().length < 3) return avisoAcao('atencao', '! O trecho da fatura precisa de pelo menos 3 letras.');
-  const marcadas = (CC.pend || []).filter((x) => CC.sel.has(Number(x.linha_id)));
+  const marcadas = (CC.pend || []).filter((x) => CC.sel.has(Number(x.linha_id))).concat((CC.linhas || []).filter((x) => CC.sel.has(Number(x.linha_id)) && !(CC.pend || []).some((p) => Number(p.linha_id) === Number(x.linha_id))));
   const umCartao = new Set(marcadas.map((x) => x.conta_cartao)).size === 1;
   const bt = document.getElementById('ccClassBt'); if (bt) { bt.disabled = true; bt.textContent = 'enviando…'; }
   avisoAcao('enviando', 'Mandando ao robô…');
