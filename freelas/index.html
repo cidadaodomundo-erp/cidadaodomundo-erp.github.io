@@ -7,7 +7,7 @@
 <title>Taxas e Freelas · Cidadão do Mundo</title>
 <meta name="theme-color" content="#111110">
 <link rel="icon" type="image/png" href="../icon-192.png">
-<!-- TAXAS E FREELAS (11/11/2026, lote em construção). Só consulta: mostra os contatos de freela e os valores por hora que já
+<!-- TAXAS E FREELAS (11/11/2026; 27/11/2026 quadro por setor Produção/Salão/Cozinha, Arrumar e Nova pessoa). Só consulta: mostra os contatos de freela e os valores por hora que já
      estão cadastrados no ERP, da loja escolhida no seletor. Não grava nada, não calcula pagamento, não abre WhatsApp. Exige a
      sessão que já existe (sem login novo). Ponto, QR de presença e pagamentos ainda estão em construção. -->
 <script>
@@ -16,15 +16,16 @@
   function avisarCasca(msg) { if (NA_CASCA) { try { parent.postMessage(msg, location.origin); } catch (e) {} } }
 </script>
 <link rel="stylesheet" href="../nucleo/nucleo.css?v=20261102a">
-<link rel="stylesheet" href="freelas.css?v=20261116a">
+<link rel="stylesheet" href="freelas.css?v=20261127a">
 </head>
 <body>
 <div class="main-content">
   <div class="wrap fl">
-    <h1>Taxas e Freelas <span class="fl-obras">Em construção</span></h1>
+    <h1>Taxas e Freelas</h1>
     <div class="fl-aviso" role="note">
-      <strong>Só consulta</strong>, menos a loja de cada freela. Aqui aparecem os contatos de freela e os valores por hora que já estão cadastrados neste sistema.
-      A única coisa que esta tela grava é a loja do freela (ligar ou trocar). Ponto, QR de presença e pagamentos ainda estão em construção. Nada aqui calcula pagamento ou envia mensagem.
+      Quadro por setor: <strong>Produção, Salão e Cozinha</strong>. Quem já chamamos direto aparece primeiro, com ⭐.
+      Para mudar alguém, toque em <strong>Arrumar</strong> no cartão. Quem se oferecer, coloque em <strong>➕ Nova pessoa</strong>.
+      Ponto, QR de presença e pagamentos ainda estão em construção. Nada aqui calcula pagamento ou envia mensagem.
     </div>
 
     <div id="bloqueio" hidden role="alert"></div>
@@ -40,6 +41,7 @@
       </div>
 
       <section id="painelContatos" role="tabpanel" aria-label="Contatos">
+        <div id="novaPessoa" class="fl-novabox" hidden></div>
         <div id="semLoja" class="fl-semloja" hidden></div>
         <div class="fl-filtros">
           <label class="fl-campo"><span class="fl-rot">Buscar por nome ou setor</span>
@@ -50,7 +52,7 @@
         <div id="fonteContatos"></div>
         <div id="statusContatos" role="status" aria-live="polite"></div>
         <div id="listaContatos" class="fl-lista"></div>
-        <p class="fl-nota">Contatos em ordem alfabética, só os ativos da loja escolhida. Freelas sem loja aparecem no quadro amarelo acima até alguém escolher a loja. Para mudar a loja de um freela, use "Trocar loja" no cartão dele.</p>
+        <p class="fl-nota">Contatos por setor, só os ativos da loja escolhida; em cada setor, quem já chamamos direto vem primeiro e depois a ordem alfabética. Freelas sem loja aparecem no quadro amarelo acima até alguém escolher a loja.</p>
       </section>
 
       <section id="painelValores" role="tabpanel" aria-label="Valores por hora" hidden>
@@ -80,10 +82,10 @@
 
 <script src="../nucleo/nucleo.js?v=20261122d"></script>
 <script src="../nucleo/loja.js?v=20261028a"></script>
-<script src="freelas-modelo.js?v=20261111a"></script>
+<script src="freelas-modelo.js?v=20261127a"></script>
 <script src="freelas-dados.js?v=20261111a"></script>
-<script src="freelas.js?v=20261116a"></script>
-<script src="freelas-loja.js?v=20261116a"></script>
+<script src="freelas.js?v=20261127a"></script>
+<script src="freelas-loja.js?v=20261127a"></script>
 <script>FreelasTela.iniciar();</script>
 </body>
 </html>

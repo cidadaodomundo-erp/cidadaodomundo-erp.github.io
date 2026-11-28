@@ -61,3 +61,14 @@
 .fl-recado-erro { color: var(--farol-fora, #ff6b6b); font-weight: 700; }
 .fl-trocar { margin-top: 8px; font-size: 13.5px; }
 .fl-trocar summary { cursor: pointer; color: var(--tx-2, #c3c2b7); font-weight: 700; min-height: 32px; }
+
+/* Quadro por setor (27/11/2026) */
+.fl-lista > h2.fl-setor { grid-column: 1 / -1; margin: 18px 0 2px; font-size: 16px; }
+.fl-chamado { border-color: var(--farol-dentro, #3fb950); }
+.fl-selo { margin: -4px 0 8px; font-size: 13px; font-weight: 800; color: var(--farol-dentro, #3fb950); }
+.fl-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.fl-marca { display: flex; align-items: center; gap: 6px; font-size: 14px; min-height: 44px; }
+.fl .fl-marca input { width: 22px; min-height: 22px; height: 22px; }
+.fl-btn-tirar { border-color: var(--farol-fora, #ff6b6b); }
+.fl-novabox { margin: 0 0 14px; }
+.fl-nova > summary { font-weight: 800; cursor: pointer; min-height: 44px; display: flex; align-items: center; }

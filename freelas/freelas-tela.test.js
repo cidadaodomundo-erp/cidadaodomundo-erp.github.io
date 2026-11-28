@@ -81,7 +81,7 @@ test('fluxo: contatos ordenados, só da loja, telefone como texto, sem link, sem
   assert.deepEqual(t.nomes('listaContatos'), ['ana', 'Zeca']);
   assert.equal(t.est.urls.length, 1);                       // valores NÃO é lido antes de abrir a aba
   assert.equal(t.est.urls[0].metodo, 'GET');
-  assert.ok(t.est.urls[0].url.startsWith('freela_contato?select=id,nome,setor,telefone,tipo,ativo,loja&ativo=eq.true&loja=in.'));
+  assert.ok(t.est.urls[0].url.startsWith('freela_contato?select=id,nome,setor,telefone,tipo,ativo,loja,chamado&ativo=eq.true&loja=in.'));
   assert.match(t.texto('listaContatos'), /\(41\) 90000-0000/);
   assert.match(t.texto('fonteContatos'), /Fonte: este sistema, cadastro de contatos/);
   assert.match(t.texto('fonteContatos'), /consultado em \d\d\/\d\d\/\d{4} \d\d:\d\d/);
@@ -387,7 +387,7 @@ test('busca e filtro de setor trabalham só no que já foi lido (sem novo GET); 
   const t = montar({ handler: () => resp(200, [
     ct(1, 'Zeca', { destaque: true, setor: 'Cozinha' }), ct(2, 'Ângela', { setor: 'Cozinha' }), ct(3, 'Bruno', { setor: 'Salão' }), ct(4, 'Carla', { setor: null })]) });
   t.start(); await settle();
-  assert.deepEqual(t.nomes('listaContatos'), ['Ângela', 'Bruno', 'Carla', 'Zeca']);
+  assert.deepEqual(t.nomes('listaContatos'), ['Bruno', 'Ângela', 'Zeca', 'Carla']);
   t.ids.buscaTexto.value = 'angela'; t.ids.buscaTexto.fire('input');
   assert.deepEqual(t.nomes('listaContatos'), ['Ângela']);
   assert.match(t.texto('listaContatos'), /1 de 4 contato/);
